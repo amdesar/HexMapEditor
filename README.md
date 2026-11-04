@@ -14,7 +14,7 @@ W folderze projektu uruchom z PowerShell:
 & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /optimize+ /out:HexMapEditor.exe /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll HexMapEditor.cs
 ```
 
-## Format projektu, wersja 1
+## Format projektu, wersja 0.1.0
 
 Projekt jest obiektem JSON z `formatVersion`, nazwą, wymiarami, orientacją i tablicą `cells`. Pola zapisano w kolejności wierszami: indeks pola to `wiersz * columns + kolumna`. Każde pole zawiera typ terenu, kolor HTML `#RRGGBB`, nazwę własną, zwykły opis i `notesFormat: "plainText"`. Wartości logicznych współrzędnych są indeksowane od zera w danych, a interfejs wyświetla kolumny A, B, …, Z, AA, … oraz wiersze od 1.
 
