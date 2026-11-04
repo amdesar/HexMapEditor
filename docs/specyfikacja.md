@@ -1,0 +1,108 @@
+# Specyfikacja użytkowa — HexMapEditor
+Wersja: 1.0, stan decyzji 4 listopada 2026.
+Nowy projekt: HexMapEditor-Codex. Implementacja od zera.
+
+## 1. Cel i zasady odczytywania wymagań
+Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
+Ten dokument określa zachowanie produktu, nie języki, frameworki, format wewnętrzny ani bibliotekę renderowania. Wykonawca ma dobrać i krótko uzasadnić technologie. Nie ma obowiązku korzystania z rozwiązań wcześniejszych prototypów. Nie wolno dopowiadać, że funkcja jest już zaimplementowana: ten projekt zaczyna się od pustego folderu.
+Sekcje 2–15 opisują zakres docelowy. Sekcja 16 wyznacza pierwszy przyrost. Całości nie należy wykonywać jednym wielkim zadaniem. Funkcje odłożone oznaczono wprost. Przykładowe nazwy i treści nie są gotowymi pakietami do dołączenia.
+
+## 2. Samodzielny program offline
+Gotowy program uruchamia się na komputerze bez internetu. Nie wymaga konta, serwera sieciowego, abonamentu, API ani pobierania dodatkowej zawartości przy zwykłym uruchamianiu. Możliwy instalator lub wersja przenośna — wybór należy do wykonawcy. Uruchamianie ma być wygodne, przez dwuklik, bez ręcznego wpisywania komend i uruchamiania serwera.
+Internet podczas tworzenia aplikacji, pobierania narzędzi i budowania jest dopuszczalny. Nie mylić trybu offline produktu z odcięciem internetu środowisku programistycznemu. Wszystkie elementy potrzebne do działania danej dostarczonej wersji muszą być dostępne lokalnie.
+Interfejs, pomoc dla użytkownika i komunikacja z użytkownikiem po polsku. Nazwy wewnętrzne kodu dobiera wykonawca. Aplikację obsługuje jedna osoba; obraz można pokazywać na Discordzie przez udostępnianie okna.
+
+## 3. Siatka, współrzędne i stan początkowy
+Liczba kolumn i wierszy jest niezależna, od 1 do 200 w każdej osi. Dopuszczalne m.in. 1×1, 10×1, 20×30, 60×60 i 200×200. Wartości muszą być całkowite. Żadna oś nie może być zerowa, ujemna ani przekraczać 200.
+Nowa mapa domyślnie: 15 kolumn × 10 wierszy; nazwa „Nowa mapa”. Przy starcie i utworzeniu mapy pokaż całość wyśrodkowaną w obszarze roboczym z marginesem, bez ucięcia przez panele.
+Obsługiwane dwie orientacje heksów: wierzchołkiem do góry i płaskim bokiem do góry. Można wybrać orientację nowej mapy i zmienić ją później. Zmiana zachowuje logiczne przypisanie danych do pól. Nie zakładać, że zmiana orientacji zachowa identyczne geometryczne sąsiedztwo: zastosować spójne, udokumentowane mapowanie.
+Każdy heks ma współrzędne, np. E15, AE3. Konwencję techniczną i identyfikatory ustala wykonawca, ale muszą być stabilne i jednoznaczne.
+Tryby etykiet przełączane w kolejności: Osie → W polach → Brak. Domyślnie Osie dla nowych map. Osie: przynajmniej litery nad mapą i liczby po lewej, zgodnie z pozycjami pól. W polach: etykieta blisko dołu heksu, nie na środku. Przy oddaleniu wolno ograniczać etykiety dla czytelności. Tryb Brak usuwa tylko napisy na mapie, nie dostępność współrzędnych w panelu i pasku stanu.
+
+## 4. Nawigacja i płynność
+Kółko myszy przybliża i oddala mapę względem kursora. Zoom nie zmienia danych ani wymiarów mapy. Można przesuwać widok. Przytrzymanie środkowego przycisku myszy pozwala przesuwać mapę niezależnie od aktywnego narzędzia.
+Wskaźnik procentowy pokazuje skalę względem bazowego rozmiaru rysowania; tooltip wyjaśnia znaczenie. Kliknięcie ustawia 100%, zachowując środek bieżącego widoku. Przycisk Dopasuj pokazuje całą mapę z marginesem i centruje ją. Nie potrzeba osobnych przycisków plus/minus ani dublującego resetu kamery.
+Przełączenie orientacji i dopasowanie kamery mają pojawić się razem, bez widocznej klatki ze zmienioną orientacją i starym dopasowaniem. Nie wymagamy ozdobnej animacji.
+Celem jest wygodna, płynna praca; nie wymagamy konkretnej liczby FPS. Typowe mapy są mniejsze od maksimum. Widok całej bardzo dużej mapy może być mniej płynny, lecz zwykły przybliżony widok powinien działać sprawnie. Nie wolno przedstawiać czasu pojedynczego obliczenia jako dowodu płynności całej aplikacji.
+
+## 5. Layout
+Estetyka: ciemny, czytelny interfejs, bez przeładowania.
+Górny pasek ma trzy grupy: po lewej Nowa/Otwórz/Zapisz/Zapisz jako/Undo/Redo; w środku nazwa mapy i gwiazdka przy niezapisanych zmianach; po prawej wymiary/orientacja/etykiety/procent zoomu/Dopasuj/Biblioteka. W węższym oknie całe grupy mogą przejść do kolejnego rzędu. Przyciski nie mogą być ucinane; teksty „Zapisz *” i wymiary nie zawijają się wewnątrz przycisku. Długą nazwę można skrócić z pełnym tooltipem. Zapisz ma wyróżniać niezapisane zmiany, a po zapisie być spokojniejszy wizualnie.
+Lewy panel, względnie wąski: Przybornik, Teren, Ikony, Obiekty. Przycisk zwija go do wąskiego paska służącego wyłącznie ponownemu rozwinięciu. Nie zamieniamy panelu w miniaturowy zestaw ikon narzędzi. Długie sekcje przewijają się niezależnie, szczególnie Teren; zapewnić dostępność przy niskim oknie.
+Zwinięcie/rozwinięcie lewego panelu nie zmienia skali ani pozycji mapy na ekranie; może tylko odsłonić lub zasłonić obszar. Nie uruchamia Dopasuj.
+Prawy panel jest wyraźnie szerszy od lewego, do wygodnego czytania. Nie narzucamy pikseli ani proporcji. Jest ukryty bez zaznaczenia, pokazuje szczegóły klikniętego heksu lub obiektu, ma przycisk zamknięcia. Nakłada się na mapę bez jej skalowania, przesuwania czy ponownego dopasowania.
+Dolny pasek: współrzędne pod kursorem, widoczne/wszystkie pola, orientacja oraz rzetelnie opisane informacje wydajnościowe, jeśli są mierzone.
+
+## 6. Heks i jego dane
+Heks posiada typ terenu, wygląd wypełnienia, opcjonalną nazwę własną i opis, stan mgły oraz przypisane ikony. Treść jest dowolna. Nie narzucamy kategorii planet, miast, gór itp.
+Wypełnienie to ALBO kolor, ALBO grafika. Grafika zastępuje widoczne wypełnienie kolorem. To nie wyklucza oddzielnych ikon ani tła całej mapy.
+Typ terenu to co innego niż nazwa własna i opis. Zmiana terenu nie wykonuje zamiany słów w notatce. Przykład: zmiana Gór na Wodę nie usuwa nazwy „Przełęcz Cieni” ani wpisanego opisu.
+Opcjonalne, czysto informacyjne pole trudności terenu pozostaje do rozważenia, poza pierwszą wersją. Nie liczymy na jego podstawie czasu ani kosztu podróży.
+
+## 7. Narzędzia
+Wybór terenu i wybór narzędzia są niezależne. Zmiana terenu nie aktywuje Pędzla i nie wyłącza Wiadra.
+Zaznacz: kliknięcie wybiera heks i pokazuje panel; przeciągnięcie przesuwa widok bez przypadkowego zaznaczania. Próg odróżnienia dobiera wykonawca.
+Rączka: przesuwa widok bez wybierania pól.
+Pędzel: maluje aktywnym terenem kliknięciem i przeciąganiem. Jedno ciągłe pociągnięcie jest jedną operacją Undo.
+Wiadro: wypełnia spójny obszar sąsiadujących heksów tego samego logicznego typu terenu. Nie zmienia oddzielonych obszarów na całej mapie. Zastępuje typ i wypełnienie, zachowując nazwę własną, opis, mgłę, niezależne ikony i obiekty. Jedno użycie to jedna operacja Undo. Kolor sam w sobie nie definiuje tożsamości typu.
+Pędzel i Mgła mają proste rozmiary: 1 pole; pole i pierwszy pierścień (7); pole i dwa pierścienie (19); pole i trzy pierścienie (37). To zakres heksowej odległości, niezależny od zoomu; na brzegach uwzględnia tylko istniejące pola. Podgląd zakresu przed kliknięciem nie zmienia danych.
+Reset: czerwony akcent, kosz, nazwa „Reset”. Usuwa nazwę, opis, przypisane ikony i indywidualne wypełnienie, przywracając neutralny teren; usuwa też mgłę, odkrywając pole. Nie usuwa heksu, współrzędnych, tła mapy ani niezależnego obiektu nad polem. Domyślnie działa pojedynczym kliknięciem. Opcjonalne „Reset przeciąganiem” włącza ciągłe resetowanie; jedno przeciągnięcie to jedna operacja. Bez powiększonego pędzla resetowania. Undo przywraca całą zawartość, także mgłę.
+
+## 8. Mgła wojny
+Stan zakrycia jest zapisywany dla heksów, ale nie niszczy ich danych. Mgła całkowicie zakrywa wygląd: różne zakryte pola wyglądają jednakowo, bez ujawniania koloru, grafiki i przypisanych ikon.
+Narzędzie ma jawne tryby Zakryj/Odkryj, kliknięcie i przeciąganie. Zakrywanie nie odkrywa zakrytego pola przez ponowne dotknięcie. Odkrycie pozostaje do czasu ponownego ręcznego zakrycia. Jedno pociągnięcie to jeden krok Undo.
+Kliknięcie zakrytego heksu pokazuje współrzędne, lecz nazwę, opis i typ zastępuje „???”, bez próbki ujawniającej wygląd. To maskowanie interfejsu, nie szyfrowanie pliku. Edycja ukrytej treści wymaga świadomego odkrycia.
+W panelu jest przełącznik Zakryty/Odkryty, również dla zakrytego pola. Obie drogi sterowania muszą używać tego samego stanu.
+Automatyczne odkrywanie przez obiekty oraz oświetlenie nie należą do bieżącego zakresu. Zachowanie swobodnych obiektów względem mgły wymaga rozstrzygnięcia przed ich wspólnym wdrożeniem; nie zakładać automatycznie, że statek drużyny ma być niewidoczny.
+
+## 9. Teren i zestawy terenów
+Sekcja nazywa się Teren. Pozycje mają nazwę, próbkę koloru lub grafiki, edycję i usunięcie. Edycja nazwy/wyglądu typu NIE zmienia wcześniej pomalowanych pól. Usunięcie pozycji z listy również ich nie zmienia i nie usuwa użytych plików. Dane historycznie zastosowanego wyglądu muszą pozostać odtwarzalne.
+Czytelne okno edycji terenu: nazwa, wybór koloru lub grafiki, podgląd, Zastosuj i Anuluj. Nie wymagać od użytkownika zgadywania, że musi zamknąć picker kliknięciem poza nim, aby znaleźć drugi zapis. Anuluj nie zmienia danych.
+Zestawy terenów są trwałymi kolekcjami używanymi w wielu mapach. Dostarczamy tylko Domyślny, z neutralną bazą: Teren neutralny, Woda, Równina, Góry, Pustynia, Czerń/Pustka. Inne zestawy tworzy i nazywa użytkownik.
+Można zapisać bieżącą paletę jako nowy zestaw, świadomie aktualizować zapisany zestaw, wybrać zestaw przy tworzeniu mapy i przełączać podczas pracy. Przełączanie nie przemalowuje mapy. Robocze kopie w projekcie są odseparowane od biblioteki. Powrót do wcześniejszej roboczej palety nie gubi jej niezapisanych do biblioteki zmian. Projekt odtwarza potrzebne palety i powiązania po otwarciu. Format przechowywania dobiera wykonawca.
+
+## 10. Biblioteka i przygotowanie grafik
+Biblioteka znajduje się w podfolderze Library obok gotowego programu, na tym samym dysku. W development jest w głównym folderze projektu. Nie w Dokumentach ani w bazie przeglądarki. Nie dodajemy teraz wyboru innej lokalizacji.
+Kategorie co najmniej: tła całej mapy, grafiki heksów, ikony, obiekty. Nie narzucamy angielskich nazw folderów. Przycisk Biblioteka otwiera folder w Eksploratorze. Po imporcie zasoby pozostają do ponownego używania także przy innych mapach.
+Program sprawdza zapis do folderu; brak uprawnień daje czytelny błąd, nie ciche przeniesienie danych ani wymaganie uruchamiania jako administrator. Dystrybucję należy dopasować do pracy w zapisywalnym folderze użytkownika. Aktualizacja, budowanie i deinstalacja nie mogą bez ostrzeżenia usuwać własnej biblioteki.
+Import przez przyciski odpowiednich kategorii. PNG preferowany; JPG również obsługiwany. Zachowujemy przezroczystość PNG. Nie wymagamy od użytkownika przygotowania dokładnych wymiarów i proporcji.
+Okno podobne do kadrowania awatara: przesuwanie, przybliżanie, oddalanie i wybór fragmentu; podgląd heksu lub ikony, zatwierdzenie/anulowanie. Obraz heksu prezentowany w sześciokątnym kształcie. Rozdzielczość, maskowanie i sposób przechowywania ustala wykonawca.
+Ikona może mieć przezroczyste albo celowo zachowane tło. Nie usuwać tła automatycznie. PÓŹNIEJ: opcjonalne lokalne usuwanie tła, nieograniczone wyłącznie do jednego koloru. Dobór narzędzia, modelu, warunków rozpowszechniania i rozmiaru pozostawić na ten etap; podstawowy import ma działać bez tej funkcji. Jakość ważniejsza od minimalnego czasu; nie obiecywać idealnych wyników.
+
+## 11. Ikony i obiekty
+Ikona jest przypisana do heksu. Obiekt ma niezależne położenie i może swobodnie leżeć również na granicy pól. Nie zastępować obiektu ręcznym przestawianiem ikony między heksami.
+Panel ikon: dwa rzędy ulubionych i dwa ostatnich; orientacyjnie 5–6 ikon w rzędzie, do dopasowania wizualnego. Limit ulubionych odpowiada pojemności dwóch rzędów. Nie usuwać ulubionych przez samo zwężenie okna. Pełna biblioteka w osobnym oknie z miniaturami, wyszukiwaniem po nazwie i zarządzaniem ulubionymi. Zestawy ulubionych nie należą do pierwszej implementacji.
+Obiekt: własna grafika, nazwa, opis, położenie, opcjonalna informacja o właścicielu. Kliknięcie używa tego samego prawego panelu co heks. Bez systemu statystyk konkretnego RPG.
+Obszar kontaktu obiektu jest kołem wokół jego środka, z określonym promieniem. Podświetlamy wszystkie heksy dotykane przez ten obszar, także przy styku z krawędzią. Nie tylko pole pod środkiem, nie prostokąt obrazu. Promień i jego kontrolkę projektuje wykonawca. Podgląd/podświetlenie nie zmienia właściwego wypełnienia. Po odejściu obiektu pole wygląda jak wcześniej.
+Pozycje i kontakt są niezależne od zoomu. Przed wdrożeniem ustalić i przetestować zachowanie obiektów przy zmianie orientacji i przycinaniu mapy; rozszerzenie nie może zostawiać obiektu nad inną treścią przez przypadkowy błąd przeliczenia.
+
+## 12. Rozszerzanie i zmniejszanie mapy
+Dodawanie i usuwanie wierszy/kolumn z KAŻDEJ strony: góra, dół, lewo, prawo. Chodzi o zmianę istniejącej mapy, nie tworzenie nowej.
+Formularz każdorazowo startuje od czterech zer. Wartości odnoszą się do bieżącego stanu: +2 dodaje dwa z danej strony, −2 usuwa dwa, 0 nic nie zmienia. Ponowne otwarcie po Zastosuj lub Anuluj znów zeruje formularz. Podgląd obecnego i wynikowego rozmiaru, czytelny kierunkowy układ i informacja „+ dodaje, − usuwa”. Dopiero zatwierdzenie modyfikuje mapę.
+Końcowy rozmiar w każdej osi musi wynosić 1–200. Przykład: mapa 10×1 nie może stracić jedynego wiersza. Nie przyjmować zera, ujemnych wartości wynikowych ani przekroczenia maksimum; blokować z wyjaśnieniem.
+Rozszerzanie zachowuje treść, względny układ i sąsiedztwo starych pól. Dotyczy to także dodania pojedynczego wiersza/kolumny od góry lub lewej: naprzemienne przesunięcia heksów nie mogą rozsypać starego obszaru. Współrzędne wyświetlane mogą się przeliczyć; tożsamość i dane nie mogą się zgubić. Mechanizm geometryczny dobiera wykonawca.
+Nowe pola mają stan domyślny. Usuwanie ostrzega o stronie, zakresie i utracie danych, wymaga potwierdzenia. Anulowanie nic nie zmienia. Cała zmiana wymiarów to jeden krok Undo, przywracający także usunięte opisy, grafiki i mgłę. Zmiana orientacji również podlega Undo.
+
+## 13. Notatki jako czytelna strona
+Prawy panel domyślnie pokazuje tytuł i treść do czytania, nie stale aktywne pola formularza. Ołówek uruchamia edycję; nazwa i opis mogą mieć osobne wejścia. Zastosuj/Anuluj. Nie gubić po cichu roboczej treści przy zmianie zaznaczenia czy zamykaniu panelu — zapewnić jawne rozstrzygnięcie.
+Prosty edytor: pogrubienie, kursywa, podkreślenie, akapity i wcięcia, listy punktowane/numerowane, kilka rozmiarów lub nagłówków, separator. Bez tabel, osadzanych obrazów i rozbudowanego zarządzania linkami w pierwszej wersji.
+Wklejanie z Worda zachowuje obsługiwane proste formatowanie, m.in. wielkość tekstu, pogrubienie, kursywę i podkreślenie. Nie obiecujemy identycznego odtworzenia dowolnego dokumentu. Wklejana treść nie może uruchamiać kodu ani niejawnie pobierać zasobów z sieci. Notatki muszą mieć trwały zapis formatowania i możliwość wyprowadzenia zwykłego tekstu do eksportu. Dobór reprezentacji i edytora należy do wykonawcy.
+
+## 14. Zapis, eksport i ochrona danych
+Edytowalny plik projektu ma odtwarzać całą mapę do dalszej pracy, nie tylko obraz. Wczytanie przywraca wymiary, orientację, dane heksów, nazwy, opisy i formatowanie, wypełnienia, ikony, mgłę, obiekty i potrzebne palety. Format, rozszerzenie i biblioteki nie są narzucone; struktura ma być udokumentowana i wersjonowana.
+Wariant lekki: dane i odwołania do lokalnej biblioteki, bez duplikowania obrazów.
+Wariant przenośny: komplet danych i wszystkich UŻYTYCH obrazów, do otwarcia na innym komputerze bez osobnego kompletowania grafik. Nie musi zawierać całej nieużytej biblioteki. Brakujące zasoby i kolizje mają być obsługiwane czytelnie, bez cichego nadpisywania.
+Zapisz aktualizuje bieżący plik; przy braku ścieżki pyta o nią. Zapisz jako zawsze pyta, a po sukcesie nowy plik jest bieżący. Zapis nie zeruje Undo. Nieudany zapis nie może niszczyć istniejącego poprawnego pliku. Nie nadpisywać po cichu nieobsługiwanej nowszej wersji.
+Osobny eksport obrazu CAŁEJ mapy: co najmniej PNG i JPG, wybór rozsądnej rozdzielczości i bezpieczne limity; nie tylko screenshot widocznego fragmentu. Inne formaty graficzne opcjonalne według uzasadnionej propozycji.
+Osobny eksport tekstowy: uporządkowane współrzędne, nazwy i opisy heksów, np. kolumna A, potem B. TXT i/lub czytelny format tekstowy dobiera wykonawca. Eksport obrazu i tekstu nie zastępuje pliku edytowalnego. Przed implementacją ustalić uwzględnianie zakrytych danych w eksportach; nie ujawniać ich przypadkiem.
+Przed nową mapą, otwarciem innej i zamknięciem (X, Alt+F4) ostrzegać o niezapisanych zmianach: Zapisz/Odrzuć/Anuluj. Błąd zapisu i anulowanie wyboru pliku pozostawiają aplikację otwartą. Gwiazdka i wyróżnienie Zapisz odpowiadają faktycznym różnicom względem zapisanego stanu, także po Undo.
+
+## 15. Historia i sprawdzanie
+Undo/Redo do 300 operacji w bieżącej sesji projektu, bez niepotrzebnego kopiowania całej mapy dla małych zmian. Historia nie jest zapisywana do pliku. Nowy projekt lub wczytanie pliku zaczynają nową historię. Zapisz i Zapisz jako jej nie czyszczą. Zamknięcie programu kończy historię sesji. Skróty w edytorze tekstu nie powinny omyłkowo cofać działań mapy.
+Sprawdzać funkcje podczas ich dodawania, nie dopiero na końcu. Kluczowe scenariusze: zapis/odczyt rzeczywistej treści; limity wymiarów; geometria rozszerzania z każdej strony w obu orientacjach; reset i mgła; brak retroaktywnych zmian terenów; spójny flood fill; cofanie operacji grupowych; panele bez przeskoków kamery; brak ucinania kontrolek; samodzielne uruchamianie. Raportować tylko wykonane testy, oddzielać testy automatyczne od oceny UI. Nie obiecywać pełnej odporności na każdą awarię.
+
+## 16. Pierwszy przyrost — nie cały zakres naraz
+Najpierw przeczytać dokument i krótko uzasadnić wybór technologii. Pytania tylko o sprawy blokujące; nie prowadzić wielu rund ogólnego planowania.
+Pierwszy działający fragment: okno desktopowe z układem stanowiącym bazę opisanego layoutu; nowa mapa 15×10 z wyborem wymiarów i orientacji; pan i zoom; wybór pola; prosta nazwa i zwykły opis; malowanie kolorem; edytowalny zapis i odczyt; wygodny sposób uruchomienia do testu. Panele powinny od początku respektować brak przesuwania/skalowania przy otwieraniu i zamykaniu. Puste przyszłe sekcje nie mogą udawać gotowych funkcji.
+Pozostałe wymagania pozostają wiążącym planem docelowym, lecz wchodzą w kolejnych małych przyrostach. Nie trzeba w pierwszym zadaniu wdrażać formatowania, wszystkich narzędzi, zestawów, bibliotek obrazów i eksportów. Zapis rozwijać razem z nowymi danymi, zachowując kompatybilność własnych wcześniejszych wersji.
+Po każdym przyroście: wykonać build/testy, uruchomić jeśli możliwe, podać rzeczywiste wyniki i krótką checklistę użytkownika, następnie zatrzymać się do oceny. Zachowywać punkty powrotu kodu przed większymi zmianami. Nigdy nie usuwać biblioteki użytkownika jako części porządkowania projektu.
