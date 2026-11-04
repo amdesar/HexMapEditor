@@ -31,8 +31,9 @@ namespace HexMapEditor
         public int Columns { get; set; }
         public int Rows { get; set; }
         public string Orientation { get; set; }
+        public string LabelMode { get; set; }
         public List<CellData> Cells { get; set; }
-        public MapData() { FormatVersion = 1; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; Cells = new List<CellData>(); }
+        public MapData() { FormatVersion = 1; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); }
     }
 
     internal sealed class CellChange
@@ -59,12 +60,11 @@ namespace HexMapEditor
         readonly Button leftToggle = new Button();
         readonly Button rightClose = new Button();
         readonly ComboBox terrainPicker = new ComboBox();
-        readonly ComboBox orientationPicker = new ComboBox();
-        readonly ComboBox labelPicker = new ComboBox();
+        readonly Button orientationToggle = new Button();
+        readonly Button labelToggle = new Button();
         readonly TextBox mapName = new TextBox();
         readonly TextBox cellName = new TextBox();
         readonly TextBox cellDescription = new TextBox();
-        readonly Label titleLabel = new Label();
         readonly Label statusLabel = new Label();
         readonly Label dimensionsLabel = new Label();
         readonly Label coordinateLabel = new Label();
@@ -80,19 +80,21 @@ namespace HexMapEditor
         int selected = -1;
         int brushIndex = 2;
         bool dirty, leftCollapsed, updating, dragging, panGesture;
+        bool rightPanelOpen;
         EditorTool currentTool = EditorTool.Select;
         Point dragOrigin;
         PointF panOrigin;
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
+        const string AppVersion = "0.1.1";
         readonly Dictionary<int, CellData> strokeBefore = new Dictionary<int, CellData>();
         readonly Stack<EditAction> undo = new Stack<EditAction>();
         readonly Stack<EditAction> redo = new Stack<EditAction>();
 
         public MainWindow()
         {
-            Text = "HexMapEditor";
+            Text = "HexMapEditor " + AppVersion;
             MinimumSize = new Size(1180, 620);
             Size = new Size(1440, 900);
             StartPosition = FormStartPosition.CenterScreen;
@@ -117,10 +119,8 @@ namespace HexMapEditor
             fitButton = AddButton(view, "Dopasuj", FitMap);
             zoomButton = AddButton(view, "100%", SetZoom100);
             zoomButton.Click += (s, e) => SetZoom100();
-            labelPicker = AddPicker(view, new[] { "Osie", "W polach", "Brak" }, 100);
-            labelPicker.SelectedIndexChanged += (s, e) => { if (!updating) { mapViewLabel(labelPicker.SelectedIndex); canvas.Invalidate(); } };
-            orientationPicker = AddPicker(view, new[] { "Wierzchołkiem do góry", "Płaskim bokiem do góry" }, 180);
-            orientationPicker.SelectedIndexChanged += (s, e) => { if (!updating) ChangeOrientation(orientationPicker.SelectedIndex == 0 ? "PointyTop" : "FlatTop"); };
+            labelToggle = AddButton(view, "Osie", CycleLabelMode); labelToggle.Width = 88; labelToggle.AutoSize = false;
+            orientationToggle = AddButton(view, "Wierzchołkiem", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop")); orientationToggle.Width = 154; orientationToggle.AutoSize = false;
             dimensionsLabel.Text = "15 × 10"; dimensionsLabel.Width = 64; dimensionsLabel.Height = 32; dimensionsLabel.Margin = new Padding(3); dimensionsLabel.TextAlign = ContentAlignment.MiddleCenter; dimensionsLabel.ForeColor = Color.FromArgb(210, 215, 225); view.Controls.Add(dimensionsLabel);
             var library = new Button { Text = "Biblioteka", Width = 84, Height = 32, Margin = new Padding(3), FlatStyle = FlatStyle.Flat };
             StyleButton(library); library.Click += (s, e) => { try { var dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Library"); Directory.CreateDirectory(dir); System.Diagnostics.Process.Start("explorer.exe", dir); } catch (Exception ex) { MessageBox.Show(this, "Nie można otworzyć biblioteki: " + ex.Message, "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Error); } }; view.Controls.Add(library);
@@ -130,11 +130,11 @@ namespace HexMapEditor
             mapName.TextChanged += (s, e) => { if (!updating) { map.Name = mapName.Text; MarkDirty(); } };
 
             statusLabel.Dock = DockStyle.Bottom; statusLabel.Height = 27; statusLabel.Padding = new Padding(12, 0, 0, 0); statusLabel.TextAlign = ContentAlignment.MiddleLeft; statusLabel.BackColor = Color.FromArgb(34, 38, 48); Controls.Add(statusLabel);
-            canvas.Dock = DockStyle.Fill; canvas.BackColor = Color.FromArgb(21, 24, 31); canvas.TabStop = true; canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel; canvas.MouseLeave += (s, e) => { coordinateLabel.Text = "Kursor: —"; }; Controls.Add(canvas);
+            canvas.Dock = DockStyle.None; canvas.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right; canvas.BackColor = Color.FromArgb(21, 24, 31); canvas.TabStop = true; canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel; canvas.MouseLeave += (s, e) => { coordinateLabel.Text = "Kursor: —"; }; Controls.Add(canvas);
             left = BuildLeftPanel(); left.Width = 208; left.BackColor = Color.FromArgb(34, 38, 48); left.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom; Controls.Add(left);
             leftToggle.Text = "Zwiń panel  ‹"; leftToggle.Dock = DockStyle.None; leftToggle.Anchor = AnchorStyles.Left | AnchorStyles.Top; leftToggle.Height = 34; StyleButton(leftToggle); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; left.Visible = !leftCollapsed; leftToggle.Text = leftCollapsed ? "›" : "Zwiń panel  ‹"; leftToggle.Width = leftCollapsed ? 36 : 208; PositionOverlays(); leftToggle.BringToFront(); }; Controls.Add(leftToggle);
-            right = BuildRightPanel(); right.Width = 320; right.Anchor = AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom; right.Visible = false; Controls.Add(right);
-            rightClose.Text = "Zamknij panel  ×"; rightClose.Dock = DockStyle.Top; rightClose.Height = 36; StyleButton(rightClose); rightClose.Click += (s, e) => { right.Visible = false; PositionOverlays(); }; right.Controls.Add(rightClose);
+            right = BuildRightPanel(); right.Width = 360; right.Anchor = AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom; right.Visible = false; Controls.Add(right);
+            rightClose.Text = "Zamknij panel  ×"; rightClose.Dock = DockStyle.Top; rightClose.Height = 36; StyleButton(rightClose); rightClose.Click += (s, e) => CloseDetailsPanel(); right.Controls.Add(rightClose);
             Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); };
             Resize += (s, e) => PositionOverlays();
             FormClosing += OnFormClosing;
@@ -145,7 +145,7 @@ namespace HexMapEditor
 
         static MapData NewMap(int cols, int rows, string orientation)
         {
-            var m = new MapData { Columns = cols, Rows = rows, Orientation = orientation };
+            var m = new MapData { Columns = cols, Rows = rows, Orientation = orientation, LabelMode = "Axes" };
             for (int i = 0; i < cols * rows; i++) m.Cells.Add(new CellData());
             return m;
         }
@@ -197,14 +197,13 @@ namespace HexMapEditor
         Panel BuildRightPanel()
         {
             var p = new Panel { Padding = new Padding(0), BackColor = Color.FromArgb(38, 42, 53) };
-            var title = new Label { Text = "SZCZEGÓŁY HEKSU", Bounds = new Rectangle(12, 43, 290, 28), ForeColor = Color.FromArgb(162, 173, 194), TextAlign = ContentAlignment.MiddleLeft }; p.Controls.Add(title);
-            var coord = new Label { Name = "cellCoord", Bounds = new Rectangle(12, 78, 290, 27), Font = new Font(Font, FontStyle.Bold), Text = "—" }; p.Controls.Add(coord);
-            var nameLabel = new Label { Text = "Nazwa własna", Bounds = new Rectangle(12, 111, 290, 22) }; p.Controls.Add(nameLabel);
-            cellName.Bounds = new Rectangle(12, 134, 296, 28); cellName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellName.BackColor = Color.FromArgb(48, 53, 66); cellName.ForeColor = ForeColor; cellName.BorderStyle = BorderStyle.FixedSingle; p.Controls.Add(cellName);
-            var terrainCaption = new Label { Text = "Teren", Bounds = new Rectangle(12, 170, 290, 22) }; p.Controls.Add(terrainCaption);
-            var terrainView = new Label { Name = "cellTerrain", Bounds = new Rectangle(12, 193, 290, 27), Text = "—", TextAlign = ContentAlignment.MiddleLeft }; p.Controls.Add(terrainView);
-            var descriptionLabel = new Label { Text = "Opis", Bounds = new Rectangle(12, 226, 290, 24) }; p.Controls.Add(descriptionLabel);
-            cellDescription.Multiline = true; cellDescription.ScrollBars = ScrollBars.Vertical; cellDescription.Bounds = new Rectangle(12, 251, 296, 220); cellDescription.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellDescription.BackColor = Color.FromArgb(48, 53, 66); cellDescription.ForeColor = ForeColor; cellDescription.BorderStyle = BorderStyle.FixedSingle; p.Controls.Add(cellDescription);
+            var title = new Label { Text = "SZCZEGÓŁY HEKSU", Bounds = new Rectangle(12, 43, 336, 28), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = Color.FromArgb(162, 173, 194), TextAlign = ContentAlignment.MiddleLeft }; p.Controls.Add(title);
+            var coord = new Label { Name = "cellCoord", Bounds = new Rectangle(12, 78, 336, 27), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, Font = new Font(Font, FontStyle.Bold), Text = "—" }; p.Controls.Add(coord);
+            var nameLabel = new Label { Text = "Nazwa własna", Bounds = new Rectangle(12, 111, 336, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; p.Controls.Add(nameLabel);
+            cellName.Bounds = new Rectangle(12, 134, 336, 28); cellName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellName.BackColor = Color.FromArgb(48, 53, 66); cellName.ForeColor = ForeColor; cellName.BorderStyle = BorderStyle.FixedSingle; p.Controls.Add(cellName);
+            var terrainView = new Label { Name = "cellTerrain", Bounds = new Rectangle(12, 170, 336, 27), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, Text = "Teren: —", TextAlign = ContentAlignment.MiddleLeft }; p.Controls.Add(terrainView);
+            var descriptionLabel = new Label { Text = "Opis", Bounds = new Rectangle(12, 205, 336, 24), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; p.Controls.Add(descriptionLabel);
+            cellDescription.Multiline = true; cellDescription.ScrollBars = ScrollBars.Vertical; cellDescription.Bounds = new Rectangle(12, 231, 336, 220); cellDescription.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellDescription.BackColor = Color.FromArgb(48, 53, 66); cellDescription.ForeColor = ForeColor; cellDescription.BorderStyle = BorderStyle.FixedSingle; p.Controls.Add(cellDescription);
             cellName.TextChanged += (s, e) => { if (!updating && selected >= 0) { map.Cells[selected].Name = cellName.Text; map.Cells[selected].NotesFormat = "plainText"; MarkDirty(); canvas.Invalidate(); } };
             cellDescription.TextChanged += (s, e) => { if (!updating && selected >= 0) { map.Cells[selected].Description = cellDescription.Text; map.Cells[selected].NotesFormat = "plainText"; MarkDirty(); } };
             return p;
@@ -213,35 +212,52 @@ namespace HexMapEditor
         void PositionOverlays()
         {
             int top = 88, bottom = 27;
+            canvas.Bounds = new Rectangle(0, top, ClientSize.Width, Math.Max(0, ClientSize.Height - top - bottom));
             left.Bounds = new Rectangle(0, top, 208, Math.Max(0, ClientSize.Height - top - bottom));
             leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : 0, top, leftCollapsed ? 36 : 208, 34);
-            right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - 332), top + 10, 320, Math.Max(120, ClientSize.Height - top - bottom - 20));
+            int panelWidth = Math.Min(360, ClientSize.Width);
+            right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - panelWidth), top, panelWidth, Math.Max(0, ClientSize.Height - top - bottom));
             left.BringToFront(); if (right.Visible) right.BringToFront(); leftToggle.BringToFront();
         }
 
-        void mapViewLabel(int index) { /* labels are a view preference */ }
+        void CycleLabelMode()
+        {
+            map.LabelMode = map.LabelMode == "Axes" ? "InCells" : map.LabelMode == "InCells" ? "None" : "Axes";
+            MarkDirty();
+        }
+
+        void CloseDetailsPanel()
+        {
+            selected = -1; rightPanelOpen = false; right.Visible = false; UpdateUI();
+        }
 
         void MarkDirty() { dirty = !String.Equals(json.Serialize(map), savedSnapshot, StringComparison.Ordinal); UpdateUI(); }
 
         void UpdateUI()
         {
             updating = true;
-            Text = "HexMapEditor" + (dirty ? " *" : ""); tips.SetToolTip(mapName, map.Name);
+            Text = "HexMapEditor " + AppVersion + (dirty ? " *" : ""); tips.SetToolTip(mapName, map.Name);
             saveButton.Text = dirty ? "Zapisz *" : "Zapisz"; saveButton.BackColor = dirty ? Color.FromArgb(83, 92, 122) : Color.FromArgb(49, 54, 67);
             undoButton.Enabled = undo.Count > 0; redoButton.Enabled = redo.Count > 0;
             zoomButton.Text = Math.Round(scale * 100) + "%"; tips.SetToolTip(zoomButton, "Skala względem bazowego rozmiaru rysowania. Kliknij, aby ustawić 100%.");
-            statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + map.Orientation + "     Widoczne: " + (map.Columns * map.Rows) + " / " + (map.Columns * map.Rows);
+            statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + map.Orientation + "     Łącznie heksów: " + map.Cells.Count;
             dimensionsLabel.Text = map.Columns + " × " + map.Rows;
             mapName.Text = map.Name;
-            orientationPicker.SelectedIndex = map.Orientation == "FlatTop" ? 1 : 0;
+            orientationToggle.Text = map.Orientation == "FlatTop" ? "Płaskim bokiem" : "Wierzchołkiem";
+            tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Orientacja: płaskim bokiem do góry. Kliknij, aby zmienić na wierzchołkiem do góry." : "Orientacja: wierzchołkiem do góry. Kliknij, aby zmienić na płaskim bokiem do góry.");
+            labelToggle.Text = map.LabelMode == "InCells" ? "W polach" : map.LabelMode == "None" ? "Brak" : "Osie";
+            tips.SetToolTip(labelToggle, "Etykiety: " + labelToggle.Text + ". Kliknij, aby przełączyć tryb.");
             if (selected >= 0 && selected < map.Cells.Count)
             {
                 var cell = map.Cells[selected];
                 cellName.Text = cell.Name; cellDescription.Text = cell.Description;
                 right.Controls["cellCoord"].Text = "Współrzędne: " + Coordinate(selected);
-                right.Controls["cellTerrain"].Text = cell.Terrain;
-                right.Visible = true; PositionOverlays(); right.BringToFront(); leftToggle.BringToFront();
+                right.Controls["cellTerrain"].Text = "Teren: " + cell.Terrain;
             }
+            else { selected = -1; rightPanelOpen = false; }
+            right.Visible = rightPanelOpen && selected >= 0;
+            PositionOverlays();
+            if (right.Visible) { right.BringToFront(); leftToggle.BringToFront(); }
             updating = false;
             canvas.Invalidate();
         }
@@ -261,30 +277,31 @@ namespace HexMapEditor
             using (var f = new NewMapDialog(map.Columns, map.Rows, map.Orientation))
             {
                 if (f.ShowDialog(this) != DialogResult.OK) return;
-                map = NewMap(f.Columns, f.Rows, f.Orientation); currentPath = null; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; undo.Clear(); redo.Clear();
-                UpdateUI(); BeginInvoke((Action)FitMap);
+                map = NewMap(f.Columns, f.Rows, f.Orientation); currentPath = null; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; rightPanelOpen = false; undo.Clear(); redo.Clear();
+                RecalculateFitTransform(); UpdateUI();
             }
         }
 
         void ChangeOrientation(string orientation)
         {
             if (map.Orientation == orientation) return;
-            map.Orientation = orientation; MarkDirty(); FitMap();
+            map.Orientation = orientation; RecalculateFitTransform(); MarkDirty();
         }
 
         void OpenProject()
         {
             if (!ConfirmDiscard()) return;
-            using (var d = new OpenFileDialog { Filter = "Projekt HexMapEditor (*.hexmap.json)|*.hexmap.json|Pliki JSON (*.json)|*.json|Wszystkie pliki (*.*)|*.*", Title = "Otwórz mapę" })
+            using (var d = new OpenFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap|Wszystkie pliki (*.*)|*.*", Title = "Otwórz mapę" })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try
                 {
                     var text = File.ReadAllText(d.FileName, Encoding.UTF8);
                     var loaded = json.Deserialize<MapData>(text);
+                    if (loaded != null && String.IsNullOrEmpty(loaded.LabelMode)) loaded.LabelMode = "Axes";
                     ValidateMap(loaded);
-                    map = loaded; currentPath = d.FileName; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; undo.Clear(); redo.Clear();
-                    UpdateUI(); BeginInvoke((Action)FitMap);
+                    map = loaded; currentPath = d.FileName; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; rightPanelOpen = false; undo.Clear(); redo.Clear();
+                    RecalculateFitTransform(); UpdateUI();
                 }
                 catch (Exception ex) { MessageBox.Show(this, "Nie można otworzyć projektu. Plik jest uszkodzony albo ma nieobsługiwaną wersję.\n\n" + ex.Message, "Błąd odczytu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             }
@@ -294,11 +311,22 @@ namespace HexMapEditor
 
         bool SaveAsProject()
         {
-            using (var d = new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap.json)|*.hexmap.json|Pliki JSON (*.json)|*.json", DefaultExt = "hexmap.json", AddExtension = true, FileName = SafeFileName(map.Name) + ".hexmap.json", Title = "Zapisz mapę jako" })
+            using (var d = new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap", DefaultExt = "hexmap", AddExtension = true, FileName = ProjectFileName(map.Name), Title = "Zapisz mapę jako" })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return false;
-                return SaveTo(d.FileName);
+                return SaveTo(EnsureProjectExtension(d.FileName));
             }
+        }
+
+        static string ProjectFileName(string name)
+        {
+            string safe = SafeFileName(name);
+            return safe.EndsWith(".hexmap", StringComparison.OrdinalIgnoreCase) ? safe : safe + ".hexmap";
+        }
+
+        static string EnsureProjectExtension(string path)
+        {
+            return path.EndsWith(".hexmap", StringComparison.OrdinalIgnoreCase) ? path : path + ".hexmap";
         }
 
         bool SaveTo(string path)
@@ -329,6 +357,7 @@ namespace HexMapEditor
             if (m.FormatVersion != 1) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ".");
             if (m.Columns < 1 || m.Columns > 200 || m.Rows < 1 || m.Rows > 200) throw new InvalidDataException("Wymiary mapy muszą mieścić się w zakresie 1–200.");
             if (m.Orientation != "PointyTop" && m.Orientation != "FlatTop") throw new InvalidDataException("Nieprawidłowa orientacja mapy.");
+            if (m.LabelMode != "Axes" && m.LabelMode != "InCells" && m.LabelMode != "None") throw new InvalidDataException("Nieprawidłowy tryb etykiet.");
             if (m.Cells == null || m.Cells.Count != m.Columns * m.Rows) throw new InvalidDataException("Liczba pól nie zgadza się z wymiarami mapy.");
             foreach (var c in m.Cells)
             {
@@ -340,10 +369,10 @@ namespace HexMapEditor
         void OnFormClosing(object sender, FormClosingEventArgs e) { if (!ConfirmDiscard()) e.Cancel = true; }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Control && e.KeyCode == Keys.S) { SaveProject(); e.Handled = true; }
-            else if (e.Control && e.Shift && e.KeyCode == Keys.S) { SaveAsProject(); e.Handled = true; }
-            else if (e.Control && e.KeyCode == Keys.Z) { Undo(); e.Handled = true; }
-            else if (e.Control && e.KeyCode == Keys.Y) { Redo(); e.Handled = true; }
+            if (e.Control && e.Shift && e.KeyCode == Keys.S) { SaveAsProject(); e.Handled = true; e.SuppressKeyPress = true; }
+            else if (e.Control && !e.Shift && e.KeyCode == Keys.S) { SaveProject(); e.Handled = true; e.SuppressKeyPress = true; }
+            else if (e.Control && e.KeyCode == Keys.Z) { Undo(); e.Handled = true; e.SuppressKeyPress = true; }
+            else if (e.Control && e.KeyCode == Keys.Y) { Redo(); e.Handled = true; e.SuppressKeyPress = true; }
         }
 
         string Coordinate(int index)
@@ -358,24 +387,40 @@ namespace HexMapEditor
         PointF Center(int col, int row)
         {
             float r = BaseRadius;
-            if (map.Orientation == "FlatTop") return new PointF((1.5f * r * col), (float)(Math.Sqrt(3) * r * (row + col / 2f)));
-            return new PointF((float)(Math.Sqrt(3) * r * (col + row / 2f)), 1.5f * r * row);
+            if (map.Orientation == "FlatTop") return new PointF(1.5f * r * col, (float)(Math.Sqrt(3) * r * (row + (col & 1) * 0.5f)));
+            return new PointF((float)(Math.Sqrt(3) * r * (col + (row & 1) * 0.5f)), 1.5f * r * row);
         }
 
         void FitMap()
         {
-            if (canvas.ClientSize.Width < 20 || canvas.ClientSize.Height < 20) return;
-            PointF first = Center(0, 0), last = Center(map.Columns - 1, map.Rows - 1);
-            float dx = last.X - first.X, dy = last.Y - first.Y;
-            float w, h;
-            if (map.Orientation == "FlatTop") { w = dx + BaseRadius * 2; h = dy + (float)(Math.Sqrt(3) * BaseRadius); }
-            else { w = dx + (float)(Math.Sqrt(3) * BaseRadius); h = dy + BaseRadius * 2; }
+            if (!RecalculateFitTransform()) return;
+            UpdateUI();
+        }
+
+        bool RecalculateFitTransform()
+        {
+            if (canvas.ClientSize.Width < 20 || canvas.ClientSize.Height < 20) return false;
+            RectangleF bounds = MapBounds();
             float leftInset = leftCollapsed ? 36f : 208f;
             float viewWidth = Math.Max(100, canvas.ClientSize.Width - leftInset);
             float centerX = leftInset + viewWidth / 2f;
-            scale = Math.Max(.08f, Math.Min(1.7f, Math.Min((viewWidth - 80) / Math.Max(w, 1), (canvas.ClientSize.Height - 80) / Math.Max(h, 1))));
-            pan = new PointF(centerX - (first.X + last.X) / 2f * scale, canvas.ClientSize.Height / 2f - (first.Y + last.Y) / 2f * scale);
-            UpdateUI();
+            scale = Math.Max(.08f, Math.Min(1.7f, Math.Min((viewWidth - 80) / Math.Max(bounds.Width, 1), (canvas.ClientSize.Height - 80) / Math.Max(bounds.Height, 1))));
+            pan = new PointF(centerX - (bounds.Left + bounds.Width / 2f) * scale, canvas.ClientSize.Height / 2f - (bounds.Top + bounds.Height / 2f) * scale);
+            return true;
+        }
+
+        RectangleF MapBounds()
+        {
+            float r = BaseRadius, sqrt3 = (float)Math.Sqrt(3);
+            if (map.Orientation == "FlatTop")
+            {
+                float maxX = 1.5f * r * (map.Columns - 1);
+                float maxY = sqrt3 * r * (map.Rows - 1 + (map.Columns > 1 ? 0.5f : 0f));
+                return RectangleF.FromLTRB(-r, -sqrt3 * r / 2f, maxX + r, maxY + sqrt3 * r / 2f);
+            }
+            float pointyMaxX = sqrt3 * r * (map.Columns - 1 + (map.Rows > 1 ? 0.5f : 0f));
+            float pointyMaxY = 1.5f * r * (map.Rows - 1);
+            return RectangleF.FromLTRB(-sqrt3 * r / 2f, -r, pointyMaxX + sqrt3 * r / 2f, pointyMaxY + r);
         }
 
         void SetZoom100()
@@ -400,14 +445,17 @@ namespace HexMapEditor
                 using (var brush = new SolidBrush(ParseColor(map.Cells[i].Color)))
                 using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
                 { e.Graphics.FillPath(brush, path); e.Graphics.DrawPath(pen, path); }
-                if (labelPicker.SelectedIndex == 1 && scale > .28f) using (var b = new SolidBrush(Color.FromArgb(220, 245, 245, 245))) using (var f = new Font("Segoe UI", Math.Max(6f, 8f * scale))) { var rect = new RectangleF(c.X - 15 * scale, c.Y + 7 * scale, 30 * scale, 12 * scale); e.Graphics.DrawString(Coordinate(i), f, b, rect, new StringFormat { Alignment = StringAlignment.Center }); }
+                if (map.LabelMode == "InCells" && scale > .28f) using (var b = new SolidBrush(Color.FromArgb(220, 245, 245, 245))) using (var f = new Font("Segoe UI", Math.Max(6f, 8f * scale))) { var rect = new RectangleF(c.X - 15 * scale, c.Y + BaseRadius * .42f * scale, 30 * scale, 12 * scale); e.Graphics.DrawString(Coordinate(i), f, b, rect, new StringFormat { Alignment = StringAlignment.Center }); }
             }
-            if (labelPicker.SelectedIndex == 0 && map.Columns * map.Rows <= 1400)
+            if (map.LabelMode == "Axes" && map.Columns * map.Rows <= 1400)
             {
                 using (var b = new SolidBrush(Color.FromArgb(185, 188, 198, 213))) using (var f = new Font("Segoe UI", 8f))
                 {
-                    for (int c = 0; c < map.Columns; c++) { var p = ScreenCenter(c, 0); string s = Coordinate(c); e.Graphics.DrawString(s.Substring(0, s.Length - 1), f, b, p.X - 16, p.Y - BaseRadius * scale - 20); }
-                    for (int r = 0; r < map.Rows; r++) { var p = ScreenCenter(0, r); e.Graphics.DrawString((r + 1).ToString(), f, b, p.X - BaseRadius * scale - 23, p.Y - 8); }
+                    RectangleF bounds = MapBounds();
+                    float labelsTop = pan.Y + bounds.Top * scale - 20;
+                    float labelsLeft = pan.X + bounds.Left * scale - 24;
+                    for (int c = 0; c < map.Columns; c++) { var p = ScreenCenter(c, 0); string s = Coordinate(c); e.Graphics.DrawString(s.Substring(0, s.Length - 1), f, b, p.X - 16, labelsTop); }
+                    for (int r = 0; r < map.Rows; r++) { var p = ScreenCenter(0, r); e.Graphics.DrawString((r + 1).ToString(), f, b, labelsLeft, p.Y - 8); }
                 }
             }
         }
@@ -446,7 +494,7 @@ namespace HexMapEditor
 
         void CanvasMouseMove(object sender, MouseEventArgs e)
         {
-            int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + map.Orientation + "     Widoczne: " + (map.Columns * map.Rows) + " / " + (map.Columns * map.Rows);
+            int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + map.Orientation + "     Łącznie heksów: " + map.Cells.Count;
             if (panGesture && (e.Button == MouseButtons.Middle || e.Button == MouseButtons.Left)) { pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate(); return; }
             if (e.Button == MouseButtons.Left && currentTool == EditorTool.Select && (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3))
             {
@@ -462,7 +510,13 @@ namespace HexMapEditor
             if (e.Button != MouseButtons.Left) return;
             if (currentTool == EditorTool.Brush) { FinishStroke(); return; }
             if (currentTool == EditorTool.Hand) return;
-            if (!dragging) { selected = HitTest(e.Location); UpdateUI(); }
+            if (!dragging)
+            {
+                int hit = HitTest(e.Location);
+                if (hit >= 0 && hit == selected && rightPanelOpen) { selected = -1; rightPanelOpen = false; }
+                else if (hit >= 0) { selected = hit; rightPanelOpen = true; }
+                UpdateUI();
+            }
         }
 
         void CanvasMouseWheel(object sender, MouseEventArgs e)

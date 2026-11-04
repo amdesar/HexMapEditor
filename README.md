@@ -1,10 +1,10 @@
-# HexMapEditor
+# HexMapEditor 0.1.1
 
-Pierwszy przyrost edytora map heksagonalnych dla Windows. Program korzysta z natywnego Windows Forms i .NET Framework 4.x oraz rysuje mapę przez GDI+. Nie pobiera zależności podczas uruchamiania.
+Prototyp edytora map heksagonalnych dla Windows. Program korzysta z C#, natywnego Windows Forms, .NET Framework 4.x i GDI+. Nie pobiera zależności podczas uruchamiania. Numer wersji aplikacji jest niezależny od numeru formatu mapy.
 
 ## Uruchamianie
 
-Uruchom dwuklikiem `HexMapEditor.exe` albo `Uruchom HexMapEditor.bat`. Projekty są zapisywane jako UTF-8 JSON (`.hexmap.json`).
+Uruchom dwuklikiem `Uruchom HexMapEditor.bat` albo `HexMapEditor.exe`. Projekty mają rozszerzenie `.hexmap`; ich zawartość to UTF-8 JSON.
 
 ## Budowanie na tym komputerze
 
@@ -16,9 +16,14 @@ W folderze projektu uruchom z PowerShell:
 
 ## Format projektu, wersja 1
 
-Projekt jest obiektem JSON z `formatVersion`, nazwą, wymiarami, orientacją i tablicą `cells`. Pola zapisano w kolejności wierszami: indeks pola to `wiersz * columns + kolumna`. Każde pole zawiera typ terenu, kolor HTML `#RRGGBB`, nazwę własną, zwykły opis i `notesFormat: "plainText"`. Wartości logicznych współrzędnych są indeksowane od zera w danych, a interfejs wyświetla kolumny A, B, …, Z, AA, … oraz wiersze od 1.
+Projekt jest obiektem JSON z `FormatVersion`, nazwą, wymiarami, orientacją, opcjonalnym `LabelMode` i tablicą `Cells`. Pola zapisano w kolejności wierszami: indeks pola to `wiersz * Columns + kolumna`. Każde pole zawiera typ terenu, kolor HTML `#RRGGBB`, nazwę własną, zwykły opis i `NotesFormat: "plainText"`. Wartości logicznych współrzędnych są indeksowane od zera w danych, a interfejs wyświetla kolumny A, B, …, Z, AA, … oraz wiersze od 1.
 
-Zwykły opis jest zapisany wprost w polu `description`. `notesFormat` pozwala później rozszerzyć notatki formatowane bez utraty tekstu.
+Brak `LabelMode` w starszym pliku oznacza `Axes` (Osie). Dozwolone wartości to `Axes`, `InCells` i `None`. To ustawienie prezentacji i nie zmienia logicznych współrzędnych. Zwykły opis jest zapisany wprost w polu `Description`. `NotesFormat` pozwala później rozszerzyć notatki formatowane bez utraty tekstu.
+
+## Historia zmian
+
+- **0.1.1** — poprawiona prostokątna geometria obu orientacji, wybór i dopasowanie heksów, przyciski orientacji i etykiet, zapamiętywanie etykiet, przełączanie panelu szczegółów, skróty zapisu, rozszerzenie `.hexmap` oraz uczciwy licznik łącznej liczby heksów.
+- **0.1.0** — pierwszy prototyp edytora.
 
 ## Biblioteka i dalsze przyrosty
 

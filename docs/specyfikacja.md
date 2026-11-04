@@ -106,3 +106,15 @@ Najpierw przeczytać dokument i krótko uzasadnić wybór technologii. Pytania t
 Pierwszy działający fragment: okno desktopowe z układem stanowiącym bazę opisanego layoutu; nowa mapa 15×10 z wyborem wymiarów i orientacji; pan i zoom; wybór pola; prosta nazwa i zwykły opis; malowanie kolorem; edytowalny zapis i odczyt; wygodny sposób uruchomienia do testu. Panele powinny od początku respektować brak przesuwania/skalowania przy otwieraniu i zamykaniu. Puste przyszłe sekcje nie mogą udawać gotowych funkcji.
 Pozostałe wymagania pozostają wiążącym planem docelowym, lecz wchodzą w kolejnych małych przyrostach. Nie trzeba w pierwszym zadaniu wdrażać formatowania, wszystkich narzędzi, zestawów, bibliotek obrazów i eksportów. Zapis rozwijać razem z nowymi danymi, zachowując kompatybilność własnych wcześniejszych wersji.
 Po każdym przyroście: wykonać build/testy, uruchomić jeśli możliwe, podać rzeczywiste wyniki i krótką checklistę użytkownika, następnie zatrzymać się do oceny. Zachowywać punkty powrotu kodu przed większymi zmianami. Nigdy nie usuwać biblioteki użytkownika jako części porządkowania projektu.
+
+## 17. Ustalenia dla prototypu 0.1.1
+Poniższe ustalenia zostały przyjęte dla pakietu poprawek 0.1.1 i mają pierwszeństwo przed sprzecznymi opisami wcześniejszych sekcji:
+
+- Numer aplikacji (0.1.0, 0.1.1 itd.) jest niezależny od wersji formatu mapy. 0.1.0 oznacza pierwszy prototyp, 0.1.x kolejne pakiety poprawek, 0.2.0 większy przyrost, a 1.0.0 przyszłą wersję do normalnego użytkowania.
+- Heksy nie mogą tworzyć narastającego skosu. Dla orientacji wierzchołkiem do góry stosuj naprzemienne przesunięcie co drugiego wiersza; dla płaskiego boku do góry — co drugiej kolumny. Logiczna kolejność wierszy i kolumn oraz dane pól pozostają bez zmian.
+- Orientację i tryb etykiet zmieniają przyciski cykliczne na pasku. Etykiety przechodzą Osie → W polach → Brak → Osie. Tryb etykiet jest zapisywany w projekcie; brak tego pola w starszym pliku oznacza Osie. Pozostaje częścią formatu mapy 1, dopóki zmiana struktury tego nie wymaga.
+- Zmiana orientacji i przeliczenie Dopasuj są wykonywane przed jednym odświeżeniem widoku. Zamknięcie prawego panelu usuwa zaznaczenie; ponowne kliknięcie zaznaczonego heksu je przełącza. Zoom, Dopasuj, zapis i odświeżanie nie otwierają panelu ponownie.
+- Prawy panel nakłada się bez zewnętrznych szczelin od paska narzędzi do paska stanu i dochodzi do prawej krawędzi obszaru roboczego. Informacja o terenie jest wyświetlana w jednej linii. Pełne formatowanie notatek pozostaje poza tym przyrostem.
+- Jeśli liczba faktycznie widocznych heksów nie jest mierzona, pasek stanu pokazuje uczciwe „Łącznie heksów: X”.
+- Rozszerzeniem projektu jest `.hexmap` (JSON w środku). Nie dopisuje się go ponownie, jeśli użytkownik już je podał.
+- Ograniczenia z pakietu 0.1.1 nie rozszerzają zakresu funkcji 0.1.0 o wiadro, mgłę, zestawy terenów, grafikę, obiekty ani eksport.
