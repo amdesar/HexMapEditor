@@ -36,11 +36,20 @@ namespace HexMapEditor
         public MapData() { FormatVersion = 1; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); }
     }
 
+    internal sealed class TerrainState
+    {
+        public readonly string Terrain;
+        public readonly string Color;
+        public TerrainState(CellData cell) { Terrain = cell.Terrain; Color = cell.Color; }
+        public bool Matches(CellData cell) { return String.Equals(Terrain, cell.Terrain, StringComparison.Ordinal) && String.Equals(Color, cell.Color, StringComparison.OrdinalIgnoreCase); }
+        public void ApplyTo(CellData cell) { cell.Terrain = Terrain; cell.Color = Color; }
+    }
+
     internal sealed class CellChange
     {
         public int Index;
-        public CellData Before;
-        public CellData After;
+        public TerrainState Before;
+        public TerrainState After;
     }
 
     internal sealed class EditAction
@@ -87,8 +96,8 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.1.1";
-        readonly Dictionary<int, CellData> strokeBefore = new Dictionary<int, CellData>();
+        const string AppVersion = "0.1.2";
+        readonly Dictionary<int, TerrainState> strokeBefore = new Dictionary<int, TerrainState>();
         readonly Stack<EditAction> undo = new Stack<EditAction>();
         readonly Stack<EditAction> redo = new Stack<EditAction>();
 
@@ -369,6 +378,8 @@ namespace HexMapEditor
         void OnFormClosing(object sender, FormClosingEventArgs e) { if (!ConfirmDiscard()) e.Cancel = true; }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
+            // Let the native text control handle Undo. TextBox has no Ctrl+Y Redo.
+            if (e.Control && (e.KeyCode == Keys.Z || e.KeyCode == Keys.Y) && ActiveControl is TextBoxBase) return;
             if (e.Control && e.Shift && e.KeyCode == Keys.S) { SaveAsProject(); e.Handled = true; e.SuppressKeyPress = true; }
             else if (e.Control && !e.Shift && e.KeyCode == Keys.S) { SaveProject(); e.Handled = true; e.SuppressKeyPress = true; }
             else if (e.Control && e.KeyCode == Keys.Z) { Undo(); e.Handled = true; e.SuppressKeyPress = true; }
@@ -528,7 +539,8 @@ namespace HexMapEditor
         void PaintCell(int index)
         {
             if (index < 0 || index >= map.Cells.Count) return;
-            if (!strokeBefore.ContainsKey(index)) strokeBefore[index] = Clone(map.Cells[index]);
+            if (String.Equals(map.Cells[index].Terrain, TerrainNames[brushIndex], StringComparison.Ordinal) && String.Equals(map.Cells[index].Color, TerrainColors[brushIndex], StringComparison.OrdinalIgnoreCase)) return;
+            if (!strokeBefore.ContainsKey(index)) strokeBefore[index] = new TerrainState(map.Cells[index]);
             map.Cells[index].Terrain = TerrainNames[brushIndex]; map.Cells[index].Color = TerrainColors[brushIndex]; dirty = true; canvas.Invalidate();
         }
 
@@ -536,14 +548,21 @@ namespace HexMapEditor
         {
             if (strokeBefore.Count == 0) return;
             var action = new EditAction { Label = "Pociągnięcie pędzla" };
-            foreach (var item in strokeBefore) action.Changes.Add(new CellChange { Index = item.Key, Before = item.Value, After = Clone(map.Cells[item.Key]) });
+            foreach (var item in strokeBefore)
+            {
+                var cell = map.Cells[item.Key];
+                // Preserve the original HTML color spelling for a net-empty stroke.
+                if (item.Value.Matches(cell)) { item.Value.ApplyTo(cell); continue; }
+                action.Changes.Add(new CellChange { Index = item.Key, Before = item.Value, After = new TerrainState(cell) });
+            }
+            strokeBefore.Clear();
+            if (action.Changes.Count == 0) { MarkDirty(); return; }
             undo.Push(action); while (undo.Count > 300) { var keep = undo.Reverse().Skip(1).ToList(); undo.Clear(); foreach (var a in keep) undo.Push(a); }
-            redo.Clear(); strokeBefore.Clear(); MarkDirty();
+            redo.Clear(); MarkDirty();
         }
 
-        static CellData Clone(CellData c) { return new CellData { Terrain = c.Terrain, Color = c.Color, Name = c.Name, Description = c.Description, NotesFormat = c.NotesFormat }; }
-        void Undo() { if (undo.Count == 0) return; var a = undo.Pop(); foreach (var c in a.Changes) map.Cells[c.Index] = Clone(c.Before); redo.Push(a); MarkDirty(); }
-        void Redo() { if (redo.Count == 0) return; var a = redo.Pop(); foreach (var c in a.Changes) map.Cells[c.Index] = Clone(c.After); undo.Push(a); MarkDirty(); }
+        void Undo() { if (undo.Count == 0) return; var a = undo.Pop(); foreach (var c in a.Changes) c.Before.ApplyTo(map.Cells[c.Index]); redo.Push(a); MarkDirty(); }
+        void Redo() { if (redo.Count == 0) return; var a = redo.Pop(); foreach (var c in a.Changes) c.After.ApplyTo(map.Cells[c.Index]); undo.Push(a); MarkDirty(); }
     }
 
     internal sealed class BufferedPanel : Panel
