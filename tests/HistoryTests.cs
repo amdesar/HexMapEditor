@@ -117,7 +117,7 @@ namespace HexMapEditor.Tests
                 });
                 Test("save -> Undo -> Redo restores saved dirty indicator", w =>
                 {
-                    string directory = Path.Combine(Path.GetTempPath(), "HexMapEditor-history-" + Guid.NewGuid().ToString("N"));
+                    string directory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "history-" + Guid.NewGuid().ToString("N"));
                     Directory.CreateDirectory(directory); string path = Path.Combine(directory, "map.hexmap");
                     try
                     {

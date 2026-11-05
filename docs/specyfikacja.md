@@ -1,5 +1,5 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.1, stan decyzji 5 listopada 2026.
+Wersja: 1.2, stan decyzji 5 listopada 2026.
 Nowy projekt: HexMapEditor-Codex. Implementacja od zera.
 
 ## 1. Cel i zasady odczytywania wymagań
@@ -131,5 +131,15 @@ Te decyzje mają pierwszeństwo przed sprzecznymi opisami wcześniejszych sekcji
 - Prawy panel jest nakładką celowo pomijaną przy Dopasuj. Lewy panel jest już prawidłowo uwzględniany i zachowujemy to zachowanie. Otwarcie lub zamknięcie paneli nie dopasowuje kamery.
 - Zmiana orientacji jest zapisywana i oznacza projekt jako zmieniony; nie musi należeć do Undo/Redo. Historia malowania nie przywraca starszej nazwy, opisu ani `NotesFormat`.
 - Niewielka tolerancja trafiania przy zewnętrznym brzegu heksu jest obecnie akceptowana i nie jest zadaniem do poprawienia w 0.1.3.
-- Testy metod nie zastępują testów rzeczywistego dialogu Windows. Pliki testowe tworzymy poza projektem w katalogu tymczasowym; sprzątamy tylko własne dane.
+- Testy metod nie zastępują testów rzeczywistego dialogu Windows. Bieżące miejsce pracy testów określa sekcja 19; sprzątamy tylko własne dane.
 - Zakres 0.2.0 pozostaje odłożony: formatowane notatki i rozbudowana historia tekstu, nazwa projektu i drugi rząd paska, Wiadro, presety i edycja terenów, zmiana rozmiaru mapy, ikony, większa przebudowa paneli, własne ostrzeżenia i pasek tytułu. Katalogi zasobów nie oznaczają gotowego importu ani eksportu. Optymalizacji nie wdrażamy na podstawie przypuszczeń.
+
+## 19. Mała łatka 0.1.4
+
+Te decyzje mają pierwszeństwo przed sprzecznymi opisami wcześniejszych sekcji. Wersja aplikacji: 0.1.4; format mapy nadal 1. Nie dodajemy funkcji edytora z 0.2.0.
+
+- Obsługa płótna wymaga własnego początku gestu na płótnie. Zdarzenia przycisku użytego w dialogu nie mogą malować, zaznaczać ani przesuwać nowo otwartej mapy. Po dialogu wymagane są zwolnienie przycisków i nowy gest. Nie wyłączamy otwierania dwuklikiem i nie opieramy ochrony wyłącznie na czasie. Zachowujemy narzędzie i czyścimy stan gestów oraz przechwycenie; zasada dotyczy Otwórz, Nowa mapa, zapisu i ostrzeżeń.
+- Nowa mapa zachowuje 15×10, zakresy 1–200, Axes i angielskie nazwy orientacji. Wiersze formularza mają kolejność: etykieta Kolumny/Wiersze, pole liczbowe, osobny zakres `(1–200)` kursywą po prawej, z odstępem i bez obcinania.
+- Źródła i skrypty testów pozostają śledzone w `tests/`. Wszystkie tworzone przez nie artefakty trafiają do oddzielnych przebiegów w `/tests/_work/`, ignorowanego i odtwarzanego przez skrypty. Nie używamy systemowego TEMP, innych folderów ani użytkowego Library do własnych map kontrolnych; nie zmieniamy globalnych TEMP/TMP. Docelowa paczka użytkownika nie zawiera `tests/`.
+- Wolno usunąć wyłącznie sprawdzone stare artefakty i znane mapy kontrolne z głównego `bin`; pusty, niepotrzebny `bin` również można usunąć. Nie usuwamy danych o nieustalonym pochodzeniu ani głównego EXE. Sprzątanie nie jest częścią startu aplikacji.
+- Główne `/Library/`, `/tests/_work/` i `/bin/` są ignorowane. Biblioteka jest tworzona przez aplikację w strukturze ustalonej dla 0.1.3, bez usuwania istniejących danych. Jej śledzenie w Git kończymy bez przepisywania historii i bez usuwania lokalnych zasobów. Lokalizacja map i zachowanie Zapisz/Zapisz jako pozostają bez zmian.

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$outputDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('HexMapEditor-tests-' + [Guid]::NewGuid().ToString('N'))
+$outputDirectory = Join-Path $PSScriptRoot ('_work\technical-' + [Guid]::NewGuid().ToString('N'))
 [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
 $testExe = Join-Path $outputDirectory 'HexMapEditor.TechnicalTests.exe'
 try {

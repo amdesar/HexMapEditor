@@ -1,8 +1,8 @@
-[Bb]in/
+/bin/
 [Oo]bj/
 *.user
 *.suo
 *.tmp
 *.bak
-Library/**
-!Library/.gitkeep
+/Library/
+/tests/_work/

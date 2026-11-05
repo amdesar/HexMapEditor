@@ -107,13 +107,17 @@ namespace HexMapEditor
         int brushIndex = 2;
         bool dirty, leftCollapsed, updating, dragging, panGesture;
         bool rightPanelOpen;
+        MouseButtons gestureButton = MouseButtons.None;
+        EditorTool gestureTool;
+        bool waitingForMouseRelease, requireFreshCanvasDown;
+        int modalDepth;
         EditorTool currentTool = EditorTool.Select;
         Point dragOrigin;
         PointF panOrigin;
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.1.3";
+        const string AppVersion = "0.1.4";
         readonly Dictionary<int, TerrainState> strokeBefore = new Dictionary<int, TerrainState>();
         readonly Stack<EditAction> undo = new Stack<EditAction>();
         readonly Stack<EditAction> redo = new Stack<EditAction>();
@@ -149,7 +153,7 @@ namespace HexMapEditor
             orientationToggle = AddButton(view, "Pointy Top", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop")); orientationToggle.Width = 154; orientationToggle.AutoSize = false;
             dimensionsLabel.Text = "15 × 10"; dimensionsLabel.Width = 64; dimensionsLabel.Height = 32; dimensionsLabel.Margin = new Padding(3); dimensionsLabel.TextAlign = ContentAlignment.MiddleCenter; dimensionsLabel.ForeColor = Color.FromArgb(210, 215, 225); view.Controls.Add(dimensionsLabel);
             var library = new Button { Text = "Biblioteka", Width = 84, Height = 32, Margin = new Padding(3), FlatStyle = FlatStyle.Flat };
-            StyleButton(library); library.Click += (s, e) => { if (!EnsureLibrary()) return; try { System.Diagnostics.Process.Start("explorer.exe", "\"" + LibraryPaths.Root + "\""); } catch (Exception ex) { MessageBox.Show(this, "Nie można otworzyć biblioteki: " + ex.Message, "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Error); } }; view.Controls.Add(library);
+            StyleButton(library); library.Click += (s, e) => { if (!EnsureLibrary()) return; try { System.Diagnostics.Process.Start("explorer.exe", "\"" + LibraryPaths.Root + "\""); } catch (Exception ex) { ShowEditorMessage("Nie można otworzyć biblioteki: " + ex.Message, "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Error); } }; view.Controls.Add(library);
             var nameWrap = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 8, 0), BackColor = Color.Transparent };
             toolbar.Controls.Add(nameWrap);
             mapName.Dock = DockStyle.Top; mapName.Height = 27; mapName.TextAlign = HorizontalAlignment.Center; mapName.BackColor = Color.FromArgb(44, 48, 59); mapName.ForeColor = ForeColor; mapName.BorderStyle = BorderStyle.FixedSingle; nameWrap.Controls.Add(mapName);
@@ -157,6 +161,7 @@ namespace HexMapEditor
 
             statusLabel.Dock = DockStyle.Bottom; statusLabel.Height = 27; statusLabel.Padding = new Padding(12, 0, 0, 0); statusLabel.TextAlign = ContentAlignment.MiddleLeft; statusLabel.BackColor = Color.FromArgb(34, 38, 48); Controls.Add(statusLabel);
             canvas.Dock = DockStyle.None; canvas.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right; canvas.BackColor = Color.FromArgb(21, 24, 31); canvas.TabStop = true; canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel; canvas.MouseLeave += (s, e) => { coordinateLabel.Text = "Kursor: —"; }; Controls.Add(canvas);
+            canvas.MouseCaptureChanged += (s, e) => { if (!canvas.Capture && gestureButton != MouseButtons.None) EndCanvasGesture(true); };
             left = BuildLeftPanel(); left.Width = 208; left.BackColor = Color.FromArgb(34, 38, 48); left.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom; Controls.Add(left);
             leftToggle.Text = "Zwiń panel  ‹"; leftToggle.Dock = DockStyle.None; leftToggle.Anchor = AnchorStyles.Left | AnchorStyles.Top; leftToggle.Height = 34; StyleButton(leftToggle); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; left.Visible = !leftCollapsed; leftToggle.Text = leftCollapsed ? "›" : "Zwiń panel  ‹"; leftToggle.Width = leftCollapsed ? 36 : 208; PositionOverlays(); leftToggle.BringToFront(); }; Controls.Add(leftToggle);
             right = BuildRightPanel(); right.Width = 360; right.Anchor = AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom; right.Visible = false; Controls.Add(right);
@@ -291,7 +296,7 @@ namespace HexMapEditor
         bool ConfirmDiscard()
         {
             if (!dirty) return true;
-            var result = MessageBox.Show(this, "Są niezapisane zmiany. Czy zapisać je przed kontynuowaniem?", "Niezapisane zmiany", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
+            var result = ShowEditorMessage("Są niezapisane zmiany. Czy zapisać je przed kontynuowaniem?", "Niezapisane zmiany", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
             if (result == DialogResult.Cancel) return false;
             if (result == DialogResult.No) return true;
             return SaveProject();
@@ -302,7 +307,7 @@ namespace HexMapEditor
             if (!ConfirmDiscard()) return;
             using (var f = new NewMapDialog(map.Orientation))
             {
-                if (f.ShowDialog(this) != DialogResult.OK) return;
+                if (RunModal(() => f.ShowDialog(this)) != DialogResult.OK) return;
                 map = NewMap(f.Columns, f.Rows, f.Orientation); currentPath = null; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; rightPanelOpen = false; undo.Clear(); redo.Clear();
                 RecalculateFitTransform(); UpdateUI();
             }
@@ -319,7 +324,7 @@ namespace HexMapEditor
             if (!ConfirmDiscard()) return;
             using (var d = new OpenFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap|Wszystkie pliki (*.*)|*.*", Title = "Otwórz mapę" })
             {
-                if (d.ShowDialog(this) != DialogResult.OK) return;
+                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
                 try
                 {
                     var text = File.ReadAllText(d.FileName, Encoding.UTF8);
@@ -329,7 +334,7 @@ namespace HexMapEditor
                     map = loaded; currentPath = d.FileName; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; rightPanelOpen = false; undo.Clear(); redo.Clear();
                     RecalculateFitTransform(); UpdateUI();
                 }
-                catch (Exception ex) { MessageBox.Show(this, "Nie można otworzyć projektu. Plik jest uszkodzony albo ma nieobsługiwaną wersję.\n\n" + ex.Message, "Błąd odczytu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                catch (Exception ex) { ShowEditorMessage("Nie można otworzyć projektu. Plik jest uszkodzony albo ma nieobsługiwaną wersję.\n\n" + ex.Message, "Błąd odczytu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             }
         }
 
@@ -340,8 +345,8 @@ namespace HexMapEditor
             if (String.IsNullOrEmpty(currentPath) && !EnsureLibrary()) return false;
             using (var d = CreateSaveDialog())
             {
-                if (d.ShowDialog(this) != DialogResult.OK) return false;
-                return SaveAsTo(d.FileName, path => MessageBox.Show(this, "Plik już istnieje:\n\n" + path + "\n\nCzy chcesz go zastąpić?", "Potwierdź nadpisanie", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2));
+                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return false;
+                return SaveAsTo(d.FileName, path => ShowEditorMessage("Plik już istnieje:\n\n" + path + "\n\nCzy chcesz go zastąpić?", "Potwierdź nadpisanie", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2));
             }
         }
 
@@ -362,7 +367,7 @@ namespace HexMapEditor
         bool EnsureLibrary()
         {
             try { LibraryPaths.EnsureDirectories(AppDomain.CurrentDomain.BaseDirectory); return true; }
-            catch (Exception ex) { MessageBox.Show(this, "Nie można przygotować lokalnej biblioteki:\n\n" + LibraryPaths.Root + "\n\n" + ex.Message + "\n\nDane nie zostały przeniesione do innego katalogu.", "Błąd biblioteki", MessageBoxButtons.OK, MessageBoxIcon.Error); return false; }
+            catch (Exception ex) { ShowEditorMessage("Nie można przygotować lokalnej biblioteki:\n\n" + LibraryPaths.Root + "\n\n" + ex.Message + "\n\nDane nie zostały przeniesione do innego katalogu.", "Błąd biblioteki", MessageBoxButtons.OK, MessageBoxIcon.Error); return false; }
         }
 
         static string ProjectFileName(string name)
@@ -385,7 +390,7 @@ namespace HexMapEditor
         {
             string error;
             if (TrySaveTo(path, allowOverwrite, out error)) return true;
-            MessageBox.Show(this, "Zapis nie powiódł się. Poprzedni plik pozostał bez zmian.\n\n" + error, "Błąd zapisu", MessageBoxButtons.OK, MessageBoxIcon.Error); return false;
+            ShowEditorMessage("Zapis nie powiódł się. Poprzedni plik pozostał bez zmian.\n\n" + error, "Błąd zapisu", MessageBoxButtons.OK, MessageBoxIcon.Error); return false;
         }
 
         bool TrySaveTo(string path, bool allowOverwrite, out string error)
@@ -541,14 +546,46 @@ namespace HexMapEditor
             return best <= threshold * threshold ? found : -1;
         }
 
+        T RunModal<T>(Func<T> show)
+        {
+            EndCanvasGesture(true);
+            modalDepth++;
+            try { return show(); }
+            finally
+            {
+                modalDepth--;
+                EndCanvasGesture(false);
+                waitingForMouseRelease = Control.MouseButtons != MouseButtons.None;
+                requireFreshCanvasDown = true;
+            }
+        }
+
+        DialogResult ShowEditorMessage(string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton = MessageBoxDefaultButton.Button1)
+        {
+            return RunModal(() => MessageBox.Show(this, text, title, buttons, icon, defaultButton));
+        }
+
+        void EndCanvasGesture(bool commitStroke)
+        {
+            bool brushStroke = gestureButton == MouseButtons.Left && gestureTool == EditorTool.Brush;
+            gestureButton = MouseButtons.None;
+            dragging = false; panGesture = false; dragOrigin = Point.Empty; panOrigin = PointF.Empty;
+            if (commitStroke && brushStroke) FinishStroke(); else strokeBefore.Clear();
+            canvas.Capture = false;
+        }
+
         void CanvasMouseDown(object sender, MouseEventArgs e)
         {
+            if (modalDepth > 0 || waitingForMouseRelease || gestureButton != MouseButtons.None) return;
+            if (requireFreshCanvasDown && e.Clicks != 1) return;
+            if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle) return;
+            requireFreshCanvasDown = false;
+            gestureButton = e.Button; gestureTool = currentTool;
+            dragging = false; dragOrigin = e.Location; panOrigin = pan;
             canvas.Focus();
-            if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Left && currentTool == EditorTool.Hand)) { panGesture = true; dragOrigin = e.Location; panOrigin = pan; return; }
-            if (e.Button != MouseButtons.Left) return;
-            dragging = false; dragOrigin = e.Location;
             canvas.Capture = true;
-            if (currentTool == EditorTool.Brush)
+            if (e.Button == MouseButtons.Middle || gestureTool == EditorTool.Hand) { panGesture = true; return; }
+            if (gestureTool == EditorTool.Brush)
             {
                 strokeBefore.Clear(); int hit = HitTest(e.Location); if (hit >= 0) PaintCell(hit); canvas.Capture = true;
             }
@@ -556,22 +593,25 @@ namespace HexMapEditor
 
         void CanvasMouseMove(object sender, MouseEventArgs e)
         {
+            if (modalDepth > 0) return;
             int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
-            if (panGesture && (e.Button == MouseButtons.Middle || e.Button == MouseButtons.Left)) { pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate(); return; }
-            if (e.Button == MouseButtons.Left && currentTool == EditorTool.Select && (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3))
+            if (e.Button == MouseButtons.None) { waitingForMouseRelease = false; if (gestureButton != MouseButtons.None) EndCanvasGesture(true); return; }
+            // A pressed button alone is not an editing gesture: its Down must belong to this canvas.
+            if (waitingForMouseRelease || gestureButton == MouseButtons.None || (e.Button & gestureButton) == MouseButtons.None) return;
+            if (panGesture) { pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate(); return; }
+            if (gestureTool == EditorTool.Select && (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3))
             {
                 if (!dragging) { dragging = true; panOrigin = pan; }
                 pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate();
             }
-            if (e.Button == MouseButtons.Left && currentTool == EditorTool.Brush) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0) PaintCell(hit); }
+            if (gestureTool == EditorTool.Brush) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0) PaintCell(hit); }
         }
 
         void CanvasMouseUp(object sender, MouseEventArgs e)
         {
-            if (panGesture) { panGesture = false; return; }
-            if (e.Button != MouseButtons.Left) return;
-            if (currentTool == EditorTool.Brush) { FinishStroke(); return; }
-            if (currentTool == EditorTool.Hand) return;
+            if (Control.MouseButtons == MouseButtons.None) waitingForMouseRelease = false;
+            if (modalDepth > 0 || waitingForMouseRelease || gestureButton == MouseButtons.None || e.Button != gestureButton) return;
+            if (panGesture || gestureTool == EditorTool.Brush) { EndCanvasGesture(true); return; }
             if (!dragging)
             {
                 int hit = HitTest(e.Location);
@@ -579,6 +619,7 @@ namespace HexMapEditor
                 else if (hit >= 0) { selected = hit; rightPanelOpen = true; }
                 UpdateUI();
             }
+            EndCanvasGesture(true);
         }
 
         void CanvasMouseWheel(object sender, MouseEventArgs e)
@@ -632,12 +673,16 @@ namespace HexMapEditor
         public NewMapDialog(string o)
         {
             Columns = 15; Rows = 10; Orientation = "PointyTop";
-            Text = "Nowa mapa"; FormBorderStyle = FormBorderStyle.FixedDialog; StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false; ClientSize = new Size(380, 215); BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.White; Font = new Font("Segoe UI", 9f);
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 2, RowCount = 4 }; layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57)); Controls.Add(layout);
-            layout.Controls.Add(new Label { Text = "Kolumny (1–200)", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 0); layout.Controls.Add(cols, 1, 0);
-            layout.Controls.Add(new Label { Text = "Wiersze (1–200)", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 1); layout.Controls.Add(rows, 1, 1);
+            Text = "Nowa mapa"; FormBorderStyle = FormBorderStyle.FixedDialog; StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false; ClientSize = new Size(420, 215); BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.White; Font = new Font("Segoe UI", 9f);
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 3, RowCount = 4 }; layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); Controls.Add(layout);
+            var rangeFont = new Font(Font, FontStyle.Italic); Disposed += (s, e) => rangeFont.Dispose();
+            layout.Controls.Add(new Label { Text = "Kolumny", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 0); layout.Controls.Add(cols, 1, 0);
+            layout.Controls.Add(new Label { Name = "columnsRange", Text = "(1–200)", Font = rangeFont, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill, Margin = new Padding(6, 0, 0, 0) }, 2, 0);
+            layout.Controls.Add(new Label { Text = "Wiersze", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 1); layout.Controls.Add(rows, 1, 1);
+            layout.Controls.Add(new Label { Name = "rowsRange", Text = "(1–200)", Font = rangeFont, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill, Margin = new Padding(6, 0, 0, 0) }, 2, 1);
             layout.Controls.Add(new Label { Text = "Orientacja", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 2); orient.Items.AddRange(new[] { "Pointy Top", "Flat Top" }); orient.SelectedIndex = o == "FlatTop" ? 1 : 0; layout.Controls.Add(orient, 1, 2);
-            var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; var ok = new Button { Text = "Utwórz", DialogResult = DialogResult.OK, Width = 92, Height = 32 }; var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Width = 92, Height = 32 }; buttons.Controls.Add(ok); buttons.Controls.Add(cancel); layout.Controls.Add(buttons, 0, 3); layout.SetColumnSpan(buttons, 2); AcceptButton = ok; CancelButton = cancel;
+            layout.SetColumnSpan(orient, 2);
+            var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; var ok = new Button { Text = "Utwórz", DialogResult = DialogResult.OK, Width = 92, Height = 32 }; var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Width = 92, Height = 32 }; buttons.Controls.Add(ok); buttons.Controls.Add(cancel); layout.Controls.Add(buttons, 0, 3); layout.SetColumnSpan(buttons, 3); AcceptButton = ok; CancelButton = cancel;
             ok.Click += (s, e) => { Columns = (int)cols.Value; Rows = (int)rows.Value; Orientation = orient.SelectedIndex == 1 ? "FlatTop" : "PointyTop"; };
         }
     }

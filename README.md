@@ -1,4 +1,4 @@
-# HexMapEditor 0.1.3
+# HexMapEditor 0.1.4
 
 Prototyp edytora map heksagonalnych dla Windows. Program korzysta z C#, natywnego Windows Forms, .NET Framework 4.x i GDI+. Nie pobiera zależności podczas uruchamiania. Numer wersji aplikacji jest niezależny od numeru formatu mapy.
 
@@ -22,6 +22,7 @@ Brak `LabelMode` w starszym pliku oznacza `Axes` (Osie). Dozwolone wartości to 
 
 ## Historia zmian
 
+- **0.1.4** — gest płótna musi rozpocząć się na płótnie; powrót z dialogów nie maluje, nie zaznacza i nie przesuwa mapy zdarzeniami zamykającego je gestu. Zakresy wymiarów są osobnymi tekstami kursywą po prawej stronie pól. Artefakty testów trafiają wyłącznie do ignorowanego `tests/_work/`; usunięto potwierdzone stare artefakty z głównego `bin`. Całe główne `Library/` pozostaje lokalne. Format mapy: **1**.
 - **0.1.3** — pojedyncze potwierdzenie nadpisania końcowej ścieżki po dopisaniu `.hexmap`; jawne katalogi początkowe zapisu; przygotowanie struktury lokalnej biblioteki; nowa mapa zawsze proponuje 15×10 z widocznym zakresem 1–200; nazwy orientacji Pointy Top / Flat Top. Geometria, Dopasuj i historia malowania pozostają bez zmian. Format projektu: **1**.
 - **0.1.2** — historia malowania przywraca wyłącznie teren i kolor, zachowując późniejsze nazwy, opisy i `NotesFormat`; Ctrl+Z/Ctrl+Y w polach tekstowych nie uruchamiają historii mapy; puste pociągnięcia nie zmieniają historii ani stanu zapisu. Format projektu pozostaje w wersji **1**.
 - **0.1.1** — poprawiona prostokątna geometria obu orientacji, wybór i dopasowanie heksów, przyciski orientacji i etykiet, zapamiętywanie etykiet, przełączanie panelu szczegółów, skróty zapisu, rozszerzenie `.hexmap` oraz uczciwy licznik łącznej liczby heksów.
@@ -36,9 +37,14 @@ Uruchom z głównego folderu projektu:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-HistoryTests.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-TechnicalTests.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-GestureTests.ps1
 ```
 
-Testy korzystają wyłącznie z lokalnego kompilatora .NET Framework. Pliki wykonywalne i mapy testowe powstają w osobnych, losowo nazwanych katalogach systemowego folderu tymczasowego poza projektem; testy sprzątają własne pliki. Zestaw historii sprawdza tekst i `NotesFormat` przy Undo/Redo, puste pociągnięcia, rozgałęzienie historii, grupowanie pól, zapis i oznaczenie zmian oraz kierowanie skrótów. Zestaw techniczny sprawdza potwierdzenia końcowej ścieżki, odmowę/anulowanie, bezpieczny zapis i błędy, ustawienia dialogu, bibliotekę, nową mapę i orientacje. To testy metod i konfiguracji kontrolek, nie pełny test natywnych dialogów Windows ani cofania wpisanego tekstu.
+Źródła i skrypty w `tests/` są śledzone w Git. Wszystkie własne artefakty testowe — EXE, mapy, logi, kopie robocze i inne pliki tworzone przez skrypty — należą wyłącznie do `tests/_work/`, do osobnego podkatalogu każdego przebiegu. Całe `_work` jest ignorowane przez Git, odtwarzane przez skrypty i można je usunąć po zakończeniu testów i zamknięciu procesów. Nie zmieniamy globalnych TEMP/TMP i nie używamy systemowego TEMP ani użytkowego Library do map kontrolnych. Standardowe przebiegi sprzątają swoje pliki; świadomie zachowane diagnostyczne EXE i logi również pozostają tylko w `_work`.
+
+Zestaw historii sprawdza tekst i `NotesFormat` przy Undo/Redo, puste pociągnięcia, rozgałęzienie historii, grupowanie pól, zapis i oznaczenie zmian oraz kierowanie skrótów. Zestaw techniczny sprawdza potwierdzenia końcowej ścieżki, odmowę/anulowanie, bezpieczny zapis i błędy, ustawienia dialogu, bibliotekę, nową mapę i orientacje. Zestaw gestów odtwarza obce Move/Up, powrót z dialogu, oczekiwanie na zwolnienie przycisków, świeże gesty, przechwycenie i zagnieżdżone dialogi. To testy metod i kontrolek; próby rzeczywistych okien są raportowane osobno.
+
+Paczka programu dla użytkownika powinna zawierać główny `HexMapEditor.exe` i potrzebne pliki uruchomieniowe/dokumentację, bez `tests/`, `_work` i testowych EXE. Nie dołączamy cudzej biblioteki ani map kontrolnych. Sama aplikacja nie uruchamia sprzątania testów.
 
 ## Zapis i katalogi początkowe
 
@@ -46,15 +52,15 @@ Zapisz aktualizuje bieżący plik bez ponownego pytania o nadpisanie. Dla niezap
 
 Nowy projekt proponuje `Library/Hexmaps` obok uruchomionego EXE. Zapisz jako dla otwartego projektu proponuje katalog bieżącego pliku. Można wybrać inny katalog.
 
-`bin` był katalogiem budowania testów 0.1.2, a nie domyślnym miejscem map ani biblioteką. Ówczesny test interaktywny świadomie zapisał tam własną mapę. Dialog nie miał ustawionego `InitialDirectory`, więc jego późniejsza propozycja mogła wynikać z zapamiętanej przez Windows lokalizacji. Od 0.1.3 katalog początkowy jest ustawiany jawnie. Istniejący `bin` i zawarte w nim mapy pozostają na miejscu, bez migracji; nowe testy nie zapisują tam plików.
+`bin` był katalogiem budowania testów 0.1.2, a nie domyślnym miejscem map ani biblioteką. Ówczesny test interaktywny świadomie zapisał tam własną mapę. Dialog nie miał ustawionego `InitialDirectory`, więc jego późniejsza propozycja mogła wynikać z zapamiętanej przez Windows lokalizacji. Od 0.1.3 katalog początkowy jest ustawiany jawnie. W 0.1.4, po sprawdzeniu pochodzenia i zawartości, usunięto testowy `HexMapEditor.HistoryTests.exe`, znane mapy kontrolne `Nowa mapa.hexmap`, `Nowa mapa.txt.hexmap` i pusty główny `bin`. Skrypty go nie odtwarzają. Nie migrujemy map użytkownika.
 
 ## Nowa mapa i orientacje
 
-Każde otwarcie okna Nowa mapa proponuje 15 kolumn i 10 wierszy; zakres obu osi wynosi 1–200. Nowa mapa ma etykiety `Axes`. Pointy Top oznacza wierzchołek na górze, a Flat Top poziomą krawędź na górze. Identyfikatory pliku pozostają `PointyTop` i `FlatTop`. Zmiana orientacji oznacza projekt jako zmieniony i jest zapisywana; nie należy do historii malowania. Dopasuj uwzględnia lewy panel i celowo pomija prawy panel będący nakładką. Dotychczasowa tolerancja trafiania przy brzegu pozostaje bez zmian.
+Każde otwarcie okna Nowa mapa proponuje 15 kolumn i 10 wierszy. Zakres `(1–200)` jest osobnym tekstem kursywą po prawej stronie każdego pola liczbowego. Nowa mapa ma etykiety `Axes`. Pointy Top oznacza wierzchołek na górze, a Flat Top poziomą krawędź na górze. Identyfikatory pliku pozostają `PointyTop` i `FlatTop`. Zmiana orientacji oznacza projekt jako zmieniony i jest zapisywana; nie należy do historii malowania. Dopasuj uwzględnia lewy panel i celowo pomija prawy panel będący nakładką. Dotychczasowa tolerancja trafiania przy brzegu pozostaje bez zmian.
 
 ## Biblioteka i dalsze przyrosty
 
-Folder `Library` jest obok uruchomionego programu, niezależnie od katalogu roboczego. Przy starcie i użyciu biblioteki program przygotowuje brakujące katalogi bez usuwania istniejącej zawartości:
+Folder `Library` jest obok uruchomionego programu, niezależnie od katalogu roboczego. Całe główne `/Library/` jest lokalne i ignorowane przez Git; nie wymaga śledzonych `.gitkeep`. Przy starcie i użyciu biblioteki program przygotowuje brakujące katalogi bez usuwania istniejącej zawartości:
 
 ```text
 Library/

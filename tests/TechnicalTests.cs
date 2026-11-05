@@ -36,7 +36,7 @@ namespace HexMapEditor.Tests
         static int Main()
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-            string tempRoot = Path.GetFullPath(Path.GetTempPath());
+            string tempRoot = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
             root = Path.GetFullPath(Path.Combine(tempRoot, "HexMapEditor-technical-" + Guid.NewGuid().ToString("N")));
             Directory.CreateDirectory(root);
             try
@@ -143,7 +143,15 @@ namespace HexMapEditor.Tests
                         var cols = (NumericUpDown)Get(second, "cols"); var rows = (NumericUpDown)Get(second, "rows");
                         Check(cols.Value == 15 && rows.Value == 10 && cols.Minimum == 1 && cols.Maximum == 200 && rows.Minimum == 1 && rows.Maximum == 200, "New dimensions/limits incorrect");
                         var labels = second.Controls[0].Controls.OfType<Label>().Select(l => l.Text).ToArray();
-                        Check(labels.Contains("Kolumny (1–200)") && labels.Contains("Wiersze (1–200)"), "Missing visible limits");
+                        Check(labels.Contains("Kolumny") && labels.Contains("Wiersze"), "Axis labels changed");
+                        var layout = (TableLayoutPanel)second.Controls[0]; second.PerformLayout(); layout.PerformLayout();
+                        foreach (string rangeName in new[] { "columnsRange", "rowsRange" })
+                        {
+                            var range = (Label)layout.Controls[rangeName]; var numeric = rangeName == "columnsRange" ? cols : rows;
+                            Check(range.Text == "(1–200)" && range.Font.Italic && layout.GetColumn(range) == 2, "Range is not a separate italic third column");
+                            Check(range.Left > numeric.Right && range.Right <= layout.ClientSize.Width - layout.Padding.Right, "Range overlaps or is clipped");
+                            Check(TextRenderer.MeasureText(range.Text, range.Font).Width <= range.Width, "Range text is clipped");
+                        }
                         Check(((ComboBox)Get(second, "orient")).Items.Cast<string>().SequenceEqual(new[] { "Pointy Top", "Flat Top" }), "Orientation choices incorrect");
                     }
                     var created = (MapData)typeof(MainWindow).GetMethod("NewMap", Private).Invoke(null, new object[] { 15, 10, "PointyTop" });
@@ -170,7 +178,7 @@ namespace HexMapEditor.Tests
             catch (Exception ex) { Console.Error.WriteLine("FAIL " + ex); return 1; }
             finally
             {
-                // Delete only this run's unique, resolved directory under the system temp root.
+                // Delete only this run's unique, resolved directory next to the test EXE in tests/_work.
                 if (!root.StartsWith(tempRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(root).StartsWith("HexMapEditor-technical-")) throw new InvalidOperationException("Unsafe test cleanup path");
                 Directory.Delete(root, true);
             }
