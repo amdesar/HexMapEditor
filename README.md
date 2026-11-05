@@ -1,4 +1,4 @@
-# HexMapEditor 0.1.2
+# HexMapEditor 0.1.3
 
 Prototyp edytora map heksagonalnych dla Windows. Program korzysta z C#, natywnego Windows Forms, .NET Framework 4.x i GDI+. Nie pobiera zależności podczas uruchamiania. Numer wersji aplikacji jest niezależny od numeru formatu mapy.
 
@@ -22,6 +22,7 @@ Brak `LabelMode` w starszym pliku oznacza `Axes` (Osie). Dozwolone wartości to 
 
 ## Historia zmian
 
+- **0.1.3** — pojedyncze potwierdzenie nadpisania końcowej ścieżki po dopisaniu `.hexmap`; jawne katalogi początkowe zapisu; przygotowanie struktury lokalnej biblioteki; nowa mapa zawsze proponuje 15×10 z widocznym zakresem 1–200; nazwy orientacji Pointy Top / Flat Top. Geometria, Dopasuj i historia malowania pozostają bez zmian. Format projektu: **1**.
 - **0.1.2** — historia malowania przywraca wyłącznie teren i kolor, zachowując późniejsze nazwy, opisy i `NotesFormat`; Ctrl+Z/Ctrl+Y w polach tekstowych nie uruchamiają historii mapy; puste pociągnięcia nie zmieniają historii ani stanu zapisu. Format projektu pozostaje w wersji **1**.
 - **0.1.1** — poprawiona prostokątna geometria obu orientacji, wybór i dopasowanie heksów, przyciski orientacji i etykiet, zapamiętywanie etykiet, przełączanie panelu szczegółów, skróty zapisu, rozszerzenie `.hexmap` oraz uczciwy licznik łącznej liczby heksów.
 - **0.1.0** — pierwszy prototyp edytora.
@@ -34,12 +35,39 @@ Uruchom z głównego folderu projektu:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-HistoryTests.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-TechnicalTests.ps1
 ```
 
-Testy korzystają wyłącznie z lokalnego kompilatora .NET Framework, tworzą plik wykonywalny w ignorowanym folderze `bin` i usuwają własny testowy plik mapy. Sprawdzają zachowanie tekstu i `NotesFormat` przy Undo/Redo, puste pociągnięcia, rozgałęzienie historii, grupowanie pól, zapis i oznaczenie zmian oraz kierowanie skrótów. To testy metod i kontrolek bez pokazywania okna, a nie test interaktywnego interfejsu ani natywnego cofania wpisanego tekstu.
+Testy korzystają wyłącznie z lokalnego kompilatora .NET Framework. Pliki wykonywalne i mapy testowe powstają w osobnych, losowo nazwanych katalogach systemowego folderu tymczasowego poza projektem; testy sprzątają własne pliki. Zestaw historii sprawdza tekst i `NotesFormat` przy Undo/Redo, puste pociągnięcia, rozgałęzienie historii, grupowanie pól, zapis i oznaczenie zmian oraz kierowanie skrótów. Zestaw techniczny sprawdza potwierdzenia końcowej ścieżki, odmowę/anulowanie, bezpieczny zapis i błędy, ustawienia dialogu, bibliotekę, nową mapę i orientacje. To testy metod i konfiguracji kontrolek, nie pełny test natywnych dialogów Windows ani cofania wpisanego tekstu.
+
+## Zapis i katalogi początkowe
+
+Zapisz aktualizuje bieżący plik bez ponownego pytania o nadpisanie. Dla niezapisanej mapy otwiera dialog Zapisz jako. Zapisz jako normalizuje rozszerzenie, a potem pyta raz o zastąpienie rzeczywistej końcowej ścieżki, także przy wpisaniu `mapa.txt`, gdy istnieje `mapa.txt.hexmap`. Rozszerzenie `.HEXMAP` jest rozpoznawane bez dopisywania kolejnego. Odmowa i anulowanie zachowują plik, bieżącą ścieżkę i stan niezapisanych zmian. Zapis nadal korzysta z pliku tymczasowego obok celu i bezpiecznego zastąpienia.
+
+Nowy projekt proponuje `Library/Hexmaps` obok uruchomionego EXE. Zapisz jako dla otwartego projektu proponuje katalog bieżącego pliku. Można wybrać inny katalog.
+
+`bin` był katalogiem budowania testów 0.1.2, a nie domyślnym miejscem map ani biblioteką. Ówczesny test interaktywny świadomie zapisał tam własną mapę. Dialog nie miał ustawionego `InitialDirectory`, więc jego późniejsza propozycja mogła wynikać z zapamiętanej przez Windows lokalizacji. Od 0.1.3 katalog początkowy jest ustawiany jawnie. Istniejący `bin` i zawarte w nim mapy pozostają na miejscu, bez migracji; nowe testy nie zapisują tam plików.
+
+## Nowa mapa i orientacje
+
+Każde otwarcie okna Nowa mapa proponuje 15 kolumn i 10 wierszy; zakres obu osi wynosi 1–200. Nowa mapa ma etykiety `Axes`. Pointy Top oznacza wierzchołek na górze, a Flat Top poziomą krawędź na górze. Identyfikatory pliku pozostają `PointyTop` i `FlatTop`. Zmiana orientacji oznacza projekt jako zmieniony i jest zapisywana; nie należy do historii malowania. Dopasuj uwzględnia lewy panel i celowo pomija prawy panel będący nakładką. Dotychczasowa tolerancja trafiania przy brzegu pozostaje bez zmian.
 
 ## Biblioteka i dalsze przyrosty
 
-Folder `Library` jest obok programu; w wersji developerskiej jest obok plików projektu. Biblioteka pozostaje lokalna i nie jest zapisywana w Dokumentach ani w przeglądarce.
+Folder `Library` jest obok uruchomionego programu, niezależnie od katalogu roboczego. Przy starcie i użyciu biblioteki program przygotowuje brakujące katalogi bez usuwania istniejącej zawartości:
+
+```text
+Library/
+  Backgrounds/
+  Terrains/
+  Icons/
+  Objects/
+  Hexmaps/
+  Exports/
+    Images/
+    Text/
+```
+
+Błąd utworzenia katalogów jest zgłaszany; program nie wybiera po cichu innej lokalizacji. Biblioteka pozostaje lokalna. Powyższe katalogi nie oznaczają wdrożonego importu, eksportu ani zarządzania zasobami.
 
 Później można dodać przycinanie i rozszerzanie mapy, Wiadro, Mgłę i Reset, zestawy terenów, import i kadrowanie grafik, ikony i obiekty ruchome, formatowane notatki, eksport obrazu i tekstu, pakiet przenośny z grafikami oraz usuwanie tła. Nie są częścią pierwszej wersji.

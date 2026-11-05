@@ -14,6 +14,23 @@ namespace HexMapEditor
     public enum LabelMode { Axes, InCells, None }
     public enum EditorTool { Select, Hand, Brush }
 
+    internal static class LibraryPaths
+    {
+        public static string Root { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Library"); } }
+        public static string Hexmaps { get { return Path.Combine(Root, "Hexmaps"); } }
+        public static void EnsureDirectories(string applicationDirectory)
+        {
+            string root = Path.Combine(applicationDirectory, "Library");
+            foreach (string folder in new[] { "Backgrounds", "Terrains", "Icons", "Objects", "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
+                Directory.CreateDirectory(Path.Combine(root, folder));
+        }
+    }
+
+    internal static class OrientationNames
+    {
+        public static string Display(string orientation) { return orientation == "FlatTop" ? "Flat Top" : "Pointy Top"; }
+    }
+
     public sealed class CellData
     {
         public string Terrain { get; set; }
@@ -96,7 +113,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.1.2";
+        const string AppVersion = "0.1.3";
         readonly Dictionary<int, TerrainState> strokeBefore = new Dictionary<int, TerrainState>();
         readonly Stack<EditAction> undo = new Stack<EditAction>();
         readonly Stack<EditAction> redo = new Stack<EditAction>();
@@ -129,10 +146,10 @@ namespace HexMapEditor
             zoomButton = AddButton(view, "100%", SetZoom100);
             zoomButton.Click += (s, e) => SetZoom100();
             labelToggle = AddButton(view, "Osie", CycleLabelMode); labelToggle.Width = 88; labelToggle.AutoSize = false;
-            orientationToggle = AddButton(view, "Wierzchołkiem", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop")); orientationToggle.Width = 154; orientationToggle.AutoSize = false;
+            orientationToggle = AddButton(view, "Pointy Top", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop")); orientationToggle.Width = 154; orientationToggle.AutoSize = false;
             dimensionsLabel.Text = "15 × 10"; dimensionsLabel.Width = 64; dimensionsLabel.Height = 32; dimensionsLabel.Margin = new Padding(3); dimensionsLabel.TextAlign = ContentAlignment.MiddleCenter; dimensionsLabel.ForeColor = Color.FromArgb(210, 215, 225); view.Controls.Add(dimensionsLabel);
             var library = new Button { Text = "Biblioteka", Width = 84, Height = 32, Margin = new Padding(3), FlatStyle = FlatStyle.Flat };
-            StyleButton(library); library.Click += (s, e) => { try { var dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Library"); Directory.CreateDirectory(dir); System.Diagnostics.Process.Start("explorer.exe", dir); } catch (Exception ex) { MessageBox.Show(this, "Nie można otworzyć biblioteki: " + ex.Message, "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Error); } }; view.Controls.Add(library);
+            StyleButton(library); library.Click += (s, e) => { if (!EnsureLibrary()) return; try { System.Diagnostics.Process.Start("explorer.exe", "\"" + LibraryPaths.Root + "\""); } catch (Exception ex) { MessageBox.Show(this, "Nie można otworzyć biblioteki: " + ex.Message, "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Error); } }; view.Controls.Add(library);
             var nameWrap = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 8, 0), BackColor = Color.Transparent };
             toolbar.Controls.Add(nameWrap);
             mapName.Dock = DockStyle.Top; mapName.Height = 27; mapName.TextAlign = HorizontalAlignment.Center; mapName.BackColor = Color.FromArgb(44, 48, 59); mapName.ForeColor = ForeColor; mapName.BorderStyle = BorderStyle.FixedSingle; nameWrap.Controls.Add(mapName);
@@ -144,7 +161,7 @@ namespace HexMapEditor
             leftToggle.Text = "Zwiń panel  ‹"; leftToggle.Dock = DockStyle.None; leftToggle.Anchor = AnchorStyles.Left | AnchorStyles.Top; leftToggle.Height = 34; StyleButton(leftToggle); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; left.Visible = !leftCollapsed; leftToggle.Text = leftCollapsed ? "›" : "Zwiń panel  ‹"; leftToggle.Width = leftCollapsed ? 36 : 208; PositionOverlays(); leftToggle.BringToFront(); }; Controls.Add(leftToggle);
             right = BuildRightPanel(); right.Width = 360; right.Anchor = AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom; right.Visible = false; Controls.Add(right);
             rightClose.Text = "Zamknij panel  ×"; rightClose.Dock = DockStyle.Top; rightClose.Height = 36; StyleButton(rightClose); rightClose.Click += (s, e) => CloseDetailsPanel(); right.Controls.Add(rightClose);
-            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); };
+            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); EnsureLibrary(); };
             Resize += (s, e) => PositionOverlays();
             FormClosing += OnFormClosing;
             KeyDown += OnKeyDown;
@@ -249,11 +266,11 @@ namespace HexMapEditor
             saveButton.Text = dirty ? "Zapisz *" : "Zapisz"; saveButton.BackColor = dirty ? Color.FromArgb(83, 92, 122) : Color.FromArgb(49, 54, 67);
             undoButton.Enabled = undo.Count > 0; redoButton.Enabled = redo.Count > 0;
             zoomButton.Text = Math.Round(scale * 100) + "%"; tips.SetToolTip(zoomButton, "Skala względem bazowego rozmiaru rysowania. Kliknij, aby ustawić 100%.");
-            statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + map.Orientation + "     Łącznie heksów: " + map.Cells.Count;
+            statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
             dimensionsLabel.Text = map.Columns + " × " + map.Rows;
             mapName.Text = map.Name;
-            orientationToggle.Text = map.Orientation == "FlatTop" ? "Płaskim bokiem" : "Wierzchołkiem";
-            tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Orientacja: płaskim bokiem do góry. Kliknij, aby zmienić na wierzchołkiem do góry." : "Orientacja: wierzchołkiem do góry. Kliknij, aby zmienić na płaskim bokiem do góry.");
+            orientationToggle.Text = OrientationNames.Display(map.Orientation);
+            tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze. Kliknij, aby zmienić na Pointy Top." : "Pointy Top: wierzchołek na górze. Kliknij, aby zmienić na Flat Top.");
             labelToggle.Text = map.LabelMode == "InCells" ? "W polach" : map.LabelMode == "None" ? "Brak" : "Osie";
             tips.SetToolTip(labelToggle, "Etykiety: " + labelToggle.Text + ". Kliknij, aby przełączyć tryb.");
             if (selected >= 0 && selected < map.Cells.Count)
@@ -283,7 +300,7 @@ namespace HexMapEditor
         void NewProject()
         {
             if (!ConfirmDiscard()) return;
-            using (var f = new NewMapDialog(map.Columns, map.Rows, map.Orientation))
+            using (var f = new NewMapDialog(map.Orientation))
             {
                 if (f.ShowDialog(this) != DialogResult.OK) return;
                 map = NewMap(f.Columns, f.Rows, f.Orientation); currentPath = null; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; rightPanelOpen = false; undo.Clear(); redo.Clear();
@@ -320,11 +337,32 @@ namespace HexMapEditor
 
         bool SaveAsProject()
         {
-            using (var d = new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap", DefaultExt = "hexmap", AddExtension = true, FileName = ProjectFileName(map.Name), Title = "Zapisz mapę jako" })
+            if (String.IsNullOrEmpty(currentPath) && !EnsureLibrary()) return false;
+            using (var d = CreateSaveDialog())
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return false;
-                return SaveTo(EnsureProjectExtension(d.FileName));
+                return SaveAsTo(d.FileName, path => MessageBox.Show(this, "Plik już istnieje:\n\n" + path + "\n\nCzy chcesz go zastąpić?", "Potwierdź nadpisanie", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2));
             }
+        }
+
+        SaveFileDialog CreateSaveDialog()
+        {
+            return new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap", DefaultExt = "hexmap", AddExtension = false, OverwritePrompt = false, RestoreDirectory = true, InitialDirectory = String.IsNullOrEmpty(currentPath) ? LibraryPaths.Hexmaps : Path.GetDirectoryName(Path.GetFullPath(currentPath)), FileName = ProjectFileName(map.Name), Title = "Zapisz mapę jako" };
+        }
+
+        bool SaveAsTo(string path, Func<string, DialogResult> confirmOverwrite)
+        {
+            string finalPath = Path.GetFullPath(EnsureProjectExtension(path));
+            bool exists = File.Exists(finalPath);
+            if (exists && confirmOverwrite(finalPath) != DialogResult.Yes) return false;
+            // If a new target appears after this check, File.Move fails instead of replacing it.
+            return SaveTo(finalPath, exists);
+        }
+
+        bool EnsureLibrary()
+        {
+            try { LibraryPaths.EnsureDirectories(AppDomain.CurrentDomain.BaseDirectory); return true; }
+            catch (Exception ex) { MessageBox.Show(this, "Nie można przygotować lokalnej biblioteki:\n\n" + LibraryPaths.Root + "\n\n" + ex.Message + "\n\nDane nie zostały przeniesione do innego katalogu.", "Błąd biblioteki", MessageBoxButtons.OK, MessageBoxIcon.Error); return false; }
         }
 
         static string ProjectFileName(string name)
@@ -340,6 +378,19 @@ namespace HexMapEditor
 
         bool SaveTo(string path)
         {
+            return SaveTo(path, true);
+        }
+
+        bool SaveTo(string path, bool allowOverwrite)
+        {
+            string error;
+            if (TrySaveTo(path, allowOverwrite, out error)) return true;
+            MessageBox.Show(this, "Zapis nie powiódł się. Poprzedni plik pozostał bez zmian.\n\n" + error, "Błąd zapisu", MessageBoxButtons.OK, MessageBoxIcon.Error); return false;
+        }
+
+        bool TrySaveTo(string path, bool allowOverwrite, out string error)
+        {
+            error = null;
             string temp = null;
             try
             {
@@ -348,13 +399,13 @@ namespace HexMapEditor
                 temp = Path.Combine(directory, ".hexmap-" + Guid.NewGuid().ToString("N") + ".tmp");
                 byte[] bytes = new UTF8Encoding(false).GetBytes(json.Serialize(map));
                 using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
-                if (File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
+                if (allowOverwrite && File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
                 currentPath = path; savedSnapshot = json.Serialize(map); dirty = false; UpdateUI(); return true;
             }
             catch (Exception ex)
             {
                 if (temp != null) try { if (File.Exists(temp)) File.Delete(temp); } catch { }
-                MessageBox.Show(this, "Zapis nie powiódł się. Poprzedni plik pozostał bez zmian.\n\n" + ex.Message, "Błąd zapisu", MessageBoxButtons.OK, MessageBoxIcon.Error); return false;
+                error = ex.Message; return false;
             }
         }
 
@@ -505,7 +556,7 @@ namespace HexMapEditor
 
         void CanvasMouseMove(object sender, MouseEventArgs e)
         {
-            int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + map.Orientation + "     Łącznie heksów: " + map.Cells.Count;
+            int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
             if (panGesture && (e.Button == MouseButtons.Middle || e.Button == MouseButtons.Left)) { pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate(); return; }
             if (e.Button == MouseButtons.Left && currentTool == EditorTool.Select && (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3))
             {
@@ -578,14 +629,14 @@ namespace HexMapEditor
         readonly NumericUpDown cols = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 15, Width = 90 };
         readonly NumericUpDown rows = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 10, Width = 90 };
         readonly ComboBox orient = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
-        public NewMapDialog(int c, int r, string o)
+        public NewMapDialog(string o)
         {
             Columns = 15; Rows = 10; Orientation = "PointyTop";
             Text = "Nowa mapa"; FormBorderStyle = FormBorderStyle.FixedDialog; StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false; ClientSize = new Size(380, 215); BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.White; Font = new Font("Segoe UI", 9f);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 2, RowCount = 4 }; layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57)); Controls.Add(layout);
-            layout.Controls.Add(new Label { Text = "Kolumny", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 0); layout.Controls.Add(cols, 1, 0); cols.Value = c;
-            layout.Controls.Add(new Label { Text = "Wiersze", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 1); layout.Controls.Add(rows, 1, 1); rows.Value = r;
-            layout.Controls.Add(new Label { Text = "Orientacja", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 2); orient.Items.AddRange(new[] { "Wierzchołkiem do góry", "Płaskim bokiem do góry" }); orient.SelectedIndex = o == "FlatTop" ? 1 : 0; layout.Controls.Add(orient, 1, 2);
+            layout.Controls.Add(new Label { Text = "Kolumny (1–200)", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 0); layout.Controls.Add(cols, 1, 0);
+            layout.Controls.Add(new Label { Text = "Wiersze (1–200)", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 1); layout.Controls.Add(rows, 1, 1);
+            layout.Controls.Add(new Label { Text = "Orientacja", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 2); orient.Items.AddRange(new[] { "Pointy Top", "Flat Top" }); orient.SelectedIndex = o == "FlatTop" ? 1 : 0; layout.Controls.Add(orient, 1, 2);
             var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; var ok = new Button { Text = "Utwórz", DialogResult = DialogResult.OK, Width = 92, Height = 32 }; var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Width = 92, Height = 32 }; buttons.Controls.Add(ok); buttons.Controls.Add(cancel); layout.Controls.Add(buttons, 0, 3); layout.SetColumnSpan(buttons, 2); AcceptButton = ok; CancelButton = cancel;
             ok.Click += (s, e) => { Columns = (int)cols.Value; Rows = (int)rows.Value; Orientation = orient.SelectedIndex == 1 ? "FlatTop" : "PointyTop"; };
         }

@@ -117,11 +117,12 @@ namespace HexMapEditor.Tests
                 });
                 Test("save -> Undo -> Redo restores saved dirty indicator", w =>
                 {
-                    string directory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "history-test-" + Guid.NewGuid().ToString("N"));
+                    string directory = Path.Combine(Path.GetTempPath(), "HexMapEditor-history-" + Guid.NewGuid().ToString("N"));
                     Directory.CreateDirectory(directory); string path = Path.Combine(directory, "map.hexmap");
                     try
                     {
-                        Paint(w, 1, 0); Check((bool)Call(w, "SaveTo", path), "Save failed");
+                        Paint(w, 1, 0); object[] saveArgs = { path, true, null };
+                        Check((bool)Call(w, "TrySaveTo", saveArgs), "Save failed: " + saveArgs[2]);
                         Check(!(bool)Get(w, "dirty") && Count(w, "undo") == 1, "Save cleared history or stayed dirty");
                         var saved = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<MapData>(File.ReadAllText(path));
                         Check(saved.FormatVersion == 1, "Map format changed");

@@ -1,5 +1,5 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.0, stan decyzji 4 listopada 2026.
+Wersja: 1.1, stan decyzji 5 listopada 2026.
 Nowy projekt: HexMapEditor-Codex. Implementacja od zera.
 
 ## 1. Cel i zasady odczytywania wymagań
@@ -14,7 +14,7 @@ Interfejs, pomoc dla użytkownika i komunikacja z użytkownikiem po polsku. Nazw
 
 ## 3. Siatka, współrzędne i stan początkowy
 Liczba kolumn i wierszy jest niezależna, od 1 do 200 w każdej osi. Dopuszczalne m.in. 1×1, 10×1, 20×30, 60×60 i 200×200. Wartości muszą być całkowite. Żadna oś nie może być zerowa, ujemna ani przekraczać 200.
-Nowa mapa domyślnie: 15 kolumn × 10 wierszy; nazwa „Nowa mapa”. Przy starcie i utworzeniu mapy pokaż całość wyśrodkowaną w obszarze roboczym z marginesem, bez ucięcia przez panele.
+Nowa mapa domyślnie: 15 kolumn × 10 wierszy; nazwa „Nowa mapa”. Każde otwarcie dialogu Nowa mapa proponuje te wymiary, bez dziedziczenia wymiarów poprzedniej mapy. Przy obu osiach widoczny zakres 1–200. Przy starcie i utworzeniu mapy pokaż całość wyśrodkowaną z marginesem, uwzględniając lewy panel. Prawy panel jest nakładką celowo pomijaną przy Dopasuj.
 Obsługiwane dwie orientacje heksów: wierzchołkiem do góry i płaskim bokiem do góry. Można wybrać orientację nowej mapy i zmienić ją później. Zmiana zachowuje logiczne przypisanie danych do pól. Nie zakładać, że zmiana orientacji zachowa identyczne geometryczne sąsiedztwo: zastosować spójne, udokumentowane mapowanie.
 Każdy heks ma współrzędne, np. E15, AE3. Konwencję techniczną i identyfikatory ustala wykonawca, ale muszą być stabilne i jednoznaczne.
 Tryby etykiet przełączane w kolejności: Osie → W polach → Brak. Domyślnie Osie dla nowych map. Osie: przynajmniej litery nad mapą i liczby po lewej, zgodnie z pozycjami pól. W polach: etykieta blisko dołu heksu, nie na środku. Przy oddaleniu wolno ograniczać etykiety dla czytelności. Tryb Brak usuwa tylko napisy na mapie, nie dostępność współrzędnych w panelu i pasku stanu.
@@ -81,7 +81,7 @@ Dodawanie i usuwanie wierszy/kolumn z KAŻDEJ strony: góra, dół, lewo, prawo.
 Formularz każdorazowo startuje od czterech zer. Wartości odnoszą się do bieżącego stanu: +2 dodaje dwa z danej strony, −2 usuwa dwa, 0 nic nie zmienia. Ponowne otwarcie po Zastosuj lub Anuluj znów zeruje formularz. Podgląd obecnego i wynikowego rozmiaru, czytelny kierunkowy układ i informacja „+ dodaje, − usuwa”. Dopiero zatwierdzenie modyfikuje mapę.
 Końcowy rozmiar w każdej osi musi wynosić 1–200. Przykład: mapa 10×1 nie może stracić jedynego wiersza. Nie przyjmować zera, ujemnych wartości wynikowych ani przekroczenia maksimum; blokować z wyjaśnieniem.
 Rozszerzanie zachowuje treść, względny układ i sąsiedztwo starych pól. Dotyczy to także dodania pojedynczego wiersza/kolumny od góry lub lewej: naprzemienne przesunięcia heksów nie mogą rozsypać starego obszaru. Współrzędne wyświetlane mogą się przeliczyć; tożsamość i dane nie mogą się zgubić. Mechanizm geometryczny dobiera wykonawca.
-Nowe pola mają stan domyślny. Usuwanie ostrzega o stronie, zakresie i utracie danych, wymaga potwierdzenia. Anulowanie nic nie zmienia. Cała zmiana wymiarów to jeden krok Undo, przywracający także usunięte opisy, grafiki i mgłę. Zmiana orientacji również podlega Undo.
+Nowe pola mają stan domyślny. Usuwanie ostrzega o stronie, zakresie i utracie danych, wymaga potwierdzenia. Anulowanie nic nie zmienia. Cała zmiana wymiarów to jeden krok Undo, przywracający także usunięte opisy, grafiki i mgłę. Zmiana orientacji jest zapisywana i oznacza projekt jako zmieniony, ale nie musi należeć do Undo/Redo.
 
 ## 13. Notatki jako czytelna strona
 Prawy panel domyślnie pokazuje tytuł i treść do czytania, nie stale aktywne pola formularza. Ołówek uruchamia edycję; nazwa i opis mogą mieć osobne wejścia. Zastosuj/Anuluj. Nie gubić po cichu roboczej treści przy zmianie zaznaczenia czy zamykaniu panelu — zapewnić jawne rozstrzygnięcie.
@@ -118,3 +118,18 @@ Poniższe ustalenia zostały przyjęte dla pakietu poprawek 0.1.1 i mają pierws
 - Jeśli liczba faktycznie widocznych heksów nie jest mierzona, pasek stanu pokazuje uczciwe „Łącznie heksów: X”.
 - Rozszerzeniem projektu jest `.hexmap` (JSON w środku). Nie dopisuje się go ponownie, jeśli użytkownik już je podał.
 - Ograniczenia z pakietu 0.1.1 nie rozszerzają zakresu funkcji 0.1.0 o wiadro, mgłę, zestawy terenów, grafikę, obiekty ani eksport.
+
+## 18. Ustalenia dla aktualizacji technicznej 0.1.3
+
+Te decyzje mają pierwszeństwo przed sprzecznymi opisami wcześniejszych sekcji. Wersja aplikacji wynosi 0.1.3, a format mapy nadal 1. Zachowujemy C# / Windows Forms / GDI+, działanie offline i poprawki historii malowania z 0.1.2.
+
+- Zapisz jako ustala końcową ścieżkę po dopisaniu `.hexmap`, a dopiero potem wyświetla jedno potwierdzenie nadpisania istniejącego pliku. Dotyczy to także `mapa.txt` → `mapa.txt.hexmap`. Rozszerzenie jest rozpoznawane bez rozróżniania wielkości liter. Odmowa/anulowanie nie zmieniają celu, bieżącej ścieżki ani stanu zapisu. Zwykłe Zapisz do bieżącego pliku nie pyta ponownie. Zachowujemy bezpieczny zapis i obsługę błędów.
+- Biblioteka jest wyznaczana względem uruchomionego EXE, bez zależności od bieżącego katalogu roboczego. Tworzymy brakujące `Library/Backgrounds`, `Terrains`, `Icons`, `Objects`, `Hexmaps`, `Exports/Images` i `Exports/Text`, zachowując istniejącą zawartość. Niepowodzenie daje czytelny komunikat, bez cichej zmiany lokalizacji.
+- Dla niezapisanego projektu dialog zapisu proponuje `Library/Hexmaps`; Zapisz jako otwartego projektu proponuje katalog bieżącego pliku. Użytkownik może wybrać inny katalog. Nie migrujemy wcześniejszych map ani nie usuwamy `bin`.
+- Nowa mapa zawsze proponuje 15×10, pokazuje zakres 1–200 przy obu polach i domyślnie używa `Axes`. Nie dodajemy nazwy projektu ani presetów do dialogu w tym przyroście.
+- Widoczne nazwy orientacji to Pointy Top (wierzchołek na górze) oraz Flat Top (pozioma krawędź na górze). Przycisk, dialog, status i rysunek muszą być spójne. Identyfikatory danych pozostają `PointyTop` i `FlatTop`; geometria pozostaje bez zmian.
+- Prawy panel jest nakładką celowo pomijaną przy Dopasuj. Lewy panel jest już prawidłowo uwzględniany i zachowujemy to zachowanie. Otwarcie lub zamknięcie paneli nie dopasowuje kamery.
+- Zmiana orientacji jest zapisywana i oznacza projekt jako zmieniony; nie musi należeć do Undo/Redo. Historia malowania nie przywraca starszej nazwy, opisu ani `NotesFormat`.
+- Niewielka tolerancja trafiania przy zewnętrznym brzegu heksu jest obecnie akceptowana i nie jest zadaniem do poprawienia w 0.1.3.
+- Testy metod nie zastępują testów rzeczywistego dialogu Windows. Pliki testowe tworzymy poza projektem w katalogu tymczasowym; sprzątamy tylko własne dane.
+- Zakres 0.2.0 pozostaje odłożony: formatowane notatki i rozbudowana historia tekstu, nazwa projektu i drugi rząd paska, Wiadro, presety i edycja terenów, zmiana rozmiaru mapy, ikony, większa przebudowa paneli, własne ostrzeżenia i pasek tytułu. Katalogi zasobów nie oznaczają gotowego importu ani eksportu. Optymalizacji nie wdrażamy na podstawie przypuszczeń.
