@@ -232,6 +232,18 @@ namespace HexMapEditor
             Box.LostKeyboardFocus += (s, e) => { if (BreakHistoryGroup != null) BreakHistoryGroup(); };
             Box.CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, (s, e) => { Paste(false); e.Handled = true; }, (s, e) => { e.CanExecute = true; e.Handled = true; }));
             dock.Children.Add(Box); AccessibleName = "Formatowany opis heksu";
+            Box.SizeChanged += (s, e) => FitTables();
+        }
+        internal void FitTables() { FitTablesIn(Box.Document.Blocks); }
+        static void FitTablesIn(BlockCollection blocks)
+        {
+            foreach (Block block in blocks)
+            {
+                var table = block as Table;
+                if (table != null) { foreach (var column in table.Columns) if (!column.Width.IsAuto) column.Width = GridLength.Auto; foreach (var group in table.RowGroups) foreach (var row in group.Rows) foreach (var cell in row.Cells) FitTablesIn(cell.Blocks); }
+                var list = block as List; if (list != null) foreach (var item in list.ListItems) FitTablesIn(item.Blocks);
+                var section = block as Section; if (section != null) FitTablesIn(section.Blocks);
+            }
         }
         static void Button(WrapPanel parent, string text, string tip, Action action)
         {
@@ -288,7 +300,7 @@ namespace HexMapEditor
                 var imported = new FlowDocument();
                 using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(RtfClipboard.Filter(rtf)))) new TextRange(imported.ContentStart, imported.ContentEnd).Load(stream, DataFormats.Rtf);
                 var clean = NoteCodec.FromJson(NoteCodec.Write(imported));
-                Mutate("paste", () => { using (var stream = new MemoryStream()) { new TextRange(clean.ContentStart, clean.ContentEnd).Save(stream, DataFormats.Rtf); stream.Position = 0; Box.Selection.Load(stream, DataFormats.Rtf); } });
+                Mutate("paste", () => { using (var stream = new MemoryStream()) { new TextRange(clean.ContentStart, clean.ContentEnd).Save(stream, DataFormats.Rtf); stream.Position = 0; Box.Selection.Load(stream, DataFormats.Rtf); } FitTables(); });
             }
             catch
             {

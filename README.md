@@ -1,10 +1,10 @@
-# HexMapEditor 0.2.0
+# HexMapEditor 0.2.1
 
 Edytor map heksagonalnych dla Windows, rozwijany z wersji 0.1.4. C# / Windows Forms / GDI+, lokalne pliki i praca offline. Formatowany edytor jest osadzonym składnikiem WPF z zainstalowanego .NET Framework; aplikacja nie pobiera bibliotek, ikon ani zasobów przy uruchamianiu. Nie wymaga konta ani usługi internetowej.
 
 ## Uruchamianie i budowanie
 
-Uruchom `HexMapEditor.exe` albo `Uruchom HexMapEditor.bat`. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8), dostępny lokalnie w Windows. Numer aplikacji: **0.2.0**. Numer zapisywanego formatu mapy: **2**.
+Uruchom `HexMapEditor.exe` albo `Uruchom HexMapEditor.bat`. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8), dostępny lokalnie w Windows. Numer aplikacji: **0.2.1**. Numer zapisywanego formatu mapy: **2**.
 
 Build z głównego folderu, bez pobierania zależności:
 
@@ -16,7 +16,7 @@ Kompilator i zestawy pochodzą z lokalnego .NET Framework. Główny EXE pozostaj
 
 ## Podstawowa obsługa
 
-- Pierwszy rząd paska: pliki i historia mapy po lewej, widok i rozmiar po prawej. Drugi rząd pokazuje nieedytowalną nazwę projektu. Pełna nazwa jest w podpowiedzi.
+- Jeden rząd paska: pliki i wspólna historia po lewej, widok i rozmiar po prawej. Nieedytowalna nazwa projektu jest wyśrodkowana w wolnym obszarze pomiędzy grupami, z wielokropkiem dla długiej nazwy i pełną podpowiedzią.
 - Nowa mapa: nazwa początkowa (domyślnie „Nowa mapa”), zawsze 15×10, zakresy 1–200, orientacja i działający zestaw terenów. Etykiety startują jako Axes / Osie.
 - Przed pierwszym zapisem nazwa początkowa jest proponowaną nazwą pliku. Po zapisie lub otwarciu nazwa pochodzi z pliku: `mapa.txt.hexmap` → `mapa.txt`. Stare wewnętrzne `Name` nie ma pierwszeństwa. Anulowanie lub błąd zachowują nazwę i ścieżkę.
 - Zaznaczanie otwiera szczegóły; ponowny klik zaznaczonego heksu lub Zamknij chowa nakładkę. Pędzel maluje, Wiadro wypełnia spójny obszar jednej utrwalonej wersji terenu. Rączka i środkowy przycisk przesuwają mapę, kółko zmienia zoom względem kursora.
@@ -36,21 +36,21 @@ Limit: 100 kroków na pole i 32 MiB dodatkowych migawek Undo/Redo łącznie. Bie
 
 ## Zestawy terenów i Wiadro
 
-Selektor wybiera roboczy zestaw, a kafelki teren. Nowy zestaw / Nazwa / Zapisz zestaw oraz Dodaj / Edytuj / Usuń pozwalają go utrzymywać. **Zapisz zestaw** zapisuje go lokalnie w `Library/Terrains/*.terrainset.json`; zapis projektu zachowuje też samowystarczalną kopię roboczych palet. Niezapisane do biblioteki zmiany zestawu można więc zachować w mapie. Zestaw domyślny jest odtwarzany z kodu, również bez lokalnego Library.
+Selektor wybiera roboczy zestaw, a kafelki teren. Nowy zestaw / Nazwa / Zapisz zestaw oraz stały przycisk Dodaj teren nad kafelkami pozwalają go utrzymywać. Dwukolumnowe kafelki mają wysokość 52 px (wcześniej 65). Na hover/fokusie pokazują ołówek i kosz; F2 edytuje, Delete pyta o usunięcie. Przyciski akcji mają podpowiedzi i nazwy dostępności, nie wybierają terenu przy okazji. **Zapisz zestaw** otwiera wybór świadomego nadpisania własnego zapisanego presetu lub zapisania aktualnej roboczej palety jako nowego z własnym ID w `Library/Terrains/*.terrainset.json`. Chroniony wzorzec Domyślny i nowy niezapisany zestaw wymagają zapisu jako nowy. Kolizja nazwy jest odrzucana. Zapis projektu zachowuje też samowystarczalną kopię roboczych palet. Niezapisane do biblioteki zmiany zestawu można więc zachować w mapie. Zestaw domyślny jest odtwarzany z kodu, również bez lokalnego Library.
 
-`TerrainId` identyfikuje teren, niezmienny `VariantId` konkretną wersję, a `Revision` jest rosnącym numerem informacyjnym. Edycja tworzy nowy wariant i domyślnie dotyczy przyszłego malowania. Przełącznik **Zastosuj do bieżącej mapy** jest wyłączony przy każdym otwarciu edycji. Po włączeniu zmienia tylko heksy używające poprzedniego dokładnego wariantu i tworzy jeden wpis Undo mapy; nie rusza nazw ani opisów. Cofnięcie przywraca teren heksów, a nie paletę. Zmiana zestawu i usunięcie terenu z palety nie przemalowują mapy. Każdy heks przechowuje własne właściwości, więc mapa nie zależy od istnienia pliku presetu.
+`TerrainId` identyfikuje teren, niezmienny `VariantId` konkretną wersję, a `Revision` jest rosnącym numerem informacyjnym. Edycja tworzy nowy wariant i domyślnie dotyczy przyszłego malowania. Przełącznik **Zastosuj do bieżącej mapy** jest wyłączony przy każdym otwarciu edycji. Po włączeniu zmienia tylko heksy używające poprzedniego dokładnego wariantu i tworzy jeden wpis Undo mapy; nie rusza nazw ani opisów. Dodanie, edycja i usunięcie terenu są częścią wspólnej chronologii palety i mapy. Przy aktualizacji mapy jedna operacja przywraca paletę i właściwe heksy atomowo. Undo odtwarza również kolejność kafelków i wybór terenu, ze stałymi ID wariantów przy Redo. Historie nazwy i opisu pozostają oddzielne. Zmiana zestawu i usunięcie terenu z palety nie przemalowują mapy. Każdy heks przechowuje własne właściwości, więc mapa nie zależy od istnienia pliku presetu.
 
 Wiadro porównuje `VariantId`, odwiedza sześciu rzeczywistych sąsiadów i używa kolejki zamiast rekurencji, także na 200×200. Oddzielone obszary pozostają bez zmian. Całość jest jednym Undo mapy; pusta operacja zachowuje Redo i stan zapisu. Zabezpieczenie gestów po dialogach obejmuje także Wiadro.
 
 ## Zmiana rozmiaru i historia mapy
 
-Rozmiar pozwala dodać lub usunąć wybraną liczbę wierszy/kolumn z góry, dołu, lewej lub prawej. Wynikowe osie: 1–200. Nowe pola są neutralne i mają nowe identyfikatory. Przed usunięciem pól z terenem innym niż stan neutralny, nazwą lub opisem pojawia się ostrzeżenie z liczbą wszystkich usuwanych pól i pól z danymi, domyślnie z odmową. Podgląd i anulowanie nie zmieniają mapy.
+Rozmiar ma cztery pola Góra/Dół/Lewo/Prawo, domyślnie 0: dodatnie dodają, ujemne usuwają. Wszystkie strony zatwierdza się jednocześnie; widoczne są bieżące i wynikowe wymiary. Usuwanie dotyczy brzegów starej mapy. Nie można usunąć całej starej osi, maskując to dodaniem po przeciwnej stronie. Wynikowe osie: 1–200; brak zmian nie tworzy historii. Nowe pola są neutralne i mają nowe identyfikatory. Przed usunięciem pól z terenem innym niż stan neutralny, nazwą lub opisem pojawia się ostrzeżenie z liczbą wszystkich usuwanych pól i pól z danymi oraz pełną przewijaną listą współrzędnych z mapy przed operacją. Narożniki są liczone raz. Domyślna odpowiedź to Nie. Podgląd i anulowanie nie zmieniają mapy.
 
-Cała zmiana rozmiaru to jeden krok Undo/Redo odtwarzający także usunięte dane. Zachowane heksy mają stabilne ID, więc ich tekst i historia nie przechodzą do innego pola. Zapisane parzystości początku siatki zachowują względne przesunięcia i sąsiedztwo po zmianie od góry/lewej. Historia malowania odwołuje się do ID, a nie przesuniętych indeksów. Limit historii mapy: 300 operacji; małe zmiany zachowują tylko właściwości terenu, zmiana rozmiaru listy odniesień do heksów. Nie kopiujemy całej mapy po każdym znaku tekstu. Historia mapy nie obejmuje edycji palet, nazw projektu ani zmiany orientacji.
+Cała zmiana rozmiaru to jeden krok Undo/Redo odtwarzający także usunięte dane. Zachowane heksy mają stabilne ID, więc ich tekst i historia nie przechodzą do innego pola. Zapisane parzystości początku siatki zachowują względne przesunięcia i sąsiedztwo po zmianie od góry/lewej. Historia malowania odwołuje się do ID, a nie przesuniętych indeksów. Limit historii mapy: 300 operacji; małe zmiany zachowują tylko właściwości terenu, zmiana rozmiaru listy odniesień do heksów. Nie kopiujemy całej mapy po każdym znaku tekstu. Wspólna historia obejmuje także zmiany roboczych zestawów i ich wybór. Nie obejmuje historii tekstu, zmiany orientacji ani zapisu plików biblioteki. Undo nigdy nie usuwa ani nie nadpisuje presetu na dysku. Zapis nowej kopii presetu dodaje/wybiera nowy roboczy zestaw; Undo tej zmiany nie usuwa zapisanego pliku.
 
 ## Format 2 i bezpieczny zapis
 
-Plik `.hexmap` to JSON UTF-8. **0.2.0 odczytuje format 1 i zapisuje format 2; wersje 0.1.x nie odczytają formatu 2.** Po otwarciu starej mapy komunikat wyjaśnia zmianę; Zapisz jako pozwala zachować oryginał. Zwykłe opisy pozostają niezmienione podczas migracji. Starsze tereny dostają jawne warianty migracyjne: znane domyślne pary nazwa/kolor odpowiadają domyślnym ID, pozostałe mają deterministyczny identyfikator z tej pary. W formacie 1 nie było danych pozwalających odtworzyć pierwotne pochodzenie lub wersję terenu.
+Plik `.hexmap` to JSON UTF-8. **0.2.1 odczytuje format 1 i zapisuje format 2; wersje 0.1.x nie odczytają formatu 2.** Po otwarciu starej mapy komunikat wyjaśnia zmianę; Zapisz jako pozwala zachować oryginał. Zwykłe opisy pozostają niezmienione podczas migracji. Starsze tereny dostają jawne warianty migracyjne: znane domyślne pary nazwa/kolor odpowiadają domyślnym ID, pozostałe mają deterministyczny identyfikator z tej pary. W formacie 1 nie było danych pozwalających odtworzyć pierwotne pochodzenie lub wersję terenu.
 
 Format 2 zapisuje wymiary, orientację, etykiety, parzystości początku, ID heksów, kopie właściwości i wariantów terenów, robocze palety oraz opisy. `NotesFormat` to `plainText` lub `richDocument1`; `RichDescription` zawiera ograniczony model JSON akapitów, tekstu, list i tabel. Nie serializujemy wykonywalnego dokumentu WPF. Nieprawidłowe/nieobsługiwane dane, sprzeczne właściwości jednego wariantu i przyszłe numery formatu są odrzucane. Limit całego pliku: 128 MiB dla zapisu i odczytu.
 
@@ -80,13 +80,29 @@ Błąd utworzenia biblioteki jest zgłaszany; nie przenosimy danych do innej lok
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-AllTests.ps1
 ```
 
-Można też uruchomić osobno `Run-HistoryTests.ps1`, `Run-TechnicalTests.ps1`, `Run-GestureTests.ps1` i `Run-FeatureTests.ps1` z `tests/`. Źródła i skrypty są śledzone w Git. Każdy przebieg kompiluje EXE i tworzy własne pliki tylko w podkatalogu `tests/_work/`, po czym sprząta swoje standardowe wyniki. Zbiorczy skrypt zostawia log w osobnym podkatalogu `_work/all-*`. Całe `/tests/_work/` i główne `/bin/` są ignorowane. `_work` można usunąć po zamknięciu procesów; skrypty go odtwarzają. Nie zmieniamy globalnych TEMP/TMP ani nie tworzymy map testowych w użytkowym Library. Zachowane ślady diagnostyczne 0.1.4 pozostają lokalne w `_work`.
+Można też uruchomić osobno `Run-HistoryTests.ps1`, `Run-TechnicalTests.ps1`, `Run-GestureTests.ps1`, `Run-FeatureTests.ps1` i `Run-PatchTests.ps1` z `tests/`. Źródła i skrypty są śledzone w Git. Każdy przebieg kompiluje EXE i tworzy własne pliki tylko w podkatalogu `tests/_work/`, po czym sprząta swoje standardowe wyniki. Zbiorczy skrypt zostawia log w osobnym podkatalogu `_work/all-*`. Całe `/tests/_work/` i główne `/bin/` są ignorowane. `_work` można usunąć po zamknięciu procesów; skrypty go odtwarzają. Nie zmieniamy globalnych TEMP/TMP ani nie tworzymy map testowych w użytkowym Library. Zachowane ślady diagnostyczne 0.1.4 pozostają lokalne w `_work`.
 
-Testy metod/kontrolek nie zastępują prób okna Windows, Worda ani różnych DPI. Rzeczywiste wyniki i ograniczenia: `docs/raport-0.2.0.md`. Specyfikacja i plan: `docs/specyfikacja.md`, `docs/plan-0.2.0.md`.
+Testy metod/kontrolek nie zastępują prób okna Windows, Worda ani różnych DPI. Rzeczywiste wyniki i ograniczenia: `docs/raport-0.2.1.md`. Specyfikacja i bieżący plan: `docs/specyfikacja.md`, `docs/plan-0.2.1.md`; zachowano również plan i raport 0.2.0.
 
 Paczka dla użytkownika powinna zawierać główny `HexMapEditor.exe`, plik uruchomieniowy i dokumentację. Bez tests, testowych EXE, logów i cudzej biblioteki. Program sam tworzy Library; nie uruchamia sprzątania testów przy starcie.
 
+
+## Zmiany techniczne 0.2.1
+
+Dopasuj wyznacza skalę wyłącznie z granic mapy i dostępnego prostokąta: margines 32 px oraz miejsce 28 px z lewej / 24 px u góry dla aktywnych osi. Usunięto sztuczne maksimum 170% i minimum dopasowania. Ręczne koło zmienia skalę o czynnik 1,12 i uwzględnia skalę po Dopasuj; nie zrzuca jej nagle do dawnego maksimum 400%. Zwykły zakres ręczny wynosi 1%–12800%, a powrót ze skali dopasowania poza tym zakresem jest płynny. Heksy nie są deformowane.
+
+Uchwyt na lewej krawędzi prawego panelu zmienia jego szerokość bez ruchu kamery. Szerokość jest zachowana w sesji po zamknięciu/otwarciu; przycisk przy Zamknij przywraca 440 px. Minimum 340 px, maksimum 72% szerokości okna lub szerokość okna minus 280 px. Edytor i tabele dopasowują szerokość; gest uchwytu nie edytuje mapy. Nie zmieniono wysokości pustego edytora.
+
+Paleta zachowuje kontrolki przy wyborze i niezwiązanych odświeżeniach. Podczas rzeczywistych zmian aktualizuje istniejące kafelki, dodaje/usuwa tylko potrzebne i przelicza układ zbiorczo. Przycisk Dodaj teren ma stałe miejsce nad kafelkami.
+
+Domyślny jest chroniony przez ID, niezależnie od roboczej nazwy. Można edytować jego kopię w projekcie, ale zapis biblioteki wymaga nowego ID. Starsze lokalne pliki o ID default nie zastępują wzorca: aplikacja zgłasza ich pominięcie i zostawia pliki bez zmian. Własny zapisany preset można jawnie nadpisać. Nazwy porównuje się bez rozróżniania wielkości liter, po normalizacji Unicode i usunięciu skrajnych spacji. Wskaźnik pod selektorem odróżnia roboczą kopię/niezapisany zestaw od palety zgodnej z plikiem. Zapis presetu nie zapisuje projektu; Undo może ponownie oznaczyć paletę jako różną od pliku.
+
+Obowiązkowa chronologia: malowanie jasną wodą → edycja palety na ciemną bez aktualizacji mapy → malowanie ciemną. Pierwsze Undo cofa ostatnie malowanie, drugie przywraca jasną paletę. Redo odtwarza je w tej samej kolejności. Pusta edycja nie usuwa Redo.
+
+Do dalszej pracy pozostają: całościowy wygląd narzędzi opisu, wskazanie aktywnych stanów formatowania, zgłoszone nieprawidłowe przełączanie pogrubienia przy pustym zaznaczeniu, wysokość/przewijanie pustego edytora i ewentualna paleta jednokolumnowa. **Nie są naprawione w 0.2.1.**
 ## Historia zmian
+
+- **0.2.1** — jeden wiersz paska, Dopasuj bez limitu 170%, regulowana prawa nakładka, stabilna kompaktowa paleta z akcjami kafelków, chroniony wzorzec i jawny zapis presetów, wspólne Undo palety/mapy oraz jednoczesny rozmiar czterech stron z pełną listą współrzędnych usuwanych danych. Format nadal **2**, odczyt **1**.
 
 - **0.2.0** — dwa wiersze paska, nazwa projektu z pliku, własne ikony, dwukolumnowa paleta i poprawione panele. Formatowany opis z rzeczywistymi tabelami, listami i osobną wielopoziomową historią tekstu. Lokalne zestawy terenów z wersjonowaniem, Wiadro oraz dodawanie/usuwanie wierszy i kolumn z Undo/Redo. Odczyt formatu 1, zapis formatu **2**. Zachowano zabezpieczenia 0.1.2–0.1.4.
 

@@ -63,7 +63,8 @@ namespace HexMapEditor
                 {
                     if (new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("Zestaw przekracza 4 MiB.");
                     var preset = MapLogic.Serializer().Deserialize<TerrainPreset>(File.ReadAllText(file, Encoding.UTF8)); Validate(preset);
-                    int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) result[at] = preset; else result.Add(preset);
+                    if (preset.Id == DefaultId) { errors.Add(Path.GetFileName(file) + ": plik nie zastępuje chronionego wzorca Domyślny; dane pliku pozostawiono bez zmian."); continue; }
+                    int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) { errors.Add(Path.GetFileName(file) + ": powtórzony identyfikator zestawu."); continue; } result.Add(preset);
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(file) + ": " + ex.Message); }
             }
@@ -71,10 +72,26 @@ namespace HexMapEditor
         }
         public static void Save(TerrainPreset preset, string directory)
         {
-            Validate(preset); Directory.CreateDirectory(directory);
-            string fileName = MapLogic.Hash(preset.Id) + ".terrainset.json";
-            MapLogic.AtomicWrite(Path.Combine(directory, fileName), MapLogic.Serializer().Serialize(preset), true);
+            Write(preset, directory, false);
         }
+        public static void Write(TerrainPreset preset, string directory, bool overwrite)
+        {
+            Validate(preset);
+            if (preset.Id == DefaultId) throw new InvalidDataException("Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset.");
+            Directory.CreateDirectory(directory);
+            var records = new List<KeyValuePair<string, TerrainPreset>>();
+            foreach (string file in Directory.GetFiles(directory, "*.terrainset.json"))
+            {
+                try { if (new FileInfo(file).Length > 4 * 1024 * 1024) continue; var p = MapLogic.Serializer().Deserialize<TerrainPreset>(File.ReadAllText(file, Encoding.UTF8)); Validate(p); records.Add(new KeyValuePair<string, TerrainPreset>(file, p)); }
+                catch (Exception ex) { if (!(ex is ArgumentException || ex is InvalidDataException || ex is InvalidOperationException)) throw; }
+            }
+            if (SameName(preset.Name, Default().Name) || records.Any(r => r.Value.Id != preset.Id && SameName(r.Value.Name, preset.Name))) throw new InvalidDataException("Nazwa presetu jest już używana. Wybierz inną nazwę; żaden plik nie został nadpisany.");
+            var targets = records.Where(r => r.Value.Id == preset.Id).ToArray(); string path;
+            if (overwrite) { if (targets.Length != 1) throw new InvalidDataException("Nie można jednoznacznie wskazać zapisanego presetu. Zapisz jako nowy preset."); path = targets[0].Key; }
+            else { if (targets.Length != 0) throw new InvalidDataException("Identyfikator presetu jest już zapisany; wymagany jest jawny wybór nadpisania."); path = Path.Combine(directory, MapLogic.Hash(preset.Id) + ".terrainset.json"); }
+            MapLogic.AtomicWrite(path, MapLogic.Serializer().Serialize(preset), overwrite);
+        }
+        public static bool SameName(string a, string b) { return String.Equals((a ?? "").Trim().Normalize(), (b ?? "").Trim().Normalize(), StringComparison.OrdinalIgnoreCase); }
         public static TerrainDefinition Legacy(string name, string color)
         {
             var known = Default().Terrains.FirstOrDefault(t => t.Name == name && String.Equals(t.Color, color, StringComparison.OrdinalIgnoreCase));
@@ -160,10 +177,22 @@ namespace HexMapEditor
         public static ResizeState Resize(MapData map, string side, int delta, out int removed, out int withData)
         {
             if (!new[] { "top", "bottom", "left", "right" }.Contains(side) || delta == 0) throw new InvalidDataException("Wybierz stronę i dodatnią liczbę pól.");
-            int dc = side == "left" || side == "right" ? delta : 0, dr = side == "top" || side == "bottom" ? delta : 0;
-            int cols = map.Columns + dc, rows = map.Rows + dr;
-            if (cols < 1 || cols > 200 || rows < 1 || rows > 200) throw new InvalidDataException("Wynikowy rozmiar musi mieścić się w zakresie 1–200 w każdej osi.");
-            int left = side == "left" ? delta : 0, top = side == "top" ? delta : 0;
+            var plan = ResizeAll(map, side == "top" ? delta : 0, side == "bottom" ? delta : 0, side == "left" ? delta : 0, side == "right" ? delta : 0);
+            removed = plan.RemovedIndices.Count; withData = plan.DataIndices.Count; return plan.State;
+        }
+        public static Size ResizeDimensions(int columns, int rows, int top, int bottom, int left, int right)
+        {
+            if (new[] { top, bottom, left, right }.Any(n => n < -199 || n > 199)) throw new InvalidDataException("Zmiana jednej strony musi mieścić się w zakresie −199…199.");
+            if (Math.Max(0, -left) + Math.Max(0, -right) >= columns || Math.Max(0, -top) + Math.Max(0, -bottom) >= rows) throw new InvalidDataException("Nie można usunąć całej starej szerokości lub wysokości, także przy dodawaniu pól po drugiej stronie.");
+            int resultColumns = columns + left + right, resultRows = rows + top + bottom;
+            if (resultColumns < 1 || resultColumns > 200 || resultRows < 1 || resultRows > 200) throw new InvalidDataException("Wynikowy rozmiar musi mieścić się w zakresie 1–200 w każdej osi.");
+            return new Size(resultColumns, resultRows);
+        }
+        public static ResizePlan ResizeAll(MapData map, int top, int bottom, int left, int right)
+        {
+            var dimensions = ResizeDimensions(map.Columns, map.Rows, top, bottom, left, right);
+            var plan = new ResizePlan(); if (top == 0 && bottom == 0 && left == 0 && right == 0) return plan;
+            int cols = dimensions.Width, rows = dimensions.Height;
             var state = new ResizeState { Columns = cols, Rows = rows, RowParity = (map.RowParity - top) & 1, ColumnParity = (map.ColumnParity - left) & 1, Cells = new List<CellData>() };
             var kept = new HashSet<string>();
             for (int r = 0; r < rows; r++) for (int c = 0; c < cols; c++)
@@ -172,7 +201,12 @@ namespace HexMapEditor
                 var cell = oldC >= 0 && oldC < map.Columns && oldR >= 0 && oldR < map.Rows ? map.Cells[oldR * map.Columns + oldC] : new CellData();
                 state.Cells.Add(cell); kept.Add(cell.Id);
             }
-            var cut = map.Cells.Where(c => !kept.Contains(c.Id)).ToList(); removed = cut.Count; withData = cut.Count(HasUserData); return state;
+            for (int i = 0; i < map.Cells.Count; i++) if (!kept.Contains(map.Cells[i].Id)) { plan.RemovedIndices.Add(i); if (HasUserData(map.Cells[i])) plan.DataIndices.Add(i); }
+            plan.State = state; return plan;
+        }
+        public static string Coordinate(int index, int columns)
+        {
+            int n = index % columns + 1; string letters = ""; while (n > 0) { n--; letters = (char)('A' + n % 26) + letters; n /= 26; } return letters + (index / columns + 1);
         }
         public static void AtomicWrite(string path, string text, bool overwrite)
         {

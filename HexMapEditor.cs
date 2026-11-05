@@ -86,6 +86,7 @@ namespace HexMapEditor
         public List<CellChange> Changes = new List<CellChange>();
         public string Label;
         public ResizeState BeforeResize, AfterResize;
+        public PaletteState BeforePalette, AfterPalette;
     }
 
     public sealed partial class MainWindow : Form
@@ -130,7 +131,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.2.0";
+        const string AppVersion = "0.2.1";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -173,12 +174,13 @@ namespace HexMapEditor
         void PositionOverlays()
         {
             if (shellToolbar == null) return;
+            LayoutMainToolbar();
             int top = shellToolbar.Height, bottom = 27, height = Math.Max(0, ClientSize.Height - top - bottom);
             canvas.Bounds = new Rectangle(0, top, ClientSize.Width, height);
             left.Bounds = new Rectangle(0, top + 30, 220, Math.Max(0, height - 30));
             leftToggle.Bounds = new Rectangle(0, top, leftCollapsed ? 28 : 220, leftCollapsed ? height : 30);
             leftToggle.Text = leftCollapsed ? "›" : "Zwiń panel  ‹"; left.Visible = !leftCollapsed;
-            int width = Math.Min(440, ClientSize.Width); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
+            int width = ClampRightWidth(requestedRightWidth); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
             left.BringToFront(); if (right.Visible) right.BringToFront(); leftToggle.BringToFront();
         }
 
@@ -216,7 +218,7 @@ namespace HexMapEditor
                 zoomButton.Text = Math.Round(scale * 100) + "%"; tips.SetToolTip(zoomButton, "Skala względem bazowego rozmiaru rysowania. Kliknij, aby ustawić 100%.");
                 statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
                 dimensionsLabel.Text = map.Columns + " × " + map.Rows;
-                orientationToggle.Text = OrientationNames.Display(map.Orientation); orientationToggle.Image = EditorIcons.Draw(map.Orientation == "FlatTop" ? "flat" : "pointy");
+                orientationToggle.Text = OrientationNames.Display(map.Orientation); orientationToggle.Image = EditorIcons.Small(map.Orientation == "FlatTop" ? "flat" : "pointy");
                 tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze" : "Pointy Top: wierzchołek na górze");
                 labelToggle.Text = map.LabelMode == "InCells" ? "W polach" : map.LabelMode == "None" ? "Brak" : "Osie";
                 if (selected >= 0 && selected < map.Cells.Count)
@@ -416,10 +418,7 @@ namespace HexMapEditor
 
         string Coordinate(int index)
         {
-            int col = index % map.Columns, row = index / map.Columns;
-            string letters = ""; int n = col + 1;
-            while (n > 0) { n--; letters = (char)('A' + n % 26) + letters; n /= 26; }
-            return letters + (row + 1);
+            return MapLogic.Coordinate(index, map.Columns);
         }
 
         static Color ParseColor(string value) { return ColorTranslator.FromHtml(value); }
@@ -441,10 +440,10 @@ namespace HexMapEditor
             if (canvas.ClientSize.Width < 20 || canvas.ClientSize.Height < 20) return false;
             RectangleF bounds = MapBounds();
             float leftInset = leftCollapsed ? 28f : 220f;
-            float viewWidth = Math.Max(100, canvas.ClientSize.Width - leftInset);
-            float centerX = leftInset + viewWidth / 2f;
-            scale = Math.Max(.08f, Math.Min(1.7f, Math.Min((viewWidth - 80) / Math.Max(bounds.Width, 1), (canvas.ClientSize.Height - 80) / Math.Max(bounds.Height, 1))));
-            pan = new PointF(centerX - (bounds.Left + bounds.Width / 2f) * scale, canvas.ClientSize.Height / 2f - (bounds.Top + bounds.Height / 2f) * scale);
+            bool axes = map.LabelMode == "Axes" && map.Cells.Count <= 1400;
+            var viewport = RectangleF.FromLTRB(leftInset + 32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), canvas.ClientSize.Width - 32, canvas.ClientSize.Height - 32);
+            scale = Math.Max(.000001f, Math.Min(Math.Max(1, viewport.Width) / Math.Max(bounds.Width, 1), Math.Max(1, viewport.Height) / Math.Max(bounds.Height, 1)));
+            pan = new PointF(viewport.Left + viewport.Width / 2f - (bounds.Left + bounds.Width / 2f) * scale, viewport.Top + viewport.Height / 2f - (bounds.Top + bounds.Height / 2f) * scale);
             return true;
         }
 
@@ -515,6 +514,7 @@ namespace HexMapEditor
 
         T RunModal<T>(Func<T> show)
         {
+            EndRightResize();
             EndCanvasGesture(true);
             modalDepth++;
             try { return show(); }
@@ -543,7 +543,7 @@ namespace HexMapEditor
 
         void CanvasMouseDown(object sender, MouseEventArgs e)
         {
-            if (modalDepth > 0 || waitingForMouseRelease || gestureButton != MouseButtons.None) return;
+            if (modalDepth > 0 || rightResizing || waitingForMouseRelease || gestureButton != MouseButtons.None) return;
             if (requireFreshCanvasDown && e.Clicks != 1) return;
             if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle) return;
             requireFreshCanvasDown = false;
@@ -561,7 +561,7 @@ namespace HexMapEditor
 
         void CanvasMouseMove(object sender, MouseEventArgs e)
         {
-            if (modalDepth > 0) return;
+            if (modalDepth > 0 || rightResizing) return;
             int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
             if (e.Button == MouseButtons.None) { waitingForMouseRelease = false; if (gestureButton != MouseButtons.None) EndCanvasGesture(true); return; }
             // A pressed button alone is not an editing gesture: its Down must belong to this canvas.
@@ -592,7 +592,8 @@ namespace HexMapEditor
 
         void CanvasMouseWheel(object sender, MouseEventArgs e)
         {
-            float old = scale, next = Math.Max(.08f, Math.Min(4f, old * (e.Delta > 0 ? 1.12f : 1f / 1.12f)));
+            if (rightResizing || modalDepth > 0) return;
+            float old = scale, next = Math.Max(Math.Min(old, .01f), Math.Min(Math.Max(old, 128f), old * (e.Delta > 0 ? 1.12f : 1f / 1.12f)));
             float factor = next / old; pan = new PointF(e.X - (e.X - pan.X) * factor, e.Y - (e.Y - pan.Y) * factor); scale = next; UpdateUI();
         }
 

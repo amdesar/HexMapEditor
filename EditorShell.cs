@@ -12,6 +12,10 @@ namespace HexMapEditor
     internal static class EditorIcons
     {
         static readonly Dictionary<string, Bitmap> cache = new Dictionary<string, Bitmap>();
+        public static Bitmap Small(string key)
+        {
+            Bitmap image; if (!cache.TryGetValue("small:" + key, out image)) { image = new Bitmap(Draw(key), new Size(18, 18)); cache.Add("small:" + key, image); } return image;
+        }
         public static Bitmap Draw(string key)
         {
             Bitmap existing; if (cache.TryGetValue(key, out existing)) return existing;
@@ -30,6 +34,8 @@ namespace HexMapEditor
                 else if (key == "hand") { g.DrawEllipse(p, 5, 8, 12, 12); for (int x = 5; x <= 17; x += 4) g.DrawLine(p, x, 10, x, 2 + Math.Abs(x - 11) / 2); }
                 else if (key == "brush") { g.DrawLines(p, new[] { new Point(6, 13), new Point(16, 2), new Point(20, 5), new Point(10, 16) }); g.DrawBezier(p, 8, 13, 2, 12, 7, 20, 2, 20); g.DrawLine(p, 2, 20, 10, 16); }
                 else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 11), new Point(10, 3), new Point(18, 11), new Point(10, 19) }); g.DrawLine(p, 3, 11, 17, 11); g.DrawEllipse(p, 18, 13, 3, 5); }
+                else if (key == "pencil") { g.DrawPolygon(p, new[] { new Point(3, 19), new Point(5, 12), new Point(15, 2), new Point(20, 7), new Point(10, 17) }); g.DrawLine(p, 12, 5, 17, 10); }
+                else if (key == "trash") { g.DrawRectangle(p, 6, 7, 11, 13); g.DrawLine(p, 3, 5, 20, 5); g.DrawLine(p, 9, 2, 14, 2); g.DrawLine(p, 9, 10, 9, 17); g.DrawLine(p, 14, 10, 14, 17); }
                 else if (key == "fit") { foreach (int x in new[] { 2, 20 }) foreach (int y in new[] { 2, 20 }) { g.DrawLine(p, x, y, x == 2 ? 8 : 14, y); g.DrawLine(p, x, y, x, y == 2 ? 8 : 14); } }
                 else { g.DrawRectangle(p, 3, 3, 16, 16); g.DrawLine(p, 7, 8, 15, 8); g.DrawLine(p, 7, 13, 15, 13); }
             }
@@ -40,22 +46,25 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         Panel shellToolbar;
+        FlowLayoutPanel fileGroup, viewGroup;
         readonly Label detailCoordinate = new Label(), detailTerrain = new Label();
-        readonly FlowLayoutPanel paletteTiles = new FlowLayoutPanel();
+        readonly FlowLayoutPanel paletteTiles = new BufferedFlowPanel();
+        readonly Label presetStateLabel = new Label();
         readonly Dictionary<EditorTool, Button> toolButtons = new Dictionary<EditorTool, Button>();
         void ConfigureButton(Button button, string text, string icon, string help, Action action, int width)
         {
             button.Text = text; button.Image = EditorIcons.Draw(icon); button.TextImageRelation = TextImageRelation.ImageBeforeText;
-            button.Width = width; button.Height = 34; button.Margin = new Padding(2); button.FlatStyle = FlatStyle.Flat;
+            button.Width = width; button.Height = 32; button.Margin = new Padding(1); button.Padding = new Padding(2, 0, 2, 0); button.FlatStyle = FlatStyle.Flat;
+            button.Image = EditorIcons.Small(icon); button.ImageAlign = ContentAlignment.MiddleCenter; button.TextAlign = ContentAlignment.MiddleCenter;
             button.AccessibleName = help; tips.SetToolTip(button, help); StyleButton(button); button.Click += (s, e) => action();
         }
         Button ShellButton(Control parent, string text, string icon, string help, Action action, int width)
         { var button = new Button(); ConfigureButton(button, text, icon, help, action, width); parent.Controls.Add(button); return button; }
         void InitializeShell()
         {
-            shellToolbar = new Panel { Dock = DockStyle.Top, Height = 83, BackColor = Color.FromArgb(34, 38, 48) }; Controls.Add(shellToolbar);
-            var file = new FlowLayoutPanel { Location = new Point(4, 4), Size = new Size(638, 38), WrapContents = false };
-            var view = new FlowLayoutPanel { Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(ClientSize.Width - 490, 4), Size = new Size(486, 38), WrapContents = false };
+            shellToolbar = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.FromArgb(34, 38, 48) }; Controls.Add(shellToolbar);
+            var file = fileGroup = new FlowLayoutPanel { Location = new Point(4, 4), Height = 34, WrapContents = false };
+            var view = viewGroup = new FlowLayoutPanel { Height = 34, WrapContents = false };
             shellToolbar.Controls.Add(file); shellToolbar.Controls.Add(view);
             ShellButton(file, "Nowa", "new", "Nowa mapa", NewProject, 70); ShellButton(file, "Otwórz", "open", "Otwórz mapę", OpenProject, 80);
             ConfigureButton(saveButton, "Zapisz", "save", "Zapisz (Ctrl+S)", () => SaveProject(), 86); file.Controls.Add(saveButton);
@@ -68,7 +77,7 @@ namespace HexMapEditor
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
             ConfigureButton(fitButton, "Dopasuj", "fit", "Dopasuj mapę (prawy panel jest nakładką)", FitMap, 94); view.Controls.Add(fitButton);
             ShellButton(view, "Rozmiar", "labels", "Dodaj lub usuń wiersze i kolumny", ResizeProject, 90);
-            mapName.SetBounds(12, 45, ClientSize.Width - 24, 30); mapName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; mapName.TextAlign = ContentAlignment.MiddleCenter; mapName.Font = new Font(Font, FontStyle.Bold); mapName.AutoEllipsis = true; mapName.AccessibleName = "Nazwa projektu"; shellToolbar.Controls.Add(mapName);
+            mapName.TextAlign = ContentAlignment.MiddleCenter; mapName.Font = new Font(Font, FontStyle.Bold); mapName.AutoEllipsis = true; mapName.AccessibleName = "Nazwa projektu"; shellToolbar.Controls.Add(mapName);
             var status = new Panel { Dock = DockStyle.Bottom, Height = 27, BackColor = shellToolbar.BackColor }; statusLabel.Dock = DockStyle.Fill; statusLabel.Padding = new Padding(10, 4, 0, 0); status.Controls.Add(statusLabel); Controls.Add(status);
             canvas.BackColor = Color.FromArgb(25, 28, 36); canvas.TabStop = true; Controls.Add(canvas); canvas.SendToBack();
             canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel;
@@ -77,20 +86,29 @@ namespace HexMapEditor
             leftToggle.FlatStyle = FlatStyle.Flat; StyleButton(leftToggle); leftToggle.AccessibleName = "Zwiń lub rozwiń paletę"; tips.SetToolTip(leftToggle, leftToggle.AccessibleName); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; PositionOverlays(); canvas.Invalidate(); }; Controls.Add(leftToggle);
             BuildPalettePanel(); BuildDetailsPanel(); Controls.Add(right);
         }
+        void LayoutMainToolbar()
+        {
+            fileGroup.Width = fileGroup.Controls.Cast<Control>().Sum(c => c.Width + c.Margin.Horizontal);
+            viewGroup.Width = viewGroup.Controls.Cast<Control>().Sum(c => c.Width + c.Margin.Horizontal);
+            fileGroup.Location = new Point(4, 4); viewGroup.Location = new Point(shellToolbar.ClientSize.Width - viewGroup.Width - 4, 4);
+            int titleHeight = mapName.Font.Height + 2;
+            mapName.Bounds = new Rectangle(fileGroup.Right + 8, 4 + (34 - titleHeight) / 2, Math.Max(0, viewGroup.Left - fileGroup.Right - 16), titleHeight);
+        }
         void BuildPalettePanel()
         {
-            var body = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(8), Width = 216 };
+            var body = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4), Width = 216 };
             left.Controls.Add(body);
-            var tools = new FlowLayoutPanel { Width = 198, Height = 44, WrapContents = false };
+            var tools = new FlowLayoutPanel { Width = 188, Height = 44, WrapContents = false };
             var names = new[] { "Zaznaczanie", "Przesuwanie", "Pędzel", "Wiadro" }; var icons = new[] { "select", "hand", "brush", "bucket" };
             for (int i = 0; i < 4; i++) { var tool = (EditorTool)i; var b = ShellButton(tools, "", icons[i], names[i], () => SelectTool(tool), 44); toolButtons.Add(tool, b); } body.Controls.Add(tools); SelectTool(EditorTool.Select);
             body.Controls.Add(new Label { Text = "Zestaw terenów", AutoSize = true, Margin = new Padding(3, 10, 3, 4) });
-            terrainPicker.Width = 194; terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name";
-            terrainPicker.SelectedIndexChanged += (s, e) => { if (updating || terrainPicker.SelectedItem == null) return; EndCanvasGesture(true); var chosen = (TerrainPreset)terrainPicker.SelectedItem; if (!map.Presets.Any(p => p.Id == chosen.Id)) map.Presets.Add(chosen.Copy()); map.ActivePresetId = chosen.Id; brushIndex = 0; RefreshPresetPicker(); MarkDirty(); }; body.Controls.Add(terrainPicker);
-            var actions = new FlowLayoutPanel { Width = 198, Height = 70, WrapContents = true };
-            SmallButton(actions, "Nowy zestaw", CreatePreset, 94); SmallButton(actions, "Nazwa", RenamePreset, 92); SmallButton(actions, "Zapisz zestaw", SavePreset, 190); body.Controls.Add(actions);
-            paletteTiles.Width = 198; paletteTiles.AutoSize = true; paletteTiles.WrapContents = true; body.Controls.Add(paletteTiles);
-            var edit = new FlowLayoutPanel { Width = 198, Height = 66 }; SmallButton(edit, "Dodaj", () => EditTerrain(true), 60); SmallButton(edit, "Edytuj", () => EditTerrain(false), 60); SmallButton(edit, "Usuń", RemoveTerrain, 60); body.Controls.Add(edit);
+            terrainPicker.Width = 188; terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name";
+            terrainPicker.SelectedIndexChanged += (s, e) => { if (!updating && terrainPicker.SelectedItem != null) SelectPreset(((TerrainPreset)terrainPicker.SelectedItem).Id); }; body.Controls.Add(terrainPicker);
+            var actions = new FlowLayoutPanel { Width = 188, Height = 70, WrapContents = true };
+            SmallButton(actions, "Nowy zestaw", CreatePreset, 90); SmallButton(actions, "Nazwa", RenamePreset, 90); SmallButton(actions, "Zapisz zestaw", SavePreset, 184); body.Controls.Add(actions);
+            presetStateLabel.Width = 188; presetStateLabel.Height = 40; presetStateLabel.AutoEllipsis = true; body.Controls.Add(presetStateLabel);
+            SmallButton(body, "Dodaj teren", () => EditTerrain(true), 184);
+            paletteTiles.Width = 188; paletteTiles.AutoSize = true; paletteTiles.WrapContents = true; body.Controls.Add(paletteTiles);
             RefreshPresetPicker();
         }
         Button SmallButton(Control parent, string text, Action action, int width)
@@ -105,17 +123,18 @@ namespace HexMapEditor
             right.BackColor = Color.FromArgb(34, 38, 48); right.Visible = false;
             var header = new Panel { Dock = DockStyle.Top, Height = 38 }; var title = new Label { Text = "Szczegóły heksu", Dock = DockStyle.Fill, Padding = new Padding(14, 10, 0, 0) }; header.Controls.Add(title);
             rightClose.Text = "Zamknij"; rightClose.Dock = DockStyle.Right; rightClose.Width = 85; StyleButton(rightClose); rightClose.Click += (s, e) => CloseDetailsPanel(); header.Controls.Add(rightClose);
-            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14) }; var content = new Panel { Location = new Point(14, 14), Height = 770, Width = 375 };
+            var scroll = new DetailsScrollPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14) }; var content = new Panel { Location = new Point(14, 14), Height = 770, Width = 375 };
             scroll.Controls.Add(content); right.Controls.Add(scroll); right.Controls.Add(header);
-            scroll.Resize += (s, e) => { content.Width = Math.Max(200, scroll.ClientSize.Width - 48); };
+            InitializePanelResize(header);
             detailCoordinate.SetBounds(0, 0, 360, 24); detailTerrain.SetBounds(0, 26, 360, 28); detailTerrain.AutoEllipsis = true; content.Controls.Add(detailCoordinate); content.Controls.Add(detailTerrain);
+            detailCoordinate.Anchor = detailTerrain.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             content.Controls.Add(new Label { Text = "Własna nazwa heksu", Location = new Point(0, 60), AutoSize = true });
             cellName.SetBounds(0, 84, 360, 26); cellName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellName.AccessibleName = "Własna nazwa heksu"; content.Controls.Add(cellName);
             cellName.TextChanged += (s, e) => NameEdited(); cellName.LostFocus += (s, e) => textHistory.BreakGroups();
             cellName.HistoryUndo = () => TextUndo("name", false);
             cellName.MouseDown += (s, e) => textHistory.BreakGroups();
             cellName.KeyDown += (s, e) => { if (e.Control || new[] { Keys.Left, Keys.Right, Keys.Up, Keys.Down, Keys.Home, Keys.End }.Contains(e.KeyCode)) textHistory.BreakGroups(); };
-            var history = new FlowLayoutPanel { Location = new Point(0, 112), Width = 360, Height = 34 }; SmallButton(history, "Cofnij nazwę", () => TextUndo("name", false), 116); SmallButton(history, "Ponów nazwę", () => TextUndo("name", true), 116); content.Controls.Add(history);
+            var history = new FlowLayoutPanel { Location = new Point(0, 112), Width = 360, Height = 34, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; SmallButton(history, "Cofnij nazwę", () => TextUndo("name", false), 116); SmallButton(history, "Ponów nazwę", () => TextUndo("name", true), 116); content.Controls.Add(history);
             content.Controls.Add(new Label { Text = "Opis (tekst, listy i tabele)", Location = new Point(0, 152), AutoSize = true });
             cellDescription.SetBounds(0, 178, 360, 570); cellDescription.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; content.Controls.Add(cellDescription);
             cellDescription.Changed = DescriptionEdited; cellDescription.HistoryRequested = repeat => TextUndo("description", repeat);
@@ -123,67 +142,8 @@ namespace HexMapEditor
             cellDescription.BreakHistoryGroup = () => textHistory.BreakGroups();
             cellDescription.Error = message => ShowEditorMessage(message, "Opis heksu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             cellDescription.TableSizeRequested = () => { using (var d = new TableSizeDialog()) return RunModal(() => d.ShowDialog(this)) == DialogResult.OK ? new[] { d.Rows, d.Columns } : null; };
-        }
-        TerrainPreset ActivePreset() { return map.Presets.First(p => p.Id == map.ActivePresetId); }
-        List<TerrainPreset> AvailablePresets() { return map.Presets.Concat(libraryPresets.Where(p => !map.Presets.Any(m => m.Id == p.Id))).ToList(); }
-        void RefreshPresetPicker()
-        {
-            bool previous = updating; updating = true;
-            try
-            {
-                terrainPicker.Items.Clear(); foreach (var p in AvailablePresets()) terrainPicker.Items.Add(p); terrainPicker.SelectedItem = map.Presets.FirstOrDefault(p => p.Id == map.ActivePresetId);
-                foreach (Control control in paletteTiles.Controls.Cast<Control>().ToArray()) control.Dispose(); paletteTiles.Controls.Clear();
-                var palette = ActivePreset(); brushIndex = Math.Max(0, Math.Min(brushIndex, palette.Terrains.Count - 1));
-                for (int i = 0; i < palette.Terrains.Count; i++)
-                {
-                    int at = i; var t = palette.Terrains[i]; var b = new Button { Text = t.Name, Width = 92, Height = 65, Margin = new Padding(3), BackColor = ParseColor(t.Color), ForeColor = Contrast(t.Color), FlatStyle = FlatStyle.Flat, AccessibleName = "Teren: " + t.Name }; b.FlatAppearance.BorderColor = Color.White; b.FlatAppearance.BorderSize = at == brushIndex ? 3 : 1;
-                    b.Click += (s, e) => { EndCanvasGesture(true); brushIndex = at; RefreshPresetPicker(); }; tips.SetToolTip(b, t.Name + " · wersja " + t.Revision); paletteTiles.Controls.Add(b);
-                }
-            }
-            finally { updating = previous; }
-        }
-        static Color Contrast(string color) { var c = ParseColor(color); return c.R * .299 + c.G * .587 + c.B * .114 > 145 ? Color.Black : Color.White; }
-        void LoadLibraryPresets(bool initial)
-        {
-            if (!EnsureLibrary()) return; string warning; libraryPresets = PresetCatalog.Load(Path.Combine(LibraryPaths.Root, "Terrains"), out warning);
-            if (initial && currentPath == null && !dirty) { var p = libraryPresets.FirstOrDefault(t => t.Id == PresetCatalog.DefaultId); if (p != null) map.Presets[0] = p.Copy(); CaptureSavedState(); }
-            RefreshPresetPicker(); if (!String.IsNullOrEmpty(warning)) ShowEditorMessage(warning, "Niektóre zestawy zostały pominięte", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
-        void CreatePreset()
-        { using (var d = new NameDialog("Nowy zestaw", "Nowy zestaw")) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK) { var p = new TerrainPreset { Name = d.Value }; p.Terrains.Add(PresetCatalog.Neutral()); map.Presets.Add(p); map.ActivePresetId = p.Id; brushIndex = 0; RefreshPresetPicker(); MarkDirty(); } }
-        void RenamePreset()
-        { var p = ActivePreset(); using (var d = new NameDialog("Nazwa zestawu", p.Name)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK) { p.Name = d.Value; RefreshPresetPicker(); MarkDirty(); } }
-        void SavePreset()
-        {
-            if (!EnsureLibrary()) return;
-            try { PresetCatalog.Save(ActivePreset(), Path.Combine(LibraryPaths.Root, "Terrains")); LoadLibraryPresets(false); ShowEditorMessage("Zapisano lokalny zestaw terenów.", "Zestaw terenów", MessageBoxButtons.OK, MessageBoxIcon.Information); }
-            catch (Exception ex) { ShowEditorMessage("Nie można zapisać zestawu.\n" + ex.Message, "Błąd zestawu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-        }
-        void EditTerrain(bool add)
-        {
-            var p = ActivePreset(); if (!add && p.Terrains.Count == 0) return;
-            var old = add ? new TerrainDefinition() : p.Terrains[brushIndex];
-            using (var d = new TerrainDialog(old, !add)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
-            {
-                var next = old.Copy(); next.Name = d.TerrainName; next.Color = d.TerrainColor;
-                if (add) { p.Terrains.Add(next); brushIndex = p.Terrains.Count - 1; }
-                else if (next.Name != old.Name || next.Color != old.Color) { next.VariantId = Guid.NewGuid().ToString("N"); next.Revision++; UpdateTerrain(old, next, d.ApplyToMap); }
-                RefreshPresetPicker(); MarkDirty();
-            }
-        }
-        void UpdateTerrain(TerrainDefinition old, TerrainDefinition next, bool apply)
-        {
-            EndCanvasGesture(true); var p = ActivePreset(); int at = p.Terrains.FindIndex(t => t.VariantId == old.VariantId); if (at < 0) throw new InvalidOperationException("Brak wersji terenu."); p.Terrains[at] = next;
-            if (!apply) return;
-            var action = new EditAction { Label = "Aktualizacja wersji terenu" };
-            foreach (var cell in map.Cells.Where(c => c.VariantId == old.VariantId)) { var before = new TerrainState(cell); MapLogic.ApplyTerrain(cell, next); action.Changes.Add(new CellChange { CellId = cell.Id, Before = before, After = new TerrainState(cell) }); }
-            if (action.Changes.Count > 0) PushAction(action);
-        }
-        void RemoveTerrain()
-        {
-            var p = ActivePreset(); if (p.Terrains.Count == 0) return;
-            if (ShowEditorMessage("Usunąć teren z zestawu? Istniejące heksy zachowają swoje dane.", "Usuń teren", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            p.Terrains.RemoveAt(brushIndex); brushIndex = 0; RefreshPresetPicker(); MarkDirty();
+            // Establish anchors at the design width before responsive layout begins.
+            scroll.Content = content; scroll.PerformLayout();
         }
     }
 }

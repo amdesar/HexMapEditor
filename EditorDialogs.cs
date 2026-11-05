@@ -38,18 +38,27 @@ namespace HexMapEditor
             apply.Checked = false; apply.Enabled = existing; Layout.Controls.Add(apply, 0, 2); Layout.SetColumnSpan(apply, 3); Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); Buttons(3, () => { if (TerrainName.Length > 0) DialogResult = DialogResult.OK; });
         }
     }
+    internal sealed class SavePresetDialog : EditorDialog
+    {
+        readonly RadioButton overwrite = new RadioButton { Text = "Nadpisz bieżący preset", AutoSize = true }, asNew = new RadioButton { Text = "Zapisz jako nowy preset", AutoSize = true };
+        readonly TextBox name = new TextBox { MaxLength = 200 };
+        public bool AsNew { get { return asNew.Checked; } } public string PresetName { get { return name.Text.Trim(); } }
+        public SavePresetDialog(TerrainPreset preset, bool saved) : base("Zapisz zestaw", 255)
+        {
+            overwrite.Enabled = saved && preset.Id != PresetCatalog.DefaultId; overwrite.Checked = overwrite.Enabled; asNew.Checked = !overwrite.Enabled;
+            name.Text = preset.Name + (preset.Id == PresetCatalog.DefaultId || saved ? " — kopia" : ""); name.Enabled = asNew.Checked;
+            Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); Layout.Controls.Add(overwrite, 0, 0); Layout.SetColumnSpan(overwrite, 3);
+            Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); Layout.Controls.Add(asNew, 0, 1); Layout.SetColumnSpan(asNew, 3);
+            Row(2, "Nowa nazwa", name, true);
+            var reason = new Label { Text = preset.Id == PresetCatalog.DefaultId ? "Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset z własnym ID." : saved ? "Nadpisanie zapisuje roboczą paletę do bieżącego pliku presetu. Historia nie cofa plików biblioteki." : "Ten zestaw nie został jeszcze zapisany. Najpierw zapisz go jako nowy preset.", Dock = DockStyle.Fill };
+            Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); Layout.Controls.Add(reason, 0, 3); Layout.SetColumnSpan(reason, 3); asNew.CheckedChanged += (s, e) => name.Enabled = asNew.Checked;
+            Buttons(4, () => { if (!AsNew || PresetName.Length > 0) DialogResult = DialogResult.OK; }); Ok.Text = "Zapisz";
+        }
+    }
     internal sealed class TableSizeDialog : EditorDialog
     {
         readonly NumericUpDown rows = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 2 }, columns = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 2 };
         public int Rows { get { return (int)rows.Value; } } public int Columns { get { return (int)columns.Value; } }
         public TableSizeDialog() : base("Wstaw tabelę (1–100)", 155) { Row(0, "Wiersze", rows, true); Row(1, "Kolumny", columns, true); Buttons(2, () => DialogResult = DialogResult.OK); }
-    }
-    internal sealed class ResizeDialog : EditorDialog
-    {
-        readonly ComboBox side = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList }, operation = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        readonly NumericUpDown amount = new NumericUpDown { Minimum = 1, Maximum = 199, Value = 1 };
-        public string Side { get { return new[] { "top", "bottom", "left", "right" }[side.SelectedIndex]; } } public int Delta { get { return (int)amount.Value * (operation.SelectedIndex == 0 ? 1 : -1); } }
-        public ResizeDialog(int columns, int rows) : base("Rozmiar mapy · " + columns + " × " + rows, 225)
-        { side.Items.AddRange(new[] { "Góra", "Dół", "Lewo", "Prawo" }); side.SelectedIndex = 0; operation.Items.AddRange(new[] { "Dodaj", "Usuń" }); operation.SelectedIndex = 0; Row(0, "Strona", side, true); Row(1, "Operacja", operation, true); Row(2, "Liczba", amount, true); Buttons(3, () => DialogResult = DialogResult.OK); }
     }
 }

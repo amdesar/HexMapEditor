@@ -43,12 +43,19 @@ namespace HexMapEditor
         {
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);
-            else
+            if (action.BeforePalette != null) { (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex); RefreshPresetPicker(); }
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);
                 foreach (var change in action.Changes) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) (after ? change.After : change.Before).ApplyTo(cell); }
             }
             selected = selectedId == null ? -1 : map.Cells.FindIndex(c => c.Id == selectedId); editorCellId = null;
+        }
+        bool ChangePalette(string label, Action mutate, Action<EditAction> changeMap = null)
+        {
+            EndCanvasGesture(true); var before = PaletteState.Capture(map, brushIndex); var action = new EditAction { Label = label, BeforePalette = before };
+            mutate(); var after = PaletteState.Capture(map, brushIndex);
+            if (before.Signature == after.Signature) return false;
+            if (changeMap != null) changeMap(action); action.AfterPalette = after; PushAction(action); RefreshPresetPicker(); MarkDirty(); return true;
         }
         void FillRegion(int start)
         {
@@ -61,15 +68,16 @@ namespace HexMapEditor
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
                 try
                 {
-                    int removed, data; var state = MapLogic.Resize(map, d.Side, d.Delta, out removed, out data);
-                    if (data > 0 && ShowEditorMessage("Usuniętych heksów: " + removed + ".\nHeksów zawierających dane: " + data + ".\n\nKontynuować usuwanie? Można je cofnąć historią mapy.", "Usunięcie danych mapy", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-                    ApplyResize(state);
+                    var plan = MapLogic.ResizeAll(map, d.TopDelta, d.BottomDelta, d.LeftDelta, d.RightDelta); if (plan.IsEmpty) return;
+                    if (plan.DataIndices.Count > 0) using (var warning = new ResizeWarningDialog(plan.RemovedIndices.Count, plan.DataIndices.Select(i => MapLogic.Coordinate(i, map.Columns)).ToArray())) { if (RunModal(() => warning.ShowDialog(this)) != DialogResult.Yes) return; }
+                    ApplyResize(plan.State);
                 }
                 catch (Exception ex) { ShowEditorMessage(ex.Message, "Nie można zmienić rozmiaru", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             }
         }
         void ApplyResize(ResizeState state)
         {
+            if (state == null) return;
             EndCanvasGesture(true); textHistory.BreakGroups();
             var action = new EditAction { Label = "Zmiana rozmiaru", BeforeResize = ResizeState.Capture(map), AfterResize = state };
             ApplyAction(action, true); PushAction(action); MarkDirty();
