@@ -43,7 +43,7 @@ namespace HexMapEditor.Tests
                 Test("orphan Move/Up cannot paint, select or pan with any tool", w =>
                 {
                     var pan = (PointF)Get(w, "pan");
-                    foreach (EditorTool tool in new[] { EditorTool.Brush, EditorTool.Select, EditorTool.Hand })
+                    foreach (EditorTool tool in new[] { EditorTool.Brush, EditorTool.Bucket, EditorTool.Select, EditorTool.Hand })
                     {
                         Set(w, "currentTool", tool);
                         Mouse(w, "Move", CellPoint(w, 0), MouseButtons.Left, 0); Mouse(w, "Up", CellPoint(w, 0), MouseButtons.Left);
@@ -129,6 +129,13 @@ namespace HexMapEditor.Tests
                     Check((MouseButtons)Get(w, "gestureButton") == MouseButtons.None && Count(w, "undo") == 1, "Capture loss left active stroke");
                     Mouse(w, "Move", CellPoint(w, 1), MouseButtons.Left, 0); Mouse(w, "Up", CellPoint(w, 1), MouseButtons.Left);
                     Check(Map(w).Cells[1].Terrain == "Teren neutralny" && Count(w, "undo") == 1, "Orphan events continued a lost-capture stroke");
+                });
+                Test("Bucket after modal rejects orphan events and needs a fresh gesture", w =>
+                {
+                    Set(w, "currentTool", EditorTool.Bucket); Modal(w, () => DialogResult.OK);
+                    Mouse(w, "Down", CellPoint(w, 0), MouseButtons.Left, 2); Mouse(w, "Move", CellPoint(w, 0), MouseButtons.Left, 0); Mouse(w, "Up", CellPoint(w, 0), MouseButtons.Left); CheckClean(w);
+                    Mouse(w, "Down", CellPoint(w, 0), MouseButtons.Left); Mouse(w, "Up", CellPoint(w, 0), MouseButtons.Left);
+                    Check(Map(w).Cells.All(c => c.Terrain == "Równina") && Count(w, "undo") == 1, "Fresh Bucket gesture failed or not grouped");
                 });
                 Console.WriteLine("Passed: " + passed + "; method/event replay tests, not native dialog interaction."); return 0;
             }

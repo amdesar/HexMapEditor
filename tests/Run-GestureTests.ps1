@@ -5,7 +5,7 @@ $outputDirectory = Join-Path $PSScriptRoot ('_work\gestures-' + [Guid]::NewGuid(
 [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
 $testExe = Join-Path $outputDirectory 'HexMapEditor.GestureTests.exe'
 try {
-    & $compiler /nologo /target:exe /optimize+ /main:HexMapEditor.Tests.GestureTests "/out:$testExe" /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll (Join-Path $projectRoot 'HexMapEditor.cs') (Join-Path $PSScriptRoot 'GestureTests.cs')
+    & (Join-Path $projectRoot 'Build.ps1') -Output $testExe -TestSource (Join-Path $PSScriptRoot 'GestureTests.cs') -EntryPoint 'HexMapEditor.Tests.GestureTests'
     if ($LASTEXITCODE -ne 0) { throw 'Gesture test compilation failed.' }
     & $testExe
     if ($LASTEXITCODE -ne 0) { throw 'Gesture tests failed.' }

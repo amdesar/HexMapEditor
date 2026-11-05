@@ -22,7 +22,7 @@ namespace HexMapEditor.Tests
         static void Check(bool value, string message) { if (!value) throw new Exception(message); }
         static void Test(string name, Action<MainWindow> body) { using (var w = new MainWindow()) body(w); passed++; Console.WriteLine("PASS " + name); }
         static string PathFor(string name) { return Path.Combine(root, name); }
-        static void Dirty(MainWindow w) { ((TextBox)Get(w, "mapName")).Text = "Niezapisana mapa"; }
+        static void Dirty(MainWindow w) { ((MapData)Get(w, "map")).Name += " zmiana"; Call(w, "MarkDirty"); }
         static bool TrySave(MainWindow w, string path, bool overwrite, out string error)
         {
             object[] args = { path, overwrite, null }; bool success = (bool)Call(w, "TrySaveTo", args); error = (string)args[2]; return success;
@@ -52,7 +52,7 @@ namespace HexMapEditor.Tests
                         Func<string, DialogResult> yes = path => { prompts++; Check(path == final, "Wrong final confirmation path"); return DialogResult.Yes; };
                         Check((bool)Call(w, "SaveAsTo", input, yes), "Confirmed save failed");
                         Check(prompts == 1 && (string)Get(w, "currentPath") == final && !(bool)Get(w, "dirty"), "Confirmation count/path/state incorrect");
-                        Check(new JavaScriptSerializer().Deserialize<MapData>(File.ReadAllText(final)).FormatVersion == 1, "Format changed");
+                        Check(new JavaScriptSerializer().Deserialize<MapData>(File.ReadAllText(final)).FormatVersion == 2, "Format changed");
                     }
                 });
                 Test("No/Cancel preserve target, current path and dirty state", w =>
@@ -71,7 +71,7 @@ namespace HexMapEditor.Tests
                     Dirty(w); int prompts = 0; string path = PathFor("new.txt.hexmap");
                     Func<string, DialogResult> unexpected = p => { prompts++; return DialogResult.No; };
                     Check((bool)Call(w, "SaveAsTo", PathFor("new.txt"), unexpected) && prompts == 0, "New file asked to overwrite");
-                    ((TextBox)Get(w, "mapName")).Text = "Zwykly zapis";
+                    ((MapData)Get(w, "map")).Name = "Zwykly zapis"; Call(w, "MarkDirty");
                     Check((bool)Call(w, "SaveProject"), "Ordinary Save failed");
                     Check((string)Get(w, "currentPath") == path && !(bool)Get(w, "dirty"), "Ordinary Save changed current path");
                     Check(new JavaScriptSerializer().Deserialize<MapData>(File.ReadAllText(path)).Name == "Zwykly zapis", "Ordinary Save missed changes");
@@ -148,7 +148,7 @@ namespace HexMapEditor.Tests
                         foreach (string rangeName in new[] { "columnsRange", "rowsRange" })
                         {
                             var range = (Label)layout.Controls[rangeName]; var numeric = rangeName == "columnsRange" ? cols : rows;
-                            Check(range.Text == "(1–200)" && range.Font.Italic && layout.GetColumn(range) == 2, "Range is not a separate italic third column");
+                            Check(range.Text == "(zakres: 1–200)" && range.Font.Italic && layout.GetColumn(range) == 2, "Range is not a separate italic third column");
                             Check(range.Left > numeric.Right && range.Right <= layout.ClientSize.Width - layout.Padding.Right, "Range overlaps or is clipped");
                             Check(TextRenderer.MeasureText(range.Text, range.Font).Width <= range.Width, "Range text is clipped");
                         }

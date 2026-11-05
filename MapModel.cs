@@ -1,0 +1,261 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Web.Script.Serialization;
+
+namespace HexMapEditor
+{
+    public sealed class TerrainDefinition
+    {
+        public string TerrainId { get; set; }
+        public string VariantId { get; set; }
+        public int Revision { get; set; }
+        public string Name { get; set; }
+        public string Color { get; set; }
+        public string FillKind { get; set; }
+        public TerrainDefinition() { TerrainId = Guid.NewGuid().ToString("N"); VariantId = Guid.NewGuid().ToString("N"); Revision = 1; Name = "Nowy teren"; Color = "#777F91"; FillKind = "color"; }
+        public TerrainDefinition Copy() { return (TerrainDefinition)MemberwiseClone(); }
+    }
+
+    public sealed class TerrainPreset
+    {
+        public int PresetFormatVersion { get; set; }
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public List<TerrainDefinition> Terrains { get; set; }
+        public TerrainPreset() { PresetFormatVersion = 1; Id = Guid.NewGuid().ToString("N"); Name = "Nowy zestaw"; Terrains = new List<TerrainDefinition>(); }
+        public TerrainPreset Copy() { return new TerrainPreset { Id = Id, Name = Name, Terrains = Terrains.Select(t => t.Copy()).ToList() }; }
+    }
+
+    internal static class PresetCatalog
+    {
+        public const string DefaultId = "default";
+        public const string NeutralId = "default-neutral";
+        public const string NeutralVariant = "default-neutral-v1";
+        public static TerrainPreset Default()
+        {
+            string[] names = { "Teren neutralny", "Woda", "Równina", "Góry", "Pustynia", "Czerń / Pustka" };
+            string[] colors = { "#777F91", "#287DB3", "#72A65B", "#8D8174", "#D1A94E", "#252735" };
+            string[] ids = { NeutralId, "default-water", "default-plain", "default-mountains", "default-desert", "default-void" };
+            var result = new TerrainPreset { Id = DefaultId, Name = "Domyślny" };
+            for (int i = 0; i < names.Length; i++) result.Terrains.Add(new TerrainDefinition { TerrainId = ids[i], VariantId = ids[i] + "-v1", Name = names[i], Color = colors[i] });
+            return result;
+        }
+        public static TerrainDefinition Neutral() { return Default().Terrains[0]; }
+        public static void Validate(TerrainPreset preset)
+        {
+            if (preset == null || preset.PresetFormatVersion != 1 || String.IsNullOrWhiteSpace(preset.Id) || String.IsNullOrWhiteSpace(preset.Name) || preset.Terrains == null || preset.Terrains.Count > 1000) throw new InvalidDataException("Nieprawidłowy zestaw terenów.");
+            var ids = new HashSet<string>(); var variants = new HashSet<string>();
+            foreach (var t in preset.Terrains)
+                if (t == null || String.IsNullOrWhiteSpace(t.TerrainId) || String.IsNullOrWhiteSpace(t.VariantId) || t.Revision < 1 || String.IsNullOrWhiteSpace(t.Name) || !MapLogic.ValidColor(t.Color) || t.FillKind != "color" || !ids.Add(t.TerrainId) || !variants.Add(t.VariantId)) throw new InvalidDataException("Nieprawidłowy lub powtórzony teren w zestawie.");
+        }
+        public static List<TerrainPreset> Load(string directory, out string warning)
+        {
+            var result = new List<TerrainPreset> { Default() }; var errors = new List<string>();
+            Directory.CreateDirectory(directory);
+            foreach (var file in Directory.GetFiles(directory, "*.terrainset.json"))
+            {
+                try
+                {
+                    if (new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("Zestaw przekracza 4 MiB.");
+                    var preset = MapLogic.Serializer().Deserialize<TerrainPreset>(File.ReadAllText(file, Encoding.UTF8)); Validate(preset);
+                    int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) result[at] = preset; else result.Add(preset);
+                }
+                catch (Exception ex) { errors.Add(Path.GetFileName(file) + ": " + ex.Message); }
+            }
+            warning = String.Join("\n", errors); return result;
+        }
+        public static void Save(TerrainPreset preset, string directory)
+        {
+            Validate(preset); Directory.CreateDirectory(directory);
+            string fileName = MapLogic.Hash(preset.Id) + ".terrainset.json";
+            MapLogic.AtomicWrite(Path.Combine(directory, fileName), MapLogic.Serializer().Serialize(preset), true);
+        }
+        public static TerrainDefinition Legacy(string name, string color)
+        {
+            var known = Default().Terrains.FirstOrDefault(t => t.Name == name && String.Equals(t.Color, color, StringComparison.OrdinalIgnoreCase));
+            if (known != null) return known;
+            string key = "legacy-" + MapLogic.Hash(name + "\n" + color.ToUpperInvariant());
+            return new TerrainDefinition { TerrainId = key, VariantId = key + "-v1", Name = name, Color = color };
+        }
+    }
+
+    internal sealed class ResizeState
+    {
+        public int Columns, Rows, RowParity, ColumnParity;
+        public List<CellData> Cells;
+        public static ResizeState Capture(MapData map) { return new ResizeState { Columns = map.Columns, Rows = map.Rows, RowParity = map.RowParity, ColumnParity = map.ColumnParity, Cells = new List<CellData>(map.Cells) }; }
+        public void Apply(MapData map) { map.Columns = Columns; map.Rows = Rows; map.RowParity = RowParity; map.ColumnParity = ColumnParity; map.Cells = new List<CellData>(Cells); }
+    }
+
+    internal static class MapLogic
+    {
+        public static JavaScriptSerializer Serializer() { return new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 128 }; }
+        public static string Hash(string value) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? ""))).Replace("-", "").ToLowerInvariant(); }
+        public static bool ValidColor(string value)
+        {
+            uint number; return value != null && value.Length == 7 && value[0] == '#' && UInt32.TryParse(value.Substring(1), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out number);
+        }
+        public static void ApplyTerrain(CellData cell, TerrainDefinition terrain)
+        {
+            cell.Terrain = terrain.Name; cell.Color = terrain.Color; cell.TerrainId = terrain.TerrainId; cell.VariantId = terrain.VariantId; cell.TerrainRevision = terrain.Revision;
+        }
+        public static MapData Migrate(MapData map)
+        {
+            if (map == null) throw new InvalidDataException("Brak danych mapy.");
+            if (map.FormatVersion != 1 && map.FormatVersion != 2) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + map.FormatVersion);
+            if (map.Cells == null) throw new InvalidDataException("Brak pól mapy.");
+            if (map.FormatVersion == 1)
+            {
+                foreach (var cell in map.Cells)
+                {
+                    if (cell == null || !ValidColor(cell.Color) || String.IsNullOrWhiteSpace(cell.Terrain)) throw new InvalidDataException("Uszkodzone dane terenu.");
+                    if (!String.IsNullOrEmpty(cell.NotesFormat) && cell.NotesFormat != "plainText") throw new InvalidDataException("Nieobsługiwany format starego opisu; plik pozostaje bez zmian.");
+                    cell.Id = Guid.NewGuid().ToString("N"); var legacy = PresetCatalog.Legacy(cell.Terrain, cell.Color);
+                    cell.TerrainId = legacy.TerrainId; cell.VariantId = legacy.VariantId; cell.TerrainRevision = legacy.Revision;
+                    cell.RichDescription = null; cell.NotesFormat = "plainText";
+                }
+                map.RowParity = map.ColumnParity = 0; map.Presets = new List<TerrainPreset> { PresetCatalog.Default() }; map.ActivePresetId = PresetCatalog.DefaultId; map.FormatVersion = 2;
+            }
+            if (String.IsNullOrEmpty(map.LabelMode)) map.LabelMode = "Axes";
+            return map;
+        }
+        public static IEnumerable<int> Neighbors(MapData map, int index)
+        {
+            int c = index % map.Columns, r = index / map.Columns;
+            var points = new List<Point>();
+            if (map.Orientation == "PointyTop")
+            {
+                int shift = ((r + map.RowParity) & 1) == 1 ? 1 : -1;
+                points.Add(new Point(c - 1, r)); points.Add(new Point(c + 1, r));
+                points.Add(new Point(c, r - 1)); points.Add(new Point(c + shift, r - 1)); points.Add(new Point(c, r + 1)); points.Add(new Point(c + shift, r + 1));
+            }
+            else
+            {
+                int shift = ((c + map.ColumnParity) & 1) == 1 ? 1 : -1;
+                points.Add(new Point(c, r - 1)); points.Add(new Point(c, r + 1));
+                points.Add(new Point(c - 1, r)); points.Add(new Point(c - 1, r + shift)); points.Add(new Point(c + 1, r)); points.Add(new Point(c + 1, r + shift));
+            }
+            foreach (var p in points) if (p.X >= 0 && p.Y >= 0 && p.X < map.Columns && p.Y < map.Rows) yield return p.Y * map.Columns + p.X;
+        }
+        public static List<int> Flood(MapData map, int start)
+        {
+            var result = new List<int>(); if (start < 0 || start >= map.Cells.Count) return result;
+            string variant = map.Cells[start].VariantId; var visited = new bool[map.Cells.Count]; var pending = new Queue<int>(); pending.Enqueue(start); visited[start] = true;
+            while (pending.Count != 0)
+            {
+                int current = pending.Dequeue(); result.Add(current);
+                foreach (int next in Neighbors(map, current)) if (!visited[next] && map.Cells[next].VariantId == variant) { visited[next] = true; pending.Enqueue(next); }
+            }
+            return result;
+        }
+        public static bool HasUserData(CellData cell)
+        {
+            return cell.VariantId != PresetCatalog.NeutralVariant || cell.Terrain != "Teren neutralny" || !String.Equals(cell.Color, "#777F91", StringComparison.OrdinalIgnoreCase) || !String.IsNullOrEmpty(cell.Name) || !String.IsNullOrEmpty(cell.Description) || !String.IsNullOrEmpty(cell.RichDescription);
+        }
+        public static ResizeState Resize(MapData map, string side, int delta, out int removed, out int withData)
+        {
+            if (!new[] { "top", "bottom", "left", "right" }.Contains(side) || delta == 0) throw new InvalidDataException("Wybierz stronę i dodatnią liczbę pól.");
+            int dc = side == "left" || side == "right" ? delta : 0, dr = side == "top" || side == "bottom" ? delta : 0;
+            int cols = map.Columns + dc, rows = map.Rows + dr;
+            if (cols < 1 || cols > 200 || rows < 1 || rows > 200) throw new InvalidDataException("Wynikowy rozmiar musi mieścić się w zakresie 1–200 w każdej osi.");
+            int left = side == "left" ? delta : 0, top = side == "top" ? delta : 0;
+            var state = new ResizeState { Columns = cols, Rows = rows, RowParity = (map.RowParity - top) & 1, ColumnParity = (map.ColumnParity - left) & 1, Cells = new List<CellData>() };
+            var kept = new HashSet<string>();
+            for (int r = 0; r < rows; r++) for (int c = 0; c < cols; c++)
+            {
+                int oldC = c - left, oldR = r - top;
+                var cell = oldC >= 0 && oldC < map.Columns && oldR >= 0 && oldR < map.Rows ? map.Cells[oldR * map.Columns + oldC] : new CellData();
+                state.Cells.Add(cell); kept.Add(cell.Id);
+            }
+            var cut = map.Cells.Where(c => !kept.Contains(c.Id)).ToList(); removed = cut.Count; withData = cut.Count(HasUserData); return state;
+        }
+        public static void AtomicWrite(string path, string text, bool overwrite)
+        {
+            string temp = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path)), ".hexmap-" + Guid.NewGuid().ToString("N") + ".tmp");
+            try
+            {
+                byte[] bytes = new UTF8Encoding(false).GetBytes(text);
+                using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
+                if (overwrite && File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
+            }
+            finally { if (File.Exists(temp)) File.Delete(temp); }
+        }
+    }
+
+    internal sealed class SavedMapState
+    {
+        readonly Dictionary<string, string> saved = new Dictionary<string, string>();
+        readonly HashSet<string> changed = new HashSet<string>();
+        string header;
+        bool headerChanged;
+        static string CellKey(CellData cell) { return MapLogic.Hash(MapLogic.Serializer().Serialize(cell)); }
+        static string Header(MapData map)
+        {
+            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets });
+        }
+        public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); changed.Clear(); headerChanged = false; }
+        public bool CheckCell(CellData cell) { string value; if (saved.TryGetValue(cell.Id, out value) && value == CellKey(cell)) changed.Remove(cell.Id); else changed.Add(cell.Id); return Dirty; }
+        public bool CheckAll(MapData map)
+        {
+            changed.Clear(); var ids = new HashSet<string>(); foreach (var cell in map.Cells) { ids.Add(cell.Id); CheckCell(cell); }
+            foreach (string id in saved.Keys) if (!ids.Contains(id)) changed.Add(id);
+            headerChanged = header != Header(map); return Dirty;
+        }
+        public bool Dirty { get { return headerChanged || changed.Count != 0; } }
+    }
+
+    internal sealed class TextHistory
+    {
+        public readonly List<string> States = new List<string>();
+        public int Cursor;
+        DateTime lastEdit;
+        DateTime groupStarted;
+        string lastKind;
+        public TextHistory(string initial) { States.Add(initial ?? ""); }
+        public void BreakGroup() { lastKind = null; }
+        public void Record(string value, string kind)
+        {
+            value = value ?? ""; if (States[Cursor] == value) return;
+            if (Cursor < States.Count - 1) States.RemoveRange(Cursor + 1, States.Count - Cursor - 1);
+            bool group = kind == "typing" && lastKind == kind && Cursor > 0 && DateTime.UtcNow - lastEdit < TimeSpan.FromMilliseconds(750) && DateTime.UtcNow - groupStarted < TimeSpan.FromSeconds(5);
+            if (group) States[Cursor] = value; else { States.Add(value); Cursor++; }
+            if (!group) groupStarted = DateTime.UtcNow;
+            while (States.Count > 101) { States.RemoveAt(0); Cursor--; }
+            lastEdit = DateTime.UtcNow; lastKind = kind;
+        }
+        public string Undo() { BreakGroup(); if (Cursor > 0) Cursor--; return States[Cursor]; }
+        public string Redo() { BreakGroup(); if (Cursor + 1 < States.Count) Cursor++; return States[Cursor]; }
+        // Current content belongs to the document; budget counts additional undo/redo snapshots.
+        public long Bytes { get { return States.Where((s, i) => i != Cursor).Sum(s => (long)s.Length * 2); } }
+        public bool DropOldest() { if (Cursor <= 0 || States.Count <= 1) return false; States.RemoveAt(0); Cursor--; return true; }
+    }
+
+    internal sealed class TextHistoryStore
+    {
+        readonly Dictionary<string, TextHistory> entries = new Dictionary<string, TextHistory>();
+        public const long Budget = 32L * 1024 * 1024;
+        public TextHistory For(string cellId, string field, string initial)
+        {
+            string key = cellId + ":" + field; TextHistory result;
+            if (!entries.TryGetValue(key, out result)) { result = new TextHistory(initial); entries.Add(key, result); } return result;
+        }
+        public void BreakGroups() { foreach (var history in entries.Values) history.BreakGroup(); }
+        public void Clear() { entries.Clear(); }
+        public void Trim()
+        {
+            long total = entries.Values.Sum(h => h.Bytes);
+            while (total > Budget)
+            {
+                var oldest = entries.Values.FirstOrDefault(h => h.Cursor > 0 && h.States.Count > 1);
+                if (oldest == null) break; long before = oldest.Bytes; oldest.DropOldest(); total -= before - oldest.Bytes;
+            }
+            // Redo snapshots also count; discard distant redo first if needed.
+            if (total > Budget) foreach (var h in entries.Values) { if (h.Cursor + 1 < h.States.Count) h.States.RemoveRange(h.Cursor + 1, h.States.Count - h.Cursor - 1); }
+        }
+    }
+}

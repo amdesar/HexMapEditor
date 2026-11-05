@@ -36,7 +36,7 @@ namespace HexMapEditor.Tests
         static void EditNotes(MainWindow window, string name, string description)
         {
             ((TextBox)Get(window, "cellName")).Text = name;
-            ((TextBox)Get(window, "cellDescription")).Text = description;
+            string doc = NoteCodec.Write(NoteCodec.FromPlain(description)); Call(window, "DescriptionEdited", doc, description, "paste");
         }
         static void Test(string name, Action<MainWindow> test)
         {
@@ -82,7 +82,7 @@ namespace HexMapEditor.Tests
                     Check(Count(w, "undo") == 0 && Count(w, "redo") == 1, "Empty stroke changed history");
                     Check(!(bool)Get(w, "dirty"), "Empty stroke dirtied project");
                     Check(((Button)Get(w, "saveButton")).Text == "Zapisz", "Empty stroke changed save indicator");
-                    ((TextBox)Get(w, "mapName")).Text = "Niezapisana nazwa"; Paint(w, 0, 0);
+                    SelectFirst(w); ((TextBox)Get(w, "cellName")).Text = "Niezapisana nazwa"; Paint(w, 0, 0);
                     Check((bool)Get(w, "dirty") && Count(w, "redo") == 1, "Empty stroke changed existing dirty state/Redo");
                 });
                 Test("real paint after Undo clears Redo", w =>
@@ -94,7 +94,7 @@ namespace HexMapEditor.Tests
                 Test("same HTML color case remains a no-op", w =>
                 {
                     Map(w).Cells[0].Color = "#777f91";
-                    Set(w, "savedSnapshot", new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(Map(w)));
+                    Call(w, "CaptureSavedState");
                     Paint(w, 1, 0); Call(w, "Undo"); Paint(w, 0, 0);
                     Check(Map(w).Cells[0].Color == "#777f91" && !(bool)Get(w, "dirty"), "Same color spelling changed project");
                     Set(w, "brushIndex", 2); Call(w, "PaintCell", 0);
@@ -125,24 +125,24 @@ namespace HexMapEditor.Tests
                         Check((bool)Call(w, "TrySaveTo", saveArgs), "Save failed: " + saveArgs[2]);
                         Check(!(bool)Get(w, "dirty") && Count(w, "undo") == 1, "Save cleared history or stayed dirty");
                         var saved = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<MapData>(File.ReadAllText(path));
-                        Check(saved.FormatVersion == 1, "Map format changed");
+                        Check(saved.FormatVersion == 2, "Map format changed");
                         Call(w, "Undo"); Check((bool)Get(w, "dirty") && w.Text.EndsWith(" *"), "Undo not marked dirty");
                         Call(w, "Redo"); Check(!(bool)Get(w, "dirty") && !w.Text.EndsWith(" *"), "Redo to saved state remains dirty");
                         Check(((Button)Get(w, "saveButton")).Text == "Zapisz", "Save indicator not restored");
                     }
                     finally { if (File.Exists(path)) File.Delete(path); Directory.Delete(directory); }
                 });
-                Test("text fields leave Ctrl+Z/Y to native control", w =>
+                Test("text fields use independent application history", w =>
                 {
                     Paint(w, 1, 0); SelectFirst(w); string terrain = Map(w).Cells[0].Terrain;
-                    foreach (string field in new[] { "mapName", "cellName", "cellDescription" })
+                    foreach (string field in new[] { "cellName" })
                     {
                         var box = (TextBox)Get(w, field); w.ActiveControl = box;
                         Check(w.ActiveControl == box, "Active text control not set");
                         foreach (Keys key in new[] { Keys.Z, Keys.Y })
                         {
                             var args = new KeyEventArgs(Keys.Control | key); Call(w, "OnKeyDown", w, args);
-                            Check(!args.Handled && !args.SuppressKeyPress, "Text shortcut intercepted");
+                            Check(args.Handled && args.SuppressKeyPress, "Text shortcut not routed to own history");
                             Check(Map(w).Cells[0].Terrain == terrain && Count(w, "undo") == 1, "Text shortcut changed map");
                         }
                         Call(w, "Undo");

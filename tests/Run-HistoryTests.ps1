@@ -5,7 +5,7 @@ $outputDirectory = Join-Path $PSScriptRoot ('_work\history-' + [Guid]::NewGuid()
 [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
 $testExe = Join-Path $outputDirectory 'HexMapEditor.HistoryTests.exe'
 try {
-    & $compiler /nologo /target:exe /optimize+ /main:HexMapEditor.Tests.HistoryTests "/out:$testExe" /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll (Join-Path $projectRoot 'HexMapEditor.cs') (Join-Path $PSScriptRoot 'HistoryTests.cs')
+    & (Join-Path $projectRoot 'Build.ps1') -Output $testExe -TestSource (Join-Path $PSScriptRoot 'HistoryTests.cs') -EntryPoint 'HexMapEditor.Tests.HistoryTests'
     if ($LASTEXITCODE -ne 0) { throw 'History test compilation failed.' }
     & $testExe
     if ($LASTEXITCODE -ne 0) { throw 'History tests failed.' }

@@ -1,10 +1,10 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.2, stan decyzji 5 listopada 2026.
-Nowy projekt: HexMapEditor-Codex. Implementacja od zera.
+Wersja: 1.3, stan decyzji 5 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.2.0; pierwszeństwo mają ustalenia sekcji 20.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
-Ten dokument określa zachowanie produktu, nie języki, frameworki, format wewnętrzny ani bibliotekę renderowania. Wykonawca ma dobrać i krótko uzasadnić technologie. Nie ma obowiązku korzystania z rozwiązań wcześniejszych prototypów. Nie wolno dopowiadać, że funkcja jest już zaimplementowana: ten projekt zaczyna się od pustego folderu.
+Ten dokument określa zachowanie produktu, nie języki, frameworki, format wewnętrzny ani bibliotekę renderowania. Wykonawca ma dobrać i krótko uzasadnić technologie. Wymagania początkowe opisywały nowy prototyp; obecnie rozwijamy istniejącą aplikację Windows Forms / GDI+ bez rozpoczynania od nowa. Funkcje docelowe nie są automatycznie funkcjami ukończonego przyrostu.
 Sekcje 2–15 opisują zakres docelowy. Sekcja 16 wyznacza pierwszy przyrost. Całości nie należy wykonywać jednym wielkim zadaniem. Funkcje odłożone oznaczono wprost. Przykładowe nazwy i treści nie są gotowymi pakietami do dołączenia.
 
 ## 2. Samodzielny program offline
@@ -143,3 +143,59 @@ Te decyzje mają pierwszeństwo przed sprzecznymi opisami wcześniejszych sekcji
 - Źródła i skrypty testów pozostają śledzone w `tests/`. Wszystkie tworzone przez nie artefakty trafiają do oddzielnych przebiegów w `/tests/_work/`, ignorowanego i odtwarzanego przez skrypty. Nie używamy systemowego TEMP, innych folderów ani użytkowego Library do własnych map kontrolnych; nie zmieniamy globalnych TEMP/TMP. Docelowa paczka użytkownika nie zawiera `tests/`.
 - Wolno usunąć wyłącznie sprawdzone stare artefakty i znane mapy kontrolne z głównego `bin`; pusty, niepotrzebny `bin` również można usunąć. Nie usuwamy danych o nieustalonym pochodzeniu ani głównego EXE. Sprzątanie nie jest częścią startu aplikacji.
 - Główne `/Library/`, `/tests/_work/` i `/bin/` są ignorowane. Biblioteka jest tworzona przez aplikację w strukturze ustalonej dla 0.1.3, bez usuwania istniejących danych. Jej śledzenie w Git kończymy bez przepisywania historii i bez usuwania lokalnych zasobów. Lokalizacja map i zachowanie Zapisz/Zapisz jako pozostają bez zmian.
+
+## 20. Rozbudowa 0.2.0
+
+Ta sekcja opisuje zaakceptowany przyrost i ma pierwszeństwo przed sprzecznymi wcześniejszymi ustaleniami. Aplikacja 0.2.0, zapis mapy w formacie 2, odczyt formatu 1. Sekcje o szerszym zakresie docelowym (grafiki, obiekty, mgła, eksport itd.) pozostają planem późniejszych przyrostów; ich brak nie jest błędem 0.2.0.
+
+### Interfejs i nazwa
+
+Pierwszy rząd paska: operacje plikowe i historia mapy po lewej, ustawienia widoku i zmiana rozmiaru po prawej. Drugi, zwarty rząd zawiera wyśrodkowaną, nieedytowalną nazwę projektu. Nie ma pola edycji nazwy mapy na głównym pasku. Nowa mapa otrzymuje nazwę początkową (domyślnie Nowa mapa), każdorazowo 15×10, osobne kursywą `(zakres: 1–200)` na prawo od obu pól, orientację i wybór działającego presetu. Etykiety bez selektora, zawsze domyślnie Axes. Dialog zachowuje szerokość 420; nie poszerzamy go z powodu zakresów.
+
+Do pierwszego zapisu wyświetlamy nazwę początkową i proponujemy ją jako nazwę pliku. Po udanym zapisie lub otwarciu źródłem nazwy jest nazwa pliku z usuniętym wyłącznie końcowym `.hexmap` (bez rozróżniania wielkości liter). `mapa.txt.hexmap` daje `mapa.txt`. Wewnętrzne `Name` nie nadpisuje tej nazwy. Zapisz zachowuje ścieżkę; Zapisz jako aktualizuje nazwę/ścieżkę wyłącznie po sukcesie. Anulowanie/błąd niczego tu nie zmieniają; ponowne otwarcie respektuje zmianę nazwy pliku w Eksploratorze.
+
+Przyciski plikowe i Biblioteka mają ikonę i polski tekst; historia mapy same zakrzywione strzałki; orientacja heks i Pointy Top / Flat Top; etykiety ikonę i krótki tryb; zoom procent; Dopasuj ikonę i tekst. Ikony narzędzi mają polskie podpowiedzi, nazwy dostępne i czytelny stan aktywny także przez ramkę. Własne symbole rysujemy w GDI+, bez emoji i pobierania zasobów. Reszta interfejsu pozostaje polska. Systemowy pasek tytułu i ostrzeżenia pozostają systemowe.
+
+Paleta jest dwukolumnowa, narzędzia mają całe ramki. Zwinięty lewy panel to wąski pasek rozwijania na całej wysokości mapy. Dopasuj uwzględnia bieżącą szerokość lewego panelu. Prawy panel pozostaje nakładką, z marginesami i przewijaniem; jego otwieranie/zamykanie nie zmienia kamery, a Dopasuj celowo nie odejmuje szerokości nakładki. Układ ma mieścić się przy minimalnym rozmiarze okna 1180×680. Niewielka dotychczasowa tolerancja trafiania przy zewnętrznym brzegu heksu pozostaje zaakceptowana.
+
+### Dokument i edytor
+
+Zachowujemy C# / Windows Forms / GDI+, offline i lokalne pliki. Formatowany edytor to WPF RichTextBox / FlowDocument osadzony przez ElementHost z istniejącego pełnego .NET Framework, bez pobierania nowej biblioteki, płatnego komponentu lub usługi. Weryfikacja lokalna przed integracją obejmuje rzeczywiste Table/Row/Cell, listę numerowaną i zapis/odczyt RTF; natywne Undo nie stanowi podstawy historii produktu.
+
+Opis obsługuje rozmiar czcionki, pogrubienie/kursywę/podkreślenie/przekreślenie, akapity, cztery podstawowe wyrównania, listy punktowane i numerowane. Wstawianie tabeli pyta o liczbę wierszy/kolumn. Można edytować komórki, dodawać/usunąć wiersz lub kolumnę przy bieżącej komórce i usunąć tabelę. To struktura dokumentu, nie tekst z tabulatorami.
+
+Wklej korzysta z RTF lub zwykłego tekstu. Przed importerem usuwa grupy obiektów/obrazów, metadane i instrukcje pól, zachowując tekst wynikowy pól; po imporcie dokument ogranicza się do obsługiwanego modelu. Nie ładuje aktywnego XAML, HTML, pakietów, obiektów ani zasobów internetowych. W razie nieudanej konwersji używa tekstu Unicode, a przy jego braku zgłasza błąd bez zmiany opisu. Oddzielne Sam tekst wkleja bez formatowania. Nie zapewniamy pełnego układu Worda: nieobsługiwane obrazy, obiekty, scalenia tabel, kroje/kolory tekstu i zaawansowany układ są upraszczane. Zachowujemy możliwy do odczytania tekst. Próba syntetycznego RTF nie jest testem Worda.
+
+Zapis opisu jest zamkniętym modelem JSON: akapit, run/break, lista/element, tabela/wiersz/komórka, obsługiwane właściwości stylu. Brak wykonywalnych odwołań. Limit 2 Mi znaków JSON, 20 000 elementów i głębokość 32; wymiary pojedynczej tabeli do 100×100 w ramach wspólnego limitu dokumentu. Odrzucenie zbyt dużej/niepoprawnej edycji przywraca poprzednią treść z komunikatem.
+
+### Oddzielne historie
+
+Historia nazwy i historia opisu (łącznie ze stylem, listami i tabelami) są wielopoziomowe i przypisane do stabilnego ID heksu oraz pola. Ctrl+Z/Ctrl+Y przy aktywnym edytorze dotyczą wyłącznie jego historii; poza edytorami historii mapy. Górne przyciski dotyczą zawsze mapy, panel ma własne przyciski tekstu. Nie używamy dwustanowego Undo natywnego TextBox jako historii produktu.
+
+Przejścia między heksami nie mieszają historii, a powrót w sesji ją zachowuje. Nowa/Otwórz i restart zerują ją; zapis jej nie zeruje ani nie utrwala. Nowa edycja po Undo usuwa odpowiednie Redo. Pisanie grupujemy przy przerwie poniżej 750 ms, najwyżej przez 5 s, z przerwaniem po nawigacji/zmianie pola. Formatowanie, tabele i wklejanie opisu mają osobne operacje. Limit 100 kroków na pole i 32 MiB dodatkowych migawek Undo/Redo łącznie, z pominięciem bieżącej treści dokumentów; przekroczenie usuwa najstarsze dostępne kroki i w razie potrzeby Redo. Przy pisaniu porównujemy stan pojedynczego heksu, nie serializujemy całej dużej mapy.
+
+Historia mapy do 300 operacji obejmuje malowanie, Wiadro, aktualizację konkretnej wersji terenu na mapie i zmianę rozmiaru. Małe operacje przywracają wyłącznie właściwości terenu, nigdy własną nazwę/opis/NotesFormat. Zmiana orientacji jest zapisywana i oznacza zmianę, ale pozostaje poza Undo/Redo. Edycja samych palet też nie jest cofaniem mapy. Zapis/Undo/Redo tekstu i mapy aktualizują oznaczenie niezapisanych zmian względem zapisanego stanu, a nie liczby wykonanych operacji.
+
+### Tereny i presety
+
+Selektor zestawu zastępuje dawny selektor pojedynczych terenów; kafelki wybierają teren. Dostępne tworzenie/wybieranie zestawów, zmiana nazwy i jawny zapis lokalny, dodawanie/edycja/usuwanie terenów z nazwą i kolorem. Zestaw domyślny odpowiada dotychczasowym sześciu terenom i jest odtwarzany z kodu. Pliki `Library/Terrains/*.terrainset.json` mają `PresetFormatVersion: 1`, stabilne ID zestawu i listę definicji. Edycje roboczych palet są też przechowywane w projekcie; Zapisz zestaw utrwala je w bibliotece.
+
+Definicja ma stabilny `TerrainId`, niezmienny `VariantId`, rosnącą `Revision` i rozszerzalne `FillKind` (obecnie wyłącznie color). Zmiana nazwy/koloru tworzy nowy wariant. Właściwości tego samego wariantu muszą być spójne w pliku. Tożsamość nie opiera się na nazwie ani kolorze.
+
+Zmiana zestawu, usunięcie terenu i domyślna edycja nie przemalowują istniejących heksów. Przełącznik Zastosuj do bieżącej mapy zawsze startuje wyłączony. Po włączeniu aktualizacja obejmuje tylko heksy bieżącej mapy używające dokładnie edytowanego starego VariantId i stanowi jeden wpis Undo. Inne warianty, pliki, własne nazwy i opisy pozostają nietknięte. Undo tej operacji dotyczy heksów, nie cofa palety. Mapa przechowuje własny wygląd i dane terenów, więc usunięcie lokalnego presetu nie odbiera jej czytelności.
+
+### Wiadro i rozmiar
+
+Wiadro od klikniętego heksu wypełnia jedynie spójny obszar tego samego VariantId, z sześcioma sąsiadami według orientacji i parzystości siatki. Stosujemy iteracyjną kolejkę, nie rekurencję. Nazwy/opisy pozostają; całe wypełnienie to jedna operacja Undo. Pusta operacja nie tworzy historii, nie usuwa Redo i nie zmienia stanu zapisu. Ochrona gestów z 0.1.4 działa również dla Wiadra i wszystkich nowych dialogów modalnych.
+
+Zmiana rozmiaru wybiera górę/dół/lewo/prawo, dodawanie/usuwanie i liczbę. Wynikowe osie 1–200. Zachowane heksy pozostają tymi samymi obiektami i ID, ze wszystkimi danymi; indeksy są przeliczane. Nowe heksy mają nową tożsamość i kanoniczny neutralny teren, bez skopiowanych notatek/historii. RowParity/ColumnParity są korygowane przy przesunięciu od góry/lewej, zachowując względny układ i sąsiedztwo w obu orientacjach.
+
+Podgląd usuwania liczy usuwane heksy i zawierające dane. Za dane uznajemy teren inny niż kanoniczny stan neutralny, własną nazwę, zwykły lub formatowany opis. Usuwanie takich pól wymaga ostrzeżenia tekstowego z obiema liczbami i potwierdzenia, domyślnie odmowa. Anulowanie nie zmienia mapy ani historii. Cały rozmiar jest jednym Undo/Redo, odtwarza usunięte heksy i wymiary. Historia malowania używa ID, a historia tekstu nadal dotyczy właściwego heksu; późniejsze notatki zachowanych heksów nie są cofane wraz z rozmiarem.
+
+### Zgodność i granice przyrostu
+
+Format 2 dodaje ID heksów, utrwalone wersje terenów, palety projektu, parzystości początku i strukturalne opisy `richDocument1`; czytelny Description pozostaje obok. Format 1 jest migrowany bez zmiany zwykłych opisów. Znane dawne pary terenu/koloru otrzymują domyślne ID, pozostałe deterministyczny wariant legacy z pary; format 1 nie pozwala odzyskać nieistniejącej informacji o historycznym pochodzeniu. Po otwarciu starej mapy informujemy o formacie 2 i braku odczytu przez 0.1.x. Zapisz jako umożliwia zachowanie oryginału.
+
+Limit całego pliku 128 MiB dotyczy zarówno zapisu, jak odczytu, aby nie zapisać mapy, której aplikacja potem nie odczyta. Nieobsługiwany format, brak jawnej wersji, brak utrwalonych ID formatu 2 i niepoprawny dokument są błędami odczytu przed zastąpieniem bieżącej mapy. Zachowujemy bezpieczny zapis i potwierdzenie końcowej ścieżki z 0.1.3 oraz wszystkie zasady Library/Gitignore i tests/_work z 0.1.4. Paczka programu nie zawiera testów ani lokalnego Library. Nie implementujemy teraz eksportu obrazów/tekstu, importu grafik, obiektów, mgły ani własnych okien systemowych.
+
+Testy 0.2.0 obejmują zapis dokumentów, oddzielne historie, presety/wersje, Wiadro, sąsiedztwo, wszystkie strony rozmiaru w obu orientacjach, Undo/Redo i ochronę danych, mapy formatu 1 oraz powroty z dialogów. Faktyczne wykonanie i ograniczenia prób okna/Worda/DPI określa raport, nie ta specyfikacja.

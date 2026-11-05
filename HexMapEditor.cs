@@ -12,7 +12,7 @@ namespace HexMapEditor
 {
     public enum HexOrientation { PointyTop, FlatTop }
     public enum LabelMode { Axes, InCells, None }
-    public enum EditorTool { Select, Hand, Brush }
+    public enum EditorTool { Select, Hand, Brush, Bucket }
 
     internal static class LibraryPaths
     {
@@ -33,12 +33,17 @@ namespace HexMapEditor
 
     public sealed class CellData
     {
+        public string Id { get; set; }
+        public string TerrainId { get; set; }
+        public string VariantId { get; set; }
+        public int TerrainRevision { get; set; }
         public string Terrain { get; set; }
         public string Color { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
         public string NotesFormat { get; set; }
-        public CellData() { Terrain = "Teren neutralny"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; }
+        public string RichDescription { get; set; }
+        public CellData() { Id = Guid.NewGuid().ToString("N"); TerrainId = PresetCatalog.NeutralId; VariantId = PresetCatalog.NeutralVariant; TerrainRevision = 1; Terrain = "Teren neutralny"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; }
     }
 
     public sealed class MapData
@@ -50,21 +55,28 @@ namespace HexMapEditor
         public string Orientation { get; set; }
         public string LabelMode { get; set; }
         public List<CellData> Cells { get; set; }
-        public MapData() { FormatVersion = 1; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); }
+        public int RowParity { get; set; }
+        public int ColumnParity { get; set; }
+        public string ActivePresetId { get; set; }
+        public List<TerrainPreset> Presets { get; set; }
+        public MapData() { FormatVersion = 2; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; }
     }
 
     internal sealed class TerrainState
     {
         public readonly string Terrain;
         public readonly string Color;
-        public TerrainState(CellData cell) { Terrain = cell.Terrain; Color = cell.Color; }
-        public bool Matches(CellData cell) { return String.Equals(Terrain, cell.Terrain, StringComparison.Ordinal) && String.Equals(Color, cell.Color, StringComparison.OrdinalIgnoreCase); }
-        public void ApplyTo(CellData cell) { cell.Terrain = Terrain; cell.Color = Color; }
+        public readonly string TerrainId, VariantId;
+        public readonly int Revision;
+        public TerrainState(CellData cell) { Terrain = cell.Terrain; Color = cell.Color; TerrainId = cell.TerrainId; VariantId = cell.VariantId; Revision = cell.TerrainRevision; }
+        public bool Matches(CellData cell) { return VariantId == cell.VariantId && TerrainId == cell.TerrainId && Revision == cell.TerrainRevision && String.Equals(Terrain, cell.Terrain, StringComparison.Ordinal) && String.Equals(Color, cell.Color, StringComparison.OrdinalIgnoreCase); }
+        public void ApplyTo(CellData cell) { cell.Terrain = Terrain; cell.Color = Color; cell.TerrainId = TerrainId; cell.VariantId = VariantId; cell.TerrainRevision = Revision; }
     }
 
     internal sealed class CellChange
     {
         public int Index;
+        public string CellId;
         public TerrainState Before;
         public TerrainState After;
     }
@@ -73,9 +85,10 @@ namespace HexMapEditor
     {
         public List<CellChange> Changes = new List<CellChange>();
         public string Label;
+        public ResizeState BeforeResize, AfterResize;
     }
 
-    public sealed class MainWindow : Form
+    public sealed partial class MainWindow : Form
     {
         static readonly string[] TerrainNames = { "Teren neutralny", "Woda", "Równina", "Góry", "Pustynia", "Czerń / Pustka" };
         static readonly string[] TerrainColors = { "#777F91", "#287DB3", "#72A65B", "#8D8174", "#D1A94E", "#252735" };
@@ -88,9 +101,9 @@ namespace HexMapEditor
         readonly ComboBox terrainPicker = new ComboBox();
         readonly Button orientationToggle = new Button();
         readonly Button labelToggle = new Button();
-        readonly TextBox mapName = new TextBox();
-        readonly TextBox cellName = new TextBox();
-        readonly TextBox cellDescription = new TextBox();
+        readonly Label mapName = new Label();
+        readonly HistoryNameBox cellName = new HistoryNameBox();
+        readonly RichNoteEditor cellDescription = new RichNoteEditor();
         readonly Label statusLabel = new Label();
         readonly Label dimensionsLabel = new Label();
         readonly Label coordinateLabel = new Label();
@@ -117,61 +130,23 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.1.4";
+        const string AppVersion = "0.2.0";
+        readonly SavedMapState savedState = new SavedMapState();
+        readonly TextHistoryStore textHistory = new TextHistoryStore();
+        string editorCellId;
+        List<TerrainPreset> libraryPresets = new List<TerrainPreset>();
         readonly Dictionary<int, TerrainState> strokeBefore = new Dictionary<int, TerrainState>();
         readonly Stack<EditAction> undo = new Stack<EditAction>();
         readonly Stack<EditAction> redo = new Stack<EditAction>();
 
         public MainWindow()
         {
-            Text = "HexMapEditor " + AppVersion;
-            MinimumSize = new Size(1180, 620);
-            Size = new Size(1440, 900);
-            StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(25, 28, 36);
-            ForeColor = Color.FromArgb(228, 231, 238);
-            Font = new Font("Segoe UI", 9f);
-            KeyPreview = true;
-
-            var toolbar = new Panel { Dock = DockStyle.Top, Height = 88, BackColor = Color.FromArgb(34, 38, 48), Padding = new Padding(10, 8, 10, 5) };
-            Controls.Add(toolbar);
-            var files = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 510, WrapContents = false, BackColor = Color.Transparent };
-            toolbar.Controls.Add(files);
-            AddButton(files, "Nowa", NewProject);
-            AddButton(files, "Otwórz", OpenProject);
-            saveButton = AddButton(files, "Zapisz", () => SaveProject());
-            AddButton(files, "Zapisz jako", () => SaveAsProject());
-            undoButton = AddButton(files, "Cofnij", Undo);
-            redoButton = AddButton(files, "Ponów", Redo);
-
-            var view = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 650, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, BackColor = Color.Transparent };
-            toolbar.Controls.Add(view);
-            fitButton = AddButton(view, "Dopasuj", FitMap);
-            zoomButton = AddButton(view, "100%", SetZoom100);
-            zoomButton.Click += (s, e) => SetZoom100();
-            labelToggle = AddButton(view, "Osie", CycleLabelMode); labelToggle.Width = 88; labelToggle.AutoSize = false;
-            orientationToggle = AddButton(view, "Pointy Top", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop")); orientationToggle.Width = 154; orientationToggle.AutoSize = false;
-            dimensionsLabel.Text = "15 × 10"; dimensionsLabel.Width = 64; dimensionsLabel.Height = 32; dimensionsLabel.Margin = new Padding(3); dimensionsLabel.TextAlign = ContentAlignment.MiddleCenter; dimensionsLabel.ForeColor = Color.FromArgb(210, 215, 225); view.Controls.Add(dimensionsLabel);
-            var library = new Button { Text = "Biblioteka", Width = 84, Height = 32, Margin = new Padding(3), FlatStyle = FlatStyle.Flat };
-            StyleButton(library); library.Click += (s, e) => { if (!EnsureLibrary()) return; try { System.Diagnostics.Process.Start("explorer.exe", "\"" + LibraryPaths.Root + "\""); } catch (Exception ex) { ShowEditorMessage("Nie można otworzyć biblioteki: " + ex.Message, "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Error); } }; view.Controls.Add(library);
-            var nameWrap = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 8, 0), BackColor = Color.Transparent };
-            toolbar.Controls.Add(nameWrap);
-            mapName.Dock = DockStyle.Top; mapName.Height = 27; mapName.TextAlign = HorizontalAlignment.Center; mapName.BackColor = Color.FromArgb(44, 48, 59); mapName.ForeColor = ForeColor; mapName.BorderStyle = BorderStyle.FixedSingle; nameWrap.Controls.Add(mapName);
-            mapName.TextChanged += (s, e) => { if (!updating) { map.Name = mapName.Text; MarkDirty(); } };
-
-            statusLabel.Dock = DockStyle.Bottom; statusLabel.Height = 27; statusLabel.Padding = new Padding(12, 0, 0, 0); statusLabel.TextAlign = ContentAlignment.MiddleLeft; statusLabel.BackColor = Color.FromArgb(34, 38, 48); Controls.Add(statusLabel);
-            canvas.Dock = DockStyle.None; canvas.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right; canvas.BackColor = Color.FromArgb(21, 24, 31); canvas.TabStop = true; canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel; canvas.MouseLeave += (s, e) => { coordinateLabel.Text = "Kursor: —"; }; Controls.Add(canvas);
-            canvas.MouseCaptureChanged += (s, e) => { if (!canvas.Capture && gestureButton != MouseButtons.None) EndCanvasGesture(true); };
-            left = BuildLeftPanel(); left.Width = 208; left.BackColor = Color.FromArgb(34, 38, 48); left.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Bottom; Controls.Add(left);
-            leftToggle.Text = "Zwiń panel  ‹"; leftToggle.Dock = DockStyle.None; leftToggle.Anchor = AnchorStyles.Left | AnchorStyles.Top; leftToggle.Height = 34; StyleButton(leftToggle); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; left.Visible = !leftCollapsed; leftToggle.Text = leftCollapsed ? "›" : "Zwiń panel  ‹"; leftToggle.Width = leftCollapsed ? 36 : 208; PositionOverlays(); leftToggle.BringToFront(); }; Controls.Add(leftToggle);
-            right = BuildRightPanel(); right.Width = 360; right.Anchor = AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom; right.Visible = false; Controls.Add(right);
-            rightClose.Text = "Zamknij panel  ×"; rightClose.Dock = DockStyle.Top; rightClose.Height = 36; StyleButton(rightClose); rightClose.Click += (s, e) => CloseDetailsPanel(); right.Controls.Add(rightClose);
-            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); EnsureLibrary(); };
-            Resize += (s, e) => PositionOverlays();
-            FormClosing += OnFormClosing;
-            KeyDown += OnKeyDown;
-            savedSnapshot = json.Serialize(map);
-            UpdateUI();
+            Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 680); Size = new Size(1440, 940);
+            StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
+            InitializeShell();
+            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); };
+            Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
+            CaptureSavedState(); UpdateUI();
         }
 
         static MapData NewMap(int cols, int rows, string orientation)
@@ -195,59 +170,15 @@ namespace HexMapEditor
 
         void StyleButton(Button b) { b.BackColor = Color.FromArgb(49, 54, 67); b.ForeColor = Color.FromArgb(236, 238, 243); b.FlatAppearance.BorderColor = Color.FromArgb(74, 81, 98); b.FlatAppearance.MouseOverBackColor = Color.FromArgb(65, 73, 90); b.Cursor = Cursors.Hand; }
 
-        Panel BuildLeftPanel()
-        {
-            var p = new Panel { Padding = new Padding(10), AutoScroll = true };
-            var content = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.Transparent, Width = 184 };
-            p.Controls.Add(content);
-            var toolTitle = new Label { Text = "PRZYBORNIK", Width = 184, Height = 30, ForeColor = Color.FromArgb(162, 173, 194), TextAlign = ContentAlignment.MiddleLeft };
-            content.Controls.Add(toolTitle);
-            var tools = new FlowLayoutPanel { Width = 188, Height = 40, WrapContents = false, BackColor = Color.Transparent, Margin = new Padding(0) };
-            foreach (var item in new[] { "Zaznacz", "Rączka", "Pędzel" })
-            {
-                var b = new RadioButton { Text = item, Appearance = Appearance.Button, Width = item == "Zaznacz" ? 72 : 57, Height = 32, Margin = new Padding(1), TextAlign = ContentAlignment.MiddleCenter, Checked = item == "Zaznacz", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(49, 54, 67), ForeColor = Color.White };
-                b.CheckedChanged += (s, e) => { if (b.Checked) { currentTool = item == "Rączka" ? EditorTool.Hand : item == "Pędzel" ? EditorTool.Brush : EditorTool.Select; canvas.Cursor = currentTool == EditorTool.Hand ? Cursors.Hand : currentTool == EditorTool.Brush ? Cursors.Cross : Cursors.Default; } };
-                tools.Controls.Add(b);
-            }
-            content.Controls.Add(tools);
-            var label = new Label { Text = "TEREN", Width = 184, Height = 32, ForeColor = Color.FromArgb(162, 173, 194), TextAlign = ContentAlignment.MiddleLeft };
-            content.Controls.Add(label);
-            terrainPicker.Width = 184; terrainPicker.Height = 30; terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.BackColor = Color.FromArgb(44, 48, 59); terrainPicker.ForeColor = ForeColor; terrainPicker.Items.AddRange(TerrainNames); terrainPicker.SelectedIndex = brushIndex; terrainPicker.SelectedIndexChanged += (s, e) => { if (terrainPicker.SelectedIndex >= 0) brushIndex = terrainPicker.SelectedIndex; };
-            content.Controls.Add(terrainPicker);
-            var palette = new FlowLayoutPanel { Width = 188, Height = 176, WrapContents = true, BackColor = Color.Transparent, Margin = new Padding(0, 10, 0, 0) };
-            for (int i = 0; i < TerrainNames.Length; i++)
-            {
-                int terrain = i;
-                var swatch = new Button { Text = TerrainNames[i], Width = 86, Height = 48, Margin = new Padding(2), FlatStyle = FlatStyle.Flat, BackColor = ParseColor(TerrainColors[i]), ForeColor = Color.White, TextAlign = ContentAlignment.MiddleCenter };
-                swatch.FlatAppearance.BorderColor = Color.FromArgb(90, 100, 120); swatch.Click += (s, e) => { brushIndex = terrain; terrainPicker.SelectedIndex = terrain; }; palette.Controls.Add(swatch);
-            }
-            content.Controls.Add(palette);
-            return p;
-        }
-
-        Panel BuildRightPanel()
-        {
-            var p = new Panel { Padding = new Padding(0), BackColor = Color.FromArgb(38, 42, 53) };
-            var title = new Label { Text = "SZCZEGÓŁY HEKSU", Bounds = new Rectangle(12, 43, 336, 28), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, ForeColor = Color.FromArgb(162, 173, 194), TextAlign = ContentAlignment.MiddleLeft }; p.Controls.Add(title);
-            var coord = new Label { Name = "cellCoord", Bounds = new Rectangle(12, 78, 336, 27), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, Font = new Font(Font, FontStyle.Bold), Text = "—" }; p.Controls.Add(coord);
-            var nameLabel = new Label { Text = "Nazwa własna", Bounds = new Rectangle(12, 111, 336, 22), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; p.Controls.Add(nameLabel);
-            cellName.Bounds = new Rectangle(12, 134, 336, 28); cellName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellName.BackColor = Color.FromArgb(48, 53, 66); cellName.ForeColor = ForeColor; cellName.BorderStyle = BorderStyle.FixedSingle; p.Controls.Add(cellName);
-            var terrainView = new Label { Name = "cellTerrain", Bounds = new Rectangle(12, 170, 336, 27), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, Text = "Teren: —", TextAlign = ContentAlignment.MiddleLeft }; p.Controls.Add(terrainView);
-            var descriptionLabel = new Label { Text = "Opis", Bounds = new Rectangle(12, 205, 336, 24), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; p.Controls.Add(descriptionLabel);
-            cellDescription.Multiline = true; cellDescription.ScrollBars = ScrollBars.Vertical; cellDescription.Bounds = new Rectangle(12, 231, 336, 220); cellDescription.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellDescription.BackColor = Color.FromArgb(48, 53, 66); cellDescription.ForeColor = ForeColor; cellDescription.BorderStyle = BorderStyle.FixedSingle; p.Controls.Add(cellDescription);
-            cellName.TextChanged += (s, e) => { if (!updating && selected >= 0) { map.Cells[selected].Name = cellName.Text; map.Cells[selected].NotesFormat = "plainText"; MarkDirty(); canvas.Invalidate(); } };
-            cellDescription.TextChanged += (s, e) => { if (!updating && selected >= 0) { map.Cells[selected].Description = cellDescription.Text; map.Cells[selected].NotesFormat = "plainText"; MarkDirty(); } };
-            return p;
-        }
-
         void PositionOverlays()
         {
-            int top = 88, bottom = 27;
-            canvas.Bounds = new Rectangle(0, top, ClientSize.Width, Math.Max(0, ClientSize.Height - top - bottom));
-            left.Bounds = new Rectangle(0, top, 208, Math.Max(0, ClientSize.Height - top - bottom));
-            leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : 0, top, leftCollapsed ? 36 : 208, 34);
-            int panelWidth = Math.Min(360, ClientSize.Width);
-            right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - panelWidth), top, panelWidth, Math.Max(0, ClientSize.Height - top - bottom));
+            if (shellToolbar == null) return;
+            int top = shellToolbar.Height, bottom = 27, height = Math.Max(0, ClientSize.Height - top - bottom);
+            canvas.Bounds = new Rectangle(0, top, ClientSize.Width, height);
+            left.Bounds = new Rectangle(0, top + 30, 220, Math.Max(0, height - 30));
+            leftToggle.Bounds = new Rectangle(0, top, leftCollapsed ? 28 : 220, leftCollapsed ? height : 30);
+            leftToggle.Text = leftCollapsed ? "›" : "Zwiń panel  ‹"; left.Visible = !leftCollapsed;
+            int width = Math.Min(440, ClientSize.Width); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
             left.BringToFront(); if (right.Visible) right.BringToFront(); leftToggle.BringToFront();
         }
 
@@ -262,35 +193,43 @@ namespace HexMapEditor
             selected = -1; rightPanelOpen = false; right.Visible = false; UpdateUI();
         }
 
-        void MarkDirty() { dirty = !String.Equals(json.Serialize(map), savedSnapshot, StringComparison.Ordinal); UpdateUI(); }
+        void MarkDirty() { dirty = savedState.CheckAll(map); UpdateUI(); }
+        void CaptureSavedState() { savedSnapshot = json.Serialize(map); savedState.Capture(map); dirty = false; }
+        void MarkCellDirty(CellData cell) { dirty = savedState.CheckCell(cell); UpdateCaption(); canvas.Invalidate(); }
+        static string ProjectTitle(string path, string initial)
+        {
+            if (String.IsNullOrEmpty(path)) return String.IsNullOrWhiteSpace(initial) ? "Nowa mapa" : initial;
+            string name = Path.GetFileName(path); return name.EndsWith(".hexmap", StringComparison.OrdinalIgnoreCase) ? name.Substring(0, name.Length - 7) : name;
+        }
+        void UpdateCaption()
+        {
+            Text = "HexMapEditor " + AppVersion + (dirty ? " *" : ""); mapName.Text = ProjectTitle(currentPath, map.Name) + (dirty ? " *" : ""); tips.SetToolTip(mapName, ProjectTitle(currentPath, map.Name));
+            saveButton.Text = dirty ? "Zapisz *" : "Zapisz"; saveButton.BackColor = dirty ? Color.FromArgb(83, 92, 122) : Color.FromArgb(49, 54, 67);
+        }
 
         void UpdateUI()
         {
             updating = true;
-            Text = "HexMapEditor " + AppVersion + (dirty ? " *" : ""); tips.SetToolTip(mapName, map.Name);
-            saveButton.Text = dirty ? "Zapisz *" : "Zapisz"; saveButton.BackColor = dirty ? Color.FromArgb(83, 92, 122) : Color.FromArgb(49, 54, 67);
-            undoButton.Enabled = undo.Count > 0; redoButton.Enabled = redo.Count > 0;
-            zoomButton.Text = Math.Round(scale * 100) + "%"; tips.SetToolTip(zoomButton, "Skala względem bazowego rozmiaru rysowania. Kliknij, aby ustawić 100%.");
-            statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
-            dimensionsLabel.Text = map.Columns + " × " + map.Rows;
-            mapName.Text = map.Name;
-            orientationToggle.Text = OrientationNames.Display(map.Orientation);
-            tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze. Kliknij, aby zmienić na Pointy Top." : "Pointy Top: wierzchołek na górze. Kliknij, aby zmienić na Flat Top.");
-            labelToggle.Text = map.LabelMode == "InCells" ? "W polach" : map.LabelMode == "None" ? "Brak" : "Osie";
-            tips.SetToolTip(labelToggle, "Etykiety: " + labelToggle.Text + ". Kliknij, aby przełączyć tryb.");
-            if (selected >= 0 && selected < map.Cells.Count)
+            try
             {
-                var cell = map.Cells[selected];
-                cellName.Text = cell.Name; cellDescription.Text = cell.Description;
-                right.Controls["cellCoord"].Text = "Współrzędne: " + Coordinate(selected);
-                right.Controls["cellTerrain"].Text = "Teren: " + cell.Terrain;
+                UpdateCaption(); undoButton.Enabled = undo.Count > 0; redoButton.Enabled = redo.Count > 0;
+                zoomButton.Text = Math.Round(scale * 100) + "%"; tips.SetToolTip(zoomButton, "Skala względem bazowego rozmiaru rysowania. Kliknij, aby ustawić 100%.");
+                statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
+                dimensionsLabel.Text = map.Columns + " × " + map.Rows;
+                orientationToggle.Text = OrientationNames.Display(map.Orientation); orientationToggle.Image = EditorIcons.Draw(map.Orientation == "FlatTop" ? "flat" : "pointy");
+                tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze" : "Pointy Top: wierzchołek na górze");
+                labelToggle.Text = map.LabelMode == "InCells" ? "W polach" : map.LabelMode == "None" ? "Brak" : "Osie";
+                if (selected >= 0 && selected < map.Cells.Count)
+                {
+                    var cell = map.Cells[selected];
+                    if (editorCellId != cell.Id) { textHistory.BreakGroups(); editorCellId = cell.Id; cellName.Text = cell.Name ?? ""; cellDescription.SetContent(cell.RichDescription, cell.Description); }
+                    detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = "Teren: " + cell.Terrain;
+                }
+                else { selected = -1; rightPanelOpen = false; editorCellId = null; }
+                right.Visible = rightPanelOpen && selected >= 0;
             }
-            else { selected = -1; rightPanelOpen = false; }
-            right.Visible = rightPanelOpen && selected >= 0;
-            PositionOverlays();
-            if (right.Visible) { right.BringToFront(); leftToggle.BringToFront(); }
-            updating = false;
-            canvas.Invalidate();
+            finally { updating = false; }
+            PositionOverlays(); canvas.Invalidate();
         }
 
         bool ConfirmDiscard()
@@ -305,37 +244,53 @@ namespace HexMapEditor
         void NewProject()
         {
             if (!ConfirmDiscard()) return;
-            using (var f = new NewMapDialog(map.Orientation))
+            var choices = AvailablePresets();
+            using (var f = new NewMapDialog(map.Orientation, choices))
             {
                 if (RunModal(() => f.ShowDialog(this)) != DialogResult.OK) return;
-                map = NewMap(f.Columns, f.Rows, f.Orientation); currentPath = null; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; rightPanelOpen = false; undo.Clear(); redo.Clear();
-                RecalculateFitTransform(); UpdateUI();
+                map = NewMap(f.Columns, f.Rows, f.Orientation); map.Name = f.ProjectName;
+                var preset = f.Preset.Copy(); map.Presets = new List<TerrainPreset> { preset }; map.ActivePresetId = preset.Id;
+                currentPath = null; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
+                CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
             }
         }
 
         void ChangeOrientation(string orientation)
         {
             if (map.Orientation == orientation) return;
+            EndCanvasGesture(true);
             map.Orientation = orientation; RecalculateFitTransform(); MarkDirty();
         }
 
         void OpenProject()
         {
             if (!ConfirmDiscard()) return;
-            using (var d = new OpenFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap|Wszystkie pliki (*.*)|*.*", Title = "Otwórz mapę" })
+            using (var d = new OpenFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap|Wszystkie pliki (*.*)|*.*", Title = "Otwórz mapę", RestoreDirectory = true })
             {
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
-                try
-                {
-                    var text = File.ReadAllText(d.FileName, Encoding.UTF8);
-                    var loaded = json.Deserialize<MapData>(text);
-                    if (loaded != null && String.IsNullOrEmpty(loaded.LabelMode)) loaded.LabelMode = "Axes";
-                    ValidateMap(loaded);
-                    map = loaded; currentPath = d.FileName; savedSnapshot = json.Serialize(map); dirty = false; selected = -1; rightPanelOpen = false; undo.Clear(); redo.Clear();
-                    RecalculateFitTransform(); UpdateUI();
-                }
-                catch (Exception ex) { ShowEditorMessage("Nie można otworzyć projektu. Plik jest uszkodzony albo ma nieobsługiwaną wersję.\n\n" + ex.Message, "Błąd odczytu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                string error; bool migrated;
+                if (!TryLoadProject(d.FileName, out error, out migrated)) ShowEditorMessage("Nie można otworzyć projektu.\n\n" + error, "Błąd odczytu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                else if (migrated) ShowEditorMessage("Wczytano mapę formatu 1 bez utraty zwykłych opisów. Następny zapis użyje formatu 2, którego wersje 0.1.x nie odczytają. Zapisz jako pozwala zachować oryginał.", "Format mapy", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+        }
+        bool TryLoadProject(string path, out string error, out bool migrated)
+        {
+            error = null; migrated = false;
+            try
+            {
+                if (new FileInfo(path).Length > 128L * 1024 * 1024) throw new InvalidDataException("Plik przekracza limit odczytu 128 MiB.");
+                var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
+                if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
+                if ((int)raw["FormatVersion"] == 2)
+                {
+                    var cells = raw.ContainsKey("Cells") ? raw["Cells"] as object[] : null;
+                    if (cells == null || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Format 2 wymaga utrwalonych identyfikatorów heksów i wersji terenów.");
+                }
+                var loaded = json.ConvertToType<MapData>(raw); migrated = loaded != null && loaded.FormatVersion == 1; loaded = MapLogic.Migrate(loaded); ValidateMap(loaded);
+                map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
+                CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); return true;
+            }
+            catch (Exception ex) { error = ex.Message; migrated = false; return false; }
         }
 
         bool SaveProject() { return String.IsNullOrEmpty(currentPath) ? SaveAsProject() : SaveTo(currentPath); }
@@ -352,7 +307,7 @@ namespace HexMapEditor
 
         SaveFileDialog CreateSaveDialog()
         {
-            return new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap", DefaultExt = "hexmap", AddExtension = false, OverwritePrompt = false, RestoreDirectory = true, InitialDirectory = String.IsNullOrEmpty(currentPath) ? LibraryPaths.Hexmaps : Path.GetDirectoryName(Path.GetFullPath(currentPath)), FileName = ProjectFileName(map.Name), Title = "Zapisz mapę jako" };
+            return new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap", DefaultExt = "hexmap", AddExtension = false, OverwritePrompt = false, RestoreDirectory = true, InitialDirectory = String.IsNullOrEmpty(currentPath) ? LibraryPaths.Hexmaps : Path.GetDirectoryName(Path.GetFullPath(currentPath)), FileName = ProjectFileName(ProjectTitle(currentPath, map.Name)), Title = "Zapisz mapę jako" };
         }
 
         bool SaveAsTo(string path, Func<string, DialogResult> confirmOverwrite)
@@ -403,9 +358,10 @@ namespace HexMapEditor
                 string directory = Path.GetDirectoryName(Path.GetFullPath(path));
                 temp = Path.Combine(directory, ".hexmap-" + Guid.NewGuid().ToString("N") + ".tmp");
                 byte[] bytes = new UTF8Encoding(false).GetBytes(json.Serialize(map));
+                if (bytes.LongLength > 128L * 1024 * 1024) throw new InvalidDataException("Mapa przekracza limit pliku 128 MiB. Zmniejsz zawartość opisów przed zapisem.");
                 using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
                 if (allowOverwrite && File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
-                currentPath = path; savedSnapshot = json.Serialize(map); dirty = false; UpdateUI(); return true;
+                currentPath = path; CaptureSavedState(); UpdateUI(); return true;
             }
             catch (Exception ex)
             {
@@ -419,27 +375,43 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 1) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ".");
+            if (m.FormatVersion != 2) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ".");
             if (m.Columns < 1 || m.Columns > 200 || m.Rows < 1 || m.Rows > 200) throw new InvalidDataException("Wymiary mapy muszą mieścić się w zakresie 1–200.");
             if (m.Orientation != "PointyTop" && m.Orientation != "FlatTop") throw new InvalidDataException("Nieprawidłowa orientacja mapy.");
             if (m.LabelMode != "Axes" && m.LabelMode != "InCells" && m.LabelMode != "None") throw new InvalidDataException("Nieprawidłowy tryb etykiet.");
-            if (m.Cells == null || m.Cells.Count != m.Columns * m.Rows) throw new InvalidDataException("Liczba pól nie zgadza się z wymiarami mapy.");
+            if (m.RowParity < 0 || m.RowParity > 1 || m.ColumnParity < 0 || m.ColumnParity > 1 || m.Cells == null || m.Cells.Count != m.Columns * m.Rows) throw new InvalidDataException("Nieprawidłowa siatka mapy.");
+            var ids = new HashSet<string>(); var variants = new Dictionary<string, string>();
             foreach (var c in m.Cells)
             {
-                uint color;
-                if (c == null || String.IsNullOrWhiteSpace(c.Terrain) || String.IsNullOrEmpty(c.Color) || c.Color.Length != 7 || !c.Color.StartsWith("#") || !UInt32.TryParse(c.Color.Substring(1), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out color)) throw new InvalidDataException("Dane terenu lub kolor pola są nieprawidłowe.");
+                if (c == null || String.IsNullOrWhiteSpace(c.Id) || !ids.Add(c.Id) || String.IsNullOrWhiteSpace(c.Terrain) || !MapLogic.ValidColor(c.Color) || String.IsNullOrWhiteSpace(c.TerrainId) || String.IsNullOrWhiteSpace(c.VariantId) || c.TerrainRevision < 1) throw new InvalidDataException("Nieprawidłowe dane heksu lub terenu.");
+                CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color);
+                if (c.NotesFormat == "richDocument1") { NoteCodec.Read(c.RichDescription); if (c.Description != NoteCodec.Plain(c.RichDescription)) throw new InvalidDataException("Zwykły tekst nie odpowiada formatowanemu opisowi."); }
+                else if (c.NotesFormat != "plainText" || !String.IsNullOrEmpty(c.RichDescription)) throw new InvalidDataException("Nieobsługiwany format notatek.");
             }
+            if (m.Presets == null || m.Presets.Count == 0 || m.Presets.Count > 100 || !m.Presets.Any(p => p.Id == m.ActivePresetId)) throw new InvalidDataException("Brak aktywnej palety projektu.");
+            var presets = new HashSet<string>(); foreach (var p in m.Presets) { PresetCatalog.Validate(p); if (!presets.Add(p.Id)) throw new InvalidDataException("Powtórzony identyfikator zestawu."); foreach (var t in p.Terrains) CheckVariant(variants, t.VariantId, t.TerrainId, t.Revision, t.Name, t.Color); }
+        }
+        static void CheckVariant(Dictionary<string, string> variants, string variant, string terrain, int revision, string name, string color)
+        {
+            string signature = MapLogic.Serializer().Serialize(new[] { terrain, revision.ToString(System.Globalization.CultureInfo.InvariantCulture), name, color.ToUpperInvariant() }); string previous;
+            if (variants.TryGetValue(variant, out previous) && previous != signature) throw new InvalidDataException("Sprzeczne właściwości tej samej wersji terenu: " + variant);
+            variants[variant] = signature;
         }
 
         void OnFormClosing(object sender, FormClosingEventArgs e) { if (!ConfirmDiscard()) e.Cancel = true; }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
-            // Let the native text control handle Undo. TextBox has no Ctrl+Y Redo.
-            if (e.Control && (e.KeyCode == Keys.Z || e.KeyCode == Keys.Y) && ActiveControl is TextBoxBase) return;
             if (e.Control && e.Shift && e.KeyCode == Keys.S) { SaveAsProject(); e.Handled = true; e.SuppressKeyPress = true; }
             else if (e.Control && !e.Shift && e.KeyCode == Keys.S) { SaveProject(); e.Handled = true; e.SuppressKeyPress = true; }
-            else if (e.Control && e.KeyCode == Keys.Z) { Undo(); e.Handled = true; e.SuppressKeyPress = true; }
-            else if (e.Control && e.KeyCode == Keys.Y) { Redo(); e.Handled = true; e.SuppressKeyPress = true; }
+            else if (e.Control && (e.KeyCode == Keys.Z || e.KeyCode == Keys.Y))
+            {
+                bool repeat = e.KeyCode == Keys.Y;
+                if (cellName.ContainsFocus || ActiveControl == cellName) TextUndo("name", repeat);
+                else if (cellDescription.ContainsFocus) TextUndo("description", repeat);
+                else if (ActiveControl is TextBoxBase) return;
+                else if (repeat) Redo(); else Undo();
+                e.Handled = true; e.SuppressKeyPress = true;
+            }
         }
 
         string Coordinate(int index)
@@ -454,8 +426,8 @@ namespace HexMapEditor
         PointF Center(int col, int row)
         {
             float r = BaseRadius;
-            if (map.Orientation == "FlatTop") return new PointF(1.5f * r * col, (float)(Math.Sqrt(3) * r * (row + (col & 1) * 0.5f)));
-            return new PointF((float)(Math.Sqrt(3) * r * (col + (row & 1) * 0.5f)), 1.5f * r * row);
+            if (map.Orientation == "FlatTop") return new PointF(1.5f * r * col, (float)(Math.Sqrt(3) * r * (row + ((col + map.ColumnParity) & 1) * 0.5f)));
+            return new PointF((float)(Math.Sqrt(3) * r * (col + ((row + map.RowParity) & 1) * 0.5f)), 1.5f * r * row);
         }
 
         void FitMap()
@@ -468,7 +440,7 @@ namespace HexMapEditor
         {
             if (canvas.ClientSize.Width < 20 || canvas.ClientSize.Height < 20) return false;
             RectangleF bounds = MapBounds();
-            float leftInset = leftCollapsed ? 36f : 208f;
+            float leftInset = leftCollapsed ? 28f : 220f;
             float viewWidth = Math.Max(100, canvas.ClientSize.Width - leftInset);
             float centerX = leftInset + viewWidth / 2f;
             scale = Math.Max(.08f, Math.Min(1.7f, Math.Min((viewWidth - 80) / Math.Max(bounds.Width, 1), (canvas.ClientSize.Height - 80) / Math.Max(bounds.Height, 1))));
@@ -478,16 +450,11 @@ namespace HexMapEditor
 
         RectangleF MapBounds()
         {
-            float r = BaseRadius, sqrt3 = (float)Math.Sqrt(3);
-            if (map.Orientation == "FlatTop")
-            {
-                float maxX = 1.5f * r * (map.Columns - 1);
-                float maxY = sqrt3 * r * (map.Rows - 1 + (map.Columns > 1 ? 0.5f : 0f));
-                return RectangleF.FromLTRB(-r, -sqrt3 * r / 2f, maxX + r, maxY + sqrt3 * r / 2f);
-            }
-            float pointyMaxX = sqrt3 * r * (map.Columns - 1 + (map.Rows > 1 ? 0.5f : 0f));
-            float pointyMaxY = 1.5f * r * (map.Rows - 1);
-            return RectangleF.FromLTRB(-sqrt3 * r / 2f, -r, pointyMaxX + sqrt3 * r / 2f, pointyMaxY + r);
+            var points = new List<PointF>();
+            foreach (int c in new[] { 0, Math.Min(1, map.Columns - 1), map.Columns - 1 }) foreach (int r in new[] { 0, Math.Min(1, map.Rows - 1), map.Rows - 1 }) points.Add(Center(c, r));
+            float xRadius = map.Orientation == "FlatTop" ? BaseRadius : (float)Math.Sqrt(3) * BaseRadius / 2f;
+            float yRadius = map.Orientation == "FlatTop" ? (float)Math.Sqrt(3) * BaseRadius / 2f : BaseRadius;
+            return RectangleF.FromLTRB(points.Min(p => p.X) - xRadius, points.Min(p => p.Y) - yRadius, points.Max(p => p.X) + xRadius, points.Max(p => p.Y) + yRadius);
         }
 
         void SetZoom100()
@@ -585,6 +552,7 @@ namespace HexMapEditor
             canvas.Focus();
             canvas.Capture = true;
             if (e.Button == MouseButtons.Middle || gestureTool == EditorTool.Hand) { panGesture = true; return; }
+            if (gestureTool == EditorTool.Bucket) { int hit = HitTest(e.Location); if (hit >= 0) FillRegion(hit); return; }
             if (gestureTool == EditorTool.Brush)
             {
                 strokeBefore.Clear(); int hit = HitTest(e.Location); if (hit >= 0) PaintCell(hit); canvas.Capture = true;
@@ -611,7 +579,7 @@ namespace HexMapEditor
         {
             if (Control.MouseButtons == MouseButtons.None) waitingForMouseRelease = false;
             if (modalDepth > 0 || waitingForMouseRelease || gestureButton == MouseButtons.None || e.Button != gestureButton) return;
-            if (panGesture || gestureTool == EditorTool.Brush) { EndCanvasGesture(true); return; }
+            if (panGesture || gestureTool == EditorTool.Brush || gestureTool == EditorTool.Bucket) { EndCanvasGesture(true); return; }
             if (!dragging)
             {
                 int hit = HitTest(e.Location);
@@ -631,9 +599,11 @@ namespace HexMapEditor
         void PaintCell(int index)
         {
             if (index < 0 || index >= map.Cells.Count) return;
-            if (String.Equals(map.Cells[index].Terrain, TerrainNames[brushIndex], StringComparison.Ordinal) && String.Equals(map.Cells[index].Color, TerrainColors[brushIndex], StringComparison.OrdinalIgnoreCase)) return;
-            if (!strokeBefore.ContainsKey(index)) strokeBefore[index] = new TerrainState(map.Cells[index]);
-            map.Cells[index].Terrain = TerrainNames[brushIndex]; map.Cells[index].Color = TerrainColors[brushIndex]; dirty = true; canvas.Invalidate();
+            var palette = ActivePreset(); if (palette.Terrains.Count == 0) return;
+            var terrain = palette.Terrains[Math.Max(0, Math.Min(brushIndex, palette.Terrains.Count - 1))]; var cell = map.Cells[index];
+            if (cell.VariantId == terrain.VariantId && cell.Terrain == terrain.Name && String.Equals(cell.Color, terrain.Color, StringComparison.OrdinalIgnoreCase)) return;
+            if (!strokeBefore.ContainsKey(index)) strokeBefore[index] = new TerrainState(cell);
+            MapLogic.ApplyTerrain(cell, terrain); dirty = true; canvas.Invalidate();
         }
 
         void FinishStroke()
@@ -645,7 +615,7 @@ namespace HexMapEditor
                 var cell = map.Cells[item.Key];
                 // Preserve the original HTML color spelling for a net-empty stroke.
                 if (item.Value.Matches(cell)) { item.Value.ApplyTo(cell); continue; }
-                action.Changes.Add(new CellChange { Index = item.Key, Before = item.Value, After = new TerrainState(cell) });
+                action.Changes.Add(new CellChange { Index = item.Key, CellId = cell.Id, Before = item.Value, After = new TerrainState(cell) });
             }
             strokeBefore.Clear();
             if (action.Changes.Count == 0) { MarkDirty(); return; }
@@ -653,8 +623,8 @@ namespace HexMapEditor
             redo.Clear(); MarkDirty();
         }
 
-        void Undo() { if (undo.Count == 0) return; var a = undo.Pop(); foreach (var c in a.Changes) c.Before.ApplyTo(map.Cells[c.Index]); redo.Push(a); MarkDirty(); }
-        void Redo() { if (redo.Count == 0) return; var a = redo.Pop(); foreach (var c in a.Changes) c.After.ApplyTo(map.Cells[c.Index]); undo.Push(a); MarkDirty(); }
+        void Undo() { EndCanvasGesture(true); if (undo.Count == 0) return; var action = undo.Pop(); ApplyAction(action, false); redo.Push(action); MarkDirty(); }
+        void Redo() { EndCanvasGesture(true); if (redo.Count == 0) return; var action = redo.Pop(); ApplyAction(action, true); undo.Push(action); MarkDirty(); }
     }
 
     internal sealed class BufferedPanel : Panel
@@ -662,31 +632,30 @@ namespace HexMapEditor
         public BufferedPanel() { DoubleBuffered = true; ResizeRedraw = true; }
     }
 
-    internal sealed class NewMapDialog : Form
+    internal sealed class NewMapDialog : EditorDialog
     {
         public int Columns { get; private set; }
         public int Rows { get; private set; }
         public string Orientation { get; private set; }
-        readonly NumericUpDown cols = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 15, Width = 90 };
-        readonly NumericUpDown rows = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 10, Width = 90 };
-        readonly ComboBox orient = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
-        public NewMapDialog(string o)
+        public string ProjectName { get; private set; }
+        public TerrainPreset Preset { get; private set; }
+        readonly NumericUpDown cols = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 15 };
+        readonly NumericUpDown rows = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 10 };
+        readonly ComboBox orient = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        readonly ComboBox presets = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name" };
+        readonly TextBox initialName = new TextBox { Text = "Nowa mapa", MaxLength = 200 };
+        public NewMapDialog(string o) : this(o, new List<TerrainPreset> { PresetCatalog.Default() }) { }
+        public NewMapDialog(string o, List<TerrainPreset> choices) : base("Nowa mapa", 270)
         {
-            Columns = 15; Rows = 10; Orientation = "PointyTop";
-            Text = "Nowa mapa"; FormBorderStyle = FormBorderStyle.FixedDialog; StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false; ClientSize = new Size(420, 215); BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.White; Font = new Font("Segoe UI", 9f);
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 3, RowCount = 4 }; layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); Controls.Add(layout);
+            Columns = 15; Rows = 10; Orientation = "PointyTop"; ProjectName = "Nowa mapa"; Preset = choices[0];
+            Row(0, "Nazwa", initialName, true); Row(1, "Kolumny", cols, false); Row(2, "Wiersze", rows, false);
             var rangeFont = new Font(Font, FontStyle.Italic); Disposed += (s, e) => rangeFont.Dispose();
-            layout.Controls.Add(new Label { Text = "Kolumny", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 0); layout.Controls.Add(cols, 1, 0);
-            layout.Controls.Add(new Label { Name = "columnsRange", Text = "(1–200)", Font = rangeFont, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill, Margin = new Padding(6, 0, 0, 0) }, 2, 0);
-            layout.Controls.Add(new Label { Text = "Wiersze", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 1); layout.Controls.Add(rows, 1, 1);
-            layout.Controls.Add(new Label { Name = "rowsRange", Text = "(1–200)", Font = rangeFont, TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill, Margin = new Padding(6, 0, 0, 0) }, 2, 1);
-            layout.Controls.Add(new Label { Text = "Orientacja", TextAlign = ContentAlignment.MiddleLeft, Dock = DockStyle.Fill }, 0, 2); orient.Items.AddRange(new[] { "Pointy Top", "Flat Top" }); orient.SelectedIndex = o == "FlatTop" ? 1 : 0; layout.Controls.Add(orient, 1, 2);
-            layout.SetColumnSpan(orient, 2);
-            var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; var ok = new Button { Text = "Utwórz", DialogResult = DialogResult.OK, Width = 92, Height = 32 }; var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Width = 92, Height = 32 }; buttons.Controls.Add(ok); buttons.Controls.Add(cancel); layout.Controls.Add(buttons, 0, 3); layout.SetColumnSpan(buttons, 3); AcceptButton = ok; CancelButton = cancel;
-            ok.Click += (s, e) => { Columns = (int)cols.Value; Rows = (int)rows.Value; Orientation = orient.SelectedIndex == 1 ? "FlatTop" : "PointyTop"; };
+            foreach (int row in new[] { 1, 2 }) Layout.Controls.Add(new Label { Name = row == 1 ? "columnsRange" : "rowsRange", Text = "(zakres: 1–200)", Font = rangeFont, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(5, 0, 0, 0) }, 2, row);
+            orient.Items.AddRange(new[] { "Pointy Top", "Flat Top" }); orient.SelectedIndex = o == "FlatTop" ? 1 : 0; Row(3, "Orientacja", orient, true);
+            foreach (var p in choices) presets.Items.Add(p); presets.SelectedIndex = 0; Row(4, "Zestaw", presets, true);
+            Buttons(5, () => { if (String.IsNullOrWhiteSpace(initialName.Text)) return; Columns = (int)cols.Value; Rows = (int)rows.Value; Orientation = orient.SelectedIndex == 1 ? "FlatTop" : "PointyTop"; ProjectName = initialName.Text.Trim(); Preset = (TerrainPreset)presets.SelectedItem; DialogResult = DialogResult.OK; }); Ok.Text = "Utwórz";
         }
     }
-
     static class Program
     {
         [STAThread]
