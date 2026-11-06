@@ -40,7 +40,7 @@ namespace HexMapEditor
             // now, before another mouse move can copy stale child-window pixels.
             if (right.Left > previous.Left)
             {
-                var exposed = Rectangle.Intersect(canvas.ClientRectangle, new Rectangle(previous.Left, 0, right.Left - previous.Left, canvas.Height));
+                var exposed = Rectangle.Intersect(canvas.ClientRectangle, new Rectangle(previous.Left - canvas.Left, 0, right.Left - previous.Left, canvas.Height));
                 if (!exposed.IsEmpty) { canvas.Invalidate(exposed); canvas.Update(); }
             }
             right.Update();

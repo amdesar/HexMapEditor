@@ -8,12 +8,12 @@ namespace HexMapEditor
     {
         void NameEdited()
         {
-            if (updating || selected < 0) return; var cell = map.Cells[selected];
+            if (updating || selected < 0 || map.Cells[selected].Fog) return; var cell = map.Cells[selected];
             var history = textHistory.For(cell.Id, "name", cell.Name); history.Record(cellName.Text, cellName.EditKind); textHistory.Trim(); cell.Name = cellName.Text; MarkCellDirty(cell);
         }
         void DescriptionEdited(string document, string plain, string kind)
         {
-            if (updating || selected < 0) return; var cell = map.Cells[selected];
+            if (updating || selected < 0 || map.Cells[selected].Fog) return; var cell = map.Cells[selected];
             if (cell.RichDescription == null && document == NoteCodec.Write(NoteCodec.FromPlain(cell.Description))) return;
             string initial = DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, "description", initial); history.Record("rich:" + document, kind); textHistory.Trim();
@@ -21,7 +21,7 @@ namespace HexMapEditor
         }
         void TextUndo(string field, bool repeat)
         {
-            if (selected < 0) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
+            if (selected < 0 || map.Cells[selected].Fog) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
             string initial = field == "name" ? cell.Name : DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, field, initial); int before = history.Cursor;
             string value = repeat ? history.Redo() : history.Undo(); if (before == history.Cursor) return;
@@ -47,6 +47,7 @@ namespace HexMapEditor
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);
                 foreach (var change in action.Changes) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) (after ? change.After : change.Before).ApplyTo(cell); }
+                foreach (var change in action.Layers) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) change.Apply(cell, after); }
             }
             selected = selectedId == null ? -1 : map.Cells.FindIndex(c => c.Id == selectedId); editorCellId = null;
         }
@@ -59,7 +60,7 @@ namespace HexMapEditor
         }
         void FillRegion(int start)
         {
-            strokeBefore.Clear(); foreach (int index in MapLogic.Flood(map, start)) PaintCell(index); FinishStroke();
+            BeginMaterialStroke(start, currentTool); foreach (int index in MapLogic.Flood(map, start, currentTool == EditorTool.FogBucket)) PaintMaterial(index); FinishStroke();
         }
         void ResizeProject()
         {

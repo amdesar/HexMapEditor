@@ -7,7 +7,7 @@ namespace HexMapEditor
 {
     internal static class PresetFiles
     {
-        internal const string Extension = ".terrainset.json";
+        internal const string Extension = ".json";
         internal static string Stem(string name)
         {
             var invalid = Path.GetInvalidFileNameChars();
@@ -48,7 +48,7 @@ namespace HexMapEditor
                 byte[] bytes = new UTF8Encoding(false).GetBytes(serialized);
                 using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { file.Write(bytes, 0, bytes.Length); file.Flush(true); }
                 // Move preserves the old bytes and has no overwrite flag. There is only
-                // one active .terrainset.json source, even between move and replacement.
+                // one active .json source, even between move and replacement.
                 File.Move(current, destination); moved = true;
                 replace(temporary, destination);
             }

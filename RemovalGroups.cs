@@ -4,12 +4,12 @@ using System.Linq;
 
 namespace HexMapEditor
 {
-    [Flags] internal enum CellContentKind { None = 0, Terrain = 1, Text = 2 }
+    [Flags] internal enum CellContentKind { None = 0, Terrain = 1, Text = 2, Icon = 4, Fog = 8 }
     internal sealed class RemovalGroup
     {
         public CellContentKind Kind;
         public string[] Coordinates;
-        public string Title { get { return Kind == CellContentKind.Terrain ? "Tylko zmieniony teren" : Kind == CellContentKind.Text ? "Tylko tekst" : "Teren i tekst"; } }
+        public string Title { get { var parts = new List<string>(); if ((Kind & CellContentKind.Terrain) != 0) parts.Add("Teren"); if ((Kind & CellContentKind.Text) != 0) parts.Add("Tekst"); if ((Kind & CellContentKind.Icon) != 0) parts.Add("Ikona"); if ((Kind & CellContentKind.Fog) != 0) parts.Add("Mgła"); return String.Join(" + ", parts); } }
         public static List<RemovalGroup> For(MapData before, IEnumerable<int> indices)
         {
             return indices.Distinct().Select(i => new { Index = i, Kind = MapLogic.ContentKind(before.Cells[i]) }).Where(p => p.Kind != CellContentKind.None)

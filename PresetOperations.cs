@@ -46,15 +46,15 @@ namespace HexMapEditor
                     }
                     finally { paletteTiles.ResumeLayout(true); if (body != null) body.ResumeLayout(true); left.ResumeLayout(true); }
                 }
-                UpdateTerrainSelection(); UpdatePresetStatus();
+                UpdateTerrainSelection(); UpdatePresetStatus(); UpdateMaterialIndicator();
             }
             finally { updating = previous; }
         }
         void UpdateTerrainSelection()
         {
-            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], at == brushIndex); }
+                var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && at == brushIndex); }
         }
-        void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; UpdateTerrainSelection(); } }
+        void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; RefreshIconSelection(); UpdateMaterialIndicator(); } }
         void SelectPreset(string id)
         {
             if (id == map.ActivePresetId) return; var chosen = AvailablePresets().First(p => p.Id == id);
@@ -72,7 +72,7 @@ namespace HexMapEditor
         {
             if (!EnsureLibrary()) return;
             if (!initial) { string notice; if (!TryRefreshPresets(LibraryPaths.Presets, out notice) || !String.IsNullOrEmpty(notice)) ShowEditorMessage(notice, "Odświeżenie presetów", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            try { string warning; List<string> migrations; libraryPresets = PresetLibrary.LoadAndMigrate(Path.Combine(LibraryPaths.Root, "Terrains"), out warning, out migrations); RefreshPresetPicker(); if (!String.IsNullOrEmpty(warning)) ShowEditorMessage(warning, "Niektóre presety zostały pominięte", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            try { string warning; libraryPresets = PresetCatalog.Load(LibraryPaths.Presets, out warning); RefreshPresetPicker(); if (!String.IsNullOrEmpty(warning)) ShowEditorMessage(warning, "Niektóre presety zostały pominięte", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             catch (Exception ex) { ShowEditorMessage("Nie można odczytać biblioteki presetów. Dane projektu pozostają dostępne.\n" + ex.Message, "Błąd biblioteki", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         bool TryRefreshPresets(string directory, out string notice)

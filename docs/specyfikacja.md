@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.6, stan decyzji 6 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.2.3; pierwszeństwo mają ustalenia sekcji 23.
+Wersja: 1.7, stan decyzji 6 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.3.0; pierwszeństwo mają ustalenia sekcji 24.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -275,3 +275,66 @@ Pierwszeństwo przed wcześniejszymi sprzecznymi ustaleniami. Rozwijamy ukończo
 Odłożone bez implementacji: siedem heksów zamiast schematu 3×3 w dialogu rozmiaru, chwilowe wyróżnienie na mapie zagrożonych heksów z danymi, już opisane wieloprojektowe zakładki bez numeru wydania, dalsze grupy/stylistyka ostrzeżeń i przebudowa edytora opisów.
 
 Celowane regresje: nazwy/kolizje/stare pliki, zapis po zmianie nazwy i błędy, bezpieczne odświeżanie/powtórzenia/konflikty, Ctrl+Shift+V i jedna historia. Własne dane wyłącznie tests/_work; prywatna Library nie jest materiałem testowym. Rzeczywisty końcowy EXE sprawdzamy tylko w nowym zakresie; bez szerokiej kampanii Worda/tabel. Zbiorcze regresje raz na końcu, powtarzanie tylko po błędzie lub zmianie wpływającej na wynik. Bez push, tagu i Release'a.
+
+## 24. Przyrost funkcjonalny 0.3.0 — obowiązujące decyzje
+
+Ta sekcja ma pierwszeństwo przed wcześniejszymi sprzecznymi ustaleniami. Rozwijamy ukończoną 0.2.3. Technologia Windows Forms / GDI+ i osadzony edytor WPF, działanie offline i lokalne pliki pozostają. Nie dodajemy zależności ani usług. Wersja aplikacji 0.3.0, mapy 3, zawartości presetu 1.
+
+### Zgodność, biblioteka i testowanie
+
+Nie wymagamy odczytu starszych formatów map ani specjalnej zgodności ze starymi nazwami presetów. Odczyt mapy wymaga jawnego formatu 3; nie ma migracji, fallbacku ani kopii migracyjnych. Starszy/nieprawidłowy plik nie zastępuje otwartego dokumentu i pozostaje nietknięty. Nie kasujemy Library ani map użytkownika. Czysta biblioteka jest prawidłowym stanem startowym.
+
+Preset zapisuje się jako `Library/Terrains/Presets/Kosmos.json`, bez `.terrainset`. Zachowujemy bezpieczne nazwy Windows, sufiksy kolizji, stabilne ID i wersje terenów, jeden plik po świadomym zapisie/przemianowaniu, ochronę Domyślnego i odświeżanie bez restartu. Skanujemy bez rekurencji *.json; nie dopisujemy mechanizmu starych rozszerzeń i nie migrujemy plików przy starcie. Undo/Redo nie wykonuje operacji dyskowych biblioteki. Kolejność sortowania pozostaje dotychczasowa.
+
+Testujemy selektywnie nowe zachowania i bezpośrednio dotknięte zależności: zapis/odczyt, historię, renderowanie i gesty. Run-AllTests i równoważna pełna kampania wymagają osobnego wyraźnego polecenia użytkownika, również po zmianie wspólnego modelu. Nie powtarzamy zaliczonych prób bez istotnej zmiany/błędu/niepewności, także po wznowieniu. Stare testy pozostają w Git; założenia formatów 1/2 oznaczamy jako historyczne. Nie przeprowadzamy kampanii Worda, formatowania, DPI ani dawnej diagnostyki prawego panelu. Własne dane wyłącznie tests/_work, bez prywatnej Library. Raport rozdziela metody/kontrolki, zwykły EXE i próby pominięte. Pełny audyt będzie zlecony osobno w pobliżu 1.0.0.
+
+### Sekcje, narzędzia i materiał
+
+Lewy panel: Przybornik / Presety / Tereny / Ikony / Obiekty, każda sekcja ma nagłówek i delikatny separator. Obiekty to tylko niewielki placeholder bez modelu i atrap przycisków. Tereny mają własne przewijanie w elastycznym obszarze; reszta pozostaje na miejscu i osiągalna przy minimalnym oknie. Ikony mają podgląd do czterech rzędów i pełną bibliotekę.
+
+Treść zachowuje 220 px; dołączony pasek 18 px jest po jej prawej stronie, na pełnej wysokości obszaru roboczego. Nie jest nakładką. Rozwinięty zespół zajmuje 238 px, zwinięty 18 px. Płótno, mysz i Dopasuj używają rzeczywistego pozostałego prostokąta. Zwinięcie/rozwinięcie nie zmienia danych/historii; kompensacja lokalnego początku płótna zachowuje położenie mapy na ekranie. Prawa nakładka nadal jest celowo pomijana przez Dopasuj.
+
+Presety: selektor z kompaktowym Odśwież; pod nim jeden rząd czterech ikon: plus Nowy preset, ołówek Edytuj nazwę, dyskietka Zapisz preset, czerwony kosz Usuń preset. Polskie tooltipy, nazwy dostępności, właściwe stany aktywności. Nazwa projektu i Rozmiar pozostają na swoich miejscach.
+
+Pędzel ma rysunek pędzla; istniejące Wiadro jest rozszerzone o materiał ikonowy. Wybór narzędzia jest oddzielony od ostatniego wybranego terenu/ikony. Wybór materiału nie edytuje mapy i nie przełącza niepotrzebnie narzędzia. Aktywny materiał wskazują opis w Przyborniku i ramka.
+
+### Wspólny kształt i rozmiar
+
+Pędzel terenów/ikon i Mgła wojny współdzielą Kształt, Rozmiar 1–15 i Wypełnienie. Prostokąt pokazuje drugi wymiar (wysokość). Linie wyłączają Wypełnienie; Punkt zawsze jeden heks. Wiadra ignorują te ustawienia. Pod kursorem jest podgląd odcisku.
+
+Osiem kształtów: Punkt, Kwadrat, Prostokąt, Koło, Heksagon, Pięciokąt foremny, Linia pozioma, Linia pionowa. Bez trójkąta. Heksagon rozmiaru N zawiera środek i N−1 pełnych pierścieni, według odległości na siatce. Pozostałe figury wybierają centra w bazowych współrzędnych mapy: kwadrat/prostokąt o podanych wymiarach, koło i foremny pięciokąt wpisane w okrąg o podanej średnicy. Jednostka to około 48,5 jednostki mapy (bazowy promień heksa 28). Linie próbkują odcinek długości (N−1) jednostek i wybierają najbliższe centra wzdłuż widocznej osi poziomej/pionowej.
+
+Wynik nie zależy od zoomu, jest deterministyczny w obu orientacjach i parzystościach. Obrys obejmuje członków figury mających sąsiada poza figurą: jeden heks grubości. Granicę wyznaczamy w wirtualnej siatce przed przycięciem do mapy. Przy małych rozmiarach figura może być jednym heksem, ale nie jest przypadkowo pusta. To dyskretna aproksymacja, bez obietnicy idealnego kształtu euklidesowego.
+
+### Ikony i mgła
+
+Biblioteka ikon: plus importu, miniatury/wybór, czerwony kosz usunięcia i wielokropek pełnej listy. Własne sylwetki z kodu: krzyż, namiot, wieża, czaszka, gwiazda. Pierwsza inicjalizacja biblioteki zapisuje pięć zasobów i znacznik; usunięte pozycje nie wracają przy następnym starcie z istniejącym znacznikiem.
+
+Import nieruchomych PNG/JPG/BMP/GIF: do 8 MiB i 2048×2048, proporcjonalna normalizacja PNG do 512×512, bez blokad źródła. Brak metaplików, SVG, animacji i zasobów sieciowych. Błąd nie zmienia dokumentu. Ikona na mapie zajmuje znaczną część wnętrza heksa z zachowaniem proporcji.
+
+Najwyżej jedna ikona na heks. Pole startowe z wybraną ikoną ustala usuwanie tej ikony; inne ustala dodawanie/zastępowanie. Tryb obowiązuje cały gest i region; nie usuwamy innych ikon w trybie usuwania wybranej. Teren, nazwa i opis pozostają niezależne. Usunięcie bibliotecznej kopii nie usuwa mapowego zasobu, a Undo nie zmienia biblioteki.
+
+Dwa narzędzia mgły: malowanie wspólnym odciskiem i Wypełnienie mgłą. Stan jest osobny dla każdego heksa. Mgła nieprzezroczysta szara przykrywa całe wnętrze z kolorem, ikoną i etykietą, pozostawia roboczą siatkę. Kolejność renderowania ma później zasłaniać także obiekty, których teraz nie implementujemy. Odkryty start nakłada, zasłonięty odkrywa, jednolicie przez cały gest/region. Odwiedzone pole nie jest przełączane ponownie.
+
+Szczegóły pod mgłą: stan ukrycia/znaki zapytania, brak ujawnienia nazwy, terenu i opisu, nieaktywna edycja i blokada historii tekstowej ukrytego pola. Stara widoczna treść jest zastępowana w kontrolce przy zmianie na zasłonięte pole, bez nadpisywania prawdziwych danych. Bez przełącznika mgły w szczegółach i bez globalnego podglądu w tym wydaniu.
+
+Wszystkie wiadra używają istniejącej kolejki i sześciu rzeczywistych sąsiadów. Tereny i ikony: region utrwalonego wariantu terenu. Mgła: region równego koloru terenu pod spodem (bez rozróżnienia wielkości liter zapisu koloru). Ikony/mgła nie wyznaczają granic regionu; nie przechodzimy do oddzielonych obszarów. Bez rekurencji.
+
+### Historia, przycinanie i format mapy
+
+Tereny, robocze palety, ikony, mgła i rozmiar są we wspólnej chronologii mapy, do 300 operacji. Jeden gest albo jedno wypełnienie to jeden wpis; zbiory odwiedzonych heksów uniemożliwiają wielokrotne przełączenia w nakładających się odciskach. Pusta operacja zachowuje Redo. Zmiany warstw przechowują tylko właściwe pola i stabilne ID heksa; nie przywracają starszego tekstu ani niezależnych warstw. Tekst ma dotychczasowe oddzielne historie. Nowa/Otwórz zerują historię i pamięć zasobów dokumentu. Dotychczasowa ochrona gestów dialogów obejmuje nowe narzędzia.
+
+Przycinanie zachowuje wszystkie dane/ID pozostawionych pól. Nowe są neutralne, bez ikony i mgły. Ostrzeżenie o usuwaniu uznaje ikonę i mgłę za dane; rozłączne maski rodzaju zawartości tworzą kombinacje z terenem/tekstem, bez podwójnego liczenia. Pełne współrzędne i domyślne Nie pozostają; stylistyki ostrzeżenia nie przebudowujemy.
+
+Format 3 dodaje IconId i Fog w każdym heksie oraz IconAssets: ID oparte na SHA-256 bajtów PNG, nazwa, wymiary, PNG base64. Nie ma ścieżek do zewnętrznych grafik. Wiele wystąpień współdzieli jeden zasób. Zapis obejmuje wyłącznie użyte zasoby, nie bibliotekę i nie nieużywane zasoby zachowane dla Undo. Po skopiowaniu samej mapy ikony pozostają dostępne. Limit 128 zasobów na dokument/sesję, 2 MiB PNG każdy, około 32 MiB PNG łącznie (44 MiB base64), 128 MiB całego pliku. Walidacja referencji, ID, wymiarów i dekodowania przed podmianą dokumentu. Bezpieczny zapis i potwierdzanie końcowej ścieżki pozostają.
+
+### Dalsze wymagania — poza 0.3.0
+
+- Obiekty prawdopodobnie 0.4.0; później przesuwanie obiektów i odkrywanie heksa wraz z sześcioma sąsiadami.
+- Tekstury terenów i zakładki kilku map przed 1.0.0. Każda zakładka ma własne dane, ścieżkę, stan zmian, kamerę, zaznaczenie, historię mapy/palety i historie tekstu; przełączenie ich nie zeruje, zamknięcie uwzględnia zmiany.
+- Po 1.0.0: high/low detail tła heksów, widok MG/graczy i prezentacja, eksperymentalne łączenie heksów.
+- Akcent koloru wybranego terenu w prawych szczegółach; zdjęcia i dalsza przebudowa opisów, stanów formatowania i tabel; decyzja o stylu zwykłego wklejania.
+- Globalny tymczasowy podgląd bez mgły. Bez regulacji przezroczystości i automatycznego odkrywania przez obiekty teraz.
+- Przeskok przycisków prawego nagłówka, siedem heksów w schemacie rozmiaru, wyróżnienie pól zagrożonych przycinaniem i dalsza stylistyka ostrzeżeń.
+
+Bez generatorów treści, spotkań, NPC i usług AI.

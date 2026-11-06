@@ -1,0 +1,14 @@
+# Plan i punkt wznowienia 0.3.0
+
+Baza: czysty master 34956ed (ukończona 0.2.3), origin sprawdzony; bez ponownego audytu 0.2.x, push/tagu/Release'a. Nie odzyskujemy ani nie czyścimy Library.
+
+1. Model mapy 3: osobne IconId i Fog heksu, osadzone współdzielone zasoby PNG identyfikowane skrótem zawartości. Przy zapisie tylko zasoby użyte przez heksy; zasoby potrzebne historii pozostają w pamięci sesji. Odczyt tylko 3, bez migracji. Presety od teraz *.json, bez zgodności/migracji dawnych nazw.
+2. Wspólny stos mapy: dotychczasowe zmiany terenu pozostają terenowe; osobne różnice ikon/mgły w tej samej EditAction. Jeden gest z ustalonym trybem i zbiorem odwiedzonych pól. Wiadro ponownie używa istniejącej kolejki/sąsiedztwa: ikony według wariantu terenu, mgła według koloru terenu.
+3. Wspólna geometria pędzla w jednostkach bazowej siatki, niezależna od zoomu: 8 zamówionych kształtów, 1–15, obrys jednoheksowy; prostokąt drugi wymiar. Heksagon to odległość grafowa/pierścienie; pozostałe figury z centrów heksów w geometrii mapy. Podgląd odcisku.
+4. Biblioteka ikon: pięć własnych sylwetek z kodu, import bitmap z limitami i normalizacją PNG, miniatury/pełna lista/usuwanie wyłącznie biblioteki. Mapa nie zależy od pliku biblioteki. Bez grafiki tła/obiektów.
+5. Lewy panel 220 px treści + osobny 18 px pasek, sekcje Przybornik/Presety/Tereny/Ikony/Obiekty. Tereny przewijane we własnym elastycznym obszarze; ikony kompaktowe do czterech rzędów. Płótno rzeczywiście poza zespołem panelu, Dopasuj i mysz liczą jego obszar. Presety cztery ikonowe akcje w rzędzie, refresh przy selektorze. Ukryte szczegóły nie ujawniają ani nie edytują treści.
+6. Tylko celowane próby nowych zachowań i bezpośrednich zależności (historia/gest, regiony, format 3/zasoby, maskowanie, geometria obu orientacji, panel/Fit). Nigdy Run-AllTests ani równoważna kampania bez nowego polecenia. Zwykły EXE, dokumentacja/raport, lokalny commit.
+
+Stan: implementacja etapów 1–5 zakończona; dziewięć różnych grup celowanych testów metod/kontrolek zaliczonych, bez Run-AllTests. Próby zwykłego EXE zakończone: import, gesty ikon/mgły z Undo/Redo, maskowanie, boczny pasek/Dopasuj, zapis/odczyt po restarcie bez źródłowej i bibliotecznej kopii grafiki, pełny selektor. Nie zaliczono interaktywnego minimum/przewijania i Kosza ikon; pozostałe ograniczenia w raporcie. Procesy okna zakończono. Dokumentacja zaktualizowana.
+
+Zakończenie: końcowy build 0.3.0.0 zaliczony, przegląd diff/ignore wykonany. Własne procesy zakończone; testowe EXE/mapa/Library z ui-030-3487a0c08b524b05ad7f8dd688dccd33 usunięte, results.log pozostawiony. Brak dalszych zaplanowanych zmian implementacji. Ostatnia operacja do zweryfikowania przy ewentualnym przerwaniu: lokalny commit obejmujący te pliki. Sprawdź git log/status przed ponawianiem zatwierdzenia; nie powtarzaj zakończonych testów. Końcowy hash i stan Git w podsumowaniu rozmowy.

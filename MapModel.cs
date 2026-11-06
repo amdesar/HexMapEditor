@@ -57,7 +57,7 @@ namespace HexMapEditor
         {
             var result = new List<TerrainPreset> { Default() }; var errors = new List<string>();
             Directory.CreateDirectory(directory);
-            foreach (var file in Directory.GetFiles(directory, "*.terrainset.json", SearchOption.TopDirectoryOnly).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+            foreach (var file in Directory.GetFiles(directory, "*.json", SearchOption.TopDirectoryOnly).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
             {
                 try
                 {
@@ -83,7 +83,7 @@ namespace HexMapEditor
         public static string FindFile(string directory, string id)
         {
             if (id == DefaultId) throw new InvalidDataException("Chroniony wzorzec nie ma pliku użytkownika.");
-            var files = Directory.GetFiles(directory, "*.terrainset.json", SearchOption.TopDirectoryOnly).Where(f => ReadFile(f).Id == id).ToArray();
+            var files = Directory.GetFiles(directory, "*.json", SearchOption.TopDirectoryOnly).Where(f => ReadFile(f).Id == id).ToArray();
             if (files.Length != 1) throw new InvalidDataException("Nie można jednoznacznie wskazać pliku presetu. Uruchom program ponownie i sprawdź komunikaty biblioteki.");
             return files[0];
         }
@@ -97,7 +97,7 @@ namespace HexMapEditor
             if (preset.Id == DefaultId) throw new InvalidDataException("Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset.");
             Directory.CreateDirectory(directory);
             var records = new List<KeyValuePair<string, TerrainPreset>>();
-            foreach (string file in Directory.GetFiles(directory, "*.terrainset.json"))
+            foreach (string file in Directory.GetFiles(directory, "*.json"))
             {
                 // Do not save through an unreadable catalog which may hide a collision.
                 var p = ReadFile(file); records.Add(new KeyValuePair<string, TerrainPreset>(file, p));
@@ -180,14 +180,14 @@ namespace HexMapEditor
             }
             foreach (var p in points) if (p.X >= 0 && p.Y >= 0 && p.X < map.Columns && p.Y < map.Rows) yield return p.Y * map.Columns + p.X;
         }
-        public static List<int> Flood(MapData map, int start)
+        public static List<int> Flood(MapData map, int start, bool byColor = false)
         {
             var result = new List<int>(); if (start < 0 || start >= map.Cells.Count) return result;
             string variant = map.Cells[start].VariantId; var visited = new bool[map.Cells.Count]; var pending = new Queue<int>(); pending.Enqueue(start); visited[start] = true;
             while (pending.Count != 0)
             {
                 int current = pending.Dequeue(); result.Add(current);
-                foreach (int next in Neighbors(map, current)) if (!visited[next] && map.Cells[next].VariantId == variant) { visited[next] = true; pending.Enqueue(next); }
+                foreach (int next in Neighbors(map, current)) if (!visited[next] && (byColor ? String.Equals(map.Cells[next].Color, map.Cells[start].Color, StringComparison.OrdinalIgnoreCase) : map.Cells[next].VariantId == variant)) { visited[next] = true; pending.Enqueue(next); }
             }
             return result;
         }
@@ -199,6 +199,8 @@ namespace HexMapEditor
         {
             var kind = CellContentKind.None;
             if (!neutralState.Matches(cell)) kind |= CellContentKind.Terrain;
+            if (cell.IconId != null) kind |= CellContentKind.Icon;
+            if (cell.Fog) kind |= CellContentKind.Fog;
             if (!String.IsNullOrEmpty(cell.Name) || !String.IsNullOrEmpty(cell.Description) || !String.IsNullOrEmpty(cell.RichDescription)) kind |= CellContentKind.Text;
             return kind;
         }

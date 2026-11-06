@@ -33,7 +33,8 @@ namespace HexMapEditor
                 else if (key == "save" || key == "saveas") { g.DrawRectangle(p, 3, 3, 16, 16); g.DrawRectangle(p, 7, 3, 8, 6); g.DrawRectangle(p, 7, 13, 8, 6); if (key == "saveas") g.DrawLine(p, 1, 20, 20, 1); }
                 else if (key == "select") g.DrawPolygon(p, new[] { new Point(4, 2), new Point(17, 12), new Point(11, 13), new Point(8, 19) });
                 else if (key == "hand") { g.DrawEllipse(p, 5, 8, 12, 12); for (int x = 5; x <= 17; x += 4) g.DrawLine(p, x, 10, x, 2 + Math.Abs(x - 11) / 2); }
-                else if (key == "brush") { g.DrawLines(p, new[] { new Point(6, 13), new Point(16, 2), new Point(20, 5), new Point(10, 16) }); g.DrawBezier(p, 8, 13, 2, 12, 7, 20, 2, 20); g.DrawLine(p, 2, 20, 10, 16); }
+                else if (key == "brush") { using (var handle = new Pen(Color.FromArgb(218, 170, 91), 4)) g.DrawLine(handle, 18, 2, 10, 12); g.FillPolygon(Brushes.WhiteSmoke, new[] { new Point(8, 10), new Point(13, 14), new Point(10, 20), new Point(2, 20), new Point(5, 16) }); }
+                else if (key == "fog" || key == "fogbucket") { g.FillEllipse(Brushes.SlateGray, 1, 9, 20, 10); g.FillEllipse(Brushes.LightSlateGray, 4, 4, 10, 12); g.FillEllipse(Brushes.LightSlateGray, 10, 7, 10, 11); if (key == "fogbucket") g.DrawLine(p, 2, 21, 20, 21); }
                 else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 11), new Point(10, 3), new Point(18, 11), new Point(10, 19) }); g.DrawLine(p, 3, 11, 17, 11); g.DrawEllipse(p, 18, 13, 3, 5); }
                 else if (key == "pencil") { g.DrawPolygon(p, new[] { new Point(3, 19), new Point(5, 12), new Point(15, 2), new Point(20, 7), new Point(10, 17) }); g.DrawLine(p, 12, 5, 17, 10); }
                 else if (key == "trash") { g.DrawRectangle(p, 6, 7, 11, 13); g.DrawLine(p, 3, 5, 20, 5); g.DrawLine(p, 9, 2, 14, 2); g.DrawLine(p, 9, 10, 9, 17); g.DrawLine(p, 14, 10, 14, 17); }
@@ -53,7 +54,7 @@ namespace HexMapEditor
         readonly FlowLayoutPanel paletteTiles = new BufferedFlowPanel();
         readonly Label presetStateLabel = new Label();
         readonly Dictionary<EditorTool, Button> toolButtons = new Dictionary<EditorTool, Button>();
-        FlowLayoutPanel paletteBody, paletteTools, presetActions;
+        FlowLayoutPanel paletteTools, presetActions;
         Panel presetPickerRow;
         Button refreshPresetsButton, addTerrainButton;
         void ConfigureButton(Button button, string text, string icon, string help, Action action, int width)
@@ -87,7 +88,7 @@ namespace HexMapEditor
             canvas.BackColor = Color.FromArgb(25, 28, 36); canvas.TabStop = true; Controls.Add(canvas); canvas.SendToBack();
             canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel;
             canvas.MouseCaptureChanged += (s, e) => { if (!canvas.Capture && gestureButton != MouseButtons.None) EndCanvasGesture(true); };
-            left.BackColor = shellToolbar.BackColor; left.AutoScroll = true; Controls.Add(left);
+            left.BackColor = shellToolbar.BackColor; left.AutoScroll = false; Controls.Add(left);
             leftToggle.FlatStyle = FlatStyle.Flat; StyleButton(leftToggle); leftToggle.AccessibleName = "Zwiń lub rozwiń paletę"; tips.SetToolTip(leftToggle, leftToggle.AccessibleName); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; PositionOverlays(); canvas.Invalidate(); }; Controls.Add(leftToggle);
             BuildPalettePanel(); BuildDetailsPanel(); Controls.Add(right);
         }
@@ -99,48 +100,7 @@ namespace HexMapEditor
             int titleHeight = mapName.Font.Height + 2;
             mapName.Bounds = new Rectangle(fileGroup.Right + 8, 4 + (34 - titleHeight) / 2, Math.Max(0, viewGroup.Left - fileGroup.Right - 16), titleHeight);
         }
-        void BuildPalettePanel()
-        {
-            var body = paletteBody = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(6), Margin = Padding.Empty };
-            left.Controls.Add(body);
-            var tools = paletteTools = new FlowLayoutPanel { Height = 38, WrapContents = false, Margin = new Padding(0, 2, 0, 2) };
-            var names = new[] { "Zaznaczanie", "Przesuwanie", "Pędzel", "Wiadro" }; var icons = new[] { "select", "hand", "brush", "bucket" };
-            for (int i = 0; i < 4; i++) { var tool = (EditorTool)i; var b = ShellButton(tools, "", icons[i], names[i], () => SelectTool(tool), 44); toolButtons.Add(tool, b); } body.Controls.Add(tools); SelectTool(EditorTool.Select);
-            body.Controls.Add(new Label { Text = "Presety", AutoSize = true, Margin = new Padding(0, 6, 0, 3) });
-            presetPickerRow = new Panel { Height = 28, Margin = new Padding(0, 0, 0, 2) }; body.Controls.Add(presetPickerRow);
-            terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name"; terrainPicker.AccessibleName = "Presety";
-            terrainPicker.SelectedIndexChanged += (s, e) => { if (!updating && terrainPicker.SelectedItem != null) SelectPreset(((TerrainPreset)terrainPicker.SelectedItem).Id); }; presetPickerRow.Controls.Add(terrainPicker);
-            refreshPresetsButton = SmallButton(presetPickerRow, "", () => LoadLibraryPresets(false), 28); refreshPresetsButton.Image = EditorIcons.Small("refresh"); refreshPresetsButton.AccessibleName = "Odśwież presety"; tips.SetToolTip(refreshPresetsButton, "Odśwież presety — zachowaj roboczą paletę projektu");
-            var actions = presetActions = new FlowLayoutPanel { Height = 64, WrapContents = true, Margin = new Padding(0, 0, 0, 2) };
-            SmallButton(actions, "Nowy preset", CreatePreset, 90); SmallButton(actions, "Zmień nazwę", RenamePreset, 90); SmallButton(actions, "Zapisz preset", SavePreset, 90); deletePresetButton = SmallButton(actions, "Usuń preset", RemovePreset, 90); body.Controls.Add(actions);
-            presetStateLabel.Height = 34; presetStateLabel.AutoEllipsis = true; presetStateLabel.Margin = new Padding(0, 2, 0, 2); body.Controls.Add(presetStateLabel);
-            addTerrainButton = SmallButton(body, "Dodaj teren", () => EditTerrain(true), 184); addTerrainButton.Margin = new Padding(0, 2, 0, 4);
-            paletteTiles.AutoSize = true; paletteTiles.FlowDirection = FlowDirection.TopDown; paletteTiles.WrapContents = false; paletteTiles.Margin = Padding.Empty; body.Controls.Add(paletteTiles);
-            left.Layout += (s, e) => LayoutPalette(); paletteTiles.ControlAdded += (s, e) => LayoutPalette();
-            LayoutPalette();
-            RefreshPresetPicker();
-        }
-        bool layingOutPalette;
-        void LayoutPalette()
-        {
-            if (layingOutPalette || paletteBody == null) return;
-            layingOutPalette = true;
-            try
-            {
-                int width = Math.Max(160, left.ClientSize.Width - paletteBody.Padding.Horizontal);
-                paletteBody.SuspendLayout();
-                try
-                {
-                    paletteTools.Width = presetPickerRow.Width = presetActions.Width = presetStateLabel.Width = addTerrainButton.Width = paletteTiles.Width = width;
-                    for (int i = 0; i < paletteTools.Controls.Count; i++) paletteTools.Controls[i].Width = (width - 8) / 4;
-                    terrainPicker.SetBounds(0, 1, width - 32, 24); refreshPresetsButton.SetBounds(width - 28, 0, 28, 26);
-                    foreach (Control b in presetActions.Controls) b.Width = (width - 8) / 2;
-                    foreach (TerrainTile tile in paletteTiles.Controls) tile.ResizeRow(width);
-                }
-                finally { paletteBody.ResumeLayout(true); }
-            }
-            finally { layingOutPalette = false; }
-        }
+        void BuildPalettePanel() { BuildSections(); }
         Button SmallButton(Control parent, string text, Action action, int width)
         { var b = new Button { Text = text, Width = width, Height = 28, Margin = new Padding(2), FlatStyle = FlatStyle.Flat, AccessibleName = text }; StyleButton(b); b.Click += (s, e) => action(); parent.Controls.Add(b); return b; }
         void SelectTool(EditorTool tool)

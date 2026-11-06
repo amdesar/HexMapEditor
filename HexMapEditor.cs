@@ -12,7 +12,7 @@ namespace HexMapEditor
 {
     public enum HexOrientation { PointyTop, FlatTop }
     public enum LabelMode { Axes, InCells, None }
-    public enum EditorTool { Select, Hand, Brush, Bucket }
+    public enum EditorTool { Select, Hand, Brush, Bucket, FogBrush, FogBucket }
 
     internal static class LibraryPaths
     {
@@ -44,6 +44,8 @@ namespace HexMapEditor
         public string Description { get; set; }
         public string NotesFormat { get; set; }
         public string RichDescription { get; set; }
+        public string IconId { get; set; }
+        public bool Fog { get; set; }
         public CellData() { Id = Guid.NewGuid().ToString("N"); TerrainId = PresetCatalog.NeutralId; VariantId = PresetCatalog.NeutralVariant; TerrainRevision = 1; Terrain = "Teren neutralny"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; }
     }
 
@@ -60,7 +62,8 @@ namespace HexMapEditor
         public int ColumnParity { get; set; }
         public string ActivePresetId { get; set; }
         public List<TerrainPreset> Presets { get; set; }
-        public MapData() { FormatVersion = 2; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; }
+        public List<IconAsset> IconAssets { get; set; }
+        public MapData() { FormatVersion = 3; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); }
     }
 
     internal sealed class TerrainState
@@ -85,6 +88,7 @@ namespace HexMapEditor
     internal sealed class EditAction
     {
         public List<CellChange> Changes = new List<CellChange>();
+        public List<LayerChange> Layers = new List<LayerChange>();
         public string Label;
         public ResizeState BeforeResize, AfterResize;
         public PaletteState BeforePalette, AfterPalette;
@@ -132,7 +136,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.2.3";
+        const string AppVersion = "0.3.0";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -146,7 +150,7 @@ namespace HexMapEditor
             Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 680); Size = new Size(1440, 940);
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
             InitializeShell();
-            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); };
+            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); };
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
             CaptureSavedState(); UpdateUI();
         }
@@ -177,10 +181,12 @@ namespace HexMapEditor
             if (shellToolbar == null) return;
             LayoutMainToolbar();
             int top = shellToolbar.Height, bottom = 27, height = Math.Max(0, ClientSize.Height - top - bottom);
-            canvas.Bounds = new Rectangle(0, top, ClientSize.Width, height);
-            left.Bounds = new Rectangle(0, top + 30, 220, Math.Max(0, height - 30));
-            leftToggle.Bounds = new Rectangle(0, top, leftCollapsed ? 28 : 220, leftCollapsed ? height : 30);
-            leftToggle.Text = leftCollapsed ? "›" : "Zwiń panel  ‹"; left.Visible = !leftCollapsed;
+            int inset = leftCollapsed ? 18 : 238;
+            if (canvas.Left != inset) pan = new PointF(pan.X + canvas.Left - inset, pan.Y);
+            canvas.Bounds = new Rectangle(inset, top, Math.Max(0, ClientSize.Width - inset), height);
+            left.Bounds = new Rectangle(0, top, 220, height);
+            leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : 220, top, 18, height);
+            leftToggle.Text = leftCollapsed ? "›" : "‹"; left.Visible = !leftCollapsed;
             int width = ClampRightWidth(requestedRightWidth); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
             left.BringToFront(); if (right.Visible) right.BringToFront(); leftToggle.BringToFront();
         }
@@ -226,8 +232,10 @@ namespace HexMapEditor
                 if (selected >= 0 && selected < map.Cells.Count)
                 {
                     var cell = map.Cells[selected];
-                    if (editorCellId != cell.Id) { textHistory.BreakGroups(); editorCellId = cell.Id; cellName.Text = cell.Name ?? ""; cellDescription.SetContent(cell.RichDescription, cell.Description); }
-                    detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = "Teren: " + cell.Terrain;
+                    string key = cell.Id + (cell.Fog ? ":fog" : ":visible");
+                    if (editorCellId != key) { textHistory.BreakGroups(); editorCellId = key; cellName.Text = cell.Fog ? "???" : cell.Name ?? ""; cellDescription.SetContent(cell.Fog ? null : cell.RichDescription, cell.Fog ? "Treść ukryta przez mgłę wojny." : cell.Description); }
+                    cellName.Enabled = cellDescription.Enabled = !cell.Fog;
+                    detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = cell.Fog ? "Mgła wojny — dane ukryte" : "Teren: " + cell.Terrain;
                 }
                 else { selected = -1; rightPanelOpen = false; editorCellId = null; }
                 right.Visible = rightPanelOpen && selected >= 0;
@@ -257,7 +265,7 @@ namespace HexMapEditor
         }
         void StartNewProject(int columns, int rows, string orientation, string name, TerrainPreset sourcePreset)
         {
-            EndCanvasGesture(true); map = NewMap(columns, rows, orientation); map.Name = name;
+            EndCanvasGesture(true); ClearDocumentIcons(); map = NewMap(columns, rows, orientation); map.Name = name;
             var preset = sourcePreset.Copy(); map.Presets = new List<TerrainPreset> { preset }; map.ActivePresetId = preset.Id;
             currentPath = null; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
             CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
@@ -278,7 +286,6 @@ namespace HexMapEditor
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
                 string error; bool migrated;
                 if (!TryLoadProject(d.FileName, out error, out migrated)) ShowEditorMessage("Nie można otworzyć projektu.\n\n" + error, "Błąd odczytu", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                else if (migrated) ShowEditorMessage("Wczytano mapę formatu 1 bez utraty zwykłych opisów. Następny zapis użyje formatu 2, którego wersje 0.1.x nie odczytają. Zapisz jako pozwala zachować oryginał.", "Format mapy", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
         bool TryLoadProject(string path, out string error, out bool migrated)
@@ -289,13 +296,13 @@ namespace HexMapEditor
                 if (new FileInfo(path).Length > 128L * 1024 * 1024) throw new InvalidDataException("Plik przekracza limit odczytu 128 MiB.");
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
-                if ((int)raw["FormatVersion"] == 2)
+                if ((int)raw["FormatVersion"] != 3) throw new InvalidDataException("Ta wersja otwiera wyłącznie mapy formatu 3. Starszy plik pozostawiono bez zmian.");
                 {
                     var cells = raw.ContainsKey("Cells") ? raw["Cells"] as object[] : null;
-                    if (cells == null || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Format 2 wymaga utrwalonych identyfikatorów heksów i wersji terenów.");
+                    if (cells == null || !raw.ContainsKey("IconAssets") || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision", "IconId", "Fog" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Format 3 wymaga jawnych danych heksów, ikon i mgły.");
                 }
-                var loaded = json.ConvertToType<MapData>(raw); migrated = loaded != null && loaded.FormatVersion == 1; loaded = MapLogic.Migrate(loaded); ValidateMap(loaded);
-                map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
+                var loaded = json.ConvertToType<MapData>(raw); ValidateMap(loaded);
+                EndCanvasGesture(false); ClearDocumentIcons(); map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
                 CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); return true;
             }
             catch (Exception ex) { error = ex.Message; migrated = false; return false; }
@@ -362,10 +369,10 @@ namespace HexMapEditor
             string temp = null;
             try
             {
-                ValidateMap(map);
+                var output = MapForSave(); ValidateMap(output);
                 string directory = Path.GetDirectoryName(Path.GetFullPath(path));
                 temp = Path.Combine(directory, ".hexmap-" + Guid.NewGuid().ToString("N") + ".tmp");
-                byte[] bytes = new UTF8Encoding(false).GetBytes(json.Serialize(map));
+                byte[] bytes = new UTF8Encoding(false).GetBytes(json.Serialize(output));
                 if (bytes.LongLength > 128L * 1024 * 1024) throw new InvalidDataException("Mapa przekracza limit pliku 128 MiB. Zmniejsz zawartość opisów przed zapisem.");
                 using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
                 if (allowOverwrite && File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
@@ -383,7 +390,8 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 2) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ".");
+            if (m.FormatVersion != 3) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ". Wymagany format 3.");
+            IconAssets.Validate(m.IconAssets); var iconIds = new HashSet<string>(m.IconAssets.Select(a => a.Id));
             if (m.Columns < 1 || m.Columns > 200 || m.Rows < 1 || m.Rows > 200) throw new InvalidDataException("Wymiary mapy muszą mieścić się w zakresie 1–200.");
             if (m.Orientation != "PointyTop" && m.Orientation != "FlatTop") throw new InvalidDataException("Nieprawidłowa orientacja mapy.");
             if (m.LabelMode != "Axes" && m.LabelMode != "InCells" && m.LabelMode != "None") throw new InvalidDataException("Nieprawidłowy tryb etykiet.");
@@ -393,6 +401,7 @@ namespace HexMapEditor
             {
                 if (c == null || String.IsNullOrWhiteSpace(c.Id) || !ids.Add(c.Id) || String.IsNullOrWhiteSpace(c.Terrain) || !MapLogic.ValidColor(c.Color) || String.IsNullOrWhiteSpace(c.TerrainId) || String.IsNullOrWhiteSpace(c.VariantId) || c.TerrainRevision < 1) throw new InvalidDataException("Nieprawidłowe dane heksu lub terenu.");
                 CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color);
+                if (c.IconId != null && !iconIds.Contains(c.IconId)) throw new InvalidDataException("Brak osadzonego zasobu ikony.");
                 if (c.NotesFormat == "richDocument1") { NoteCodec.Read(c.RichDescription); if (c.Description != NoteCodec.Plain(c.RichDescription)) throw new InvalidDataException("Zwykły tekst nie odpowiada formatowanemu opisowi."); }
                 else if (c.NotesFormat != "plainText" || !String.IsNullOrEmpty(c.RichDescription)) throw new InvalidDataException("Nieobsługiwany format notatek.");
             }
@@ -445,9 +454,8 @@ namespace HexMapEditor
         {
             if (canvas.ClientSize.Width < 20 || canvas.ClientSize.Height < 20) return false;
             RectangleF bounds = MapBounds();
-            float leftInset = leftCollapsed ? 28f : 220f;
             bool axes = map.LabelMode == "Axes" && map.Cells.Count <= 1400;
-            var viewport = RectangleF.FromLTRB(leftInset + 32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), canvas.ClientSize.Width - 32, canvas.ClientSize.Height - 32);
+            var viewport = RectangleF.FromLTRB(32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), canvas.ClientSize.Width - 32, canvas.ClientSize.Height - 32);
             scale = Math.Max(.000001f, Math.Min(Math.Max(1, viewport.Width) / Math.Max(bounds.Width, 1), Math.Max(1, viewport.Height) / Math.Max(bounds.Height, 1)));
             pan = new PointF(viewport.Left + viewport.Width / 2f - (bounds.Left + bounds.Width / 2f) * scale, viewport.Top + viewport.Height / 2f - (bounds.Top + bounds.Height / 2f) * scale);
             return true;
@@ -484,8 +492,13 @@ namespace HexMapEditor
                 using (var path = HexPath(c, BaseRadius * scale))
                 using (var brush = new SolidBrush(ParseColor(map.Cells[i].Color)))
                 using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
-                { e.Graphics.FillPath(brush, path); e.Graphics.DrawPath(pen, path); }
-                if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle);
+                {
+                    e.Graphics.FillPath(brush, path);
+                    if (!map.Cells[i].Fog) { DrawCellIcon(e.Graphics, map.Cells[i], c); if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle); }
+                    // Fog is the final content layer, below only the working grid.
+                    if (map.Cells[i].Fog) using (var fog = new SolidBrush(Color.FromArgb(101, 107, 117))) e.Graphics.FillPath(fog, path);
+                    e.Graphics.DrawPath(pen, path);
+                }
             }
             if (map.LabelMode == "Axes" && map.Columns * map.Rows <= 1400)
             {
@@ -498,6 +511,7 @@ namespace HexMapEditor
                     for (int r = 0; r < map.Rows; r++) { var p = ScreenCenter(0, r); e.Graphics.DrawString((r + 1).ToString(), f, b, labelsLeft, p.Y - 8); }
                 }
             }
+            DrawBrushPreview(e.Graphics);
         }
 
         GraphicsPath HexPath(PointF center, float radius)
@@ -541,10 +555,11 @@ namespace HexMapEditor
 
         void EndCanvasGesture(bool commitStroke)
         {
-            bool brushStroke = gestureButton == MouseButtons.Left && gestureTool == EditorTool.Brush;
+            bool brushStroke = gestureButton == MouseButtons.Left && (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush);
             gestureButton = MouseButtons.None;
             dragging = false; panGesture = false; dragOrigin = Point.Empty; panOrigin = PointF.Empty;
-            if (commitStroke && brushStroke) FinishStroke(); else strokeBefore.Clear();
+            if (commitStroke && brushStroke) FinishStroke(); else { strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); }
+            strokeStarted = false;
             canvas.Capture = false;
         }
 
@@ -559,10 +574,11 @@ namespace HexMapEditor
             canvas.Focus();
             canvas.Capture = true;
             if (e.Button == MouseButtons.Middle || gestureTool == EditorTool.Hand) { panGesture = true; return; }
-            if (gestureTool == EditorTool.Bucket) { int hit = HitTest(e.Location); if (hit >= 0) FillRegion(hit); return; }
-            if (gestureTool == EditorTool.Brush)
+            strokeStarted = false;
+            if (gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket) { int hit = HitTest(e.Location); if (hit >= 0) FillRegion(hit); return; }
+            if (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush)
             {
-                strokeBefore.Clear(); int hit = HitTest(e.Location); if (hit >= 0) PaintCell(hit); canvas.Capture = true;
+                strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); PaintStamp(hit); } canvas.Capture = true;
             }
         }
 
@@ -570,6 +586,7 @@ namespace HexMapEditor
         {
             if (modalDepth > 0 || rightResizing) return;
             int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
+            if (previewCell != hit) { previewCell = hit; canvas.Invalidate(); }
             if (e.Button == MouseButtons.None) { waitingForMouseRelease = false; if (gestureButton != MouseButtons.None) EndCanvasGesture(true); return; }
             // A pressed button alone is not an editing gesture: its Down must belong to this canvas.
             if (waitingForMouseRelease || gestureButton == MouseButtons.None || (e.Button & gestureButton) == MouseButtons.None) return;
@@ -579,14 +596,14 @@ namespace HexMapEditor
                 if (!dragging) { dragging = true; panOrigin = pan; }
                 pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate();
             }
-            if (gestureTool == EditorTool.Brush) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0) PaintCell(hit); }
+            if (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); PaintStamp(hit); } }
         }
 
         void CanvasMouseUp(object sender, MouseEventArgs e)
         {
             if (Control.MouseButtons == MouseButtons.None) waitingForMouseRelease = false;
             if (modalDepth > 0 || waitingForMouseRelease || gestureButton == MouseButtons.None || e.Button != gestureButton) return;
-            if (panGesture || gestureTool == EditorTool.Brush || gestureTool == EditorTool.Bucket) { EndCanvasGesture(true); return; }
+            if (panGesture || gestureTool != EditorTool.Select) { EndCanvasGesture(true); return; }
             if (!dragging)
             {
                 int hit = HitTest(e.Location);
@@ -616,7 +633,7 @@ namespace HexMapEditor
 
         void FinishStroke()
         {
-            if (strokeBefore.Count == 0) return;
+            if (strokeBefore.Count == 0 && layerBefore.Count == 0) return;
             var action = new EditAction { Label = "Pociągnięcie pędzla" };
             foreach (var item in strokeBefore)
             {
@@ -626,9 +643,9 @@ namespace HexMapEditor
                 action.Changes.Add(new CellChange { Index = item.Key, CellId = cell.Id, Before = item.Value, After = new TerrainState(cell) });
             }
             strokeBefore.Clear();
-            if (action.Changes.Count == 0) { MarkDirty(); return; }
-            undo.Push(action); while (undo.Count > 300) { var keep = undo.Reverse().Skip(1).ToList(); undo.Clear(); foreach (var a in keep) undo.Push(a); }
-            redo.Clear(); MarkDirty();
+            action.Layers.AddRange(layerBefore.Values); layerBefore.Clear(); strokeVisited.Clear();
+            if (action.Changes.Count == 0 && action.Layers.Count == 0) { MarkDirty(); return; }
+            PushAction(action); MarkDirty();
         }
 
         void Undo() { EndCanvasGesture(true); if (undo.Count == 0) return; var action = undo.Pop(); ApplyAction(action, false); redo.Push(action); MarkDirty(); }
