@@ -32,10 +32,10 @@ namespace HexMapEditor
             catch (Exception ex) { ShowEditorMessage("Nie można odczytać ikon: " + ex.Message, "Biblioteka ikon", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         void SelectIcon(string id)
-        { EndCanvasGesture(true); if (!libraryIcons.Any(a => a.Id == id)) return; activeIcon = id; iconMaterial = true; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); canvas.Invalidate(); }
+        { EndCanvasGesture(true); if (!libraryIcons.Any(a => a.Id == id)) return; activeIcon = id; iconMaterial = true; objectMaterial=false;noMaterial=false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); canvas.Invalidate(); }
         void UpdateMaterialIndicator()
         {
-            UpdateTerrainSelection(); RefreshIconSelection();
+            UpdateTerrainSelection(); RefreshIconSelection(); RefreshObjectSelection(); UpdateBrushAvailability();
         }
         Button IconButton(LibraryIcon asset, Action choose)
         {
@@ -55,6 +55,10 @@ namespace HexMapEditor
         { if (iconPreview == null) return; foreach (Button b in iconPreview.Controls) { bool chosen = iconMaterial && (string)b.Tag == activeIcon; b.FlatAppearance.BorderSize = chosen ? 3 : 1; b.FlatAppearance.BorderColor = chosen ? Color.Gold : Color.Gray; } if (deleteIconButton != null) deleteIconButton.Enabled = iconMaterial && activeIcon != null && libraryIcons.Any(a => a.Id == activeIcon); }
         void ImportIcon()
         {
+            using(var choice=new GraphicSourceDialog("Dodaj ikonę","obiektów")){
+                if(RunModal(()=>choice.ShowDialog(this))!=DialogResult.OK)return;
+                if(choice.FromLibrary){var graphic=PickObjectGraphic(this);if(graphic!=null){string error;if(!TryChangeLibraryIcon(null,new LibraryIcon{Name=graphic.Name,Asset=graphic.Asset},false,Path.Combine(LibraryPaths.Root,"Icons"),out error))ShowEditorMessage(error,"Nie można dodać ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);}return;}
+            }
             using (var dialog = new OpenFileDialog { Title = "Dodaj ikonę", Filter = "Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif", RestoreDirectory = true })
             {
                 if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;
@@ -75,10 +79,12 @@ namespace HexMapEditor
         {
             var entry = iconMaterial ? libraryIcons.FirstOrDefault(a => a.Id == activeIcon) : null;
             if (entry == null) { ShowEditorMessage("Zaznacz ikonę", "Edytuj ikonę", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            using (var d = new IconEditDialog(entry, PickLibraryIcon)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
+            using (var d = new IconEditDialog(entry, PickLibraryIcon, PickObjectGraphic)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
             {
                 var next = entry.Copy(); next.Name = d.IconName; next.Asset = d.Asset; string error;
-                if (!TryChangeLibraryIcon(entry,next,d.UpdateMap,Path.GetDirectoryName(entry.FilePath),out error)) ShowEditorMessage(error,"Nie można edytować ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);
+                clearAfterIconEdit=true;
+                try { if (!TryChangeLibraryIcon(entry,next,d.UpdateMap,Path.GetDirectoryName(entry.FilePath),out error)) ShowEditorMessage(error,"Nie można edytować ikony",MessageBoxButtons.OK,MessageBoxIcon.Error); else ClearIconMaterial(); }
+                finally { clearAfterIconEdit=false; }
             }
         }
         LibraryIcon PickLibraryIcon(IWin32Window owner)
@@ -88,8 +94,8 @@ namespace HexMapEditor
         void OpenIconLibrary() { var chosen = PickLibraryIcon(this); if (chosen != null) SelectIcon(chosen.Id); }
         MapData MapForSave()
         {
-            var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId));
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList() };
+            var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), Objects=map.Objects };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {

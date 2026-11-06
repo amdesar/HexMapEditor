@@ -71,6 +71,7 @@ namespace HexMapEditor
         public byte[] BeforeBytes, AfterBytes;
         public string BeforeSelected, AfterSelected;
         public bool BeforeMaterial, AfterMaterial;
+        public bool BeforeObjectMaterial, BeforeNoMaterial, AfterNoMaterial;
         public int Index;
         public void Write(bool after)
         { var from = after ? Before : After; var to = after ? After : Before; LibraryFiles.Transition(from == null ? null : from.FilePath, after ? BeforeBytes : AfterBytes, to == null ? null : to.FilePath, after ? AfterBytes : BeforeBytes); }

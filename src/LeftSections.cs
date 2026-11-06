@@ -28,19 +28,20 @@ namespace HexMapEditor
         void BuildSections()
         {
             leftSections = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty, Padding = Padding.Empty };
-            foreach (var style in new[] { new RowStyle(SizeType.Absolute, 137), new RowStyle(SizeType.Absolute, 118), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, 194), new RowStyle(SizeType.Absolute, 40) }) leftSections.RowStyles.Add(style);
+            foreach (var style in new[] { new RowStyle(SizeType.Absolute, 137), new RowStyle(SizeType.Absolute, 118), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, 90), new RowStyle(SizeType.Absolute, 90) }) leftSections.RowStyles.Add(style);
             left.Controls.Add(leftSections);
             var toolbox = Section("Przybornik", 0);
             paletteTools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false }; toolbox.Controls.Add(paletteTools);
             string[] names = { "Zaznaczanie", "Przesuwanie", "Pędzel", "Wiadro", "Mgła wojny", "Wypełnienie mgłą" }, icons = { "select", "hand", "brush", "bucket", "fog", "fogbucket" };
             for (int i = 0; i < names.Length; i++) { var tool = (EditorTool)i; var b = ShellButton(paletteTools, "", icons[i], names[i], () => SelectTool(tool), 32); toolButtons.Add(tool, b); }
+            var selectMenu=new ContextMenuStrip();selectMenu.Items.Add("Klik / prostokąt",null,(s,e)=>{selectionKind=0;SelectTool(EditorTool.Select);});selectMenu.Items.Add("Swobodne lasso",null,(s,e)=>{selectionKind=1;SelectTool(EditorTool.Select);});toolButtons[EditorTool.Select].ContextMenuStrip=selectMenu;tips.SetToolTip(toolButtons[EditorTool.Select],"Zaznaczanie: klik / przeciągnij prostokąt. Prawy przycisk: wybierz lasso. Ctrl przełącza wybór.");
             var shapeLabel = new Label { Text = "Kształt", Width = 52, Height = 22 }; toolbox.Controls.Add(shapeLabel);
             shapePicker = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Kształt pędzla" }; shapePicker.Items.AddRange(new object[] { "Punkt", "Kwadrat", "Prostokąt", "Koło", "Heksagon", "Pięciokąt foremny", "Linia pozioma", "Linia pionowa" }); shapePicker.SelectedIndex = 0; toolbox.Controls.Add(shapePicker);
             var sizeLabel = new Label { Text = "Rozmiar", Width = 52, Height = 22 }; toolbox.Controls.Add(sizeLabel);
             sizePicker = new NumericUpDown { Minimum = 1, Maximum = 15, Value = 1, Width = 60, AccessibleName = "Rozmiar lub szerokość pędzla" }; heightPicker = new NumericUpDown { Minimum = 1, Maximum = 15, Value = 1, Width = 60, Visible = false, AccessibleName = "Wysokość prostokąta" }; toolbox.Controls.Add(sizePicker); toolbox.Controls.Add(heightPicker);
             fillPicker = new CheckBox { Text = "Wypełnienie", Checked = true, AutoSize = true, AccessibleName = "Wypełnienie figury; wyłącz, aby malować obrys" }; toolbox.Controls.Add(fillPicker);
             tips.SetToolTip(sizePicker, "1–15. Heksagon: promień w pierścieniach + pole środkowe. Pozostałe: wymiar figury w odstępach siatki. Punkt zawsze 1 heks."); tips.SetToolTip(heightPicker, "Drugi wymiar prostokąta: wysokość 1–15");
-            Action settings = () => { EndCanvasGesture(true); brushShape = (BrushShape)shapePicker.SelectedIndex; brushSize = (int)sizePicker.Value; brushHeight = (int)heightPicker.Value; brushFilled = fillPicker.Checked; heightPicker.Visible = brushShape == BrushShape.Rectangle; sizePicker.Enabled = brushShape != BrushShape.Point; fillPicker.Enabled = brushShape != BrushShape.Horizontal && brushShape != BrushShape.Vertical && brushShape != BrushShape.Point; tips.SetToolTip(sizeLabel, brushShape == BrushShape.Point ? "Punkt obejmuje zawsze jeden heks; rozmiar i wypełnienie nie mają zastosowania." : "Wymiar figury w jednostkach siatki: 1–15."); canvas.Invalidate(); };
+            Action settings = () => { EndCanvasGesture(true); brushShape = (BrushShape)shapePicker.SelectedIndex; brushSize = (int)sizePicker.Value; brushHeight = (int)heightPicker.Value; brushFilled = fillPicker.Checked; heightPicker.Visible = brushShape == BrushShape.Rectangle; UpdateBrushAvailability(); tips.SetToolTip(sizeLabel, brushShape == BrushShape.Point ? "Punkt obejmuje zawsze jeden heks; rozmiar i wypełnienie nie mają zastosowania." : "Wymiar figury w jednostkach siatki: 1–15."); canvas.Invalidate(); };
             shapePicker.SelectedIndexChanged += (s, e) => settings(); sizePicker.ValueChanged += (s, e) => settings(); heightPicker.ValueChanged += (s, e) => settings(); fillPicker.CheckedChanged += (s, e) => settings(); settings();
             toolbox.Layout += (s, e) => { int w = toolbox.ClientSize.Width; foreach (Control b in paletteTools.Controls) b.Width = (w - 12) / 6; shapeLabel.Location = new Point(0, 39); shapePicker.SetBounds(52, 37, Math.Max(80, w - 52), 24); sizeLabel.Location = new Point(0, 65); sizePicker.Location = new Point(52, 63); heightPicker.Location = new Point(w - 60, 63); fillPicker.Location = new Point(0, 89); };
 
@@ -64,9 +65,11 @@ namespace HexMapEditor
             var iconSection = Section("Ikony", 3); var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 30, WrapContents = false }; iconSection.Controls.Add(actions);
             IconAction(actions, "new", "Dodaj ikonę z pliku", ImportIcon); IconAction(actions, "pencil", "Edytuj ikonę", EditLibraryIcon); deleteIconButton = IconAction(actions, "trash", "Usuń wybraną ikonę z biblioteki", DeleteLibraryIcon); var more = SmallButton(actions, "…", OpenIconLibrary, 40); more.AccessibleName = "Pełna biblioteka ikon"; tips.SetToolTip(more, more.AccessibleName);
             iconPreview = new BufferedFlowPanel { Dock = DockStyle.Fill, WrapContents = true, AutoScroll = false, Padding = Padding.Empty }; iconSection.Controls.Add(iconPreview); iconPreview.BringToFront();
-            Section("Obiekty", 4).Controls.Add(new Label { Text = "W przyszłym etapie", Dock = DockStyle.Fill, ForeColor = Color.Silver });
+            var objects=Section("Obiekty",4);var objectActions=new FlowLayoutPanel{Dock=DockStyle.Top,Height=30,WrapContents=false};objects.Controls.Add(objectActions);
+            IconAction(objectActions,"new","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);IconAction(objectActions,"trash","Usuń wzorzec obiektu",DeleteObjectTemplate);SmallButton(objectActions,"…",OpenObjectLibrary,32);IconAction(objectActions,"labels","Lista instancji na mapie",OpenObjectInstances);
+            objectPreview=new BufferedFlowPanel{Dock=DockStyle.Fill,AutoScroll=false,WrapContents=true};objects.Controls.Add(objectPreview);objectPreview.BringToFront();
             SelectTool(EditorTool.Select); LayoutPalette(); RefreshPresetPicker(); UpdateMaterialIndicator();
-            canvas.MouseLeave += (s, e) => { previewCell = -1; previousStrokePoint = null; canvas.Invalidate(); };
+            canvas.MouseLeave += (s, e) => { previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
             Disposed += (s, e) => { foreach (var b in documentBitmaps.Values) b.Dispose(); foreach (var b in libraryBitmaps.Values) b.Dispose(); };
         }
         bool layingOutPalette;

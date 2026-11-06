@@ -89,7 +89,9 @@ namespace HexMapEditor
             ConfigureButton(orientationToggle, "Pointy Top", "pointy", "Zmień orientację", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop"), 128); view.Controls.Add(orientationToggle);
             ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
-            ConfigureButton(fitButton, "Dopasuj", "fit", "Dopasuj mapę (prawy panel jest nakładką)", FitMap, 94); view.Controls.Add(fitButton);
+            var fitMenu=new ContextMenuStrip();fitMenu.Items.Add("Dopasuj mapę",null,(s,e)=>FitMap());fitMenu.Items.Add("Dopasuj wszystko",null,(s,e)=>FitEverything());
+            fitMenu.Opening+=(s,e)=>EndCanvasGesture(true);fitMenu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};
+            ConfigureButton(fitButton, "Dopasuj", "fit", "Dopasuj mapę / Dopasuj wszystko", ()=>fitMenu.Show(fitButton,0,fitButton.Height), 94); view.Controls.Add(fitButton);
             ShellButton(view, "Rozmiar", "labels", "Dodaj lub usuń wiersze i kolumny", ResizeProject, 90);
             mapName.TextAlign = ContentAlignment.MiddleCenter; mapName.Font = new Font(Font, FontStyle.Bold); mapName.AutoEllipsis = true; mapName.AccessibleName = "Nazwa projektu"; shellToolbar.Controls.Add(mapName);
             var status = new Panel { Dock = DockStyle.Bottom, Height = 27, BackColor = shellToolbar.BackColor }; statusLabel.Dock = DockStyle.Fill; statusLabel.Padding = new Padding(10, 4, 0, 0); status.Controls.Add(statusLabel); Controls.Add(status);
@@ -115,26 +117,29 @@ namespace HexMapEditor
         {
             EndCanvasGesture(true); currentTool = tool;
             foreach (var pair in toolButtons) { pair.Value.BackColor = pair.Key == tool ? Color.FromArgb(93, 111, 156) : Color.FromArgb(49, 54, 67); pair.Value.FlatAppearance.BorderSize = pair.Key == tool ? 3 : 1; pair.Value.AccessibleDescription = pair.Key == tool ? "Aktywne" : "Nieaktywne"; }
+            UpdateBrushAvailability();
         }
         void BuildDetailsPanel()
         {
             right.BackColor = Color.FromArgb(34, 38, 48); right.Visible = false;
-            var header = new Panel { Dock = DockStyle.Top, Height = 38 }; var title = new Label { Text = "Szczegóły heksu", Dock = DockStyle.Fill, Padding = new Padding(14, 10, 0, 0) }; header.Controls.Add(title);
+            var header = new Panel { Dock = DockStyle.Top, Height = 38 }; var title = detailTitle = new Label { Text = "Szczegóły heksu", Dock = DockStyle.Fill, Padding = new Padding(14, 10, 0, 0) }; header.Controls.Add(title);
             rightClose.Text = "Zamknij"; rightClose.Dock = DockStyle.Right; rightClose.Width = 85; StyleButton(rightClose); rightClose.Click += (s, e) => CloseDetailsPanel(); header.Controls.Add(rightClose);
             var scroll = new DetailsScrollPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14) }; var content = new Panel { Location = new Point(14, 14), Height = 770, Width = 375 };
             scroll.Controls.Add(content); right.Controls.Add(scroll); right.Controls.Add(header);
+            hexDetailScroll=scroll;
             InitializePanelResize(header);
             detailCoordinate.SetBounds(0, 0, 360, 24); detailTerrain.SetBounds(0, 26, 360, 28); detailTerrain.AutoEllipsis = true; content.Controls.Add(detailCoordinate); content.Controls.Add(detailTerrain);
             detailCoordinate.Anchor = detailTerrain.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            content.Controls.Add(new Label { Text = "Własna nazwa heksu", Location = new Point(0, 60), AutoSize = true });
-            cellName.SetBounds(0, 84, 360, 26); cellName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellName.AccessibleName = "Własna nazwa heksu"; content.Controls.Add(cellName);
+            detailIcon.SetBounds(0,54,360,24);detailIcon.AutoEllipsis=true;detailIcon.Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right;content.Controls.Add(detailIcon);
+            content.Controls.Add(new Label { Text = "Własna nazwa heksu", Location = new Point(0, 86), AutoSize = true });
+            cellName.SetBounds(0, 110, 360, 26); cellName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellName.AccessibleName = "Własna nazwa heksu"; content.Controls.Add(cellName);
             cellName.TextChanged += (s, e) => NameEdited(); cellName.LostFocus += (s, e) => textHistory.BreakGroups();
             cellName.HistoryUndo = () => TextUndo("name", false);
             cellName.MouseDown += (s, e) => textHistory.BreakGroups();
             cellName.KeyDown += (s, e) => { if (e.Control || new[] { Keys.Left, Keys.Right, Keys.Up, Keys.Down, Keys.Home, Keys.End }.Contains(e.KeyCode)) textHistory.BreakGroups(); };
-            var history = new FlowLayoutPanel { Location = new Point(0, 112), Width = 360, Height = 34, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; SmallButton(history, "Cofnij nazwę", () => TextUndo("name", false), 116); SmallButton(history, "Ponów nazwę", () => TextUndo("name", true), 116); content.Controls.Add(history);
-            content.Controls.Add(new Label { Text = "Opis (tekst, listy i tabele)", Location = new Point(0, 152), AutoSize = true });
-            cellDescription.SetBounds(0, 178, 360, 570); cellDescription.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; content.Controls.Add(cellDescription);
+            var history = new FlowLayoutPanel { Location = new Point(0, 138), Width = 360, Height = 34, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; SmallButton(history, "Cofnij nazwę", () => TextUndo("name", false), 116); SmallButton(history, "Ponów nazwę", () => TextUndo("name", true), 116); content.Controls.Add(history);
+            content.Controls.Add(new Label { Text = "Opis (tekst, listy i tabele)", Location = new Point(0, 178), AutoSize = true });
+            cellDescription.SetBounds(0, 204, 360, 570); cellDescription.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; content.Controls.Add(cellDescription);content.Height=800;
             cellDescription.Changed = DescriptionEdited; cellDescription.HistoryRequested = repeat => TextUndo("description", repeat);
             cellDescription.SaveRequested = asNew => { if (asNew) SaveAsProject(); else SaveProject(); };
             cellDescription.BreakHistoryGroup = () => textHistory.BreakGroups();
@@ -142,6 +147,7 @@ namespace HexMapEditor
             cellDescription.TableSizeRequested = () => { using (var d = new TableSizeDialog()) return RunModal(() => d.ShowDialog(this)) == DialogResult.OK ? new[] { d.Rows, d.Columns } : null; };
             // Establish anchors at the design width before responsive layout begins.
             scroll.Content = content; scroll.PerformLayout();
+            BuildObjectDetails();
         }
     }
 }

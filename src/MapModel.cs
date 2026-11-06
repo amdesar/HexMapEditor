@@ -136,6 +136,7 @@ namespace HexMapEditor
     {
         public int Columns, Rows, RowParity, ColumnParity;
         public List<CellData> Cells;
+        internal int ShiftColumns, ShiftRows;
         public static ResizeState Capture(MapData map) { return new ResizeState { Columns = map.Columns, Rows = map.Rows, RowParity = map.RowParity, ColumnParity = map.ColumnParity, Cells = new List<CellData>(map.Cells) }; }
         public void Apply(MapData map) { map.Columns = Columns; map.Rows = Rows; map.RowParity = RowParity; map.ColumnParity = ColumnParity; map.Cells = new List<CellData>(Cells); }
     }
@@ -236,7 +237,7 @@ namespace HexMapEditor
             var dimensions = ResizeDimensions(map.Columns, map.Rows, top, bottom, left, right);
             var plan = new ResizePlan(); if (top == 0 && bottom == 0 && left == 0 && right == 0) return plan;
             int cols = dimensions.Width, rows = dimensions.Height;
-            var state = new ResizeState { Columns = cols, Rows = rows, RowParity = (map.RowParity - top) & 1, ColumnParity = (map.ColumnParity - left) & 1, Cells = new List<CellData>() };
+            var state = new ResizeState { Columns = cols, Rows = rows, RowParity = (map.RowParity - top) & 1, ColumnParity = (map.ColumnParity - left) & 1, Cells = new List<CellData>(), ShiftColumns=left, ShiftRows=top };
             var kept = new HashSet<string>();
             for (int r = 0; r < rows; r++) for (int c = 0; c < cols; c++)
             {
@@ -273,7 +274,7 @@ namespace HexMapEditor
         static string CellKey(CellData cell) { return MapLogic.Hash(MapLogic.Serializer().Serialize(cell)); }
         static string Header(MapData map)
         {
-            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets });
+            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects });
         }
         public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); changed.Clear(); headerChanged = false; }
         public bool CheckCell(CellData cell) { string value; if (saved.TryGetValue(cell.Id, out value) && value == CellKey(cell)) changed.Remove(cell.Id); else changed.Add(cell.Id); return Dirty; }

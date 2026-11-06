@@ -53,9 +53,9 @@ namespace HexMapEditor
         }
         void UpdateTerrainSelection()
         {
-            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && at == brushIndex); tile.Edit.Enabled = tile.Delete.Enabled = !PresetReadOnly; }
+            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex); tile.Edit.Enabled = tile.Delete.Enabled = !PresetReadOnly; }
         }
-        void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); } }
+        void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; objectMaterial=false;noMaterial=false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); } }
         void MaterialChosen() { if (!updating && (currentTool == EditorTool.FogBrush || currentTool == EditorTool.FogBucket)) SelectTool(EditorTool.Brush); }
         void SelectPreset(string id)
         {

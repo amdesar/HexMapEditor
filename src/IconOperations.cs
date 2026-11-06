@@ -40,7 +40,7 @@ namespace HexMapEditor
                 }
                 bool fileChange = before == null || next == null || !String.Equals(before.FilePath,next.FilePath,StringComparison.Ordinal) || !before.DiskBytes.SequenceEqual(next.DiskBytes);
                 if (!fileChange && action.Layers.Count == 0) return true;
-                if (fileChange) action.LibraryChange = new IconLibraryChange { Before=before == null ? null : before.Copy(), After=next, BeforeBytes=before == null ? null : before.DiskBytes, AfterBytes=next == null ? null : next.DiskBytes, BeforeSelected=activeIcon, BeforeMaterial=iconMaterial, AfterSelected=next == null ? null : next.Id, AfterMaterial=next != null, Index=before == null ? libraryIcons.Count : libraryIcons.FindIndex(i=>i.Id==before.Id) };
+                if (fileChange) action.LibraryChange = new IconLibraryChange { Before=before == null ? null : before.Copy(), After=next, BeforeBytes=before == null ? null : before.DiskBytes, AfterBytes=next == null ? null : next.DiskBytes, BeforeSelected=activeIcon, BeforeMaterial=iconMaterial, BeforeObjectMaterial=objectMaterial, BeforeNoMaterial=noMaterial, AfterSelected=next == null || clearAfterIconEdit ? null : next.Id, AfterMaterial=next != null && !clearAfterIconEdit, AfterNoMaterial=next==null || clearAfterIconEdit, Index=before == null ? libraryIcons.Count : libraryIcons.FindIndex(i=>i.Id==before.Id) };
                 ApplyAction(action,true); PushAction(action); MarkDirty(); return true;
             }
             catch(Exception ex) { error=ex.Message; return false; }
@@ -52,6 +52,7 @@ namespace HexMapEditor
             if (removed != null) libraryIcons.RemoveAll(i => i.Id == removed.Id);
             if (entry != null) libraryIcons.Insert(Math.Min(change.Index,libraryIcons.Count),entry.Copy());
             activeIcon = after ? change.AfterSelected : change.BeforeSelected; iconMaterial = after ? change.AfterMaterial : change.BeforeMaterial;
+            objectMaterial=!after&&change.BeforeObjectMaterial;noMaterial=after?change.AfterNoMaterial:change.BeforeNoMaterial;
             if (!libraryIcons.Any(i=>i.Id==activeIcon)) { activeIcon=null; iconMaterial=false; }
             RefreshIconPreview();
         }

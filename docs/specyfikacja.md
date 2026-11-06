@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.9, stan decyzji 6 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.3.2; pierwszeństwo mają ustalenia sekcji 26.
+Wersja: 2.0, stan decyzji 6 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.4.0; pierwszeństwo mają ustalenia sekcji 27.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -414,3 +414,46 @@ Bajty oczekiwane są zapamiętane przy odczycie/zapisie, z wykrywaniem zewnętrz
 Tylko kilka celowanych scenariuszy kontrolek/materiału/selektora, pustej biblioteki, dokładnej historii presetów i jednego konfliktu oraz resetu bez usuwania plików. Krótka reprezentatywna próba zwykłego EXE: mgła → materiał, wizualny wybór grafiki, testowy preset usuń/Undo z plikiem, jeden krok strzałki. Nie deklarujemy wykonania niemożliwej próby. Nie Run-AllTests, nie dawne zestawy ani ponawianie zaliczonych prób bez istotnej zmiany/błędu/niepewnego wyniku. Nie usuwamy historycznych testów; ich dawna zasada bez plikowego Undo presetów jest od 0.3.2 historyczna, nie wymaganiem przywrócenia tamtego zachowania.
 
 Poza zakresem: obiekty, dwie kolumny, pełna stylistyka, kadrowanie/arkusze/tekstury, geometria i dalsza interpolacja, ponowna diagnoza przeskoku panelu, opisy, optymalizacja dużych map i trwałe odzyskiwanie poza limitem. Mapy nadal osadzają użyte grafiki i logiczne metadane wystąpień. Własne dane wyłącznie tests/_work, bez prywatnej Library i jej czyszczenia.
+## 27. Obiekty 0.4.0 — obowiązujące wymagania
+
+Ta sekcja zastępuje sprzeczne decyzje wcześniejszych etapów: Obiekty są funkcją, nie placeholderem. Zachowujemy ukończone 0.3.2, technologię/offline/src/Library obok EXE, bez zależności/usług i ponownego wykonywania starych prac. Testowanie tylko minimalne i celowane; bez Run-AllTests lub równoważnej kampanii bez wyraźnego osobnego polecenia. Prywatna Library i mapy nie służą do prób; własne dane tylko tests/_work. Bez push/tagu/Release'a/przepisywania historii. Zajętego EXE użytkownika nie zamykamy i nie odrzucamy danych.
+
+### Wzorzec, grafika, instancja
+
+ObjectTemplate to biblioteka (ObjectFormatVersion 1, logiczne Id, Name i Asset), IconAsset to wspólne PNG z content-ID, MapObject to konkretna instancja ze stałym własnym ID i TemplateId. Instancja ma Name, AssetId, swobodne X/Y świata, Size najdłuższego boku z zachowaniem proporcji, Side Ally/Neutral/Enemy, Locked, RevealsFog i RevealRadius. Nie jest polem heksa; może być wiele obiektów w jednym miejscu i poza mapą. Teren/ikona/tekst heksa są niezależne. Środek jest geometrycznym środkiem prostokąta grafiki, niezależnie od przezroczystości. Początkowo Neutralny, ruch odblokowany, odkrywanie wyłączone, Size 48, promień 1. Size 8–1024, promień 0–20, świat ±10 000 000, do 5000 instancji. Walidacja przed podmianą dokumentu.
+
+### Biblioteki i wybór
+
+Sekcja Obiekty: miniatury, plus, ołówek, czerwony kosz, pełny wizualny selektor i osobna lista instancji. Bez przebudowy całego lewego panelu na dwie kolumny. Dwie kompaktowe sekcje miniatur pozostawiają elastyczne miejsce przewijanym terenom; pełne selektory dają dostęp do dalszych pozycji. Czysta biblioteka ma Namiot i Wieżę oraz znacznik inicjalizacji, bez odtwarzania świadomie usuniętych wzorców. Pliki Library/Objects/object-Namiot.json, object-Drużyna (2).json: mały prefiks object-, zachowane litery nazwy, wspólna normalizacja Windows i sufiksy kolizji. ID nie zależy od ścieżki. Nie ma masowej migracji/czyszczenia prywatnych danych.
+
+Dodawanie wzorca: z pliku lub grafika z ikon. Dodawanie ikony: z pliku lub grafika z obiektów. Edycja obu: nazwa, plik, wizualny wybór z obu bibliotek, podgląd i Zaktualizuj wystąpienia na bieżącej mapie domyślnie wyłączone. Wspólne IconPickerDialog i IconEditDialog nie tworzą drugiego systemu wyboru. Kopiujemy wyłącznie grafikę do nowego logicznego ID, bez zachowań/powiązania edycyjnego. Wybór grafiki nie przemianowuje wpisu. Anulowanie nie zapisuje zmian. Aktualizacja wzorca wpływa na nazwę/grafikę pasujących TemplateId tylko w bieżącym dokumencie, nie na pozycje/stronę/blokadę/odkrywanie ani niezależne identyczne PNG. Bez checkboxa dawne instancje zostają migawkami. Usunięcie wzorca nie usuwa instancji.
+
+Ostatni materiał to teren / ikona / obiekt z jednym złotym zaznaczeniem albo brak materiału. Wybór wzorca przełącza na Pędzel do pojedynczego umieszczania, także po Wiadrze i narzędziach mgły. Jeden MouseDown tworzy jedną instancję, również na pustym płótnie poza mapą; drag nie stempluje, Wiadro nie umieszcza, geometrie pędzla nie dotyczą obiektów i ich kontrolki są nieaktywne. Wybór terenu/ikony zachowuje zaakceptowane reguły 0.3.2. Po udanym OK edycji ikony (także bez zmiany wartości) brak aktywnego materiału, bez automatycznego wyboru zamiennika/narzędzia/historii/gwiazdki. Pędzel/Wiadro bez materiału nic nie zmieniają; mgła nie wymaga materiału. Anuluj zachowuje wybór.
+
+### Zaznaczanie, szczegóły i kamera
+
+Zaznaczanie ma klik/prostokąt i lasso, wybierane prawym przyciskiem na istniejącym narzędziu; bez duplikowania narzędzi. Klik górnego w stabilnej kolejności rysowania; Ctrl przełącza przynależność. Prostokąt/lasso wybierają według centrów; lasso domykane na puszczeniu, bez Ctrl wybór zastępuje, Ctrl przełącza. Puste miejsce/Escape czyści wybór. Ruch zaznaczonej grupy zachowuje wzajemne przesunięcia, jeden gest/jeden wpis, także poza mapą. Locked można wybrać, ale nie ruszyć; grupa pomija zablokowane z krótką informacją. Brak ruchu nie tworzy pustego wpisu. Po utracie capture gest kończy się, po opuszczeniu płótna nie interpolujemy nieznanej ścieżki. Delete usuwa instancje, nie wzorce. Obiektowy skrót nie przechwytuje tekstu ani Delete kafelka terenu.
+
+Pojedynczy wybór pokazuje szczegóły obiektu zamiast heksa: Name, Side, Size, Locked, RevealsFog, RevealRadius; jawne Zastosuj właściwości jest jednym wpisem historii. Grupa pokazuje liczbę bez masowej edycji. Szczegóły heksa mają dodatkowo Ikona: nazwa/brak, pod mgłą ???. Obiektu nie dodajemy jako pojedynczego pola heksa.
+
+Osobna lista instancji pokazuje nazwę, miniaturę, stronę i Poza mapą. Zaznacz bez centrowania nie rusza kamery. Pokaż na mapie wybiera i centruje z rozsądną skalą, uwzględniając lewy i prawy panel, także poza mapą. Nie zmienia danych/mgły/historii. Dwa jawne polecenia w menu Dopasuj: Dopasuj mapę (tylko geometria) i Dopasuj wszystko (geometria oraz całe prostokąty wszystkich instancji, niezależnie od wyboru, także poza mapą). Bez obiektów równoważne. Fit nadal celowo pomija prawą nakładkę; jej otwarcie nie porusza kamery. Nie jest to widok MG/gracza.
+
+### Mgła i geometria obiektów
+
+Odkrywa wyłącznie Side Ally i RevealsFog=true; Neutralny/Wróg mają widoczne, nieaktywne kontrolki i nie odkrywają innym wejściem. Checkbox wyłączony zachowuje promień, który jest wtedy nieaktywny. 0 = heks pod środkiem, 1 = pierwszy pierścień itd. Rozmiar obrazu nie zmienia promienia. Zmiana strony wyłącza funkcję; powrót do Ally nie włącza jej automatycznie. Włączenie lub zwiększenie promienia odsłania otoczenie w tej samej operacji co ustawienie; umieszczenie uprawnionej instancji stosuje tę samą regułę (obecne bezpieczne nowe instancje są Neutralne).
+
+Ruch każdego uprawnionego członka grupy odkrywa odcinek między zdarzeniami z próbkowaniem co najwyżej 9 jednostek świata i sześcioma rzeczywistymi sąsiadami. Próbkowanie jest ograniczone do obwiedni mapy, a właściwy hit-test wymaga rzeczywistego heksa, bez ujawniania najbliższego pola spoza mapy. Po nieznanej drodze kursor/leave/capture nie powstaje łącznik. Odkrycie jest trwałym skutkiem operacji; nie ma pętli odwracającej ręczną mgłę co klatkę, ponownego zasłaniania ani linii wzroku. Undo ruchu odtwarza tylko zmienione przez niego Fog, nie wcześniejsze odkrycia i niezwiązany tekst/teren/ikony.
+
+Renderowanie przycina grafikę i obrys zaznaczenia po zasłoniętych wielokątach heksów, nie tylko po środku. Poza mapą nie ma mgły. Zwykły hit-test nie zdradza całkowicie ukrytego obiektu; obszarowe zaznaczanie pomija całkowicie zasłonięte. Brak nazw/tooltipów nad ukrytymi grafikami. Lista instancji celowo daje edytorowi dostęp do ukrytych danych. Mgła nie szyfruje pliku.
+
+Resize nie usuwa obiektów. Pozycje przesuwają się razem ze starą rozszerzoną siatką, z zachowaniem heksa i lokalnego offsetu dla zachowanych komórek; nad usuniętymi i poza mapą pozostają na planszy. Orientacja przelicza ten sam indeks rozszerzonej siatki i offset w lokalnych osiach heksa (obrót offsetu o 30° między orientacjami, bez obracania grafiki), aby przybrzeżny punkt nie trafił do innego heksa. Bez snapowania lub fikcyjnych komórek dokumentu. Obiekty i geometria trafiają do tego samego wpisu Undo. Techniczne przeliczenie nie odkrywa drogi. Crop nie raportuje obiektów jako usuwanych danych.
+
+### Historia, pliki, format
+
+Wspólny stos 300 obejmuje utworzenie/usunięcie/ruch grupy/właściwości/fog-delta, bibliotekę obiektów i jej pliki, obok ikon/presetów/terenów. Biblioteka używa LibraryFiles: bajty w RAM, oczekiwane ścieżki i źródła, konflikty bez cichego nadpisania, brak przesunięcia stosu po błędzie i możliwość ponowienia. Także kontrola duplikatu ID wzorca. Biblioteka+aktualizacja wystąpień jest jednym wpisem po udanym przejściu dyskowym. Sama biblioteka nie oznacza mapy gwiazdką. Usuwanie bez Kosza, z jasnym potwierdzeniem sesyjności: reset/limit/zamknięcie usuwa możliwość cofnięcia, nie aktywne pliki. Nowa/Otwórz zerują zaznaczenie i historie dopiero po sukcesie; błąd/anulowanie zachowują dokument. Bez trwałego archiwum historii.
+
+Format mapy 4 ma obowiązkowe Objects: wszystkie instancje, także poza mapą, ich pełne właściwości i logiczne źródła. IconAssets pozostaje wspólnym magazynem osadzonych PNG ikon i obiektów, deduplikowanym po SHA-256 bez powiązania edycji. Zapis tylko użytych grafik, jeden zasób dla wielu wystąpień, samowystarczalny plik bez biblioteki/źródeł. Wspólny limit 128 zasobów, 2 MiB/PNG i około 32 MiB łącznie, plik do 128 MiB. Odczyt wymaga jawnych pól obiektów i poprawnych referencji/rozmiarów/pozycji/stron/promieni przed podmianą mapy; nie wykonuje ponownie odkrywania. Brak migracji map 1–3. Import grafiki i bezpieczny zapis pozostają z 0.3.2; źródła są zwalniane.
+
+### Granice
+
+Nie planujemy walki, statystyk, ekwipunku/inicjatywy, wyszukiwania ścieżek, animacji ruchu lub zaawansowanych tras; nie dopisujemy ich jako przyszłych zadań. Później: niezależna warstwa światła/ciemności, źródło/zasięg światła obiektu, ciemność powracająca po odejściu, niezależnie od trwałego odkrywania. Światła teraz nie implementujemy. Nadal odłożone: widok MG/gracza, tekstury/detail, zakładki, kadrowanie/arkusze, opisy, pełny redesign i wydajnościowa kampania dużych map. Testy tylko kilku nowych scenariuszy i krótki zwykły EXE; raport uczciwie oddziela metody/okno/pominięte obszary.

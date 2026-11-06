@@ -44,9 +44,13 @@ namespace HexMapEditor
             // Nothing in memory or on either stack changes before the checked disk transition.
             if (action.LibraryChange != null) ApplyIconLibrary(action.LibraryChange, after);
             if (action.PresetChange != null) ApplyPresetLibrary(action.PresetChange, after);
+            if (action.ObjectLibraryChange != null) ApplyObjectLibrary(action.ObjectLibraryChange, after);
             foreach (var asset in action.RequiredAssets) if (!map.IconAssets.Any(a => a.Id == asset.Id)) map.IconAssets.Add(asset);
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);
+            if (action.BeforeOrientation != null) map.Orientation=after?action.AfterOrientation:action.BeforeOrientation;
+            foreach(var change in action.Objects)change.Apply(map,after);
+            selectedObjects.RemoveWhere(id=>!map.Objects.Any(o=>o.Id==id));
             if (action.BeforePalette != null) (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex);
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);
@@ -86,6 +90,7 @@ namespace HexMapEditor
             if (state == null) return;
             EndCanvasGesture(true); textHistory.BreakGroups();
             var action = new EditAction { Label = "Zmiana rozmiaru", BeforeResize = ResizeState.Capture(map), AfterResize = state };
+            var geometry=new MapData {Orientation=map.Orientation,RowParity=state.RowParity,ColumnParity=state.ColumnParity};action.Objects=TransformObjects(geometry,state.ShiftColumns,state.ShiftRows);
             ApplyAction(action, true); PushAction(action); MarkDirty();
         }
     }

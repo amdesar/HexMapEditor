@@ -1,118 +1,90 @@
-# HexMapEditor 0.3.2
+# HexMapEditor 0.4.0
 
-Samodzielny edytor map heksagonalnych dla Windows. C# / Windows Forms / GDI+, osadzony edytor opisu WPF z lokalnego .NET Framework. Działa offline, bez konta, usług i pobierania zależności lub zasobów przy uruchamianiu. Rozwijamy istniejący projekt; aplikacja nie została napisana od nowa.
+Samodzielny edytor map heksagonalnych dla Windows. C# / Windows Forms / GDI+, osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zasobów lub zależności przy uruchamianiu. Rozwijamy istniejący projekt.
 
-## Uruchamianie i budowanie
+## Uruchamianie
 
-Uruchom `HexMapEditor.exe` lub `Uruchom HexMapEditor.bat`. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8), dostępny w Windows. Wersja aplikacji **0.3.2**, format mapy **3**, format presetu nadal **1**.
+Uruchom `HexMapEditor.exe` lub `Uruchom HexMapEditor.bat`. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.4.0**, mapy **formatu 4**, presety **1**, ikony biblioteczne **2**, wzorce obiektów **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 ```
 
-Źródła C# znajdują się w jednym katalogu `src/`; Build.ps1 kompiluje `src/*.cs`. Library pozostaje obok głównego EXE. Build używa lokalnego kompilatora .NET Framework. Główny EXE jest śledzony w Git. Ikony interfejsu i pięć startowych ikon mapy są naszymi rysunkami z kodu, bez zewnętrznych licencji i usług.
+Build.ps1 używa lokalnego kompilatora i źródeł `src/*.cs`. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony w Git. Ikony startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zasobów.
 
-**0.3.2 otwiera wyłącznie mapy formatu 3.** Starsze pliki są odrzucane bez zmieniania pliku i otwartego projektu. Nie ma migracji ani konwertera. Nie należy zastępować starego programu, jeśli potrzebny jest jeszcze odczyt dawnych map.
+**0.4.0 otwiera tylko format 4.** Nowa obowiązkowa kolekcja niezależnych instancji uzasadnia zmianę formatu: dawny program nie powinien po cichu pomijać tej warstwy. Nie ma konwersji map 1–3; odrzucenie pliku nie zmienia otwartego dokumentu ani źródła. Zachowaj starszy program, jeśli potrzebujesz dawnych map.
 
-## Podstawowa obsługa
+## Podstawowa obsługa i materiał
 
-- Górny pasek: pliki i wspólna historia po lewej, widok i Rozmiar po prawej, nieedytowalna nazwa projektu pośrodku. Nazwa po otwarciu/zapisie pochodzi z pliku, bez końcowego `.hexmap`.
-- Nowa mapa: nazwa początkowa, zawsze domyślne 15×10, zakres 1–200, orientacja i preset. Etykiety domyślnie Osie.
-- Zaznaczanie otwiera prawą nakładkę szczegółów. Rączka lub środkowy przycisk przesuwa, kółko przybliża względem kursora. Pointy Top / Flat Top zachowują dotychczasową geometrię.
-- Lewy panel ma sekcje Przybornik, Presety, Tereny, Ikony, Obiekty. **Tylko lista terenów ma własne przewijanie**: kółko i dwie strzałki nad/pod listą zamiast bocznego scrollbara. Strzałki stale zajmują miejsce i wyłączają się na granicach. Kliknięcie przesuwa dokładnie o jeden wiersz z odstępem (obecnie 36 px), przy końcu o pozostały dystans. Obie używają tego samego lokalnego rysunku odwróconego w pionie. Dodaj teren i pozostałe sekcje pozostają na miejscu. Obiekty to wyłącznie nagłówek i małe zarezerwowane miejsce.
-- Pasek na prawej krawędzi lewego panelu zwija/rozwija panel. Treść zachowuje 220 px; pasek zajmuje dodatkowe 18 px. Płótno zaczyna się za nim. Zmiana widoczności nie edytuje mapy ani historii i zachowuje położenie mapy na ekranie; Dopasuj liczy aktualnie dostępny obszar. Prawa nakładka nadal jest celowo pomijana przy Dopasuj.
+- Nazwa projektu na górnym pasku pochodzi z pliku, bez końcowego `.hexmap`. Nowa mapa: nazwa początkowa, 15×10, zakres 1–200, orientacja i preset; etykiety domyślnie Osie.
+- Jeden aktywny materiał: teren, ikona albo wzorzec obiektu, ze złotą ramką. Wybór terenu/ikony po Mgle lub Wiadrze mgły przełącza na Pędzel; zwykłe Wiadro pozostaje Wiadrem. Świadomy wybór wzorca obiektu wybiera Pędzel do pojedynczego umieszczania. Sam wybór nie edytuje mapy.
+- Po udanym OK w Edytuj ikonę wybór materiału jest pusty, również bez zmiany wartości. Narzędzie nie zmienia się, nie wybiera się automatycznie teren lub obiekt. Pędzel/Wiadro bez materiału niczego nie edytują; mgła nadal działa. Anuluj zachowuje wybór.
+- Rączka lub środkowy przycisk przesuwa kamerę; kółko przybliża względem kursora. Sekcje lewego panelu pozostają osobne; tylko tereny przewijają się kółkiem i strzałkami o jeden wiersz. Pasek zwijania zajmuje własne miejsce. Miniatury ikon/obiektów są kompaktowe; pełna biblioteka pod `…` daje dostęp do pozostałych.
+- Prawy panel jest nakładką, ma uchwyt i reset szerokości. Jego otwarcie nie porusza kamery. Dopasuj otwiera jawne opcje **Dopasuj mapę** oraz **Dopasuj wszystko**. Pierwsza liczy tylko geometrię heksów, druga także pełne prostokąty wszystkich obiektów, również poza mapą. Obie celowo pomijają prawą nakładkę; bez obiektów wyniki są takie same.
 
-## Materiał, pędzel i kształty
+## Obiekty na planszy
 
-**Narzędzie i materiał są niezależne.** Kliknięcie terenu lub miniatury ikony wybiera materiał dla tego samego Pędzla/Wiadra; nie zmienia danych mapy. Wyjątek dla narzędzia: świadomy wybór terenu lub ikony po Mgle/Wiadrze mgły przełącza na zwykły Pędzel, zachowując kształt, rozmiary i wypełnienie. Zwykłe Wiadro pozostaje Wiadrem; pozostałe narzędzia bez zmiany. Odświeżanie, wczytywanie i historia nie uruchamiają tego wyjątku. Pogrubiona złota ramka wybranej pozycji wskazuje dokładnie jeden materiał; usunięto tekstowy wiersz materiału w Przyborniku. Mgła ma dwa własne narzędzia i nie zależy od wybranego materiału.
+Sekcja Obiekty ma plus, ołówek, czerwony kosz, pełny selektor `…` oraz przycisk **Lista instancji na mapie**. To dwie różne rzeczy: biblioteka zawiera wzorce, lista — konkretne instancje bieżącego dokumentu. Czysta biblioteka dostaje Namiot i Wieżę; znacznik inicjalizacji nie odtwarza świadomie skasowanych wzorców.
 
-Wspólne ustawienia Pędzla terenów, ikon i Mgły wojny: Kształt, Rozmiar **1–15**, Wypełnienie. Punkt wyłącza Rozmiar i Wypełnienie, z wyjaśnieniem w podpowiedzi. Wyłączenie Wypełnienia dla figur powierzchniowych pozostawia obrys grubości jednego heksa. Pod kursorem widać zasięg odcisku. Wiadra nie korzystają z rozmiaru i kształtu.
+Wybierz wzorzec i kliknij płótno. **Jeden klik tworzy jedną instancję**, również poza mapą; przeciąganie nie stempluje kopii. Wiadro nie tworzy obiektów, a kształt i rozmiar pędzla nie mają zastosowania. Nowa instancja: Neutralny, ruch odblokowany, odkrywanie wyłączone, rozmiar 48 jednostek świata, promień 1. Wiele obiektów może zachodzić na ten sam heks lub siebie nawzajem. Nie są polami heksa i nie zastępują ikon.
 
-| Kształt | Znaczenie rozmiaru |
-| --- | --- |
-| Punkt | Zawsze jeden heks. |
-| Heksagon | 1 = środek, 2 = środek i pierwszy pierścień, 3 = dwa pierścienie itd. |
-| Kwadrat / Prostokąt | Szerokość w jednostkach siatki; prostokąt ma dodatkowe pole wysokości. |
-| Koło / Pięciokąt foremny | Średnica okręgu opisującego w jednostkach siatki; pięciokąt ma wierzchołek w górę. |
-| Linia pozioma / pionowa | Długość wzdłuż widocznych osi ekranu; Wypełnienie nieaktywne. |
+Wybierz Zaznaczanie, aby kliknąć/przesuwać istniejące instancje. Górny z nakładających się obiektów ma pierwszeństwo. Ctrl+klik przełącza przynależność. Przeciągnięcie od pustego miejsca wybiera centra prostokątem. **Prawy przycisk na Zaznaczaniu** wybiera Klik/prostokąt albo Swobodne lasso; lasso domyka się przy puszczeniu. Ctrl przełącza również wybór obszarem. Klik pustego miejsca lub Escape czyści wybór. Ruch zaznaczonej grupy zachowuje wzajemne przesunięcia; zablokowane obiekty pozostają na miejscu. Jeden gest to jeden Undo/Redo, bez edycji heksów. Delete usuwa instancje, nie wzorce. Skróty nie przechwytują edycji tekstu.
 
-Jednostka geometryczna wynosi około 48,5 jednostki bazowej mapy (odstęp centrów w nieprzesuniętej osi). Figury wybierają centra heksów wewnątrz obszaru; linie wybierają najbliższe centra wzdłuż odcinka. Wynik jest dyskretny, deterministyczny i niezależny od zoomu, w obu orientacjach i po zmianie parzystości początku mapy. Małe figury mogą sprowadzać się do jednego pola. Obrys jest wyznaczany przed przycięciem do brzegów mapy. Przy szybkim ruchu interpolujemy odcinek między kolejnymi pozycjami w jednostkach mapy i nanosimy ten sam odcisk, ze wspólnym zbiorem odwiedzonych pól. Po wyjściu z płótna, utracie przechwycenia lub nowym geście odcinek jest zerowany.
+Pojedynczy obiekt ma w prawym panelu nazwę, Sojusznik/Neutralny/Wróg, rozmiar najdłuższego boku **8–1024** jednostek świata (proporcje grafiki zachowane), blokadę ruchu, odkrywanie i promień **0–20**. Zatwierdź przez **Zastosuj właściwości** — jedna operacja historii. Wybór grupy pokazuje liczbę, bez masowej edycji. Limit 5000 instancji; współrzędne świata ±10 000 000, bez obowiązkowego snapowania.
 
-## Ikony mapy
+Lista instancji pokazuje nazwę, miniaturę, stronę i Poza mapą. Zaznacz bez centrowania nie zmienia kamery. **Pokaż na mapie** zaznacza i centruje instancję z uwzględnieniem obu paneli, bez zmiany danych, historii lub mgły. Lista jest narzędziem edytora i daje dostęp także do obiektów całkowicie zasłoniętych.
 
-Sekcja Ikony ma do czterech rzędów miniatur oraz **plus**, **ołówek Edytuj ikonę**, **czerwony kosz** i **…** otwierający pełną bibliotekę. Pięć startowych sylwetek: krzyż, namiot, wieża, czaszka, gwiazda. Są tworzone z kodu przy pierwszym uruchomieniu w nowej bibliotece; znacznik `.starter-icons-v1` zapobiega ponownemu dodawaniu świadomie usuniętych pozycji.
+### Biblioteki i kopiowanie grafik
 
-Import: nieruchome PNG/JPG/BMP/GIF do **8 MiB i 2048×2048**. Obraz jest proporcjonalnie zmniejszany do najwyżej 512×512 i zapisywany jako PNG z przezroczystością tam, gdzie była dostępna. Brak SVG, metaplików, animacji i aktywnej zawartości. Plik źródłowy nie pozostaje otwarty. Każdy import tworzy logiczną pozycję z własnym ID; nawet takie same bajty nie oznaczają tej samej pozycji. Mapowe PNG nadal są współdzielone po skrócie zawartości.
+Dodawanie wzorca: plik graficzny albo grafika z biblioteki ikon. Dodawanie ikony: plik albo grafika z biblioteki obiektów. Edycja obu rodzajów ma nazwę, import, wizualny wybór z obu bibliotek, podgląd i domyślnie wyłączone Zaktualizuj wystąpienia na bieżącej mapie. Wybór grafiki nie zmienia nazwy wpisu; anulowanie nie zapisuje zmian.
 
-Jeden heks zawiera najwyżej jedną ikonę, dużą i proporcjonalną. Pędzel: brak/inny symbol → dodaj/zastąp; ta sama ikona na polu początkowym → usuń wybraną ikonę. Tryb obowiązuje cały gest, a nakładające się odciski nie przełączają ponownie odwiedzonych pól. Teren i tekst pozostają bez zmian. Usunięcie z biblioteki wymaga potwierdzenia; istniejące mapy zachowują osadzony zasób. **Ikony mają sesyjne Undo/Redo plików**: poprzednie bajty i metadane są w pamięci historii, a nie w prywatnym Koszu Windows. Usunięcie nie przenosi pliku do Kosza. Po utracie odpowiadającej historii nie ma sesyjnej kopii do cofnięcia.
+Kopiowana jest tylko grafika, z nową logiczną tożsamością wpisu, bez zachowań lub powiązanej edycji. Zasób PNG można współdzielić. Aktualizacja instancji wzorca zmienia wyłącznie nazwę/grafikę powiązanych przez jego ID instancji bieżącej mapy; zachowuje pozycję, stronę, blokadę i odkrywanie. Bez checkboxa dawne instancje zostają niezmienione. Usunięcie wzorca nie usuwa instancji.
 
-Przytrzymanie i przeciągnięcie każdego Wiadra wypełnia kolejne napotkane regiony, jako jeden krok wspólnej historii. Tryb ikon/mgły ustalony na początku całego gestu nie zmienia się. Regiony i ich granice pochodzą z migawki sprzed modyfikacji; region nie przełącza się ponownie. Wiadro ikon używa spójnego regionu **wariantu terenu** i sześciu sąsiadów, z istniejącej kolejki Wiadra. Ikony i mgła nie są granicami. Pole startowe ustala dodawanie/zastępowanie albo usuwanie wybranej ikony; przy usuwaniu inne ikony pozostają.
+Pliki: `Library/Objects/object-Namiot.json`, `object-Drużyna (2).json`; ikony: `Library/Icons/icon-Czaszka.json`. Mały prefiks, zachowane litery nazwy, bezpieczne nazwy Windows i sufiksy kolizji, wewnętrzne ID niezależne od ścieżki. Bez masowej migracji prywatnych danych. Import nadal: nieruchome PNG/JPG/BMP/GIF do 8 MiB i 2048×2048, proporcjonalne PNG do 512×512, bez blokady źródła.
 
-## Mgła wojny
+## Mgła i obiekty
 
-Mgła wojny maluje wspólnym kształtem; Wypełnienie mgłą działa na spójnym regionie zgodnego **koloru, nazwy rodzaju terenu i początkowego stanu mgły**. Region używa tej samej kolejki i sąsiedztwa co Wiadro; różni się predykatem. Ikony, indywidualna nazwa i opis nie dzielą regionu; ID/wariant terenu nie jest warunkiem mgły. Woda i neutralny o tym samym kolorze są rozdzielone, tak jak dwie plamy mgły rozdzielone odkrytymi polami. Odkryte pole startowe ustala zasłanianie, zasłonięte — odkrywanie. Jeden gest/jedno wypełnienie to jeden krok historii, bez ponownego przełączania odwiedzonych pól.
+Tylko **Sojusznik z włączonym Odkrywa mgłę** może odkrywać. Neutralny/Wróg mają kontrolki widoczne, ale nieaktywne. Promień 0 = tylko rzeczywisty heks pod geometrycznym środkiem grafiki, 1 = środek i sześciu sąsiadów itd. Rozmiar obrazu jest niezależny. Wyłączenie odkrywania zachowuje promień; zmiana strony wyłącza funkcję, powrót do Sojusznika nie włącza jej sam.
 
-Mgła jest nieprzezroczysta i szara, zasłania kolor, ikonę i etykietę wewnętrzną. Pozostają robocze granice siatki i współrzędne osi. Szczegóły zasłoniętego heksa pokazują `???` i stan ukrycia zamiast nazwy/terenu/opisu; pola są nieaktywne. Rzeczywiste dane nie są zastępowane znakami zapytania. **Mgła jest funkcją prezentacji, nie szyfrowaniem pliku**: zawartość mapy nadal obejmuje ukryte dane. Nie ma teraz widoku MG/graczy ani globalnego podglądu bez mgły.
+Włączenie funkcji lub zwiększenie promienia odkrywa otoczenie w tym samym wpisie co ustawienie. Ruch odkrywa drogę między zdarzeniami myszy i własny promień każdego uprawnionego obiektu grupy. Po wyjściu z płótna/utracie capture nie powstaje łącznik nieznanej drogi. Środek poza rzeczywistym heksiem nie korzysta z najbliższego pola. Odkryte pola pozostają odkryte; usunięcie obiektu/wyłączenie/zmiana strony ich nie zasłania. Ręczna mgła nie jest nadpisywana co klatkę. Undo ruchu przywraca tylko mgłę zmienioną przez ten ruch.
 
-## Presety, tekst i historia
+Mgła przycina **części** grafiki i obrysu zaznaczenia nad zasłoniętymi heksami. Poza mapą mgły nie ma. Zwykły hit-test nie wybiera przez mgłę; brak tooltipów/nazw ujawniających obiekty. Lista instancji pozostaje świadomym narzędziem edytora, nie zabezpieczonym widokiem gracza. Mgła nie szyfruje mapy.
 
-Presety: selektor z Odśwież obok, pod nim jeden rząd ikon Nowy preset / Edytuj nazwę / Zapisz preset / Usuń preset. Nowe pliki mają postać **`Library/Terrains/Presets/Kosmos.json`**, bez `.terrainset`. Zawartość presetu nadal ma wersję 1. Zachowano stabilne ID, bezpieczne nazwy Windows, sufiksy kolizji, świadomy zapis i przemianowanie jednego pliku dopiero przy zapisie. Skanowanie `*.json` jest nierekurencyjne, bez specjalnego mechanizmu starych rozszerzeń i bez migracji startowej.
+## Geometria, historia i zapis
 
-Domyślny pochodzi z kodu i jest chroniony po ID. Nie można zmieniać jego nazwy ani definicji, dodawać/usuwać terenów, nadpisywać go lub usuwać — również przez F2/Delete i metody edycji. Można malować jego terenami oraz zapisać go jako nowy własny preset, wybierany po sukcesie i w pełni edytowalny. Anulowanie/błąd nie zmienia Domyślnego. Edycja terenu tworzy nowy wariant i domyślnie wpływa na przyszłe malowanie. Zastosuj do bieżącej mapy jest domyślnie wyłączone. Odświeżanie nie resetuje roboczej palety ani historii. Usunięcie pliku presetu nie zmienia samowystarczalnej mapy.
+Resize zachowuje wszystkie obiekty, także nad usuniętymi heksami. Przesuwa je razem z geometrią starej siatki; lokalny offset zostaje. Orientacja przelicza pozycje przez rozszerzoną siatkę i **lokalne osie heksa**: offset obraca się o 30° między Pointy Top i Flat Top, aby także punkt przy brzegu pozostał nad tym samym heksiem. Grafika nie obraca się. Poza mapą stosuje się tę samą regułę, bez dodawania fikcyjnych komórek. Resize/orientacja i obiekty są jednym Undo, bez odkrywania technicznej drogi. Ostrzeżenie crop dotyczy faktycznie usuwanych danych heksów; obiekty nie są usuwane.
 
-Wspólna historia mapy obejmuje tereny, robocze palety i ich wybór, ikony, mgłę oraz rozmiar. Limit: **300 operacji**. Jeden gest/wypełnienie/zmiana rozmiaru to jeden krok. Różnice terenów przywracają tylko teren, różnice warstw tylko ikonę lub mgłę; nazwy i opisy są niezależne. Puste operacje nie kasują Redo. Nowa/Otwórz zerują historie dokumentu i jego pamięć zasobów. Historia ikon i presetów odtwarza także pliki biblioteki.
+Wspólna chronologiczna historia obejmuje mapę, paletę, instancje, ich fog-delta oraz pliki bibliotek ikon/presetów/obiektów. Limit 300. Brak rzeczywistej zmiany nie tworzy wpisu. Usunięcie pliku jest **bez Kosza**, z bajtową kopią w pamięci historii. Cofanie przestaje być dostępne po resecie, wypadnięciu wpisu lub zamknięciu programu. LibraryFiles wykrywa zmienione źródła/zajęte cele i nie nadpisuje obcych danych; błąd nie przesuwa historii, można ponowić po rozwiązaniu konfliktu. Błąd rollback wskazuje zachowaną własną kopię `.library-session-*.tmp`. Same pliki biblioteki nie tworzą fałszywej gwiazdki mapy. Udane Nowa/Otwórz zeruje historie i zaznaczenie bez kasowania aktywnych plików; błąd/anulowanie zachowuje dokument.
 
-Formatowany opis zachowuje dotychczasowe akapity, style, listy i edytowalne tabele. Ctrl+Shift+V / Sam tekst / menu Wklej jako zwykły tekst korzystają z tej samej operacji. Nazwa i opis mają osobne wielopoziomowe historie przypisane do ID heksa. Ctrl+Z/Y w polu tekstowym dotyczą jego historii, górne strzałki zawsze mapy. Limit tekstu: 100 kroków na pole, 32 MiB dodatkowych migawek łącznie; pisanie grupowane do 750 ms przerwy i 5 s trwania. Historie nie są zapisywane. Pełna przebudowa edytora nie należy do 0.3.2.
+Format **4**: `Objects` zawiera stabilne ID instancji i wzorca, nazwę, AssetId, X/Y, Size, Side, Locked, RevealsFog, RevealRadius. `IconAssets` jest wspólnym magazynem PNG ikon i obiektów po SHA-256. Zapisuje tylko użyte zasoby, jeden na wiele wystąpień, nie całą bibliotekę. Sam plik mapy wystarcza, również dla obiektów poza mapą. Limit wspólny 128 zasobów, 2 MiB PNG/zasób i około 32 MiB PNG łącznie, plik do 128 MiB. Odczyt waliduje przed podmianą dokumentu i **nie wykonuje odkrywania ponownie**. Bezpieczny zapis z Flush/atomowym zastąpieniem i potwierdzaniem końcowej ścieżki pozostał.
 
-Rozmiar pozostaje atomową operacją czterech stron ze znakami. Zachowuje ID i wszystkie dane pozostałych pól, w tym ikonę i mgłę. Ostrzeżenie ma rozłączne grupy kombinacji terenu, tekstu, ikony i mgły z pełnymi współrzędnymi sprzed operacji; każdy heks liczony raz. Domyślnie Nie. Nowe pola są neutralne, odkryte, bez ikony.
+## Zachowane funkcje
 
-## Edycja i sesyjna historia biblioteki ikon w 0.3.1
+Osiem kształtów pędzla terenów/ikon/mgły: Punkt, Kwadrat, Prostokąt, Koło, Heksagon, Pięciokąt foremny i dwie linie. Wspólne rozmiary 1–15 oraz wypełnienie/obrys; Punkt zawsze jeden heks. Geometrii i interpolacji nie przebudowano. Wiadro terenów/ikon używa wariantu terenu; mgły — koloru, nazwy rodzaju terenu i początkowego stanu mgły. Gest z przeciąganiem ma jeden wpis historii, stały tryb i odwiedzone regiony. Regionów nie diagnozowano ponownie.
 
-Edytuj ikonę umożliwia nazwę, podmianę z pliku albo grafikę już dostępną w bibliotece. Przycisk Wybierz z biblioteki otwiera ten sam pełny widok miniatur i nazw co główne okno. W kontekście edycji zwraca tylko grafikę do podglądu: nie zmienia głównego materiału, narzędzia, mapy ani biblioteki przed OK. Anuluj selektora zachowuje poprzedni podgląd. Checkbox **Zaktualizuj wystąpienia na bieżącej mapie** jest przy każdym otwarciu wyłączony. Bez niego mapowe grafiki i nazwy pozostają migawką; po włączeniu aktualizowane są wystąpienia logicznego ID tej pozycji (również starsze warianty tej samej pozycji), a nie wszystkie podobne PNG. Teren, mgła, nazwa i opis heksa pozostają niezależne. Całość to jeden wpis historii. Bez aktywnej ikony przycisk mówi „Zaznacz ikonę”. Anulowanie dialogu lub wyboru pliku nie zmienia biblioteki ani mapy.
+Domyślny preset nadal całkowicie tylko do odczytu; własna kopia edytowalna. Czytelne pliki presetów `Library/Terrains/Presets/Kosmos.json`, odświeżanie bez utraty roboczej palety, stabilne ID/wersje i kontrola konfliktów. Opis heksa pozostaje formatowany z tabelami. Nazwa/opis mają oddzielne historie tekstu; Ctrl+Z/Y w edytorze obsługuje wyłącznie tekst, górne strzałki wspólną historię mapy. Ctrl+Shift+V i menu zwykłego wklejania bez zmian. Szczegóły heksa mają nowy wiersz Ikona: nazwa/brak, pod mgłą `???`.
 
-Biblioteczny JSON ma teraz `IconFormatVersion: 2`, stałe ID pozycji, nazwę oraz zasób PNG. Pliki: **icon-Czaszka.json**, **icon-Namiot (2).json**. Prefiks jest małymi literami, nazwa zachowuje zapis użytkownika, polskie znaki i spacje. Normalizacja Windows, limit ścieżki i czytelne sufiksy chronią przed kolizją. Stary płaski JSON i jego nazwa są czytane w pamięci, bez startowego przemianowania; dopiero świadoma edycja zapisuje nowe opakowanie i czytelną nazwę jednego pliku. Stare ID pozostaje logicznym ID, więc istniejące przypisania mogą być aktualizowane bez dopasowywania nowej pozycji wyłącznie po bajtach.
+## Biblioteka i testowanie
 
-Import, usunięcie, zmiana nazwy/grafiki oraz opcjonalna aktualizacja mapy korzystają ze wspólnej chronologii. Migawki w pamięci są dostępne, dopóki odpowiadający wpis znajduje się w historii (limit 300 wpisów). Nowa rzeczywista operacja usuwa Redo. Udane Nowa/Otwórz zerują historię, anulowanie i błąd odczytu nie. Samo zamknięcie nie cofa zapisanej biblioteki i respektuje pytanie o niezapisane zmiany mapy. Biblioteczna edycja bez zmiany wystąpień nie oznacza mapy gwiazdką.
+Aplikacja tworzy brakujące katalogi Library bez usuwania/nadpisywania istniejących danych: Backgrounds, Terrains/Presets, Icons, Objects, Hexmaps, Exports/Images, Exports/Text. Nowy projekt proponuje Hexmaps; otwarty respektuje swoją ścieżkę. Library jest lokalne i ignorowane przez Git.
 
-Przed zmianą sprawdzamy oczekiwane bajty i ścieżkę. Konflikt lub zewnętrzna zmiana blokuje operację, bez nadpisania i przesunięcia stosu. Należy rozwiązać konflikt pliku i ponowić operację. Zapis etapuje plik z unikalną nazwą, zapisuje nowe bajty bez nadpisania obcego celu, a przy błędzie przywraca starą ścieżkę. Jeśli sam rollback zablokuje zewnętrzna operacja, komunikat wskazuje zachowaną kopię `.library-session-*.tmp`; nie kasuj jej. Nie ma sprzątania aktywnych ikon przy Nowa/Otwórz ani przy starcie. Od 0.3.2 ten sam mechanizm przejść plikowych obsługuje również **presety**.
-
-## Sesyjne Undo/Redo plików presetów w 0.3.2
-
-Wspólna chronologia obejmuje utworzenie presetu, zapis kopii jako nowej, nadpisanie, zapis roboczo zmienionej nazwy wraz z przemianowaniem pliku i usunięcie. Jeden rzeczywisty zapis/usunięcie to jeden wpis z dokładnymi bajtami i ścieżkami oraz potrzebną zmianą palety projektu. Sama robocza nazwa/edycja terenu zachowuje dotychczasowy krok bez operacji plikowej. Zapis bez żadnej zmiany bajtów/ścieżki/projektu nie tworzy pustej historii.
-
-Undo nadpisania przywraca poprzedni plik; nie cofa wcześniej przygotowanej roboczej palety. Undo usunięcia przywraca plik i stan projektu sprzed usunięcia, bez dodatkowego Zapisz. Jeżeli robocza paleta już wcześniej różniła się od pliku, nadal ma te niezapisane różnice. Domyślny pozostaje chroniony; zapis własnej kopii można cofnąć jak utworzenie.
-
-Usuwanie presetów od teraz działa **bez Kosza**, z kopią w pamięci historii, tak samo jak ikon. Potwierdzenie opisuje możliwość cofnięcia tylko do wyzerowania historii, wypadnięcia wpisu z limitu 300 lub zakończenia programu. Udane Nowa/Otwórz zerują historię, błędne/anulowane przejście nie; reset nie usuwa aktywnych plików. Nie ma trwałego archiwum wersji.
-
-Wspólny LibraryFiles sprawdza bajty i ścieżki przed zmianą; historia presetów sprawdza również kolizje ID/nazw w katalogu. Nieudane Undo/Redo zachowuje pozycję stosu, dane mapy i biblioteki; po rozwiązaniu konfliktu można ponowić operację. Nadpisanie samego pliku nie dodaje gwiazdki mapy, jeśli projekt się nie zmienił. Utworzenie/wybór kopii lub usunięcie roboczej palety rzeczywiście zmienia projekt i jest odpowiednio oznaczane. Tereny heksów, ikony, mgła, nazwy i opisy nie są cofane przy okazji operacji bibliotecznej.
-
-## Format 3 i bezpieczny zapis
-
-`.hexmap` to samowystarczalny JSON UTF-8: geometria i parzystości, ID i właściwości terenów, robocze presety, nazwy i formatowane opisy oraz `IconId` i `Fog` każdego pola. Opcjonalne `IconEntryId` i `IconName` pola przechowują logiczne źródło i nazwę wystąpienia. `IconAssets` zawiera deduplikowane PNG w base64, wymiary, pomocniczą nazwę i ID będące SHA-256 bajtów; nazwą wystąpienia jest `IconName`. Dodanie opcjonalnych pól nie wymaga zmiany numeru 3; starsze mapy 3 mają je puste i zachowują zasoby. Nowe mapy zapisuj w 0.3.2 — starszy program 0.3.0 nie zachowa tych nowych metadanych przy ponownym zapisie. **Zapisuje się tylko użyte zasoby**, jeden na wiele wystąpień. Nie ma zewnętrznych ścieżek grafik. Kopia samej mapy wystarcza do wyświetlenia ikon.
-
-Walidacja sprawdza referencje, unikalność ID, sumy, wymiary i dekodowanie PNG. Limit 128 zasobów, 2 MiB PNG na zasób, około 32 MiB PNG łącznie (44 MiB base64); cały plik do 128 MiB. Nieużywane zasoby potrzebne Undo pozostają w pamięci sesji, lecz nie trafiają do zapisu. Po dojściu do budżetu sesji można zapisać i ponownie otworzyć mapę, aby zwolnić nieużywane zasoby. Błędny import/odczyt nie zastępuje otwartego projektu.
-
-Zachowano zapis tymczasowy obok celu, Flush(true), atomowe zastąpienie i pojedyncze potwierdzenie końcowej ścieżki po dopisaniu `.hexmap`. Anulowanie, odmowa i błąd nie zmieniają ścieżki/nazwy/stanu zapisu. Gest zamykający dialog nie maluje, nie zaznacza ani nie przesuwa mapy; potrzebne jest nowe naciśnięcie na płótnie.
-
-## Lokalna biblioteka i testy
-
-Library jest obok uruchomionego EXE, niezależnie od katalogu roboczego. Program tworzy brakujące katalogi bez kasowania zawartości: Backgrounds, Terrains/Presets, Icons, Objects, Hexmaps, Exports/Images, Exports/Text. Nowy projekt proponuje Library/Hexmaps. Główne `/Library/` pozostaje lokalne i ignorowane przez Git. Nie wdrożono obiektów, tekstur, tła ani eksportów.
-
-**Testowanie 0.3.2 jest minimalne i selektywne. Nie uruchamiamy Run-AllTests ani równoważnej pełnej kampanii bez osobnego polecenia użytkownika.** Przykład pojedynczej próby:
+**Tylko testy minimalne, selektywne. Nie uruchamiaj Run-AllTests bez osobnego polecenia.** Nowe krótkie scenariusze wybierane pojedynczo:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch032Tests.ps1 -Case presets
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Object040Tests.ps1 -Case geometry
 ```
 
-Szczegóły filtrów i historycznych testów: `tests/README.md`. Źródła/skrypty testów są śledzone; własne EXE, mapy, grafiki i logi powstają wyłącznie w ignorowanym `tests/_work/`, w osobnych przebiegach. Nie używamy prywatnej Library ani głównego bin. `_work` można usunąć po zakończeniu jego procesów; aplikacja nie sprząta go przy starcie. `tests/Create-Patch032Ui.ps1` przygotowuje kopię zwykłego EXE i własną grafikę do prób okna. Wyniki, ograniczenia i checklistę zawiera `docs/raport-0.3.2.md`; plan: `docs/plan-0.3.2.md`, wymagania: `docs/specyfikacja.md`.
+Dostępne Case: geometry, gestures, library, view, input — nie są uruchamiane automatycznie razem. Źródła/skrypty są śledzone, własne EXE/mapy/logi tylko w ignorowanym tests/_work z podkatalogami przebiegów. Create-Object040Ui.ps1 przygotowuje zwykły EXE i własną mapę/bibliotekę; nie jest testem okna. `_work` można usunąć po zakończeniu jego procesów. Program nie sprząta przy starcie. Prywatna Library nie służy do testów. Paczka użytkownika nie zawiera tests/artefaktów/prywatnej biblioteki. Główny bin nie jest potrzebny.
 
-Paczka użytkownika: główny EXE, plik uruchomieniowy i dokumentacja, bez tests/artefaktów/prywatnej Library. Główny bin był dawnym katalogiem budowania testów, nie biblioteką; obecne skrypty go nie tworzą.
+Dokumentacja: `docs/raport-0.4.0.md`, `docs/plan-0.4.0.md`, bieżące wymagania sekcji 27 `docs/specyfikacja.md`. Raport rozdziela wykonane próby metod, zwykłego EXE i pominięte obszary; nie deklaruje pełnego przetestowania.
 
-## Dalej, bez implementacji w 0.3.2
+## Później
 
-Obiekty prawdopodobnie 0.4.0; ich przesuwanie i odkrywanie sąsiadów później. Tekstury terenów i zakładki wielu map przed 1.0.0. Po 1.0.0: high/low detail tła, widok MG/graczy i prezentacja, eksperymentalne łączenie heksów. Odłożone: akcent terenu w szczegółach, zdjęcia i przebudowa opisów/stany formatowania/tabele, decyzja o stylu zwykłego wklejania, globalny podgląd bez mgły, przeskok prawego nagłówka, siedem heksów w schemacie rozmiaru i wyróżnienie pól zagrożonych przycinaniem. Poza tą łatką pozostają też dwie kolumny i pełna przebudowa proporcji panelu, graficzna mgła/szczegółowość, współrzędne na ikonach, kadrowanie/arkusze ikon, pełny selektor oraz optymalizacja dużych map. Przyszły świadomy wybór materiału obiektu również powinien wyłączać narzędzie mgły na rzecz Pędzla; obiektów teraz nie implementujemy. Nie dodajemy generatorów treści ani usług AI.
+Osobna warstwa światła/ciemności, źródło i zasięg światła obiektu oraz powracająca ciemność, niezależne od trwałego odkrywania mgły. Nadal odłożone: zakładki wielu map, tekstury/high-low detail, widok MG/gracza, kadrowanie/arkusze grafik, opisy/zdjęcia/formatowanie, pełny redesign paneli, globalny podgląd bez mgły, przeskok prawego nagłówka, siedem heksów w schemacie rozmiaru, wyróżnienie przycinanych pól i stylistyka ostrzeżeń. Bez mechaniki walki, statystyk/ekwipunku/inicjatywy, pathfindingu, animacji ruchu i zaawansowanych tras; nie są to przyszłe zadania. Bez generatorów treści lub usług AI.
 
 ## Historia zmian
+
+- **0.4.0** — niezależne instancje, biblioteka obiektów i kopiowanie grafik, zaznaczanie/ruch/grupy, trwałe odkrywanie mgły przez sojuszników, lista instancji, dwa dopasowania, historia plików obiektów i przenośny format mapy 4.
 
 - **0.3.2** — strzałki o jeden wiersz i wspólny rysunek, wybór materiału po narzędziu mgły przełącza na Pędzel, wizualny selektor grafiki współdzielony z edycją ikony oraz sesyjne Undo/Redo plików presetów ze wspólnym mechanizmem ochrony plików. Generator startowych ikon potwierdzony bez zmiany i bez migracji prywatnej biblioteki. Format mapy 3, presetu 1 i ikony 2.
 

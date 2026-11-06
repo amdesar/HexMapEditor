@@ -65,7 +65,8 @@ namespace HexMapEditor
         public string ActivePresetId { get; set; }
         public List<TerrainPreset> Presets { get; set; }
         public List<IconAsset> IconAssets { get; set; }
-        public MapData() { FormatVersion = 3; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); }
+        public List<MapObject> Objects { get; set; }
+        public MapData() { FormatVersion = 4; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); Objects = new List<MapObject>(); }
     }
 
     internal sealed class TerrainState
@@ -93,6 +94,9 @@ namespace HexMapEditor
         public List<LayerChange> Layers = new List<LayerChange>();
         public IconLibraryChange LibraryChange;
         public PresetFileChange PresetChange;
+        public ObjectLibraryChange ObjectLibraryChange;
+        public List<ObjectChange> Objects = new List<ObjectChange>();
+        public string BeforeOrientation, AfterOrientation;
         public List<IconAsset> RequiredAssets = new List<IconAsset>();
         public string Label;
         public ResizeState BeforeResize, AfterResize;
@@ -141,7 +145,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.3.2";
+        const string AppVersion = "0.4.0";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -155,7 +159,7 @@ namespace HexMapEditor
             Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 680); Size = new Size(1440, 940);
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
             InitializeShell();
-            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); };
+            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); LoadObjects(); };
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
             CaptureSavedState(); UpdateUI();
         }
@@ -207,7 +211,7 @@ namespace HexMapEditor
 
         void CloseDetailsPanel()
         {
-            selected = -1; rightPanelOpen = false; right.Visible = false; UpdateUI();
+            selected = -1; selectedObjects.Clear(); rightPanelOpen = false; right.Visible = false; UpdateUI();
         }
 
         void MarkDirty() { dirty = savedState.CheckAll(map); UpdateUI(); }
@@ -237,16 +241,22 @@ namespace HexMapEditor
                 tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze" : "Pointy Top: wierzchołek na górze");
                 labelToggle.Text = map.LabelMode == "InCells" ? "W heksach" : map.LabelMode == "None" ? "Brak" : "Osie";
                 tips.SetToolTip(labelToggle, map.LabelMode == "InCells" ? "Pełne współrzędne wewnątrz heksów (od 80% skali, jeśli cały napis mieści się w polu i oknie)." : map.LabelMode == "None" ? "Bez etykiet współrzędnych." : "Współrzędne na osiach mapy.");
-                if (selected >= 0 && selected < map.Cells.Count)
+                bool objectDetails = selectedObjects.Count > 0;
+                if (hexDetailScroll != null) hexDetailScroll.Visible = !objectDetails;
+                if (objectDetailPanel != null) objectDetailPanel.Visible = objectDetails;
+                if (detailTitle != null) detailTitle.Text = objectDetails ? "Szczegóły obiektu" : "Szczegóły heksu";
+                if (objectDetails) { selected = -1; editorCellId = null; UpdateObjectDetails(); }
+                else if (selected >= 0 && selected < map.Cells.Count)
                 {
                     var cell = map.Cells[selected];
                     string key = cell.Id + (cell.Fog ? ":fog" : ":visible");
                     if (editorCellId != key) { textHistory.BreakGroups(); editorCellId = key; cellName.Text = cell.Fog ? "???" : cell.Name ?? ""; cellDescription.SetContent(cell.Fog ? null : cell.RichDescription, cell.Fog ? "Treść ukryta przez mgłę wojny." : cell.Description); }
                     cellName.Enabled = cellDescription.Enabled = !cell.Fog;
                     detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = cell.Fog ? "Mgła wojny — dane ukryte" : "Teren: " + cell.Terrain;
+                    detailIcon.Text = cell.Fog ? "Ikona: ???" : "Ikona: " + (cell.IconId == null ? "brak" : cell.IconName ?? map.IconAssets.First(a=>a.Id==cell.IconId).Name);
                 }
                 else { selected = -1; rightPanelOpen = false; editorCellId = null; }
-                right.Visible = rightPanelOpen && selected >= 0;
+                right.Visible = rightPanelOpen && (selected >= 0 || objectDetails);
             }
             finally { updating = false; }
             PositionOverlays(); canvas.Invalidate();
@@ -273,7 +283,7 @@ namespace HexMapEditor
         }
         void StartNewProject(int columns, int rows, string orientation, string name, TerrainPreset sourcePreset)
         {
-            EndCanvasGesture(true); ClearDocumentIcons(); map = NewMap(columns, rows, orientation); map.Name = name;
+            EndCanvasGesture(true); ResetObjectDocument(); ClearDocumentIcons(); map = NewMap(columns, rows, orientation); map.Name = name;
             var preset = sourcePreset.Copy(); map.Presets = new List<TerrainPreset> { preset }; map.ActivePresetId = preset.Id;
             currentPath = null; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
             CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
@@ -283,7 +293,9 @@ namespace HexMapEditor
         {
             if (map.Orientation == orientation) return;
             EndCanvasGesture(true);
-            map.Orientation = orientation; RecalculateFitTransform(); MarkDirty();
+            var geometry = new MapData { Orientation=orientation, RowParity=map.RowParity, ColumnParity=map.ColumnParity };
+            var action = new EditAction { Label="Orientacja mapy", BeforeOrientation=map.Orientation, AfterOrientation=orientation, Objects=TransformObjects(geometry,0,0) };
+            ApplyAction(action,true); PushAction(action); RecalculateFitTransform(); MarkDirty();
         }
 
         void OpenProject()
@@ -304,13 +316,16 @@ namespace HexMapEditor
                 if (new FileInfo(path).Length > 128L * 1024 * 1024) throw new InvalidDataException("Plik przekracza limit odczytu 128 MiB.");
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
-                if ((int)raw["FormatVersion"] != 3) throw new InvalidDataException("Ta wersja otwiera wyłącznie mapy formatu 3. Starszy plik pozostawiono bez zmian.");
+                if ((int)raw["FormatVersion"] != 4) throw new InvalidDataException("Ta wersja otwiera wyłącznie mapy formatu 4. Starszy plik pozostawiono bez zmian.");
                 {
                     var cells = raw.ContainsKey("Cells") ? raw["Cells"] as object[] : null;
-                    if (cells == null || !raw.ContainsKey("IconAssets") || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision", "IconId", "Fog" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Format 3 wymaga jawnych danych heksów, ikon i mgły.");
+                    var objects=raw.ContainsKey("Objects")?raw["Objects"] as object[]:null;
+                    string[] objectFields={"Id","TemplateId","Name","AssetId","X","Y","Size","Side","Locked","RevealsFog","RevealRadius"};
+                    if(objects==null||objects.Any(o=>!(o is Dictionary<string,object>)||objectFields.Any(key=>!((Dictionary<string,object>)o).ContainsKey(key))))throw new InvalidDataException("Niepełne dane instancji obiektu w formacie 4.");
+                    if (cells == null || !raw.ContainsKey("Objects") || !raw.ContainsKey("IconAssets") || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision", "IconId", "Fog" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Format 4 wymaga jawnych danych heksów, zasobów, obiektów i mgły.");
                 }
                 var loaded = json.ConvertToType<MapData>(raw); ValidateMap(loaded);
-                EndCanvasGesture(false); ClearDocumentIcons(); map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
+                EndCanvasGesture(false); ResetObjectDocument(); ClearDocumentIcons(); map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
                 CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); return true;
             }
             catch (Exception ex) { error = ex.Message; migrated = false; return false; }
@@ -398,8 +413,9 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 3) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ". Wymagany format 3.");
+            if (m.FormatVersion != 4) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ". Wymagany format 4.");
             IconAssets.Validate(m.IconAssets); var iconIds = new HashSet<string>(m.IconAssets.Select(a => a.Id));
+            ObjectGeometry.Validate(m,iconIds);
             if (m.Columns < 1 || m.Columns > 200 || m.Rows < 1 || m.Rows > 200) throw new InvalidDataException("Wymiary mapy muszą mieścić się w zakresie 1–200.");
             if (m.Orientation != "PointyTop" && m.Orientation != "FlatTop") throw new InvalidDataException("Nieprawidłowa orientacja mapy.");
             if (m.LabelMode != "Axes" && m.LabelMode != "InCells" && m.LabelMode != "None") throw new InvalidDataException("Nieprawidłowy tryb etykiet.");
@@ -427,6 +443,7 @@ namespace HexMapEditor
         void OnFormClosing(object sender, FormClosingEventArgs e) { if (!ConfirmDiscard()) e.Cancel = true; }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
+            if ((e.KeyCode==Keys.Escape || e.KeyCode==Keys.Delete && selectedObjects.Count>0 && !left.ContainsFocus) && !TextInputFocused(this)) { if(e.KeyCode==Keys.Delete)DeleteSelectedObjects();else {EndCanvasGesture(true);selectedObjects.Clear();UpdateUI();} e.Handled=true;e.SuppressKeyPress=true;return; }
             if (e.Control && e.Shift && e.KeyCode == Keys.S) { SaveAsProject(); e.Handled = true; e.SuppressKeyPress = true; }
             else if (e.Control && !e.Shift && e.KeyCode == Keys.S) { SaveProject(); e.Handled = true; e.SuppressKeyPress = true; }
             else if (e.Control && (e.KeyCode == Keys.Z || e.KeyCode == Keys.Y))
@@ -434,7 +451,7 @@ namespace HexMapEditor
                 bool repeat = e.KeyCode == Keys.Y;
                 if (cellName.ContainsFocus || ActiveControl == cellName) TextUndo("name", repeat);
                 else if (cellDescription.ContainsFocus) TextUndo("description", repeat);
-                else if (ActiveControl is TextBoxBase) return;
+                else if (TextInputFocused(this)) return;
                 else if (repeat) Redo(); else Undo();
                 e.Handled = true; e.SuppressKeyPress = true;
             }
@@ -521,6 +538,7 @@ namespace HexMapEditor
                 }
             }
             DrawBrushPreview(e.Graphics);
+            DrawObjects(e.Graphics);
         }
 
         GraphicsPath HexPath(PointF center, float radius)
@@ -564,6 +582,7 @@ namespace HexMapEditor
 
         void EndCanvasGesture(bool commitStroke)
         {
+            FinishObjectGesture(commitStroke);
             bool brushStroke = gestureButton == MouseButtons.Left && (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket);
             gestureButton = MouseButtons.None;
             dragging = false; panGesture = false; dragOrigin = Point.Empty; panOrigin = PointF.Empty;
@@ -584,6 +603,8 @@ namespace HexMapEditor
             canvas.Focus();
             canvas.Capture = true;
             if (e.Button == MouseButtons.Middle || gestureTool == EditorTool.Hand) { panGesture = true; return; }
+            if (ObjectMouseDown(e)) return;
+            if ((gestureTool==EditorTool.Brush || gestureTool==EditorTool.Bucket) && (noMaterial || objectMaterial)) return;
             strokeStarted = false;
             previousStrokePoint = null;
             if (gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket) { int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); } return; }
@@ -602,6 +623,8 @@ namespace HexMapEditor
             // A pressed button alone is not an editing gesture: its Down must belong to this canvas.
             if (waitingForMouseRelease || gestureButton == MouseButtons.None || (e.Button & gestureButton) == MouseButtons.None) return;
             if (panGesture) { pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate(); return; }
+            if (ObjectMouseMove(e)) return;
+            if ((gestureTool==EditorTool.Brush || gestureTool==EditorTool.Bucket) && (noMaterial || objectMaterial)) return;
             if (gestureTool == EditorTool.Select && (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3))
             {
                 if (!dragging) { dragging = true; panOrigin = pan; }
@@ -615,6 +638,7 @@ namespace HexMapEditor
         {
             if (Control.MouseButtons == MouseButtons.None) waitingForMouseRelease = false;
             if (modalDepth > 0 || waitingForMouseRelease || gestureButton == MouseButtons.None || e.Button != gestureButton) return;
+            if (!panGesture && ObjectMouseUp(e)) { EndCanvasGesture(true); return; }
             if (panGesture || gestureTool != EditorTool.Select) { EndCanvasGesture(true); return; }
             if (!dragging)
             {

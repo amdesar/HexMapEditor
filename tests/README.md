@@ -2,6 +2,17 @@
 
 Źródła i skrypty pozostają w Git. Każdy przebieg tworzy własne EXE/dane tylko w `tests/_work/<rodzaj>-<GUID>/`. Logi są ignorowane; procesy należy zakończyć przed usunięciem katalogów. Nie używamy użytkowego Library, głównego bin ani globalnego TEMP/TMP.
 
+## 0.4.0 — nowe, selektywne scenariusze
+
+Run-Object040Tests.ps1 wymaga jednego Case, bez automatycznego uruchamiania wszystkich. Własne kompilacje/mapy/grafiki/logi tylko tests/_work/object-040-GUID; po zakończeniu pozostaje results.log.
+
+- geometry: przenośny format 4, deduplikacja wspólnej grafiki ikony/obiektów, obiekt poza mapą, odczyt bez biblioteki i bez ponownego odkrywania, odmowa błędnego obiektu, offsety i mieszany resize w obu orientacjach z Undo/Redo.
+- gestures: jeden obiekt na klik, bez drag-stamp i wiadra; promień 0/1, strona/checkbox/rozmiar, droga i jedno Undo/Redo z zachowaniem wcześniejszej mgły, blokada, prostokąt/lasso/Ctrl i hit-test ukrytego obiektu.
+- library: czytelne pliki obiektów, edycja z/bez aktualizacji instancji, exact-byte Undo/Redo/usunięcie, konflikt odtworzenia i ponowienie, kopiowana grafika/niezależne ID, brak materiału, Pokaż i reset bez kasowania biblioteki.
+- view: piksele przycięcia części grafiki przez mgłę i widoczność poza mapą, proporcje, rzeczywiste bounds Dopasuj wszystko i równoważność bez obiektów, grupa z zachowaniem offsetów i blokady, brak łącznika nieznanej drogi, ograniczenie próbkowania poza mapą i Undo orientacji.
+- input: tylko nowa bezpośrednia zależność skrótów: Delete nie zabiera edycji tekstu ani dawnego skrótu terenu, usuwa instancję z płótna i działa Undo; zamykany dialog/pozostałość dwukliku nie umieszcza obiektu.
+
+Create-Object040Ui.ps1 przygotowuje zwykły EXE i własną mapę/bibliotekę, nie testuje okna. Faktyczne próby i ograniczenia w docs/raport-0.4.0.md. Nie uruchamiano Run-AllTests ani starych zestawów. Historyczne fixture/oczekiwania formatu 3 nie są automatycznie wymaganiem zachowania odczytu 3 w 0.4.0; źródeł nie usunięto i nie dodano konwertera dla ich zaliczenia.
 ## 0.3.2 — trzy celowane scenariusze
 
 Run-Patch032Tests.ps1 wymaga jednego Case: controls, library albo presets. Nie uruchamia wszystkich ani dawnego zestawu. Dane i kompilacje są w osobnym tests/_work/patch-032-GUID; po zakończeniu pozostaje tylko results.log.
