@@ -73,7 +73,7 @@ namespace HexMapEditor.Tests
                 {
                     var panel=(FlowLayoutPanel)Get(w,"paletteTiles"); var original=panel.Controls.Cast<Control>().ToArray(); int adds=0,removes=0; var heights=new List<int>(); panel.ControlAdded+=(s,e)=>adds++; panel.ControlRemoved+=(s,e)=>removes++; panel.SizeChanged+=(s,e)=>heights.Add(panel.Height);
                     foreach(var terrain in Map(w).Presets[0].Terrains) Call(w,"SelectTerrain",terrain.TerrainId); Call(w,"RefreshPresetPicker"); Call(w,"UpdateUI");
-                    Check(adds==0 && removes==0 && original.SequenceEqual(panel.Controls.Cast<Control>()) && heights.Count==0,"Unchanged palette rebuilt/flickered"); Check(original.All(c=>c.Height==52),"Tiles not 20% shorter");
+                    Check(adds==0 && removes==0 && original.SequenceEqual(panel.Controls.Cast<Control>()) && heights.Count==0,"Unchanged palette rebuilt/flickered"); Check(original.All(c=>c.Height==42 && c.Width==182) && panel.FlowDirection==FlowDirection.TopDown && !panel.WrapContents,"Palette not one compact column");
                     var add=panel.Parent.Controls.OfType<Button>().Single(b=>b.Text=="Dodaj teren"); int y=add.Top; Call(w,"AddTerrain",new TerrainDefinition { Name="Extra" }); Check(add.Top==y && original.All(c=>!c.IsDisposed),"Adding moved header/recreated old tiles");
                 });
                 Test("tile actions are accessible, do not select, and never resize tile",w=>

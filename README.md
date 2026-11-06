@@ -1,10 +1,10 @@
-# HexMapEditor 0.2.1
+# HexMapEditor 0.2.2
 
 Edytor map heksagonalnych dla Windows, rozwijany z wersji 0.1.4. C# / Windows Forms / GDI+, lokalne pliki i praca offline. Formatowany edytor jest osadzonym składnikiem WPF z zainstalowanego .NET Framework; aplikacja nie pobiera bibliotek, ikon ani zasobów przy uruchamianiu. Nie wymaga konta ani usługi internetowej.
 
 ## Uruchamianie i budowanie
 
-Uruchom `HexMapEditor.exe` albo `Uruchom HexMapEditor.bat`. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8), dostępny lokalnie w Windows. Numer aplikacji: **0.2.1**. Numer zapisywanego formatu mapy: **2**.
+Uruchom `HexMapEditor.exe` albo `Uruchom HexMapEditor.bat`. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8), dostępny lokalnie w Windows. Numer aplikacji: **0.2.2**. Numer zapisywanego formatu mapy: **2**.
 
 Build z głównego folderu, bez pobierania zależności:
 
@@ -28,7 +28,7 @@ Kompilator i zestawy pochodzą z lokalnego .NET Framework. Główny EXE pozostaj
 
 Opis obsługuje rozmiar czcionki, pogrubienie, kursywę, podkreślenie, przekreślenie, akapity, wyrównanie do lewej/środka/prawej i justowanie, listy punktowane i numerowane. Tabela jest obiektem dokumentu z edytowalnymi komórkami: wybierz wymiary przy wstawianiu, ustaw kursor w komórce i użyj przycisków dodawania/usuwania wierszy lub kolumn oraz usuwania tabeli. Dane tabeli nie są zastępowane tabulatorami; zwykły `Description` jest dodatkową czytelną reprezentacją.
 
-Wklej / Ctrl+V używa RTF i zachowuje obsługiwane formatowanie; Sam tekst wkleja zwykły tekst. Przed konwersją usuwane są obiekty, obrazy, metadane motywu i instrukcje pól. Wyniki tekstowe pól pozostają tekstem. Następnie dokument jest upraszczany do dozwolonych elementów. Nie ładujemy HTML, XAML, pakietów schowka ani zasobów sieciowych. Jeśli konwersja się nie powiedzie, używamy tekstu Unicode ze schowka; przy jego braku pokazujemy komunikat i zachowujemy opis. Nie jest to pełna zgodność układu Worda: krój i kolor tekstu, obrazy, obiekty, scalania tabel i zaawansowany układ nie należą do obsługiwanego modelu. Nie wykonano próby z Microsoft Wordem; sprawdzono syntetyczny RTF i rzeczywisty schowek między opisami tej aplikacji.
+Wklej / Ctrl+V używa RTF i zachowuje obsługiwane formatowanie; Sam tekst oraz menu kontekstowe Wklej jako zwykły tekst wklejają wyłącznie tekst, jako jeden krok historii opisu. Opcja menu jest nieaktywna bez tekstu w schowku. Przed konwersją usuwane są obiekty, obrazy, metadane motywu i instrukcje pól. Wyniki tekstowe pól pozostają tekstem. Następnie dokument jest upraszczany do dozwolonych elementów. Nie ładujemy HTML, XAML, pakietów schowka ani zasobów sieciowych. Jeśli konwersja się nie powiedzie, używamy tekstu Unicode ze schowka; przy jego braku pokazujemy komunikat i zachowujemy opis. Nie jest to pełna zgodność układu Worda: krój i kolor tekstu, obrazy, obiekty, scalania tabel i zaawansowany układ nie należą do obsługiwanego modelu. Nie wykonano próby z Microsoft Wordem; sprawdzono syntetyczny RTF i rzeczywisty schowek między opisami tej aplikacji.
 
 Nazwa heksu i opis mają osobne, wielopoziomowe historie dla każdego heksu. Ctrl+Z/Ctrl+Y w aktywnym edytorze dotyczą wyłącznie jego pola; poza edytorami sterują mapą. Górne strzałki zawsze dotyczą mapy, a panel ma własne przyciski tekstowe. Powrót do heksu zachowuje historię w sesji. Nowa/Otwórz i ponowne uruchomienie ją zerują; zapis jej nie czyści i nie umieszcza w pliku. Nowa edycja po Undo usuwa tylko właściwe Redo.
 
@@ -36,7 +36,11 @@ Limit: 100 kroków na pole i 32 MiB dodatkowych migawek Undo/Redo łącznie. Bie
 
 ## Zestawy terenów i Wiadro
 
-Selektor wybiera roboczy zestaw, a kafelki teren. Nowy zestaw / Nazwa / Zapisz zestaw oraz stały przycisk Dodaj teren nad kafelkami pozwalają go utrzymywać. Dwukolumnowe kafelki mają wysokość 52 px (wcześniej 65). Na hover/fokusie pokazują ołówek i kosz; F2 edytuje, Delete pyta o usunięcie. Przyciski akcji mają podpowiedzi i nazwy dostępności, nie wybierają terenu przy okazji. **Zapisz zestaw** otwiera wybór świadomego nadpisania własnego zapisanego presetu lub zapisania aktualnej roboczej palety jako nowego z własnym ID w `Library/Terrains/*.terrainset.json`. Chroniony wzorzec Domyślny i nowy niezapisany zestaw wymagają zapisu jako nowy. Kolizja nazwy jest odrzucana. Zapis projektu zachowuje też samowystarczalną kopię roboczych palet. Niezapisane do biblioteki zmiany zestawu można więc zachować w mapie. Zestaw domyślny jest odtwarzany z kodu, również bez lokalnego Library.
+Selektor wybiera roboczy zestaw, a kafelki teren. Paleta ma jedną kolumnę: szeroki kolorowy przycisk z nazwą, a obok stałe, osobne przyciski edycji i usunięcia. Długie nazwy są skracane, z pełną podpowiedzią. F2 edytuje, Delete pyta o usunięcie terenu. Akcje nie wybierają innego terenu przy okazji; kontrolki są zachowywane przy niezwiązanych odświeżeniach. Dodaj teren pozostaje nad listą.
+
+**Nowy zestaw** pyta o nazwę i po udanym zapisie tworzy jeden własny preset z terenem neutralnym, od razu wybrany. Anulowanie, kolizja lub błąd nie dodają wpisu. Późniejsze edycje są robocze i nie zapisują się automatycznie. **Zapisz zestaw** pozwala świadomie nadpisać własny zapisany preset lub zapisać kopię jako nowy z własnym ID. Pierwszy zapis starszego niezapisanego wpisu zachowuje jeden wpis roboczy. Chroniony Domyślny wymaga nowej tożsamości, niezależnie od zmiany samej nazwy. Kolizje nazw/ID są zgłaszane. Zapis projektu zachowuje samowystarczalną kopię roboczych palet; mapa nie zależy od obecności presetu w bibliotece.
+
+**Usuń preset** dotyczy tylko własnego zapisanego zestawu. Potwierdzenie wymienia nazwę, zachowanie danych mapy, nieodwracalność operacji plikowej przez Undo i ewentualne zmiany robocze. Program zleca przeniesienie pliku do Kosza Windows (Windows 8+); nie stosuje cichego trwałego usuwania w zastępstwie. Przy braku możliwości odzyskiwalnego usunięcia obowiązuje ostrzeżenie powłoki lub komunikat błędu. Undo/Redo może odtworzyć paletę jako niezapisany stan roboczy, ale nigdy nie odtwarza, nie usuwa i nie nadpisuje pliku biblioteki. Domyślny pochodzi z kodu i nie może być usunięty.
 
 `TerrainId` identyfikuje teren, niezmienny `VariantId` konkretną wersję, a `Revision` jest rosnącym numerem informacyjnym. Edycja tworzy nowy wariant i domyślnie dotyczy przyszłego malowania. Przełącznik **Zastosuj do bieżącej mapy** jest wyłączony przy każdym otwarciu edycji. Po włączeniu zmienia tylko heksy używające poprzedniego dokładnego wariantu i tworzy jeden wpis Undo mapy; nie rusza nazw ani opisów. Dodanie, edycja i usunięcie terenu są częścią wspólnej chronologii palety i mapy. Przy aktualizacji mapy jedna operacja przywraca paletę i właściwe heksy atomowo. Undo odtwarza również kolejność kafelków i wybór terenu, ze stałymi ID wariantów przy Redo. Historie nazwy i opisu pozostają oddzielne. Zmiana zestawu i usunięcie terenu z palety nie przemalowują mapy. Każdy heks przechowuje własne właściwości, więc mapa nie zależy od istnienia pliku presetu.
 
@@ -50,7 +54,7 @@ Cała zmiana rozmiaru to jeden krok Undo/Redo odtwarzający także usunięte dan
 
 ## Format 2 i bezpieczny zapis
 
-Plik `.hexmap` to JSON UTF-8. **0.2.1 odczytuje format 1 i zapisuje format 2; wersje 0.1.x nie odczytają formatu 2.** Po otwarciu starej mapy komunikat wyjaśnia zmianę; Zapisz jako pozwala zachować oryginał. Zwykłe opisy pozostają niezmienione podczas migracji. Starsze tereny dostają jawne warianty migracyjne: znane domyślne pary nazwa/kolor odpowiadają domyślnym ID, pozostałe mają deterministyczny identyfikator z tej pary. W formacie 1 nie było danych pozwalających odtworzyć pierwotne pochodzenie lub wersję terenu.
+Plik `.hexmap` to JSON UTF-8. **0.2.2 odczytuje format 1 i zapisuje format 2; wersje 0.1.x nie odczytają formatu 2.** Po otwarciu starej mapy komunikat wyjaśnia zmianę; Zapisz jako pozwala zachować oryginał. Zwykłe opisy pozostają niezmienione podczas migracji. Starsze tereny dostają jawne warianty migracyjne: znane domyślne pary nazwa/kolor odpowiadają domyślnym ID, pozostałe mają deterministyczny identyfikator z tej pary. W formacie 1 nie było danych pozwalających odtworzyć pierwotne pochodzenie lub wersję terenu.
 
 Format 2 zapisuje wymiary, orientację, etykiety, parzystości początku, ID heksów, kopie właściwości i wariantów terenów, robocze palety oraz opisy. `NotesFormat` to `plainText` lub `richDocument1`; `RichDescription` zawiera ograniczony model JSON akapitów, tekstu, list i tabel. Nie serializujemy wykonywalnego dokumentu WPF. Nieprawidłowe/nieobsługiwane dane, sprzeczne właściwości jednego wariantu i przyszłe numery formatu są odrzucane. Limit całego pliku: 128 MiB dla zapisu i odczytu.
 
@@ -62,7 +66,7 @@ Library zawsze znajduje się obok uruchomionego EXE, niezależnie od katalogu ro
 
 ```text
 Library/Backgrounds
-Library/Terrains
+Library/Terrains/Presets
 Library/Icons
 Library/Objects
 Library/Hexmaps
@@ -80,9 +84,9 @@ Błąd utworzenia biblioteki jest zgłaszany; nie przenosimy danych do innej lok
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-AllTests.ps1
 ```
 
-Można też uruchomić osobno `Run-HistoryTests.ps1`, `Run-TechnicalTests.ps1`, `Run-GestureTests.ps1`, `Run-FeatureTests.ps1` i `Run-PatchTests.ps1` z `tests/`. Źródła i skrypty są śledzone w Git. Każdy przebieg kompiluje EXE i tworzy własne pliki tylko w podkatalogu `tests/_work/`, po czym sprząta swoje standardowe wyniki. Zbiorczy skrypt zostawia log w osobnym podkatalogu `_work/all-*`. Całe `/tests/_work/` i główne `/bin/` są ignorowane. `_work` można usunąć po zamknięciu procesów; skrypty go odtwarzają. Nie zmieniamy globalnych TEMP/TMP ani nie tworzymy map testowych w użytkowym Library. Zachowane ślady diagnostyczne 0.1.4 pozostają lokalne w `_work`.
+Można też uruchomić osobno `Run-HistoryTests.ps1`, `Run-TechnicalTests.ps1`, `Run-GestureTests.ps1`, `Run-FeatureTests.ps1`, `Run-PatchTests.ps1` i `Run-MaintenanceTests.ps1` z `tests/`. Obecnie jest 104 testów metod/kontrolek, w tym 14 regresji 0.2.2. Próba schowka wymaga interaktywnej sesji Windows, zachowuje i przywraca jego poprzednią zawartość. Źródła i skrypty są śledzone w Git. Każdy przebieg kompiluje EXE i tworzy własne pliki tylko w podkatalogu `tests/_work/`, po czym sprząta swoje standardowe wyniki. Zbiorczy skrypt zostawia log w osobnym podkatalogu `_work/all-*`. Całe `/tests/_work/` i główne `/bin/` są ignorowane. `_work` można usunąć po zamknięciu procesów; skrypty go odtwarzają. Nie zmieniamy globalnych TEMP/TMP ani nie tworzymy map testowych w użytkowym Library. Zachowane ślady diagnostyczne 0.1.4 pozostają lokalne w `_work`. `tests/Create-UiFixtures.ps1` przygotowuje w osobnym przebiegu wyłącznie własne mapy i zwykłą kopię końcowego EXE do prób okna z izolowaną biblioteką.
 
-Testy metod/kontrolek nie zastępują prób okna Windows, Worda ani różnych DPI. Rzeczywiste wyniki i ograniczenia: `docs/raport-0.2.1.md`. Specyfikacja i bieżący plan: `docs/specyfikacja.md`, `docs/plan-0.2.1.md`; zachowano również plan i raport 0.2.0.
+Testy metod/kontrolek nie zastępują prób okna Windows, Worda ani różnych DPI. Rzeczywiste wyniki i ograniczenia: `docs/raport-0.2.2.md`. Specyfikacja i bieżący plan: `docs/specyfikacja.md`, `docs/plan-0.2.2.md`; zachowano wcześniejsze plany i raporty.
 
 Paczka dla użytkownika powinna zawierać główny `HexMapEditor.exe`, plik uruchomieniowy i dokumentację. Bez tests, testowych EXE, logów i cudzej biblioteki. Program sam tworzy Library; nie uruchamia sprzątania testów przy starcie.
 
@@ -95,12 +99,25 @@ Uchwyt na lewej krawędzi prawego panelu zmienia jego szerokość bez ruchu kame
 
 Paleta zachowuje kontrolki przy wyborze i niezwiązanych odświeżeniach. Podczas rzeczywistych zmian aktualizuje istniejące kafelki, dodaje/usuwa tylko potrzebne i przelicza układ zbiorczo. Przycisk Dodaj teren ma stałe miejsce nad kafelkami.
 
-Domyślny jest chroniony przez ID, niezależnie od roboczej nazwy. Można edytować jego kopię w projekcie, ale zapis biblioteki wymaga nowego ID. Starsze lokalne pliki o ID default nie zastępują wzorca: aplikacja zgłasza ich pominięcie i zostawia pliki bez zmian. Własny zapisany preset można jawnie nadpisać. Nazwy porównuje się bez rozróżniania wielkości liter, po normalizacji Unicode i usunięciu skrajnych spacji. Wskaźnik pod selektorem odróżnia roboczą kopię/niezapisany zestaw od palety zgodnej z plikiem. Zapis presetu nie zapisuje projektu; Undo może ponownie oznaczyć paletę jako różną od pliku.
+Domyślny jest chroniony przez ID, niezależnie od roboczej nazwy. Można edytować jego kopię w projekcie, ale zapis biblioteki wymaga nowego ID. Od 0.2.2 poprawne stare pliki kolidujące z jego ID są bezpiecznie odzyskiwane jako własne presety, zgodnie z zasadami migracji poniżej. Nazwy porównuje się bez rozróżniania wielkości liter, po normalizacji Unicode i usunięciu skrajnych spacji. Wskaźnik pod selektorem odróżnia roboczą kopię/niezapisany zestaw od palety zgodnej z plikiem. Zapis presetu nie zapisuje projektu; Undo może ponownie oznaczyć paletę jako różną od pliku.
 
 Obowiązkowa chronologia: malowanie jasną wodą → edycja palety na ciemną bez aktualizacji mapy → malowanie ciemną. Pierwsze Undo cofa ostatnie malowanie, drugie przywraca jasną paletę. Redo odtwarza je w tej samej kolejności. Pusta edycja nie usuwa Redo.
 
-Do dalszej pracy pozostają: całościowy wygląd narzędzi opisu, wskazanie aktywnych stanów formatowania, zgłoszone nieprawidłowe przełączanie pogrubienia przy pustym zaznaczeniu, wysokość/przewijanie pustego edytora i ewentualna paleta jednokolumnowa. **Nie są naprawione w 0.2.1.**
+Do dalszej pracy pozostają: treść/wygląd statusu presetu, przebudowa narzędzi opisu, aktywne stany formatowania, zgłoszone nieprawidłowe przełączanie pogrubienia przy pustym zaznaczeniu oraz wysokość/przewijanie pustego edytora. **Nie są naprawione w 0.2.2.** Wieloprojektowe zakładki są wymaganiem przyszłym, bez przypisania wydania; obecnie otwarty jest jeden projekt.
+
+## Zmiany techniczne 0.2.2
+
+Własny preset to jeden aktywny plik `Library/Terrains/Presets/*.terrainset.json`, możliwy do przekazania innej osobie. Ręcznie skopiowany poprawny plik pojawia się po ponownym uruchomieniu. Skanowanie nie jest rekurencyjne: `_backups` i inne podfoldery są pomijane. Format presetu pozostaje **1**, z walidacją pól, ID, nazw, wariantów oraz limitem 4 MiB. Niepoprawne lub przyszłe nieobsługiwane dane są zgłaszane; nie nadpisujemy kolizji po cichu.
+
+Przy starcie aplikacja migruje stare pliki z `Library/Terrains/`. Przed zmianą robi sprawdzoną bajtową kopię w `Library/Terrains/Presets/_backups/` (nazwa źródła + fragment SHA-256 + `.bak`). Własne presety przenosi bez zmiany bajtów. Poprawny stary zestaw o ID Domyślnego odzyskuje z nowym ID i nazwą z dopiskiem „odzyskany”, zachowując definicje i warianty terenów. Jedna już istniejąca równoważna własna kopia jest używana ponownie. Po potwierdzeniu kopii i celu źródło przestaje być aktywnym plikiem. Drugi start nie powiela plików ani kopii. Przy niejednoznaczności/uszkodzeniu migracja pozostawia źródło i zgłasza problem. Nie zmienia żadnych map.
+
+Podczas zwężania prawej nakładki płótno odrysowuje odsłaniany pas od razu, przed kolejnym ruchem, bez opóźnienia i przebudowy edytora. Kamera i historia pozostają bez zmian. Tryby przycisku to **Osie / W heksach / Brak**. Etykiety wewnętrzne są mierzone i rysowane w całości bez zawijania; poniżej 80% skali, przy zbyt małej czcionce lub częściowym wyjściu napisu poza okno ukrywany jest cały napis.
+
+Pola rozmiaru otaczają lokalny schemat mapy. Ostrzeżenie ma rozłączne grupy „Tylko zmieniony teren”, „Tylko tekst”, „Teren i tekst”, każdą z liczbą i pełną przewijaną listą współrzędnych sprzed operacji. Tożsamość terenu jest porównywana z rzeczywistym neutralnym stanem, nie tylko z kolorem. Nazwa i opis (także formatowany) zaliczają pole do tekstu. Menu opisu oferuje **Wklej jako zwykły tekst**, korzystające z tej samej operacji co Sam tekst; polskie znaki, wiersze i pojedyncze Undo/Redo opisu są zachowane, bez przenoszenia formatowania ani struktury tabel.
+
 ## Historia zmian
+
+- **0.2.2** — bezpieczna migracja presetów i katalog Presets, tworzenie bez podwajania oraz usuwanie własnego presetu do Kosza, paleta jednokolumnowa ze stałymi akcjami, natychmiastowe odrysowanie po zwężeniu nakładki, pełne etykiety, przestrzenny dialog rozmiaru i grupy danych oraz zwykły tekst w menu opisu. Format mapy **2**, odczyt **1**, format presetu **1**.
 
 - **0.2.1** — jeden wiersz paska, Dopasuj bez limitu 170%, regulowana prawa nakładka, stabilna kompaktowa paleta z akcjami kafelków, chroniony wzorzec i jawny zapis presetów, wspólne Undo palety/mapy oraz jednoczesny rozmiar czterech stron z pełną listą współrzędnych usuwanych danych. Format nadal **2**, odczyt **1**.
 

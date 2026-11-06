@@ -180,6 +180,7 @@ namespace HexMapEditor
     {
         readonly ElementHost host = new ElementHost();
         internal readonly RichTextBox Box = new RichTextBox();
+        internal readonly MenuItem PlainPasteItem = new MenuItem { Header = "Wklej jako zwykły tekst" };
         bool loading;
         string lastValid;
         public Action<string, string, string> Changed;
@@ -233,6 +234,12 @@ namespace HexMapEditor
             Box.CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, (s, e) => { Paste(false); e.Handled = true; }, (s, e) => { e.CanExecute = true; e.Handled = true; }));
             dock.Children.Add(Box); AccessibleName = "Formatowany opis heksu";
             Box.SizeChanged += (s, e) => FitTables();
+            var menu = new ContextMenu();
+            menu.Items.Add(new MenuItem { Header = "Wytnij", Command = ApplicationCommands.Cut, CommandTarget = Box });
+            menu.Items.Add(new MenuItem { Header = "Kopiuj", Command = ApplicationCommands.Copy, CommandTarget = Box });
+            menu.Items.Add(new MenuItem { Header = "Wklej", Command = ApplicationCommands.Paste, CommandTarget = Box });
+            menu.Items.Add(new Separator()); menu.Items.Add(PlainPasteItem); PlainPasteItem.Click += (s, e) => Paste(true);
+            menu.Opened += (s, e) => { try { PlainPasteItem.IsEnabled = HasPlainClipboardText(); } catch { PlainPasteItem.IsEnabled = false; } }; Box.ContextMenu = menu;
         }
         internal void FitTables() { FitTablesIn(Box.Document.Blocks); }
         static void FitTablesIn(BlockCollection blocks)
@@ -281,16 +288,18 @@ namespace HexMapEditor
         {
             try
             {
-                string text = Clipboard.ContainsText() ? Clipboard.GetText() : "";
+                bool hasText = HasPlainClipboardText();
+                string text = Clipboard.ContainsText(TextDataFormat.UnicodeText) ? Clipboard.GetText(TextDataFormat.UnicodeText) : hasText ? Clipboard.GetText(TextDataFormat.Text) : "";
                 if (!plain && Clipboard.ContainsData(DataFormats.Rtf))
                 {
                     string rtf = Clipboard.GetData(DataFormats.Rtf) as string;
                     PasteRtf(rtf, text); return;
                 }
-                Mutate("paste", () => Box.Selection.Text = text);
+                if (hasText) Mutate("paste", () => Box.Selection.Text = text);
             }
             catch (Exception ex) { if (Error != null) Error("Nie można wkleić formatowania: " + ex.Message + ". Użyj Wklej jako zwykły tekst."); }
         }
+        internal static bool HasPlainClipboardText() { return Clipboard.ContainsText(TextDataFormat.UnicodeText) || Clipboard.ContainsText(TextDataFormat.Text); }
         public void PasteRtf(string rtf, string fallback)
         {
             // Reject active/embedded destinations BEFORE the framework RTF importer sees them.

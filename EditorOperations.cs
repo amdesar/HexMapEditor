@@ -69,7 +69,7 @@ namespace HexMapEditor
                 try
                 {
                     var plan = MapLogic.ResizeAll(map, d.TopDelta, d.BottomDelta, d.LeftDelta, d.RightDelta); if (plan.IsEmpty) return;
-                    if (plan.DataIndices.Count > 0) using (var warning = new ResizeWarningDialog(plan.RemovedIndices.Count, plan.DataIndices.Select(i => MapLogic.Coordinate(i, map.Columns)).ToArray())) { if (RunModal(() => warning.ShowDialog(this)) != DialogResult.Yes) return; }
+                    if (plan.DataIndices.Count > 0) using (var warning = new ResizeWarningDialog(plan.RemovedIndices.Count, RemovalGroup.For(map, plan.DataIndices))) { if (RunModal(() => warning.ShowDialog(this)) != DialogResult.Yes) return; }
                     ApplyResize(plan.State);
                 }
                 catch (Exception ex) { ShowEditorMessage(ex.Message, "Nie można zmienić rozmiaru", MessageBoxButtons.OK, MessageBoxIcon.Warning); }

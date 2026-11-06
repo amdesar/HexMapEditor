@@ -18,10 +18,11 @@ namespace HexMapEditor
     {
         public static string Root { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Library"); } }
         public static string Hexmaps { get { return Path.Combine(Root, "Hexmaps"); } }
+        public static string Presets { get { return Path.Combine(Root, "Terrains", "Presets"); } }
         public static void EnsureDirectories(string applicationDirectory)
         {
             string root = Path.Combine(applicationDirectory, "Library");
-            foreach (string folder in new[] { "Backgrounds", "Terrains", "Icons", "Objects", "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
+            foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), "Icons", "Objects", "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
                 Directory.CreateDirectory(Path.Combine(root, folder));
         }
     }
@@ -131,7 +132,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.2.1";
+        const string AppVersion = "0.2.2";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -220,7 +221,8 @@ namespace HexMapEditor
                 dimensionsLabel.Text = map.Columns + " × " + map.Rows;
                 orientationToggle.Text = OrientationNames.Display(map.Orientation); orientationToggle.Image = EditorIcons.Small(map.Orientation == "FlatTop" ? "flat" : "pointy");
                 tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze" : "Pointy Top: wierzchołek na górze");
-                labelToggle.Text = map.LabelMode == "InCells" ? "W polach" : map.LabelMode == "None" ? "Brak" : "Osie";
+                labelToggle.Text = map.LabelMode == "InCells" ? "W heksach" : map.LabelMode == "None" ? "Brak" : "Osie";
+                tips.SetToolTip(labelToggle, map.LabelMode == "InCells" ? "Pełne współrzędne wewnątrz heksów (od 80% skali, jeśli cały napis mieści się w polu i oknie)." : map.LabelMode == "None" ? "Bez etykiet współrzędnych." : "Współrzędne na osiach mapy.");
                 if (selected >= 0 && selected < map.Cells.Count)
                 {
                     var cell = map.Cells[selected];
@@ -250,11 +252,15 @@ namespace HexMapEditor
             using (var f = new NewMapDialog(map.Orientation, choices))
             {
                 if (RunModal(() => f.ShowDialog(this)) != DialogResult.OK) return;
-                map = NewMap(f.Columns, f.Rows, f.Orientation); map.Name = f.ProjectName;
-                var preset = f.Preset.Copy(); map.Presets = new List<TerrainPreset> { preset }; map.ActivePresetId = preset.Id;
-                currentPath = null; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
-                CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
+                StartNewProject(f.Columns, f.Rows, f.Orientation, f.ProjectName, f.Preset);
             }
+        }
+        void StartNewProject(int columns, int rows, string orientation, string name, TerrainPreset sourcePreset)
+        {
+            EndCanvasGesture(true); map = NewMap(columns, rows, orientation); map.Name = name;
+            var preset = sourcePreset.Copy(); map.Presets = new List<TerrainPreset> { preset }; map.ActivePresetId = preset.Id;
+            currentPath = null; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
+            CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
         }
 
         void ChangeOrientation(string orientation)
@@ -473,12 +479,13 @@ namespace HexMapEditor
             {
                 var c = ScreenCenter(col, row);
                 if (c.X < -margin || c.Y < -margin || c.X > canvas.Width + margin || c.Y > canvas.Height + margin) continue;
+                if (!e.ClipRectangle.IntersectsWith(Rectangle.Ceiling(new RectangleF(c.X - BaseRadius * scale - 3, c.Y - BaseRadius * scale - 3, 2 * BaseRadius * scale + 6, 2 * BaseRadius * scale + 6)))) continue;
                 int i = row * map.Columns + col;
                 using (var path = HexPath(c, BaseRadius * scale))
                 using (var brush = new SolidBrush(ParseColor(map.Cells[i].Color)))
                 using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
                 { e.Graphics.FillPath(brush, path); e.Graphics.DrawPath(pen, path); }
-                if (map.LabelMode == "InCells" && scale > .28f) using (var b = new SolidBrush(Color.FromArgb(220, 245, 245, 245))) using (var f = new Font("Segoe UI", Math.Max(6f, 8f * scale))) { var rect = new RectangleF(c.X - 15 * scale, c.Y + BaseRadius * .42f * scale, 30 * scale, 12 * scale); e.Graphics.DrawString(Coordinate(i), f, b, rect, new StringFormat { Alignment = StringAlignment.Center }); }
+                if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle);
             }
             if (map.LabelMode == "Axes" && map.Columns * map.Rows <= 1400)
             {

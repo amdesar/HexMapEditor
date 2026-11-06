@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.4, stan decyzji 6 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.2.1; pierwszeństwo mają ustalenia sekcji 21.
+Wersja: 1.5, stan decyzji 6 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.2.2; pierwszeństwo mają ustalenia sekcji 22.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -216,3 +216,45 @@ Te ustalenia mają pierwszeństwo przed sprzecznymi wcześniejszymi zapisami. Ro
 Poza tą poprawką pozostają: całościowy wygląd narzędzi opisu, aktywne stany formatowania, zgłoszone nieprawidłowe pogrubienie przy pustym zaznaczeniu, wysokość/przewijanie pustego edytora, ewentualna paleta jednokolumnowa i dalsze nieomówione funkcje. Nie przedstawiamy ich jako naprawionych.
 
 Testy obejmują Dopasuj powyżej 170% i pierwsze koło, chroniony preset/nowy zapis/błędy/anulowanie, wspólną chronologię, atomową aktualizację, cztery strony z mieszanymi znakami, koordynaty i unikalne liczenie, parzystości/opisy/Undo/Redo oraz gesty uchwytu. Wykonane próby metod i zwykłego końcowego EXE są oddzielone w raporcie. Własne pliki testowe wyłącznie w tests/_work; testy UI zapisu presetów korzystają z identycznej kopii EXE i biblioteki obok niej w _work, bez modyfikacji prywatnego Library. Bez push i Release'a.
+
+## 22. Poprawka po testach 0.2.2
+
+Ta sekcja ma pierwszeństwo przed sprzecznymi wcześniejszymi ustaleniami. Rozwijamy istniejącą 0.2.1; aplikacja 0.2.2, format mapy nadal 2 i odczyt 1, format presetu nadal 1. Zachowujemy offline, technologię oraz zabezpieczenia danych, końcowej ścieżki zapisu i gestów z 0.1.2–0.1.4. Nie przebudowujemy całego edytora opisów ani miejsca nazwy projektu. Ograniczone zawijanie i wielokropek nazwy są zaakceptowane.
+
+### Biblioteka i migracja
+
+Własne presety mają jeden aktywny plik na ID w `Library/Terrains/Presets/`, z rozszerzeniem `.terrainset.json`. Poprawny plik można przekazać innemu użytkownikowi; skopiowany ręcznie jest odczytywany co najmniej przy następnym starcie. Nie skanujemy rekurencyjnie `_backups` ani innych podfolderów. Walidujemy schemat, wymagane pola, ID/nazwy i warianty; błędy i kolizje nie mogą prowadzić do cichego nadpisania. Wzorzec Domyślny nadal pochodzi z kodu, jest chroniony przez ID i nie może być zastąpiony plikiem ani zmianą nazwy roboczej.
+
+Starsze pliki bezpośrednio w `Library/Terrains/` migrują bez utraty danych. Przed zmianą każdego źródła powstaje sprawdzona bajtowa kopia w `Library/Terrains/Presets/_backups/`. Poprawny plik kolidujący z ID Domyślnego zostaje odzyskany jako własny preset z nową tożsamością, przy zachowaniu definicji/wersji terenów. Jedna równoważna własna kopia jest używana ponownie; nie powielamy jej. Niejednoznaczny konflikt lub uszkodzenie pozostawia źródło bez zmian i podaje problem do decyzji. Migracja jest idempotentna: drugi start nie odtwarza ostrzeżenia dla poprawnie przeniesionych danych, plików ani kopii. Nie ukrywamy pozostałych błędów. Mapy oraz zapisane w nich warianty pozostają bez zmian. Prywatne dane wolno dotknąć wyłącznie w ramach tej zabezpieczonej migracji, nigdy jako materiał testowy.
+
+### Tworzenie, zapis, usuwanie i historia
+
+Nowy zestaw pyta o nazwę i po zatwierdzeniu skutecznie zapisuje nowy własny preset z neutralnym terenem. Po sukcesie jest jeden wpis, od razu wybrany. Anulowanie, kolizja lub błąd nie pozostawiają fałszywego zapisanego wpisu. Późniejsze zmiany są robocze, bez automatycznego zapisu. Zapisz jako nowy z istniejącego zapisanego presetu świadomie tworzy kopię. Pierwszy zapis starszego niezapisanego wpisu nie pozostawia jego zbędnego duplikatu. Własny zapisany preset można jawnie nadpisać; Domyślny wymaga nowego ID.
+
+Usuń preset dotyczy aktywnego własnego zapisanego pliku. Potwierdzenie wymienia jego nazwę, usunięcie z biblioteki, zachowanie danych mapy, brak cofania pliku przez Undo oraz ewentualne zmiany robocze. Preferowane jest przeniesienie do Kosza; nie stosujemy cichego trwałego zastępstwa. Błąd/anulowanie zachowują spójny stan i dają komunikat. Po sukcesie lista biblioteki jest aktualizowana bez zbędnego tworzenia wszystkich kafelków od nowa.
+
+Wspólna historia mapy/palety pozostaje chronologiczna; historie nazwy/opisu oddzielne. Undo/Redo nigdy nie tworzy, nie usuwa ani nie nadpisuje plików biblioteki. Odtworzony roboczy stan usuniętego presetu jest oznaczony jako niezapisany, z nieaktywnym usuwaniem pliku. Projekt pozostaje samowystarczalny; usunięcie presetu/terenu nie przemalowuje mapy. Nowa/Otwórz zerują wszystkie historie sesji. Zachowujemy stabilne ID/wersje i wyłączone domyślnie Zastosuj do bieżącej mapy.
+
+### Paleta, panel i etykiety
+
+Paleta ma jedną kolumnę przy tej samej szerokości lewego panelu. Każdy wiersz zawiera szeroki kolorowy prostokąt z wyśrodkowaną nazwą oraz dwie stałe zewnętrzne kolumny przycisków edycji i usunięcia. Ikony są stale widoczne, nie zasłaniają nazwy ani nie zmieniają wymiarów. Długie nazwy są skracane z pełną podpowiedzią; nie ma poziomego przewijania. Dodaj pozostaje nad listą. Zachowujemy klawiaturę, nazwy dostępności, ostrzeżenia i wybór; akcja nie wybiera innego terenu, nie maluje i nie otwiera podwójnego dialogu. Niezwiązane odświeżenie zachowuje istniejące kontrolki. Nie dodajemy grafik terenów.
+
+Zwężanie nakładki odrysowuje odsłaniany pas płótna podczas gestu, bez arbitralnego opóźnienia, czekania do puszczenia i przebudowy edytora co piksel. Zachowujemy wydajność, kamerę, dane, historię, uchwyt/reset oraz poprawne dopasowanie tabel. Prawa nakładka nadal jest pomijana przez Dopasuj; lewy panel jest uwzględniany.
+
+Przycisk etykiet pokazuje pełne krótkie nazwy Osie / W heksach / Brak i pełne wyjaśnienie w podpowiedzi, bez nakładania grup. Napisy wewnątrz mapy są mierzone, bez zawijania i ucinania końcowych znaków, także dla wieloliterowych kolumn i wiersza 200 w obu orientacjach. Przy normalnym zoomie cały identyfikator mieści się w heksie. Poniżej 80% lub gdy nie mieści się cały czytelny napis (minimum 7,5 px czcionki, granice widoku), ukrywamy całość, nigdy fragment sugerujący inne pole. Nie zmieniamy logicznych współrzędnych.
+
+### Rozmiar i ostrzeżenie
+
+Cztery wartości ze znakami otaczają lokalnie narysowany schemat: Góra nad nim, Dół pod nim, Lewo/Prawo po bokach. Legenda: dodatnie dodają, ujemne usuwają, 0 bez zmiany. Pokazujemy bieżący i wynikowy rozmiar. Zachowujemy atomowy plan czterech stron, walidację starych brzegów, limity 1–200, parzystości, ID, pełną zawartość i jedną operację Undo/Redo.
+
+Ostrzeżenie zachowuje sumy i współrzędne PRZED operacją. Rozłączne grupy: tylko zmieniony teren, tylko tekst, teren i tekst. Tekst oznacza nazwę lub opis, także formatowany. Teren jest porównywany z pełnym kanonicznym neutralnym stanem, nie tylko kolorem. Każdy heks i narożnik należą do jednej grupy i są liczone raz; suma grup zgadza się z liczbą heksów z danymi. Każda niepusta grupa ma liczbę i pełną przewijaną listę w ograniczonym oknie. Maski rodzaju zawartości pozwalają później rozwinąć kombinacje, bez pustych sekcji ikon/obiektów teraz. Domyślne Nie i anulowanie nie zmieniają niczego.
+
+### Zwykły tekst i wymagania przyszłe
+
+Menu kontekstowe opisu zachowuje Wytnij/Kopiuj/Wklej i dodaje Wklej jako zwykły tekst. Używa istniejącego mechanizmu Sam tekst, wyłącznie tekstu Unicode/zwykłego ze schowka, zachowuje polskie znaki i wiersze, nie przenosi stylów ani tabel jako tabel. To jedna operacja historii opisu, bez historii mapy. Opcja nieaktywna bez odpowiedniego tekstu; zwykłe formatowane wklejanie pozostaje.
+
+Przyszłe wymaganie, bez przypisania do 0.3.0 lub 0.4.0: wiele jednocześnie otwartych projektów z zakładkami, np. na dole jak arkusze, dla map wszechświata, planety, miasta, budynku i pokoju. Każdy projekt ma własne dane, ścieżkę, stan niezapisanych zmian, kamerę, zaznaczenie, historię mapy/palety oraz historie tekstu. Przełączanie zachowuje wszystkie historie; zamknięcie uwzględnia niezapisane zmiany. Nie implementujemy zakładek w 0.2.2.
+
+Odłożone pozostają treść i wygląd statusu presetu oraz przebudowa edytora opisu, stanów formatowania i tabel, w tym zgłoszony problem pogrubienia bez zaznaczenia oraz wysokość/przewijanie pustego edytora. Nie oznaczamy ich jako naprawionych.
+
+Własne pliki testowe wyłącznie w tests/_work, bez prywatnej biblioteki. Regresje i próby zwykłego końcowego EXE raportujemy oddzielnie; nie deklarujemy Worda, większego DPI ani płynnego ciągłego ruchu, jeżeli nie zostały faktycznie sprawdzone. Bez push i Release'a.

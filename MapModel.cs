@@ -57,18 +57,35 @@ namespace HexMapEditor
         {
             var result = new List<TerrainPreset> { Default() }; var errors = new List<string>();
             Directory.CreateDirectory(directory);
-            foreach (var file in Directory.GetFiles(directory, "*.terrainset.json"))
+            foreach (var file in Directory.GetFiles(directory, "*.terrainset.json", SearchOption.TopDirectoryOnly).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
             {
                 try
                 {
-                    if (new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("Zestaw przekracza 4 MiB.");
-                    var preset = MapLogic.Serializer().Deserialize<TerrainPreset>(File.ReadAllText(file, Encoding.UTF8)); Validate(preset);
+                    var preset = ReadFile(file);
                     if (preset.Id == DefaultId) { errors.Add(Path.GetFileName(file) + ": plik nie zastępuje chronionego wzorca Domyślny; dane pliku pozostawiono bez zmian."); continue; }
-                    int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) { errors.Add(Path.GetFileName(file) + ": powtórzony identyfikator zestawu."); continue; } result.Add(preset);
+                    int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) { errors.Add(Path.GetFileName(file) + ": powtórzony identyfikator zestawu."); continue; }
+                    if (result.Any(p => SameName(p.Name, preset.Name))) { errors.Add(Path.GetFileName(file) + ": powtórzona nazwa zestawu."); continue; } result.Add(preset);
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(file) + ": " + ex.Message); }
             }
             warning = String.Join("\n", errors); return result;
+        }
+        public static TerrainPreset ReadFile(string file)
+        {
+            if (new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("Zestaw przekracza 4 MiB.");
+            var json = MapLogic.Serializer(); var raw = json.DeserializeObject(File.ReadAllText(file, Encoding.UTF8)) as Dictionary<string, object>;
+            string[] fields = { "PresetFormatVersion", "Id", "Name", "Terrains" };
+            if (raw == null || fields.Any(k => !raw.ContainsKey(k)) || raw.Keys.Any(k => !fields.Contains(k))) throw new InvalidDataException("Brak wymaganych pól lub nieobsługiwane dodatkowe pola presetu; plik pozostawiono bez zmian.");
+            var terrains = raw["Terrains"] as object[]; string[] terrainFields = { "TerrainId", "VariantId", "Revision", "Name", "Color", "FillKind" };
+            if (terrains == null || terrains.Any(t => !(t is Dictionary<string, object>) || terrainFields.Any(k => !((Dictionary<string, object>)t).ContainsKey(k)) || ((Dictionary<string, object>)t).Keys.Any(k => !terrainFields.Contains(k)))) throw new InvalidDataException("Niepełna lub nieobsługiwana definicja terenu; plik pozostawiono bez zmian.");
+            var preset = json.ConvertToType<TerrainPreset>(raw); Validate(preset); return preset;
+        }
+        public static string FindFile(string directory, string id)
+        {
+            if (id == DefaultId) throw new InvalidDataException("Chroniony wzorzec nie ma pliku użytkownika.");
+            var files = Directory.GetFiles(directory, "*.terrainset.json", SearchOption.TopDirectoryOnly).Where(f => ReadFile(f).Id == id).ToArray();
+            if (files.Length != 1) throw new InvalidDataException("Nie można jednoznacznie wskazać pliku presetu. Uruchom program ponownie i sprawdź komunikaty biblioteki.");
+            return files[0];
         }
         public static void Save(TerrainPreset preset, string directory)
         {
@@ -82,14 +99,16 @@ namespace HexMapEditor
             var records = new List<KeyValuePair<string, TerrainPreset>>();
             foreach (string file in Directory.GetFiles(directory, "*.terrainset.json"))
             {
-                try { if (new FileInfo(file).Length > 4 * 1024 * 1024) continue; var p = MapLogic.Serializer().Deserialize<TerrainPreset>(File.ReadAllText(file, Encoding.UTF8)); Validate(p); records.Add(new KeyValuePair<string, TerrainPreset>(file, p)); }
-                catch (Exception ex) { if (!(ex is ArgumentException || ex is InvalidDataException || ex is InvalidOperationException)) throw; }
+                // Do not save through an unreadable catalog which may hide a collision.
+                var p = ReadFile(file); records.Add(new KeyValuePair<string, TerrainPreset>(file, p));
             }
             if (SameName(preset.Name, Default().Name) || records.Any(r => r.Value.Id != preset.Id && SameName(r.Value.Name, preset.Name))) throw new InvalidDataException("Nazwa presetu jest już używana. Wybierz inną nazwę; żaden plik nie został nadpisany.");
             var targets = records.Where(r => r.Value.Id == preset.Id).ToArray(); string path;
             if (overwrite) { if (targets.Length != 1) throw new InvalidDataException("Nie można jednoznacznie wskazać zapisanego presetu. Zapisz jako nowy preset."); path = targets[0].Key; }
             else { if (targets.Length != 0) throw new InvalidDataException("Identyfikator presetu jest już zapisany; wymagany jest jawny wybór nadpisania."); path = Path.Combine(directory, MapLogic.Hash(preset.Id) + ".terrainset.json"); }
-            MapLogic.AtomicWrite(path, MapLogic.Serializer().Serialize(preset), overwrite);
+            string serialized = MapLogic.Serializer().Serialize(preset);
+            if (Encoding.UTF8.GetByteCount(serialized) > 4 * 1024 * 1024) throw new InvalidDataException("Zestaw przekracza limit zapisu/odczytu 4 MiB.");
+            MapLogic.AtomicWrite(path, serialized, overwrite);
         }
         public static bool SameName(string a, string b) { return String.Equals((a ?? "").Trim().Normalize(), (b ?? "").Trim().Normalize(), StringComparison.OrdinalIgnoreCase); }
         public static TerrainDefinition Legacy(string name, string color)
@@ -111,6 +130,7 @@ namespace HexMapEditor
 
     internal static class MapLogic
     {
+        static readonly TerrainState neutralState = new TerrainState(new CellData());
         public static JavaScriptSerializer Serializer() { return new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 128 }; }
         public static string Hash(string value) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? ""))).Replace("-", "").ToLowerInvariant(); }
         public static bool ValidColor(string value)
@@ -172,7 +192,14 @@ namespace HexMapEditor
         }
         public static bool HasUserData(CellData cell)
         {
-            return cell.VariantId != PresetCatalog.NeutralVariant || cell.Terrain != "Teren neutralny" || !String.Equals(cell.Color, "#777F91", StringComparison.OrdinalIgnoreCase) || !String.IsNullOrEmpty(cell.Name) || !String.IsNullOrEmpty(cell.Description) || !String.IsNullOrEmpty(cell.RichDescription);
+            return ContentKind(cell) != CellContentKind.None;
+        }
+        public static CellContentKind ContentKind(CellData cell)
+        {
+            var kind = CellContentKind.None;
+            if (!neutralState.Matches(cell)) kind |= CellContentKind.Terrain;
+            if (!String.IsNullOrEmpty(cell.Name) || !String.IsNullOrEmpty(cell.Description) || !String.IsNullOrEmpty(cell.RichDescription)) kind |= CellContentKind.Text;
+            return kind;
         }
         public static ResizeState Resize(MapData map, string side, int delta, out int removed, out int withData)
         {

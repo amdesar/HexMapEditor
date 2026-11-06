@@ -31,7 +31,20 @@ namespace HexMapEditor
             rightResizeGrip.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) EndRightResize(); };
             rightResizeGrip.MouseCaptureChanged += (s, e) => { if (rightResizing && !rightResizeGrip.Capture) EndRightResize(); };
         }
-        void SetRightWidth(int width) { requestedRightWidth = ClampRightWidth(width); PositionOverlays(); }
+        void SetRightWidth(int width)
+        {
+            Rectangle previous = right.Bounds; requestedRightWidth = ClampRightWidth(width); PositionOverlays();
+            if (!right.Visible || previous == right.Bounds) return;
+            // Moving an overlay with an ElementHost does not repaint the buffered
+            // sibling canvas during a captured drag. Repaint just the revealed strip
+            // now, before another mouse move can copy stale child-window pixels.
+            if (right.Left > previous.Left)
+            {
+                var exposed = Rectangle.Intersect(canvas.ClientRectangle, new Rectangle(previous.Left, 0, right.Left - previous.Left, canvas.Height));
+                if (!exposed.IsEmpty) { canvas.Invalidate(exposed); canvas.Update(); }
+            }
+            right.Update();
+        }
         void BeginRightResize(int screenX)
         {
             if (modalDepth > 0) return; EndCanvasGesture(true); rightResizing = true; waitingForMouseRelease = true; requireFreshCanvasDown = true;

@@ -73,7 +73,7 @@ namespace HexMapEditor
             ConfigureButton(redoButton, "", "redo", "Ponów operację mapy", Redo, 32); file.Controls.Add(redoButton);
             ShellButton(file, "Biblioteka", "library", "Pokaż lokalizację biblioteki", () => ShowEditorMessage("Lokalna biblioteka:\n" + LibraryPaths.Root + "\n\nZestawy terenów można zapisywać w panelu po lewej. Pozostałe katalogi są przygotowane na przyszłe funkcje.", "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Information), 98);
             ConfigureButton(orientationToggle, "Pointy Top", "pointy", "Zmień orientację", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop"), 128); view.Controls.Add(orientationToggle);
-            ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 88); view.Controls.Add(labelToggle);
+            ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
             ConfigureButton(fitButton, "Dopasuj", "fit", "Dopasuj mapę (prawy panel jest nakładką)", FitMap, 94); view.Controls.Add(fitButton);
             ShellButton(view, "Rozmiar", "labels", "Dodaj lub usuń wiersze i kolumny", ResizeProject, 90);
@@ -104,11 +104,11 @@ namespace HexMapEditor
             body.Controls.Add(new Label { Text = "Zestaw terenów", AutoSize = true, Margin = new Padding(3, 10, 3, 4) });
             terrainPicker.Width = 188; terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name";
             terrainPicker.SelectedIndexChanged += (s, e) => { if (!updating && terrainPicker.SelectedItem != null) SelectPreset(((TerrainPreset)terrainPicker.SelectedItem).Id); }; body.Controls.Add(terrainPicker);
-            var actions = new FlowLayoutPanel { Width = 188, Height = 70, WrapContents = true };
-            SmallButton(actions, "Nowy zestaw", CreatePreset, 90); SmallButton(actions, "Nazwa", RenamePreset, 90); SmallButton(actions, "Zapisz zestaw", SavePreset, 184); body.Controls.Add(actions);
+            var actions = new FlowLayoutPanel { Width = 188, Height = 100, WrapContents = true };
+            SmallButton(actions, "Nowy zestaw", CreatePreset, 90); SmallButton(actions, "Nazwa", RenamePreset, 90); SmallButton(actions, "Zapisz zestaw", SavePreset, 184); deletePresetButton = SmallButton(actions, "Usuń preset", RemovePreset, 184); body.Controls.Add(actions);
             presetStateLabel.Width = 188; presetStateLabel.Height = 40; presetStateLabel.AutoEllipsis = true; body.Controls.Add(presetStateLabel);
             SmallButton(body, "Dodaj teren", () => EditTerrain(true), 184);
-            paletteTiles.Width = 188; paletteTiles.AutoSize = true; paletteTiles.WrapContents = true; body.Controls.Add(paletteTiles);
+            paletteTiles.Width = 188; paletteTiles.AutoSize = true; paletteTiles.FlowDirection = FlowDirection.TopDown; paletteTiles.WrapContents = false; body.Controls.Add(paletteTiles);
             RefreshPresetPicker();
         }
         Button SmallButton(Control parent, string text, Action action, int width)
