@@ -32,7 +32,7 @@ namespace HexMapEditor
             catch (Exception ex) { ShowEditorMessage("Nie można odczytać ikon: " + ex.Message, "Biblioteka ikon", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         void SelectIcon(string id)
-        { EndCanvasGesture(true); if (!libraryIcons.Any(a => a.Id == id)) return; activeIcon = id; iconMaterial = true; RefreshIconSelection(); UpdateMaterialIndicator(); canvas.Invalidate(); }
+        { EndCanvasGesture(true); if (!libraryIcons.Any(a => a.Id == id)) return; activeIcon = id; iconMaterial = true; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); canvas.Invalidate(); }
         void UpdateMaterialIndicator()
         {
             UpdateTerrainSelection(); RefreshIconSelection();
@@ -75,21 +75,17 @@ namespace HexMapEditor
         {
             var entry = iconMaterial ? libraryIcons.FirstOrDefault(a => a.Id == activeIcon) : null;
             if (entry == null) { ShowEditorMessage("Zaznacz ikonę", "Edytuj ikonę", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            using (var d = new IconEditDialog(entry, libraryIcons)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
+            using (var d = new IconEditDialog(entry, PickLibraryIcon)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
             {
                 var next = entry.Copy(); next.Name = d.IconName; next.Asset = d.Asset; string error;
                 if (!TryChangeLibraryIcon(entry,next,d.UpdateMap,Path.GetDirectoryName(entry.FilePath),out error)) ShowEditorMessage(error,"Nie można edytować ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);
             }
-        }        void OpenIconLibrary()
-        {
-            using (var dialog = new Form { Text = "Biblioteka ikon — wybierz", Size = new Size(520, 420), MinimumSize = new Size(350, 240), StartPosition = FormStartPosition.CenterParent, BackColor = BackColor })
-            {
-                var list = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12) }; dialog.Controls.Add(list);
-                string chosen = null;
-                foreach (var asset in libraryIcons) { var a = asset; var button = IconButton(a, () => { chosen = a.Id; dialog.DialogResult = DialogResult.OK; }); button.Width = 88; button.Height = 76; button.Text = a.Name; button.AutoEllipsis = true; button.TextImageRelation = TextImageRelation.ImageAboveText; list.Controls.Add(button); }
-                if (RunModal(() => dialog.ShowDialog(this)) == DialogResult.OK && chosen != null) SelectIcon(chosen);
-            }
         }
+        LibraryIcon PickLibraryIcon(IWin32Window owner)
+        {
+            using (var dialog = new IconPickerDialog(libraryIcons, IconButton, BackColor)) return RunModal(() => dialog.ShowDialog(owner)) == DialogResult.OK ? dialog.Chosen : null;
+        }
+        void OpenIconLibrary() { var chosen = PickLibraryIcon(this); if (chosen != null) SelectIcon(chosen.Id); }
         MapData MapForSave()
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId));

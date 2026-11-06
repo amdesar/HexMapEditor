@@ -1,0 +1,20 @@
+# Plan i punkt wznowienia 0.3.2
+
+Baza: czysty master d28c7173d8b53abaa4b72e504e8e2f86926487a6; origin https://github.com/amdesar/HexMapEditor.git, lokalne HEAD/origin/master zgodne. Nie wykonywano fetch/synchronizacji (nie żądano ich w tym zadaniu). Przeczytano README, raport 0.3.1, wymagania sekcji 25; brak dodatkowych AGENTS.md w sprawdzonych lokalizacjach. Początkowa lista procesów sandboxa nie pokazała edytora; później wykryto okno użytkownika przez Computer Use (opis poniżej). Prywatna Library nie jest materiałem testowym.
+
+1. Strzałki: krok Height+Margin.Vertical jednego TerrainTile; stałe bounds, jeden rysunek lokalny i jego pionowe odbicie, bez glifów. Bez redesignu viewportu/kółka.
+2. Świadomy SelectTerrain/SelectIcon po FogBrush/FogBucket wybiera Brush, z warunkiem !updating; refresh i history pozostają bez takiej zmiany. Rozmiar/kształt/fill bez zmian. Pełny selektor współdzielony: osobny IconPickerDialog używany przez główne okno i dialog edycji. Edycja otrzymuje jedynie wybraną grafikę, bez zmiany materiału/narzędzia.
+3. Generator startowych ikon wygląda już poprawnie: krótka próba pustego katalogu i ponownego odczytu bez odtwarzania skasowanej pozycji. Bez naprawy/migracji prywatnych nazw z 0.3.0.
+4. Wyodrębnić istniejące IconFiles.Transition do wspólnego LibraryFiles (ten sam algorytm). PresetLibraryChange przechowuje znane przy odczycie bajty/ścieżki Before/After i pojedynczą pozycję katalogu. EditAction łączy plik z opcjonalnymi BeforePalette/AfterPalette, wyliczonymi bez mutacji projektu przed udanym przejściem dyskowym. Nadpisanie samego pliku nie zmienia roboczej palety; Create/Copy/Delete zachowują dotychczasowe zmiany projektu. Undo/Redo sprawdza bajty, ścieżki i kolizje logicznych ID/nazw; nie przesuwa stosu przy błędzie. Usuwanie bez Kosza z bajtami w RAM, komunikat o sesyjności i limicie 300. Domyślny chroniony. Reset historii nie usuwa aktywnych plików.
+5. Minimalne nowe scenariusze: kontrolki/materiał/wybór grafiki; pusty generator; cykl presetów z dokładnym Undo/Redo, konfliktem i resetem. Krótka reprezentatywna próba zwykłego EXE, własna mapa/biblioteka tylko tests/_work. Bez Run-AllTests i bez ponownych prób zaakceptowanych regionów, geometrii, interpolacji i przeskoku.
+6. Wersja 0.3.2, format mapy nadal 3 i ikony osadzone; README/spec/raport, build, cleanup własnych danych, lokalny commit bez push/tagu/Release'a.
+
+## Stan i punkt wznowienia
+
+Implementacja punktów 1–4 zakończona. Zaliczone pojedynczo controls, library i presets z Run-Patch032Tests.ps1; nie ponawiać bez zmiany wpływającej na wynik. Logi przebiegów wskazane w raporcie. Dokumentacja sekcji 26 specyfikacji i tests/README zapisana i odczytana kontrolnie.
+
+Zwykły EXE 0.3.2 zbudowany w tests/_work/ui-032-15b00899b16f4ff4b94a1cb708f035af. Wykonano krok strzałki o jeden wiersz, dwa przejścia z mgły na Pędzel i wybór/anulowanie grafiki przez wspólny selektor. Zatwierdzenie edycji grafiki nie zmieniło głównego narzędzia ani mapy. Po tej próbie poprawiono wyłącznie kontrast przycisku Anuluj selektora; końcowy build i krótkie obejrzenie tej zmiany również zakończone, bez powtarzania pozostałych prób.
+
+Po zgodzie użytkownika wykonano usunięcie własnego presetu, sprawdzono brak pliku i Ctrl+Z. Odtworzony plik miał identyczny SHA256 64B0C215F577C2745612C63C3A6A76ABA4F39096A6C989AF5E50F4128956BF2D; paleta zapisana, mapa bez gwiazdki. Nie ponawiano usunięcia przez Redo w oknie; metoda Redo już sprawdzona.
+
+Pierwszy główny build zablokowało okno użytkownika 0.3.1 z niezapisanymi zmianami (CS0016). Użytkownik sam zamknął je i potwierdził kontynuację. Po sprawdzeniu okien zbudowano główny EXE 0.3.2.0. Jego identyczna kopia (SHA256 5F335F178CB6E07C6E086FED89D692F9CF41936869B5B934A3921B1F609342CD) uruchomiona w tests/_work potwierdziła czytelny Anuluj po ostatniej kosmetycznej zmianie. Własne okno zamknięte, brak procesu potwierdzony, usunięto własne artefakty; pozostają tylko logi. README/specyfikacja/raport zaktualizowane. Ostatni krok: przegląd przygotowanych plików i lokalny commit bez push/tagu/Release'a, z podaniem wyniku w odpowiedzi.

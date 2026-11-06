@@ -56,8 +56,8 @@ namespace HexMapEditor
 
             var terrains = Section("Tereny", 2); addTerrainButton = SmallButton(terrains, "Dodaj teren", () => EditTerrain(true), 208); addTerrainButton.Dock = DockStyle.Top; addTerrainButton.Height = 26;
             var terrainList = new Panel { Dock = DockStyle.Fill }; terrains.Controls.Add(terrainList); terrainList.BringToFront();
-            terrainUp = SmallButton(terrainList, "▲", () => ScrollTerrains(-72), 208); terrainUp.Dock = DockStyle.Top; terrainUp.Height = 18; terrainUp.AccessibleName = "Przewiń tereny w górę"; tips.SetToolTip(terrainUp, terrainUp.AccessibleName);
-            terrainDown = SmallButton(terrainList, "▼", () => ScrollTerrains(72), 208); terrainDown.Dock = DockStyle.Bottom; terrainDown.Height = 18; terrainDown.AccessibleName = "Przewiń tereny w dół"; tips.SetToolTip(terrainDown, terrainDown.AccessibleName);
+            terrainUp = TerrainScrollButton(terrainList, true);
+            terrainDown = TerrainScrollButton(terrainList, false);
             terrainScroll = new WheelViewport(delta => ScrollTerrains(delta)) { Dock = DockStyle.Fill, AccessibleName = "Lista terenów — osobne przewijanie" }; terrainList.Controls.Add(terrainScroll); terrainScroll.BringToFront();
             paletteTiles.AutoSize = true; paletteTiles.AutoSizeMode = AutoSizeMode.GrowAndShrink; paletteTiles.FlowDirection = FlowDirection.TopDown; paletteTiles.WrapContents = false; paletteTiles.Margin = Padding.Empty; terrainScroll.Controls.Add(paletteTiles); terrainScroll.Layout += (s, e) => LayoutPalette(); paletteTiles.SizeChanged += (s, e) => LayoutPalette(); paletteTiles.ControlAdded += (s, e) => LayoutPalette(); paletteTiles.ControlRemoved += (s, e) => LayoutPalette();
 
@@ -70,6 +70,18 @@ namespace HexMapEditor
             Disposed += (s, e) => { foreach (var b in documentBitmaps.Values) b.Dispose(); foreach (var b in libraryBitmaps.Values) b.Dispose(); };
         }
         bool layingOutPalette;
+        Button TerrainScrollButton(Control parent, bool up)
+        {
+            var button = SmallButton(parent, "", () => ScrollTerrainRow(up ? -1 : 1), 208);
+            button.Dock = up ? DockStyle.Top : DockStyle.Bottom; button.Height = 18; button.Margin = Padding.Empty; button.Padding = Padding.Empty;
+            button.Image = EditorIcons.ScrollArrow(up); button.ImageAlign = ContentAlignment.MiddleCenter;
+            button.AccessibleName = up ? "Przewiń tereny w górę" : "Przewiń tereny w dół"; tips.SetToolTip(button, button.AccessibleName); return button;
+        }
+        void ScrollTerrainRow(int direction)
+        {
+            var row = paletteTiles.Controls.Cast<TerrainTile>().FirstOrDefault();
+            ScrollTerrains(direction * (row == null ? 36 : row.Height + row.Margin.Vertical));
+        }
         void ScrollTerrains(int delta) { terrainOffset += delta; LayoutPalette(); }
         void LayoutPalette()
         {

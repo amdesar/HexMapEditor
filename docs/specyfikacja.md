@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.8, stan decyzji 6 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.3.1; pierwszeństwo mają ustalenia sekcji 25.
+Wersja: 1.9, stan decyzji 6 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.3.2; pierwszeństwo mają ustalenia sekcji 26.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -383,3 +383,34 @@ Przed przejściem porównujemy oczekiwane bajty istniejącego źródła i zajęt
 Pozostają odłożone: obiekty, dwie kolumny i podział wysokości panelu, graficzna mgła/szczegółowość, współrzędne na ikonach, kadrowanie/arkusze ikon, przebudowa pełnego selektora, optymalizacja dużych map, opisy/formatowanie i przeskok prawego nagłówka. Wymagania przyszłe z sekcji 24 pozostają. Typowe mapy użytkownika 60×60–70×70; brak kampanii 200×200 nie jest nowym zadaniem ani błędem łatki.
 
 Tylko minimalne celowane scenariusze nowych i zmienionych zachowań, bez Run-AllTests i równoważnej kampanii, również z powodu przenosin/modelu/historii. Nie usuwamy starych testów, nie przedstawiamy dawnych wyników jako nowych. Własne dane tylko tests/_work, bez prywatnej biblioteki i czyszczenia map. Krótka próba strzałek i ruchu panelu na zwykłym EXE; osobno metody/kontrolki i ograniczenia próbkowania obrazu. Bez push/tagu/Release'a. Pełny audyt wyłącznie na osobne polecenie.
+## 26. Łatka 0.3.2 — obowiązujące decyzje
+
+Pierwszeństwo przed sprzecznymi wcześniejszymi ustaleniami. Rozwijamy ukończoną 0.3.1; format mapy 3, presetu 1 i ikony bibliotecznej 2 bez zmian, źródła w src i Library obok EXE. Bez nowych zależności/usług, migracji hipotetycznych starych map, push/tagu/Release'a. Użytkownik potwierdził poprawne regiony i przeciąganie mgły, maskowanie, brak przeskoku panelu, stabilność przewijania, jedną złotą ramkę, blokady Domyślnego, edycję/historię ikon, ciągłość i reset odcinka po wyjściu z mapy oraz jeden wpis gestu. Nie diagnozujemy ich ponownie i nie zmieniamy geometrii/interpolacji. Limit 300 i utrata cofania po wypadnięciu wpisu są zaakceptowane.
+
+### Strzałki i świadomy wybór materiału
+
+Kliknięcie strzałki przesuwa dokładnie o Height + Margin.Vertical jednego wiersza terenu (obecnie 36 px), nie o dwa; na brzegu ograniczamy do pozostałego zakresu. Stałe miejsce i stany aktywności, kółko, nieruchome inne sekcje i Dodaj pozostają. Obie kontrolki mają takie same wymiary, padding, marginesy i wyrównanie. Używają jednego lokalnego rysunku 9×5 i jego dokładnego pionowego odbicia, nie dwóch glifów. Bez pełnego redesignu panelu.
+
+Świadome kliknięcie terenu/ikony przy FogBrush lub FogBucket wybiera materiał i zwykły Brush. Przy zwykłym Bucket pozostaje Bucket, przy Brush pozostaje Brush; nie rozszerzamy na inne narzędzia. Pełny selektor ikon w kontekście głównego okna podlega tej samej regule. Nie wywołujemy jej przez odbudowę/odświeżanie/synchronizację, odczyt lub historię. Sam wybór nie zmienia mapy, gwiazdki ani historii i zachowuje wszystkie ustawienia pędzla. Przyszłe świadome wybieranie obiektowego materiału powinno stosować tę zasadę, ale obiektów teraz nie implementujemy.
+
+### Wizualny wybór grafiki i nazwy ikon
+
+Edytuj ikonę zamiast rozwijanej listy nazw ma Wybierz z biblioteki. Otwiera ten sam pełny IconPickerDialog z miniaturami i nazwami co główne okno, bez drugiego widoku biblioteki. W tym kontekście zwraca tylko grafikę do dialogu edycji, nie zmienia głównego materiału/narzędzia i nie zapisuje niczego przed OK edycji. Anuluj selektora zachowuje podgląd; anulowanie edycji zachowuje wszystkie dane. Pozostają grafika z pliku, nazwa, podgląd, domyślnie wyłączona aktualizacja wystąpień i jeden spójny wpis historii. Bez kadrowania/arkuszy lub przebudowy stylistyki całego selektora.
+
+Generator startowych ikon w 0.3.1 już zapisuje icon-Namiot.json, icon-Czaszka.json itd. Sprawdzamy nowy pusty katalog i zachowanie znacznika, nie dodajemy niepotrzebnej poprawki. Pliki z długim content-ID są pozostałością mechanizmu 0.3.0: sam program nie przepisuje ich przy starcie; świadoma edycja i OK porządkują właściwy plik. Nie resetujemy znacznika i nie przywracamy usuniętych ikon. Zachowujemy bezpieczne nazwy, mały prefiks icon-, zapis liter nazwy i kolizje.
+
+### Historia plików presetów
+
+Wspólna chronologia obejmuje od teraz także pliki: nowy preset, kopię jako nowy, nadpisanie własnego, zapis zmienionej nazwy z przemianowaniem pliku i usunięcie. Operacje robocze (np. nazwa przed zapisem) zachowują dotychczasowy sens i nie wykonują dodatkowej operacji dyskowej. Jeden rzeczywisty zapis/usunięcie to jeden wpis. Identyczne bajty/ścieżka i niezmieniony projekt nie tworzą pustego wpisu.
+
+LibraryFiles jest wyodrębnionym istniejącym mechanizmem ikon, używanym również przez presety, z bajtowymi stanami i ścieżkami w RAM. Nie tworzymy innego stosu, skrótu ani archiwum. PresetFileChange zapisuje pojedynczy stan biblioteki/pliku; EditAction łączy go z opcjonalnym stanem palety projektu, przygotowanym przed zapisaniem bez mutacji mapy. Nadpisanie samego pliku nie cofa wcześniejszej roboczej palety ani nie tworzy fałszywej gwiazdki. Nowy/kopia/usunięcie mogą rzeczywiście zmieniać projekt i mają odpowiednie oznaczenie. Nie cofamy przy okazji heksów, ikon, mgły, nazw/opisów. Domyślny całkowicie chroniony; jego własną kopię można cofnąć jak utworzenie.
+
+Undo/Redo przywraca dokładne bajty, nazwę pliku i odpowiedni stan programu. Undo usunięcia odtwarza zapisany preset na dysku bez dodatkowego Zapisz; jeśli paleta robocza wcześniej różniła się od pliku, zachowuje ten stan różnic. Usuwanie presetów, analogicznie do ikon, odbywa się bez Kosza z kopią w pamięci. Potwierdzenie wyjaśnia brak Kosza, sesyjność, limit 300 i utratę cofania po resecie/wypadnięciu wpisu/zakończeniu programu. Nie sprzątamy prywatnej biblioteki ani Kosza Windows.
+
+Bajty oczekiwane są zapamiętane przy odczycie/zapisie, z wykrywaniem zewnętrznych zmian i zajętych ścieżek. Historia presetów sprawdza też kolizje logicznych ID/nazw. Źródło jest etapowane i ponownie sprawdzane; nowe bajty Flush i atomowy Move bez nadpisania obcego celu; błąd przywraca poprzednią ścieżkę. Jeśli zewnętrzna kolizja zablokuje sam rollback, wskazujemy zachowaną kopię .library-session-*.tmp, bez nadpisania. Pamięć i pozycja stosu zmieniają się dopiero po udanym przejściu dyskowym; błąd pozwala rozwiązać konflikt i ponowić. Nie ma trwałego odzyskiwania poza zachowaną historią. Nowa/Otwórz zerują ją dopiero po sukcesie; błąd/anulowanie zachowuje historię. Reset nie usuwa aktywnych presetów/ikon.
+
+### Granice i weryfikacja
+
+Tylko kilka celowanych scenariuszy kontrolek/materiału/selektora, pustej biblioteki, dokładnej historii presetów i jednego konfliktu oraz resetu bez usuwania plików. Krótka reprezentatywna próba zwykłego EXE: mgła → materiał, wizualny wybór grafiki, testowy preset usuń/Undo z plikiem, jeden krok strzałki. Nie deklarujemy wykonania niemożliwej próby. Nie Run-AllTests, nie dawne zestawy ani ponawianie zaliczonych prób bez istotnej zmiany/błędu/niepewnego wyniku. Nie usuwamy historycznych testów; ich dawna zasada bez plikowego Undo presetów jest od 0.3.2 historyczna, nie wymaganiem przywrócenia tamtego zachowania.
+
+Poza zakresem: obiekty, dwie kolumny, pełna stylistyka, kadrowanie/arkusze/tekstury, geometria i dalsza interpolacja, ponowna diagnoza przeskoku panelu, opisy, optymalizacja dużych map i trwałe odzyskiwanie poza limitem. Mapy nadal osadzają użyte grafiki i logiczne metadane wystąpień. Własne dane wyłącznie tests/_work, bez prywatnej Library i jej czyszczenia.

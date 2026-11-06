@@ -92,6 +92,7 @@ namespace HexMapEditor
         public List<CellChange> Changes = new List<CellChange>();
         public List<LayerChange> Layers = new List<LayerChange>();
         public IconLibraryChange LibraryChange;
+        public PresetFileChange PresetChange;
         public List<IconAsset> RequiredAssets = new List<IconAsset>();
         public string Label;
         public ResizeState BeforeResize, AfterResize;
@@ -140,7 +141,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.3.1";
+        const string AppVersion = "0.3.2";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;

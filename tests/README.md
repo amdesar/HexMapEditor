@@ -2,7 +2,16 @@
 
 Źródła i skrypty pozostają w Git. Każdy przebieg tworzy własne EXE/dane tylko w `tests/_work/<rodzaj>-<GUID>/`. Logi są ignorowane; procesy należy zakończyć przed usunięciem katalogów. Nie używamy użytkowego Library, głównego bin ani globalnego TEMP/TMP.
 
-## 0.3.1 — pięć krótkich scenariuszy do wyboru
+## 0.3.2 — trzy celowane scenariusze
+
+Run-Patch032Tests.ps1 wymaga jednego Case: controls, library albo presets. Nie uruchamia wszystkich ani dawnego zestawu. Dane i kompilacje są w osobnym tests/_work/patch-032-GUID; po zakończeniu pozostaje tylko results.log.
+
+- controls: krok jednego wiersza, clamp i równa/odwrócona geometria strzałek; świadomy materiał po mgle, zachowanie zwykłego Wiadra i innych narzędzi/ustawień; refresh bez autoswitch; współdzielony selektor oraz lokalny podgląd/anulowanie edycji bez zmiany głównego stanu.
+- library: nowy pusty katalog ma pięć czytelnych nazw startowych; ponowny odczyt nie odtwarza usuniętej pozycji ani nie resetuje znacznika; pojedynczy kontrolny Undo/Redo ikony jako bezpośrednia zależność wyodrębnionego LibraryFiles.
+- presets: kopia Domyślnego, nowy neutralny preset, nadpisanie i robocza nazwa/zapis przemianowania, usunięcie z dokładnymi plikami/stanu Undo/Redo, brak fałszywej gwiazdki i uszkodzenia heksów, konflikt ścieżki i ponowienie, zewnętrzna zmiana/zablokowany plik, reset historii po sukcesie bez usunięcia aktywnych plików.
+
+Create-Patch032Ui.ps1 buduje zwykły EXE i własną mapę/preset w tests/_work/ui-032-GUID. Nie używa prywatnej biblioteki i nie jest automatycznym testem okna. Rzeczywiste próby i ograniczenia: docs/raport-0.3.2.md. Historyczne testy usuwania presetów przez callback Kosza i oczekiwania braku plikowego Undo odzwierciedlają poprzednią wersję; zachowano je bez uruchamiania. Nie przywracamy starej semantyki tylko dla ich zaliczenia.
+## 0.3.1 — pięć krótkich scenariuszy do wyboru (historia)
 
 `Run-Patch031Tests.ps1 -Case regions|controls|icons|import|names` wymaga **jednego** konkretnego Case, bez automatycznego uruchomienia wszystkich. Każda próba jest osobnym przebiegiem w _work i zostawia tylko results.log.
 

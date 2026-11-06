@@ -27,8 +27,10 @@ namespace HexMapEditor
         public string Id { get; set; }
         public string Name { get; set; }
         public List<TerrainDefinition> Terrains { get; set; }
+        internal string FilePath;
+        internal byte[] DiskBytes;
         public TerrainPreset() { PresetFormatVersion = 1; Id = Guid.NewGuid().ToString("N"); Name = "Nowy preset"; Terrains = new List<TerrainDefinition>(); }
-        public TerrainPreset Copy() { return new TerrainPreset { Id = Id, Name = Name, Terrains = Terrains.Select(t => t.Copy()).ToList() }; }
+        public TerrainPreset Copy() { return new TerrainPreset { Id = Id, Name = Name, Terrains = Terrains.Select(t => t.Copy()).ToList(), FilePath = FilePath, DiskBytes = DiskBytes }; }
     }
 
     internal static class PresetCatalog
@@ -73,12 +75,13 @@ namespace HexMapEditor
         public static TerrainPreset ReadFile(string file)
         {
             if (new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("Preset przekracza 4 MiB.");
-            var json = MapLogic.Serializer(); var raw = json.DeserializeObject(File.ReadAllText(file, Encoding.UTF8)) as Dictionary<string, object>;
+            byte[] bytes = File.ReadAllBytes(file); string text; using (var stream = new MemoryStream(bytes)) using (var reader = new StreamReader(stream, Encoding.UTF8, true)) text = reader.ReadToEnd();
+            var json = MapLogic.Serializer(); var raw = json.DeserializeObject(text) as Dictionary<string, object>;
             string[] fields = { "PresetFormatVersion", "Id", "Name", "Terrains" };
             if (raw == null || fields.Any(k => !raw.ContainsKey(k)) || raw.Keys.Any(k => !fields.Contains(k))) throw new InvalidDataException("Brak wymaganych pól lub nieobsługiwane dodatkowe pola presetu; plik pozostawiono bez zmian.");
             var terrains = raw["Terrains"] as object[]; string[] terrainFields = { "TerrainId", "VariantId", "Revision", "Name", "Color", "FillKind" };
             if (terrains == null || terrains.Any(t => !(t is Dictionary<string, object>) || terrainFields.Any(k => !((Dictionary<string, object>)t).ContainsKey(k)) || ((Dictionary<string, object>)t).Keys.Any(k => !terrainFields.Contains(k)))) throw new InvalidDataException("Niepełna lub nieobsługiwana definicja terenu; plik pozostawiono bez zmian.");
-            var preset = json.ConvertToType<TerrainPreset>(raw); Validate(preset); return preset;
+            var preset = json.ConvertToType<TerrainPreset>(raw); Validate(preset); preset.FilePath = Path.GetFullPath(file); preset.DiskBytes = bytes; return preset;
         }
         public static string FindFile(string directory, string id)
         {
@@ -92,6 +95,11 @@ namespace HexMapEditor
             Write(preset, directory, false);
         }
         public static void Write(TerrainPreset preset, string directory, bool overwrite)
+        {
+            var plan = PrepareWrite(preset,directory,overwrite,null);
+            LibraryFiles.Transition(plan.Before == null ? null : plan.Before.FilePath, plan.Before == null ? null : plan.Before.DiskBytes,plan.After.FilePath,plan.After.DiskBytes);
+        }
+        internal static PresetFileChange PrepareWrite(TerrainPreset preset, string directory, bool overwrite, TerrainPreset expected)
         {
             Validate(preset);
             if (preset.Id == DefaultId) throw new InvalidDataException("Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset.");
@@ -109,7 +117,10 @@ namespace HexMapEditor
             string serialized = MapLogic.Serializer().Serialize(preset);
             if (Encoding.UTF8.GetByteCount(serialized) > 4 * 1024 * 1024) throw new InvalidDataException("Preset przekracza limit zapisu/odczytu 4 MiB.");
             string destination = PresetFiles.Destination(directory, preset.Name, path);
-            PresetFiles.Write(destination, path, serialized);
+            var before = path == null ? null : targets[0].Value;
+            if (expected != null && (before == null || !String.Equals(expected.FilePath,before.FilePath,StringComparison.OrdinalIgnoreCase) || !expected.DiskBytes.SequenceEqual(before.DiskBytes))) throw new IOException("Plik presetu zmienił się poza programem. Zachowano plik, projekt i historię. Odśwież presety i sprawdź dane przed ponownym zapisem.");
+            var after = preset.Copy(); after.FilePath = destination; after.DiskBytes = new UTF8Encoding(false).GetBytes(serialized);
+            return new PresetFileChange { Before = before, After = after };
         }
         public static bool SameName(string a, string b) { return String.Equals((a ?? "").Trim().Normalize(), (b ?? "").Trim().Normalize(), StringComparison.OrdinalIgnoreCase); }
         public static TerrainDefinition Legacy(string name, string color)

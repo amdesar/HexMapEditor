@@ -43,16 +43,18 @@ namespace HexMapEditor
         {
             // Nothing in memory or on either stack changes before the checked disk transition.
             if (action.LibraryChange != null) ApplyIconLibrary(action.LibraryChange, after);
+            if (action.PresetChange != null) ApplyPresetLibrary(action.PresetChange, after);
             foreach (var asset in action.RequiredAssets) if (!map.IconAssets.Any(a => a.Id == asset.Id)) map.IconAssets.Add(asset);
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);
-            if (action.BeforePalette != null) { (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex); RefreshPresetPicker(); }
+            if (action.BeforePalette != null) (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex);
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);
                 foreach (var change in action.Changes) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) (after ? change.After : change.Before).ApplyTo(cell); }
                 foreach (var change in action.Layers) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) change.Apply(cell, after); }
             }
             selected = selectedId == null ? -1 : map.Cells.FindIndex(c => c.Id == selectedId); editorCellId = null;
+            if (action.BeforePalette != null || action.PresetChange != null) RefreshPresetPicker();
         }
         bool ChangePalette(string label, Action mutate, Action<EditAction> changeMap = null)
         {

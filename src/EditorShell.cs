@@ -12,6 +12,14 @@ namespace HexMapEditor
     internal static class EditorIcons
     {
         static readonly Dictionary<string, Bitmap> cache = new Dictionary<string, Bitmap>();
+        internal static Bitmap ScrollArrow(bool up)
+        {
+            Bitmap image; string key = up ? "terrain-up" : "terrain-down";
+            if (cache.TryGetValue(key, out image)) return image;
+            if (up) { image = new Bitmap(9,5); using (var g = Graphics.FromImage(image)) g.FillPolygon(Brushes.WhiteSmoke, new[] { new Point(0,4), new Point(4,0), new Point(8,4) }); }
+            else { image = (Bitmap)ScrollArrow(true).Clone(); image.RotateFlip(RotateFlipType.RotateNoneFlipY); }
+            cache.Add(key,image); return image;
+        }
         public static Bitmap Small(string key)
         {
             Bitmap image; if (!cache.TryGetValue("small:" + key, out image)) { image = new Bitmap(Draw(key), new Size(18, 18)); cache.Add("small:" + key, image); } return image;
