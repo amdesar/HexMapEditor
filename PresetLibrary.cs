@@ -54,7 +54,7 @@ namespace HexMapEditor
                         else
                         {
                             var recovered = preset.Copy(); recovered.Id = "recovered-" + MapLogic.Hash(ContentKey(preset));
-                            if (records.Any(r => r.Preset.Id == recovered.Id)) throw new InvalidDataException("Konflikt ID odzyskiwanego zestawu; źródło pozostawiono.");
+                            if (records.Any(r => r.Preset.Id == recovered.Id)) throw new InvalidDataException("Konflikt ID odzyskiwanego presetu; źródło pozostawiono.");
                             string baseName = preset.Name + " — odzyskany"; recovered.Name = baseName; int suffix = 2;
                             while (PresetCatalog.SameName(recovered.Name, PresetCatalog.Default().Name) || records.Any(r => PresetCatalog.SameName(r.Preset.Name, recovered.Name))) recovered.Name = baseName + " (" + suffix++ + ")";
                             string backup = Backup(source, directory, original);

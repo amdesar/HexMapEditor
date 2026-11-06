@@ -27,7 +27,7 @@ namespace HexMapEditor
         public string Id { get; set; }
         public string Name { get; set; }
         public List<TerrainDefinition> Terrains { get; set; }
-        public TerrainPreset() { PresetFormatVersion = 1; Id = Guid.NewGuid().ToString("N"); Name = "Nowy zestaw"; Terrains = new List<TerrainDefinition>(); }
+        public TerrainPreset() { PresetFormatVersion = 1; Id = Guid.NewGuid().ToString("N"); Name = "Nowy preset"; Terrains = new List<TerrainDefinition>(); }
         public TerrainPreset Copy() { return new TerrainPreset { Id = Id, Name = Name, Terrains = Terrains.Select(t => t.Copy()).ToList() }; }
     }
 
@@ -48,10 +48,10 @@ namespace HexMapEditor
         public static TerrainDefinition Neutral() { return Default().Terrains[0]; }
         public static void Validate(TerrainPreset preset)
         {
-            if (preset == null || preset.PresetFormatVersion != 1 || String.IsNullOrWhiteSpace(preset.Id) || String.IsNullOrWhiteSpace(preset.Name) || preset.Terrains == null || preset.Terrains.Count > 1000) throw new InvalidDataException("Nieprawidłowy zestaw terenów.");
+            if (preset == null || preset.PresetFormatVersion != 1 || String.IsNullOrWhiteSpace(preset.Id) || String.IsNullOrWhiteSpace(preset.Name) || preset.Terrains == null || preset.Terrains.Count > 1000) throw new InvalidDataException("Nieprawidłowy preset terenów.");
             var ids = new HashSet<string>(); var variants = new HashSet<string>();
             foreach (var t in preset.Terrains)
-                if (t == null || String.IsNullOrWhiteSpace(t.TerrainId) || String.IsNullOrWhiteSpace(t.VariantId) || t.Revision < 1 || String.IsNullOrWhiteSpace(t.Name) || !MapLogic.ValidColor(t.Color) || t.FillKind != "color" || !ids.Add(t.TerrainId) || !variants.Add(t.VariantId)) throw new InvalidDataException("Nieprawidłowy lub powtórzony teren w zestawie.");
+                if (t == null || String.IsNullOrWhiteSpace(t.TerrainId) || String.IsNullOrWhiteSpace(t.VariantId) || t.Revision < 1 || String.IsNullOrWhiteSpace(t.Name) || !MapLogic.ValidColor(t.Color) || t.FillKind != "color" || !ids.Add(t.TerrainId) || !variants.Add(t.VariantId)) throw new InvalidDataException("Nieprawidłowy lub powtórzony teren w presecie.");
         }
         public static List<TerrainPreset> Load(string directory, out string warning)
         {
@@ -63,8 +63,8 @@ namespace HexMapEditor
                 {
                     var preset = ReadFile(file);
                     if (preset.Id == DefaultId) { errors.Add(Path.GetFileName(file) + ": plik nie zastępuje chronionego wzorca Domyślny; dane pliku pozostawiono bez zmian."); continue; }
-                    int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) { errors.Add(Path.GetFileName(file) + ": powtórzony identyfikator zestawu."); continue; }
-                    if (result.Any(p => SameName(p.Name, preset.Name))) { errors.Add(Path.GetFileName(file) + ": powtórzona nazwa zestawu."); continue; } result.Add(preset);
+                    int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) { errors.Add(Path.GetFileName(file) + ": powtórzony identyfikator presetu."); continue; }
+                    if (result.Any(p => SameName(p.Name, preset.Name))) { errors.Add(Path.GetFileName(file) + ": powtórzona nazwa presetu."); continue; } result.Add(preset);
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(file) + ": " + ex.Message); }
             }
@@ -72,7 +72,7 @@ namespace HexMapEditor
         }
         public static TerrainPreset ReadFile(string file)
         {
-            if (new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("Zestaw przekracza 4 MiB.");
+            if (new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("Preset przekracza 4 MiB.");
             var json = MapLogic.Serializer(); var raw = json.DeserializeObject(File.ReadAllText(file, Encoding.UTF8)) as Dictionary<string, object>;
             string[] fields = { "PresetFormatVersion", "Id", "Name", "Terrains" };
             if (raw == null || fields.Any(k => !raw.ContainsKey(k)) || raw.Keys.Any(k => !fields.Contains(k))) throw new InvalidDataException("Brak wymaganych pól lub nieobsługiwane dodatkowe pola presetu; plik pozostawiono bez zmian.");
@@ -105,10 +105,11 @@ namespace HexMapEditor
             if (SameName(preset.Name, Default().Name) || records.Any(r => r.Value.Id != preset.Id && SameName(r.Value.Name, preset.Name))) throw new InvalidDataException("Nazwa presetu jest już używana. Wybierz inną nazwę; żaden plik nie został nadpisany.");
             var targets = records.Where(r => r.Value.Id == preset.Id).ToArray(); string path;
             if (overwrite) { if (targets.Length != 1) throw new InvalidDataException("Nie można jednoznacznie wskazać zapisanego presetu. Zapisz jako nowy preset."); path = targets[0].Key; }
-            else { if (targets.Length != 0) throw new InvalidDataException("Identyfikator presetu jest już zapisany; wymagany jest jawny wybór nadpisania."); path = Path.Combine(directory, MapLogic.Hash(preset.Id) + ".terrainset.json"); }
+            else { if (targets.Length != 0) throw new InvalidDataException("Identyfikator presetu jest już zapisany; wymagany jest jawny wybór nadpisania."); path = null; }
             string serialized = MapLogic.Serializer().Serialize(preset);
-            if (Encoding.UTF8.GetByteCount(serialized) > 4 * 1024 * 1024) throw new InvalidDataException("Zestaw przekracza limit zapisu/odczytu 4 MiB.");
-            MapLogic.AtomicWrite(path, serialized, overwrite);
+            if (Encoding.UTF8.GetByteCount(serialized) > 4 * 1024 * 1024) throw new InvalidDataException("Preset przekracza limit zapisu/odczytu 4 MiB.");
+            string destination = PresetFiles.Destination(directory, preset.Name, path);
+            PresetFiles.Write(destination, path, serialized);
         }
         public static bool SameName(string a, string b) { return String.Equals((a ?? "").Trim().Normalize(), (b ?? "").Trim().Normalize(), StringComparison.OrdinalIgnoreCase); }
         public static TerrainDefinition Legacy(string name, string color)

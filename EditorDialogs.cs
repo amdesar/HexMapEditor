@@ -43,14 +43,14 @@ namespace HexMapEditor
         readonly RadioButton overwrite = new RadioButton { Text = "Nadpisz bieżący preset", AutoSize = true }, asNew = new RadioButton { Text = "Zapisz jako nowy preset", AutoSize = true };
         readonly TextBox name = new TextBox { MaxLength = 200 };
         public bool AsNew { get { return asNew.Checked; } } public string PresetName { get { return name.Text.Trim(); } }
-        public SavePresetDialog(TerrainPreset preset, bool saved) : base("Zapisz zestaw", 255)
+        public SavePresetDialog(TerrainPreset preset, bool saved) : base("Zapisz preset", 255)
         {
             overwrite.Enabled = saved && preset.Id != PresetCatalog.DefaultId; overwrite.Checked = overwrite.Enabled; asNew.Checked = !overwrite.Enabled;
             name.Text = preset.Name + (preset.Id == PresetCatalog.DefaultId || saved ? " — kopia" : ""); name.Enabled = asNew.Checked;
             Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); Layout.Controls.Add(overwrite, 0, 0); Layout.SetColumnSpan(overwrite, 3);
             Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); Layout.Controls.Add(asNew, 0, 1); Layout.SetColumnSpan(asNew, 3);
             Row(2, "Nowa nazwa", name, true);
-            var reason = new Label { Text = preset.Id == PresetCatalog.DefaultId ? "Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset z własnym ID." : saved ? "Nadpisanie zapisuje roboczą paletę do bieżącego pliku presetu. Historia nie cofa plików biblioteki." : "Ten zestaw nie został jeszcze zapisany. Najpierw zapisz go jako nowy preset.", Dock = DockStyle.Fill };
+            var reason = new Label { Text = preset.Id == PresetCatalog.DefaultId ? "Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset z własnym ID." : saved ? "Nadpisanie zapisuje roboczą paletę do bieżącego pliku presetu. Historia nie cofa plików biblioteki." : "Ten preset nie został jeszcze zapisany. Najpierw zapisz go jako nowy preset.", Dock = DockStyle.Fill };
             Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); Layout.Controls.Add(reason, 0, 3); Layout.SetColumnSpan(reason, 3); asNew.CheckedChanged += (s, e) => name.Enabled = asNew.Checked;
             Buttons(4, () => { if (!AsNew || PresetName.Length > 0) DialogResult = DialogResult.OK; }); Ok.Text = "Zapisz";
         }

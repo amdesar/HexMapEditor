@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.5, stan decyzji 6 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.2.2; pierwszeństwo mają ustalenia sekcji 22.
+Wersja: 1.6, stan decyzji 6 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.2.3; pierwszeństwo mają ustalenia sekcji 23.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -258,3 +258,20 @@ Przyszłe wymaganie, bez przypisania do 0.3.0 lub 0.4.0: wiele jednocześnie otw
 Odłożone pozostają treść i wygląd statusu presetu oraz przebudowa edytora opisu, stanów formatowania i tabel, w tym zgłoszony problem pogrubienia bez zaznaczenia oraz wysokość/przewijanie pustego edytora. Nie oznaczamy ich jako naprawionych.
 
 Własne pliki testowe wyłącznie w tests/_work, bez prywatnej biblioteki. Regresje i próby zwykłego końcowego EXE raportujemy oddzielnie; nie deklarujemy Worda, większego DPI ani płynnego ciągłego ruchu, jeżeli nie zostały faktycznie sprawdzone. Bez push i Release'a.
+
+## 23. Poprawka obsługi 0.2.3
+
+Pierwszeństwo przed wcześniejszymi sprzecznymi ustaleniami. Rozwijamy ukończoną 0.2.2; format mapy 2, odczyt 1, preset 1, bez nowych zależności/usług. Użytkownik potwierdził działanie presetów, palety, smug, etykiet i rozmiaru 0.2.2. Nie powtarzamy całej poprzedniej diagnostyki. Użytkownik świadomie usunął lokalną Library, w tym kopie migracji; nie odzyskujemy danych ani nie traktujemy tego jako błędu. Pusta struktura odtwarzana obok EXE i wzorzec z kodu są prawidłowym stanem startowym/dystrybucyjnym.
+
+- Plik presetu ma czytelną nazwę wyprowadzoną z jego nazwy, np. Kosmos.terrainset.json. Wewnętrzne ID pozostaje tożsamością, niezależnie od przemianowania pliku. Zachowujemy format zawartości. Normalizacja obejmuje znaki Windows, nazwy urządzeń (także z rozszerzeniem), końcowe kropki/spacje, pusty wynik, polskie znaki i spacje, rozsądną długość oraz brak wyjścia poza katalog. Kolizja po normalizacji, również tylko wielkością liter, dostaje czytelny sufiks liczbowy bez nadpisania innego pliku. Konflikty logicznej nazwy/ID nadal są jawnie odrzucane.
+- Istniejący preset zapisuje jeden aktywny plik. Zmiana nazwy jest robocza; świadomy zapis zmienionej nazwy aktualizuje nazwę tego pliku z zachowaniem ID, danych i bezpieczeństwa błędu. Stare nazwy są czytane; nie ma masowej migracji przy uruchomieniu. Można je uporządkować przy jawnym zapisie. Undo/Redo nigdy nie zmienia plików. Plik przekazany innej osobie działa po skopiowaniu do Presets i odświeżeniu, z istniejącą walidacją i obsługą konfliktów.
+- Napisy związane z zapisanymi zestawami konsekwentnie używają „preset”: nagłówek Presety, Nowy preset / Zmień nazwę, Zapisz preset / Usuń preset w dwóch wierszach po dwa przyciski. Obejmuje dialogi, komunikaty i podpowiedzi; pojedynczy teren nadal nazywa się terenem. Nie przemianowujemy klas ani pól formatu tylko dla tego napisu.
+- Kompaktowy Odśwież presety mieści się przy selektorze, ma tooltip i nazwę dostępności. Używa obecnego odczytu/walidatora, bez obserwatora i osobnego importera. Nie zmienia mapy, jej historii, aktywnego ID ani roboczych palet, nie wybiera nowego presetu i nie resetuje zmian z dysku. Zniknięcie lub zewnętrzna zmiana aktywnego pliku jest komunikowana; dane robocze pozostają. Powtórzenia nie dublują wpisów, błędne pliki/kolizje są zgłaszane bez blokowania aplikacji i uznawania ich za poprawny import.
+- Lewy panel ma tę samą szerokość i jedną kolumnę. Zbliżone boczne marginesy i szerokość zawartości uwzględniają faktyczny pionowy pasek przewijania. Niższe wiersze i odstępy wyraźnie zmniejszają wysokość palety. Zachowujemy czytelne nazwy, osobne akcje i wygodne obszary, F2/Delete, pełne podpowiedzi skróconych nazw, minimum okna, przewijanie, dostęp do Dodaj i istniejące kontrolki przy niezwiązanych odświeżeniach. Funkcje przybornika bez zmian.
+- Kosz terenu jest czerwony, z czytelnym hover/fokusem i stanem nieaktywnym. Podpowiedzi ikon: Edytuj teren (F2), Usuń teren (Delete), bez nazwy terenu. Nazwa pozostaje w potwierdzeniu i nazwie dostępności identyfikującej cel.
+- Ctrl+Shift+V tylko przy fokusie opisu wywołuje dokładnie tę samą operację Paste(true) co menu/Sam tekst, raz i jako jeden krok historii opisu, bez historii mapy. Nie zmienia Ctrl+V ani formatowanego wklejania. Brak tekstu nie kasuje zaznaczenia. Menu pokazuje skrót; przechwycenie zatrzymuje dalszą obsługę tego zdarzenia.
+- Prawy nagłówek sprawdzamy krótko pod kątem prostej zbędnej aktualizacji. Jeśli nie ma małej uzasadnionej poprawki, pozostawiamy lekki przeskok i opisujemy ograniczenie. Nie pogarszamy naprawy smug, tabel ani uchwytu. Przycisk Rozmiar pozostaje bez zmian.
+
+Odłożone bez implementacji: siedem heksów zamiast schematu 3×3 w dialogu rozmiaru, chwilowe wyróżnienie na mapie zagrożonych heksów z danymi, już opisane wieloprojektowe zakładki bez numeru wydania, dalsze grupy/stylistyka ostrzeżeń i przebudowa edytora opisów.
+
+Celowane regresje: nazwy/kolizje/stare pliki, zapis po zmianie nazwy i błędy, bezpieczne odświeżanie/powtórzenia/konflikty, Ctrl+Shift+V i jedna historia. Własne dane wyłącznie tests/_work; prywatna Library nie jest materiałem testowym. Rzeczywisty końcowy EXE sprawdzamy tylko w nowym zakresie; bez szerokiej kampanii Worda/tabel. Zbiorcze regresje raz na końcu, powtarzanie tylko po błędzie lub zmianie wpływającej na wynik. Bez push, tagu i Release'a.

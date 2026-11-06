@@ -132,7 +132,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.2.2";
+        const string AppVersion = "0.2.3";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -397,7 +397,7 @@ namespace HexMapEditor
                 else if (c.NotesFormat != "plainText" || !String.IsNullOrEmpty(c.RichDescription)) throw new InvalidDataException("Nieobsługiwany format notatek.");
             }
             if (m.Presets == null || m.Presets.Count == 0 || m.Presets.Count > 100 || !m.Presets.Any(p => p.Id == m.ActivePresetId)) throw new InvalidDataException("Brak aktywnej palety projektu.");
-            var presets = new HashSet<string>(); foreach (var p in m.Presets) { PresetCatalog.Validate(p); if (!presets.Add(p.Id)) throw new InvalidDataException("Powtórzony identyfikator zestawu."); foreach (var t in p.Terrains) CheckVariant(variants, t.VariantId, t.TerrainId, t.Revision, t.Name, t.Color); }
+            var presets = new HashSet<string>(); foreach (var p in m.Presets) { PresetCatalog.Validate(p); if (!presets.Add(p.Id)) throw new InvalidDataException("Powtórzony identyfikator presetu."); foreach (var t in p.Terrains) CheckVariant(variants, t.VariantId, t.TerrainId, t.Revision, t.Name, t.Color); }
         }
         static void CheckVariant(Dictionary<string, string> variants, string variant, string terrain, int revision, string name, string color)
         {
@@ -660,7 +660,7 @@ namespace HexMapEditor
             var rangeFont = new Font(Font, FontStyle.Italic); Disposed += (s, e) => rangeFont.Dispose();
             foreach (int row in new[] { 1, 2 }) Layout.Controls.Add(new Label { Name = row == 1 ? "columnsRange" : "rowsRange", Text = "(zakres: 1–200)", Font = rangeFont, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(5, 0, 0, 0) }, 2, row);
             orient.Items.AddRange(new[] { "Pointy Top", "Flat Top" }); orient.SelectedIndex = o == "FlatTop" ? 1 : 0; Row(3, "Orientacja", orient, true);
-            foreach (var p in choices) presets.Items.Add(p); presets.SelectedIndex = 0; Row(4, "Zestaw", presets, true);
+            foreach (var p in choices) presets.Items.Add(p); presets.SelectedIndex = 0; Row(4, "Preset", presets, true);
             Buttons(5, () => { if (String.IsNullOrWhiteSpace(initialName.Text)) return; Columns = (int)cols.Value; Rows = (int)rows.Value; Orientation = orient.SelectedIndex == 1 ? "FlatTop" : "PointyTop"; ProjectName = initialName.Text.Trim(); Preset = (TerrainPreset)presets.SelectedItem; DialogResult = DialogResult.OK; }); Ok.Text = "Utwórz";
         }
     }

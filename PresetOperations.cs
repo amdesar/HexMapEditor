@@ -58,36 +58,56 @@ namespace HexMapEditor
         void SelectPreset(string id)
         {
             if (id == map.ActivePresetId) return; var chosen = AvailablePresets().First(p => p.Id == id);
-            ChangePalette("Wybór zestawu", () => { if (!map.Presets.Any(p => p.Id == id)) map.Presets.Add(chosen.Copy()); map.ActivePresetId = id; brushIndex = 0; });
+            ChangePalette("Wybór presetu", () => { if (!map.Presets.Any(p => p.Id == id)) map.Presets.Add(chosen.Copy()); map.ActivePresetId = id; brushIndex = 0; });
         }
         void UpdatePresetStatus()
         {
             var p = ActivePreset(); var stored = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
             bool differs = p.Id == PresetCatalog.DefaultId ? json.Serialize(p) != json.Serialize(PresetCatalog.Default()) : stored == null || json.Serialize(p) != json.Serialize(stored);
-            string status = p.Id == PresetCatalog.DefaultId ? (differs ? "Kopia robocza wzorca Domyślny *" : "Domyślny: chroniony wzorzec") : stored == null ? "Zestaw niezapisany w bibliotece" : differs ? "Paleta różni się od zapisanego presetu *" : "Paleta zgodna z zapisanym presetem";
+            string status = p.Id == PresetCatalog.DefaultId ? (differs ? "Kopia robocza wzorca Domyślny *" : "Domyślny: chroniony wzorzec") : stored == null ? "Preset niezapisany w bibliotece" : differs ? "Paleta różni się od zapisanego presetu *" : "Paleta zgodna z zapisanym presetem";
             presetStateLabel.Text = status; presetStateLabel.ForeColor = differs ? Color.FromArgb(246, 207, 124) : ForeColor; tips.SetToolTip(presetStateLabel, status + "\nNazwa robocza: " + p.Name); presetStateLabel.AccessibleName = status;
-            if (deletePresetButton != null) { deletePresetButton.Enabled = p.Id != PresetCatalog.DefaultId && stored != null; tips.SetToolTip(deletePresetButton, p.Id == PresetCatalog.DefaultId ? "Chronionego wzorca Domyślny nie można usunąć." : stored == null ? "Ten roboczy zestaw nie ma pliku w bibliotece." : "Usuń własny preset z biblioteki; dane mapy pozostaną."); }
+            if (deletePresetButton != null) { deletePresetButton.Enabled = p.Id != PresetCatalog.DefaultId && stored != null; tips.SetToolTip(deletePresetButton, p.Id == PresetCatalog.DefaultId ? "Chronionego wzorca Domyślny nie można usunąć." : stored == null ? "Ten roboczy preset nie ma pliku w bibliotece." : "Usuń własny preset z biblioteki; dane mapy pozostaną."); }
         }
         void LoadLibraryPresets(bool initial)
         {
             if (!EnsureLibrary()) return;
-            try { string warning; List<string> migrations; libraryPresets = PresetLibrary.LoadAndMigrate(Path.Combine(LibraryPaths.Root, "Terrains"), out warning, out migrations); RefreshPresetPicker(); if (!String.IsNullOrEmpty(warning)) ShowEditorMessage(warning, "Niektóre zestawy zostały pominięte", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            if (!initial) { string notice; if (!TryRefreshPresets(LibraryPaths.Presets, out notice) || !String.IsNullOrEmpty(notice)) ShowEditorMessage(notice, "Odświeżenie presetów", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            try { string warning; List<string> migrations; libraryPresets = PresetLibrary.LoadAndMigrate(Path.Combine(LibraryPaths.Root, "Terrains"), out warning, out migrations); RefreshPresetPicker(); if (!String.IsNullOrEmpty(warning)) ShowEditorMessage(warning, "Niektóre presety zostały pominięte", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             catch (Exception ex) { ShowEditorMessage("Nie można odczytać biblioteki presetów. Dane projektu pozostają dostępne.\n" + ex.Message, "Błąd biblioteki", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+        bool TryRefreshPresets(string directory, out string notice)
+        {
+            notice = null;
+            try
+            {
+                var previous = libraryPresets.FirstOrDefault(p => p.Id == map.ActivePresetId);
+                string warning; var loaded = PresetCatalog.Load(directory, out warning);
+                var next = loaded.FirstOrDefault(p => p.Id == map.ActivePresetId);
+                var messages = new List<string>();
+                if (!String.IsNullOrEmpty(warning)) messages.Add(warning);
+                if (previous != null && previous.Id != PresetCatalog.DefaultId)
+                {
+                    if (next == null) messages.Add("Plik aktywnego presetu zniknął lub został pominięty. Zachowano roboczą paletę projektu; nie jest ona zapisana w odczytanej bibliotece.");
+                    else if (json.Serialize(previous) != json.Serialize(next)) messages.Add("Plik aktywnego presetu zmienił się poza programem. Zachowano roboczą paletę projektu. Zapis nadpisze plik dopiero po świadomym wyborze.");
+                }
+                libraryPresets = loaded; RefreshPresetPicker(); notice = String.Join(Environment.NewLine, messages); return true;
+            }
+            catch (Exception ex) { notice = "Nie można odświeżyć presetów. Zachowano poprzednią listę i robocze dane projektu.\n" + ex.Message; return false; }
         }
         void CreatePreset()
         {
-            using (var d = new NameDialog("Nowy zestaw", "Nowy zestaw")) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
-            { string error; if (!TryCreatePreset(LibraryPaths.Presets, d.Value, out error)) ShowEditorMessage("Nie można utworzyć zestawu.\n" + error, "Błąd zestawu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            using (var d = new NameDialog("Nowy preset", "Nowy preset")) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
+            { string error; if (!TryCreatePreset(LibraryPaths.Presets, d.Value, out error)) ShowEditorMessage("Nie można utworzyć presetu.\n" + error, "Błąd presetu", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         bool TryCreatePreset(string directory, string name, out string error)
         {
             error = null;
             try
             {
-                if (map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych zestawów w projekcie.");
+                if (map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
                 if (map.Presets.Any(p => PresetCatalog.SameName(p.Name, name))) throw new InvalidDataException("Nazwa jest już używana w projekcie.");
                 var preset = new TerrainPreset { Name = (name ?? "").Trim() }; preset.Terrains.Add(PresetCatalog.Neutral()); PresetCatalog.Write(preset, directory, false);
-                libraryPresets.Add(preset.Copy()); ChangePalette("Nowy zapisany zestaw", () => { map.Presets.Add(preset); map.ActivePresetId = preset.Id; brushIndex = 0; }); return true;
+                libraryPresets.Add(preset.Copy()); ChangePalette("Nowy zapisany preset", () => { map.Presets.Add(preset); map.ActivePresetId = preset.Id; brushIndex = 0; }); return true;
             }
             catch (Exception ex) { error = ex.Message; return false; }
         }
@@ -96,9 +116,9 @@ namespace HexMapEditor
             var p = ActivePreset(); var saved = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
             if (p.Id == PresetCatalog.DefaultId || saved == null) return;
             bool changed = json.Serialize(p) != json.Serialize(saved);
-            string message = "Usunąć preset „" + saved.Name + "” z biblioteki?\n\nDane już zapisane na mapie pozostaną bez zmian.\nHistoria Undo mapy nie cofnie usunięcia pliku." + (changed ? "\n\nRobocza paleta ma niezapisane zmiany. Zestaw zostanie usunięty z listy projektu; Undo może przywrócić go wyłącznie jako niezapisany zestaw roboczy." : "") + "\n\nPlik zostanie przekazany do Kosza systemowego. Program nie stosuje cichego trwałego usuwania.";
+            string message = "Usunąć preset „" + saved.Name + "” z biblioteki?\n\nDane już zapisane na mapie pozostaną bez zmian.\nHistoria Undo mapy nie cofnie usunięcia pliku." + (changed ? "\n\nRobocza paleta ma niezapisane zmiany. Preset zostanie usunięty z listy projektu; Undo może przywrócić go wyłącznie jako niezapisany preset roboczy." : "") + "\n\nPlik zostanie przekazany do Kosza systemowego. Program nie stosuje cichego trwałego usuwania.";
             if (ShowEditorMessage(message, "Usuń własny preset", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            string error = null; if (!RunModal(() => TryDeletePreset(LibraryPaths.Presets, (path) => RecycleFile.Send(path, Handle), out error))) ShowEditorMessage("Nie można usunąć presetu.\n" + error, "Błąd zestawu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            string error = null; if (!RunModal(() => TryDeletePreset(LibraryPaths.Presets, (path) => RecycleFile.Send(path, Handle), out error))) ShowEditorMessage("Nie można usunąć presetu.\n" + error, "Błąd presetu", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         bool TryDeletePreset(string directory, Action<string> recycle, out string error)
         {
@@ -109,7 +129,7 @@ namespace HexMapEditor
                 path = PresetCatalog.FindFile(directory, current.Id); recycle(path);
                 if (File.Exists(path)) throw new IOException("Plik nadal istnieje; lista nie została zmieniona.");
                 libraryPresets.RemoveAll(p => p.Id == current.Id);
-                ChangePalette("Usunięcie roboczego zestawu z projektu", () => {
+                ChangePalette("Usunięcie roboczego presetu z projektu", () => {
                     map.Presets.RemoveAll(p => p.Id == current.Id);
                     if (!map.Presets.Any(p => p.Id == PresetCatalog.DefaultId)) map.Presets.Add(PresetCatalog.Default());
                     map.ActivePresetId = PresetCatalog.DefaultId; brushIndex = 0;
@@ -125,7 +145,7 @@ namespace HexMapEditor
         }
         void RenamePreset()
         {
-            var p = ActivePreset(); using (var d = new NameDialog(p.Id == PresetCatalog.DefaultId ? "Nazwa roboczej kopii Domyślnego" : "Nazwa roboczego zestawu", p.Name)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK) ChangePalette("Nazwa roboczego zestawu", () => p.Name = d.Value);
+            var p = ActivePreset(); using (var d = new NameDialog(p.Id == PresetCatalog.DefaultId ? "Nazwa roboczej kopii Domyślnego" : "Nazwa roboczego presetu", p.Name)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK) ChangePalette("Nazwa roboczego presetu", () => p.Name = d.Value);
         }
         void SavePreset()
         {
@@ -133,7 +153,7 @@ namespace HexMapEditor
             using (var d = new SavePresetDialog(p, saved))
             {
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
-                string error; if (!TrySaveWorkingPreset(LibraryPaths.Presets, d.AsNew, d.PresetName, out error)) ShowEditorMessage("Nie można zapisać zestawu.\n" + error, "Błąd zestawu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string error; if (!TrySaveWorkingPreset(LibraryPaths.Presets, d.AsNew, d.PresetName, out error)) ShowEditorMessage("Nie można zapisać presetu.\n" + error, "Błąd presetu", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         bool TrySaveWorkingPreset(string directory, bool asNew, string name, out string error)
@@ -145,13 +165,13 @@ namespace HexMapEditor
                 bool firstSave = current.Id != PresetCatalog.DefaultId && !libraryPresets.Any(p => p.Id == current.Id);
                 if (asNew)
                 {
-                    if (!firstSave && map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych zestawów w projekcie.");
+                    if (!firstSave && map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
                     if (!firstSave) candidate.Id = Guid.NewGuid().ToString("N"); candidate.Name = (name ?? "").Trim();
-                    if (map.Presets.Any(p => p.Id != current.Id && PresetCatalog.SameName(p.Name, candidate.Name))) throw new InvalidDataException("Nazwa jest już używana przez inny zestaw projektu.");
+                    if (map.Presets.Any(p => p.Id != current.Id && PresetCatalog.SameName(p.Name, candidate.Name))) throw new InvalidDataException("Nazwa jest już używana przez inny preset projektu.");
                 }
                 PresetCatalog.Write(candidate, directory, !asNew);
                 libraryPresets.RemoveAll(p => p.Id == candidate.Id); libraryPresets.Add(candidate.Copy());
-                if (asNew) ChangePalette(firstSave ? "Pierwszy zapis zestawu" : "Nowa zapisana kopia zestawu", () => { if (firstSave) map.Presets[map.Presets.FindIndex(p => p.Id == current.Id)] = candidate; else map.Presets.Add(candidate); map.ActivePresetId = candidate.Id; });
+                if (asNew) ChangePalette(firstSave ? "Pierwszy zapis presetu" : "Nowa zapisana kopia presetu", () => { if (firstSave) map.Presets[map.Presets.FindIndex(p => p.Id == current.Id)] = candidate; else map.Presets.Add(candidate); map.ActivePresetId = candidate.Id; });
                 RefreshPresetPicker(); return true;
             }
             catch (Exception ex) { error = ex.Message; return false; }

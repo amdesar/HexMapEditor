@@ -22,6 +22,7 @@ namespace HexMapEditor
             var image = new Bitmap(22, 22);
             using (var g = Graphics.FromImage(image)) using (var p = new Pen(Color.WhiteSmoke, 1.8f))
             {
+                if (key == "trash") p.Color = Color.FromArgb(244, 113, 113);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 if (key == "undo" || key == "redo")
                 { if (key == "redo") { g.TranslateTransform(22, 0); g.ScaleTransform(-1, 1); } g.DrawArc(p, 4, 6, 14, 12, 205, 240); g.DrawLines(p, new[] { new Point(3, 3), new Point(3, 11), new Point(10, 9) }); }
@@ -37,6 +38,7 @@ namespace HexMapEditor
                 else if (key == "pencil") { g.DrawPolygon(p, new[] { new Point(3, 19), new Point(5, 12), new Point(15, 2), new Point(20, 7), new Point(10, 17) }); g.DrawLine(p, 12, 5, 17, 10); }
                 else if (key == "trash") { g.DrawRectangle(p, 6, 7, 11, 13); g.DrawLine(p, 3, 5, 20, 5); g.DrawLine(p, 9, 2, 14, 2); g.DrawLine(p, 9, 10, 9, 17); g.DrawLine(p, 14, 10, 14, 17); }
                 else if (key == "fit") { foreach (int x in new[] { 2, 20 }) foreach (int y in new[] { 2, 20 }) { g.DrawLine(p, x, y, x == 2 ? 8 : 14, y); g.DrawLine(p, x, y, x, y == 2 ? 8 : 14); } }
+                else if (key == "refresh") { g.DrawArc(p, 4, 4, 14, 14, 40, 285); g.DrawLines(p, new[] { new Point(12, 2), new Point(18, 4), new Point(17, 10) }); }
                 else { g.DrawRectangle(p, 3, 3, 16, 16); g.DrawLine(p, 7, 8, 15, 8); g.DrawLine(p, 7, 13, 15, 13); }
             }
             cache.Add(key, image); return image;
@@ -51,6 +53,9 @@ namespace HexMapEditor
         readonly FlowLayoutPanel paletteTiles = new BufferedFlowPanel();
         readonly Label presetStateLabel = new Label();
         readonly Dictionary<EditorTool, Button> toolButtons = new Dictionary<EditorTool, Button>();
+        FlowLayoutPanel paletteBody, paletteTools, presetActions;
+        Panel presetPickerRow;
+        Button refreshPresetsButton, addTerrainButton;
         void ConfigureButton(Button button, string text, string icon, string help, Action action, int width)
         {
             button.Text = text; button.Image = EditorIcons.Draw(icon); button.TextImageRelation = TextImageRelation.ImageBeforeText;
@@ -71,7 +76,7 @@ namespace HexMapEditor
             ShellButton(file, "Zapisz jako", "saveas", "Zapisz jako (Ctrl+Shift+S)", () => SaveAsProject(), 100);
             ConfigureButton(undoButton, "", "undo", "Cofnij operację mapy", Undo, 32); file.Controls.Add(undoButton);
             ConfigureButton(redoButton, "", "redo", "Ponów operację mapy", Redo, 32); file.Controls.Add(redoButton);
-            ShellButton(file, "Biblioteka", "library", "Pokaż lokalizację biblioteki", () => ShowEditorMessage("Lokalna biblioteka:\n" + LibraryPaths.Root + "\n\nZestawy terenów można zapisywać w panelu po lewej. Pozostałe katalogi są przygotowane na przyszłe funkcje.", "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Information), 98);
+            ShellButton(file, "Biblioteka", "library", "Pokaż lokalizację biblioteki", () => ShowEditorMessage("Lokalna biblioteka:\n" + LibraryPaths.Root + "\n\nPresety terenów można zapisywać w panelu po lewej. Pozostałe katalogi są przygotowane na przyszłe funkcje.", "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Information), 98);
             ConfigureButton(orientationToggle, "Pointy Top", "pointy", "Zmień orientację", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop"), 128); view.Controls.Add(orientationToggle);
             ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
@@ -96,20 +101,45 @@ namespace HexMapEditor
         }
         void BuildPalettePanel()
         {
-            var body = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4), Width = 216 };
+            var body = paletteBody = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(6), Margin = Padding.Empty };
             left.Controls.Add(body);
-            var tools = new FlowLayoutPanel { Width = 188, Height = 44, WrapContents = false };
+            var tools = paletteTools = new FlowLayoutPanel { Height = 38, WrapContents = false, Margin = new Padding(0, 2, 0, 2) };
             var names = new[] { "Zaznaczanie", "Przesuwanie", "Pędzel", "Wiadro" }; var icons = new[] { "select", "hand", "brush", "bucket" };
             for (int i = 0; i < 4; i++) { var tool = (EditorTool)i; var b = ShellButton(tools, "", icons[i], names[i], () => SelectTool(tool), 44); toolButtons.Add(tool, b); } body.Controls.Add(tools); SelectTool(EditorTool.Select);
-            body.Controls.Add(new Label { Text = "Zestaw terenów", AutoSize = true, Margin = new Padding(3, 10, 3, 4) });
-            terrainPicker.Width = 188; terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name";
-            terrainPicker.SelectedIndexChanged += (s, e) => { if (!updating && terrainPicker.SelectedItem != null) SelectPreset(((TerrainPreset)terrainPicker.SelectedItem).Id); }; body.Controls.Add(terrainPicker);
-            var actions = new FlowLayoutPanel { Width = 188, Height = 100, WrapContents = true };
-            SmallButton(actions, "Nowy zestaw", CreatePreset, 90); SmallButton(actions, "Nazwa", RenamePreset, 90); SmallButton(actions, "Zapisz zestaw", SavePreset, 184); deletePresetButton = SmallButton(actions, "Usuń preset", RemovePreset, 184); body.Controls.Add(actions);
-            presetStateLabel.Width = 188; presetStateLabel.Height = 40; presetStateLabel.AutoEllipsis = true; body.Controls.Add(presetStateLabel);
-            SmallButton(body, "Dodaj teren", () => EditTerrain(true), 184);
-            paletteTiles.Width = 188; paletteTiles.AutoSize = true; paletteTiles.FlowDirection = FlowDirection.TopDown; paletteTiles.WrapContents = false; body.Controls.Add(paletteTiles);
+            body.Controls.Add(new Label { Text = "Presety", AutoSize = true, Margin = new Padding(0, 6, 0, 3) });
+            presetPickerRow = new Panel { Height = 28, Margin = new Padding(0, 0, 0, 2) }; body.Controls.Add(presetPickerRow);
+            terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name"; terrainPicker.AccessibleName = "Presety";
+            terrainPicker.SelectedIndexChanged += (s, e) => { if (!updating && terrainPicker.SelectedItem != null) SelectPreset(((TerrainPreset)terrainPicker.SelectedItem).Id); }; presetPickerRow.Controls.Add(terrainPicker);
+            refreshPresetsButton = SmallButton(presetPickerRow, "", () => LoadLibraryPresets(false), 28); refreshPresetsButton.Image = EditorIcons.Small("refresh"); refreshPresetsButton.AccessibleName = "Odśwież presety"; tips.SetToolTip(refreshPresetsButton, "Odśwież presety — zachowaj roboczą paletę projektu");
+            var actions = presetActions = new FlowLayoutPanel { Height = 64, WrapContents = true, Margin = new Padding(0, 0, 0, 2) };
+            SmallButton(actions, "Nowy preset", CreatePreset, 90); SmallButton(actions, "Zmień nazwę", RenamePreset, 90); SmallButton(actions, "Zapisz preset", SavePreset, 90); deletePresetButton = SmallButton(actions, "Usuń preset", RemovePreset, 90); body.Controls.Add(actions);
+            presetStateLabel.Height = 34; presetStateLabel.AutoEllipsis = true; presetStateLabel.Margin = new Padding(0, 2, 0, 2); body.Controls.Add(presetStateLabel);
+            addTerrainButton = SmallButton(body, "Dodaj teren", () => EditTerrain(true), 184); addTerrainButton.Margin = new Padding(0, 2, 0, 4);
+            paletteTiles.AutoSize = true; paletteTiles.FlowDirection = FlowDirection.TopDown; paletteTiles.WrapContents = false; paletteTiles.Margin = Padding.Empty; body.Controls.Add(paletteTiles);
+            left.Layout += (s, e) => LayoutPalette(); paletteTiles.ControlAdded += (s, e) => LayoutPalette();
+            LayoutPalette();
             RefreshPresetPicker();
+        }
+        bool layingOutPalette;
+        void LayoutPalette()
+        {
+            if (layingOutPalette || paletteBody == null) return;
+            layingOutPalette = true;
+            try
+            {
+                int width = Math.Max(160, left.ClientSize.Width - paletteBody.Padding.Horizontal);
+                paletteBody.SuspendLayout();
+                try
+                {
+                    paletteTools.Width = presetPickerRow.Width = presetActions.Width = presetStateLabel.Width = addTerrainButton.Width = paletteTiles.Width = width;
+                    for (int i = 0; i < paletteTools.Controls.Count; i++) paletteTools.Controls[i].Width = (width - 8) / 4;
+                    terrainPicker.SetBounds(0, 1, width - 32, 24); refreshPresetsButton.SetBounds(width - 28, 0, 28, 26);
+                    foreach (Control b in presetActions.Controls) b.Width = (width - 8) / 2;
+                    foreach (TerrainTile tile in paletteTiles.Controls) tile.ResizeRow(width);
+                }
+                finally { paletteBody.ResumeLayout(true); }
+            }
+            finally { layingOutPalette = false; }
         }
         Button SmallButton(Control parent, string text, Action action, int width)
         { var b = new Button { Text = text, Width = width, Height = 28, Margin = new Padding(2), FlatStyle = FlatStyle.Flat, AccessibleName = text }; StyleButton(b); b.Click += (s, e) => action(); parent.Controls.Add(b); return b; }

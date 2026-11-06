@@ -180,7 +180,7 @@ namespace HexMapEditor
     {
         readonly ElementHost host = new ElementHost();
         internal readonly RichTextBox Box = new RichTextBox();
-        internal readonly MenuItem PlainPasteItem = new MenuItem { Header = "Wklej jako zwykły tekst" };
+        internal readonly MenuItem PlainPasteItem = new MenuItem { Header = "Wklej jako zwykły tekst", InputGestureText = "Ctrl+Shift+V" };
         bool loading;
         string lastValid;
         public Action<string, string, string> Changed;
@@ -224,6 +224,7 @@ namespace HexMapEditor
             {
                 if (new[] { Key.Left, Key.Right, Key.Up, Key.Down, Key.Home, Key.End, Key.PageUp, Key.PageDown }.Contains(e.Key) && BreakHistoryGroup != null) BreakHistoryGroup();
                 if ((Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == 0) return;
+                if (HandlePlainPasteKey(e.Key, Keyboard.Modifiers)) { e.Handled = true; return; }
                 if (e.Key == Key.S) { e.Handled = true; if (SaveRequested != null) SaveRequested((Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0); return; }
                 if (e.Key == Key.Z || e.Key == Key.Y) { e.Handled = true; if (HistoryRequested != null) HistoryRequested(e.Key == Key.Y); return; }
                 RoutedUICommand command = e.Key == Key.B ? EditingCommands.ToggleBold : e.Key == Key.I ? EditingCommands.ToggleItalic : e.Key == Key.U ? EditingCommands.ToggleUnderline : e.Key == Key.E ? EditingCommands.AlignCenter : e.Key == Key.L ? EditingCommands.AlignLeft : e.Key == Key.R ? EditingCommands.AlignRight : e.Key == Key.J ? EditingCommands.AlignJustify : null;
@@ -300,6 +301,11 @@ namespace HexMapEditor
             catch (Exception ex) { if (Error != null) Error("Nie można wkleić formatowania: " + ex.Message + ". Użyj Wklej jako zwykły tekst."); }
         }
         internal static bool HasPlainClipboardText() { return Clipboard.ContainsText(TextDataFormat.UnicodeText) || Clipboard.ContainsText(TextDataFormat.Text); }
+        internal bool HandlePlainPasteKey(Key key, System.Windows.Input.ModifierKeys modifiers)
+        {
+            if (key != Key.V || modifiers != (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift) || !Box.IsKeyboardFocusWithin) return false;
+            Paste(true); return true;
+        }
         public void PasteRtf(string rtf, string fallback)
         {
             // Reject active/embedded destinations BEFORE the framework RTF importer sees them.
