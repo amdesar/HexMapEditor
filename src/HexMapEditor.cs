@@ -45,6 +45,8 @@ namespace HexMapEditor
         public string NotesFormat { get; set; }
         public string RichDescription { get; set; }
         public string IconId { get; set; }
+        public string IconEntryId { get; set; }
+        public string IconName { get; set; }
         public bool Fog { get; set; }
         public CellData() { Id = Guid.NewGuid().ToString("N"); TerrainId = PresetCatalog.NeutralId; VariantId = PresetCatalog.NeutralVariant; TerrainRevision = 1; Terrain = "Teren neutralny"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; }
     }
@@ -89,6 +91,8 @@ namespace HexMapEditor
     {
         public List<CellChange> Changes = new List<CellChange>();
         public List<LayerChange> Layers = new List<LayerChange>();
+        public IconLibraryChange LibraryChange;
+        public List<IconAsset> RequiredAssets = new List<IconAsset>();
         public string Label;
         public ResizeState BeforeResize, AfterResize;
         public PaletteState BeforePalette, AfterPalette;
@@ -136,7 +140,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.3.0";
+        const string AppVersion = "0.3.1";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -182,6 +186,8 @@ namespace HexMapEditor
             LayoutMainToolbar();
             int top = shellToolbar.Height, bottom = 27, height = Math.Max(0, ClientSize.Height - top - bottom);
             int inset = leftCollapsed ? 18 : 238;
+            using (new CanvasUpdate(canvas, canvas.Left != inset))
+            {
             if (canvas.Left != inset) pan = new PointF(pan.X + canvas.Left - inset, pan.Y);
             canvas.Bounds = new Rectangle(inset, top, Math.Max(0, ClientSize.Width - inset), height);
             left.Bounds = new Rectangle(0, top, 220, height);
@@ -189,6 +195,7 @@ namespace HexMapEditor
             leftToggle.Text = leftCollapsed ? "›" : "‹"; left.Visible = !leftCollapsed;
             int width = ClampRightWidth(requestedRightWidth); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
             left.BringToFront(); if (right.Visible) right.BringToFront(); leftToggle.BringToFront();
+            }
         }
 
         void CycleLabelMode()
@@ -402,6 +409,7 @@ namespace HexMapEditor
                 if (c == null || String.IsNullOrWhiteSpace(c.Id) || !ids.Add(c.Id) || String.IsNullOrWhiteSpace(c.Terrain) || !MapLogic.ValidColor(c.Color) || String.IsNullOrWhiteSpace(c.TerrainId) || String.IsNullOrWhiteSpace(c.VariantId) || c.TerrainRevision < 1) throw new InvalidDataException("Nieprawidłowe dane heksu lub terenu.");
                 CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color);
                 if (c.IconId != null && !iconIds.Contains(c.IconId)) throw new InvalidDataException("Brak osadzonego zasobu ikony.");
+                if ((c.IconName != null && (String.IsNullOrWhiteSpace(c.IconName) || c.IconName.Length > 200)) || (c.IconEntryId != null && (String.IsNullOrWhiteSpace(c.IconEntryId) || c.IconEntryId.Length > 200)) || (c.IconId == null && (c.IconName != null || c.IconEntryId != null))) throw new InvalidDataException("Nieprawidłowe metadane wystąpienia ikony.");
                 if (c.NotesFormat == "richDocument1") { NoteCodec.Read(c.RichDescription); if (c.Description != NoteCodec.Plain(c.RichDescription)) throw new InvalidDataException("Zwykły tekst nie odpowiada formatowanemu opisowi."); }
                 else if (c.NotesFormat != "plainText" || !String.IsNullOrEmpty(c.RichDescription)) throw new InvalidDataException("Nieobsługiwany format notatek.");
             }
@@ -555,11 +563,12 @@ namespace HexMapEditor
 
         void EndCanvasGesture(bool commitStroke)
         {
-            bool brushStroke = gestureButton == MouseButtons.Left && (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush);
+            bool brushStroke = gestureButton == MouseButtons.Left && (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket);
             gestureButton = MouseButtons.None;
             dragging = false; panGesture = false; dragOrigin = Point.Empty; panOrigin = PointF.Empty;
             if (commitStroke && brushStroke) FinishStroke(); else { strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); }
             strokeStarted = false;
+            bucketOrigin = null; bucketProcessed.Clear(); previousStrokePoint = null;
             canvas.Capture = false;
         }
 
@@ -575,10 +584,11 @@ namespace HexMapEditor
             canvas.Capture = true;
             if (e.Button == MouseButtons.Middle || gestureTool == EditorTool.Hand) { panGesture = true; return; }
             strokeStarted = false;
-            if (gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket) { int hit = HitTest(e.Location); if (hit >= 0) FillRegion(hit); return; }
+            previousStrokePoint = null;
+            if (gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket) { int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); } return; }
             if (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush)
             {
-                strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); PaintStamp(hit); } canvas.Capture = true;
+                strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); PaintAlong(e.Location, hit); } canvas.Capture = true;
             }
         }
 
@@ -596,7 +606,8 @@ namespace HexMapEditor
                 if (!dragging) { dragging = true; panOrigin = pan; }
                 pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate();
             }
-            if (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); PaintStamp(hit); } }
+            if (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); PaintAlong(e.Location, hit); } else previousStrokePoint = null; }
+            if ((gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket) && hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); }
         }
 
         void CanvasMouseUp(object sender, MouseEventArgs e)
@@ -648,11 +659,17 @@ namespace HexMapEditor
             PushAction(action); MarkDirty();
         }
 
-        void Undo() { EndCanvasGesture(true); if (undo.Count == 0) return; var action = undo.Pop(); ApplyAction(action, false); redo.Push(action); MarkDirty(); }
-        void Redo() { EndCanvasGesture(true); if (redo.Count == 0) return; var action = redo.Pop(); ApplyAction(action, true); undo.Push(action); MarkDirty(); }
+        bool TryHistory(bool after, out string error)
+        {
+            EndCanvasGesture(true); var from = after ? redo : undo; var to = after ? undo : redo; error = null; if (from.Count == 0) return true;
+            try { var action = from.Peek(); ApplyAction(action, after); from.Pop(); to.Push(action); MarkDirty(); return true; }
+            catch (Exception ex) { error = ex.Message; return false; }
+        }
+        void Undo() { string error; if (!TryHistory(false, out error)) ShowEditorMessage(error, "Nie można cofnąć", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        void Redo() { string error; if (!TryHistory(true, out error)) ShowEditorMessage(error, "Nie można ponowić", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     }
 
-    internal sealed class BufferedPanel : Panel
+    internal class BufferedPanel : Panel
     {
         public BufferedPanel() { DoubleBuffered = true; ResizeRedraw = true; }
     }

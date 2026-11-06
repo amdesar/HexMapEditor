@@ -12,6 +12,7 @@ namespace HexMapEditor
         string pickerSignature, paletteSignature;
         Button deletePresetButton;
         TerrainPreset ActivePreset() { return map.Presets.First(p => p.Id == map.ActivePresetId); }
+        bool PresetReadOnly { get { return map.ActivePresetId == PresetCatalog.DefaultId; } }
         List<TerrainPreset> AvailablePresets() { return map.Presets.Concat(libraryPresets.Where(p => !map.Presets.Any(m => m.Id == p.Id))).ToList(); }
         void RefreshPresetPicker()
         {
@@ -52,7 +53,7 @@ namespace HexMapEditor
         }
         void UpdateTerrainSelection()
         {
-                var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && at == brushIndex); }
+            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && at == brushIndex); tile.Edit.Enabled = tile.Delete.Enabled = !PresetReadOnly; }
         }
         void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; RefreshIconSelection(); UpdateMaterialIndicator(); } }
         void SelectPreset(string id)
@@ -63,6 +64,8 @@ namespace HexMapEditor
         void UpdatePresetStatus()
         {
             var p = ActivePreset(); var stored = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
+            if (renamePresetButton != null) renamePresetButton.Enabled = !PresetReadOnly;
+            if (addTerrainButton != null) addTerrainButton.Enabled = !PresetReadOnly;
             bool differs = p.Id == PresetCatalog.DefaultId ? json.Serialize(p) != json.Serialize(PresetCatalog.Default()) : stored == null || json.Serialize(p) != json.Serialize(stored);
             string status = p.Id == PresetCatalog.DefaultId ? (differs ? "Kopia robocza wzorca Domyślny *" : "Domyślny: chroniony wzorzec") : stored == null ? "Preset niezapisany w bibliotece" : differs ? "Paleta różni się od zapisanego presetu *" : "Paleta zgodna z zapisanym presetem";
             presetStateLabel.Text = status; presetStateLabel.ForeColor = differs ? Color.FromArgb(246, 207, 124) : ForeColor; tips.SetToolTip(presetStateLabel, status + "\nNazwa robocza: " + p.Name); presetStateLabel.AccessibleName = status;
@@ -145,6 +148,7 @@ namespace HexMapEditor
         }
         void RenamePreset()
         {
+            if (PresetReadOnly) return;
             var p = ActivePreset(); using (var d = new NameDialog(p.Id == PresetCatalog.DefaultId ? "Nazwa roboczej kopii Domyślnego" : "Nazwa roboczego presetu", p.Name)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK) ChangePalette("Nazwa roboczego presetu", () => p.Name = d.Value);
         }
         void SavePreset()
@@ -180,6 +184,7 @@ namespace HexMapEditor
         void EditTerrain(bool add) { EditTerrainDialog(add, null); }
         void EditTerrainDialog(bool add, string id)
         {
+            if (PresetReadOnly) return;
             var p = ActivePreset(); var old = add ? new TerrainDefinition() : p.Terrains.FirstOrDefault(t => t.TerrainId == id);
             if (old == null) return;
             using (var d = new TerrainDialog(old, !add)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
@@ -190,9 +195,10 @@ namespace HexMapEditor
             }
         }
         void AddTerrain(TerrainDefinition terrain)
-        { ChangePalette("Dodanie terenu", () => { var p = ActivePreset(); p.Terrains.Add(terrain.Copy()); brushIndex = p.Terrains.Count - 1; }); }
+        { if (PresetReadOnly) return; ChangePalette("Dodanie terenu", () => { var p = ActivePreset(); p.Terrains.Add(terrain.Copy()); brushIndex = p.Terrains.Count - 1; }); }
         void UpdateTerrain(TerrainDefinition old, TerrainDefinition next, bool apply)
         {
+            if (PresetReadOnly) return;
             var p = ActivePreset(); int at = p.Terrains.FindIndex(t => t.TerrainId == old.TerrainId && t.VariantId == old.VariantId); if (at < 0) throw new InvalidOperationException("Brak wersji terenu.");
             if (old.Name == next.Name && String.Equals(old.Color, next.Color, StringComparison.OrdinalIgnoreCase)) return;
             ChangePalette("Edycja terenu" + (apply ? " i mapy" : ""), () => p.Terrains[at] = next.Copy(), action =>
@@ -203,11 +209,13 @@ namespace HexMapEditor
         }
         void RemoveTerrainById(string id)
         {
+            if (PresetReadOnly) return;
             var t = ActivePreset().Terrains.FirstOrDefault(v => v.TerrainId == id); if (t == null) return;
             if (ShowEditorMessage("Usunąć teren „" + t.Name + "” z roboczej palety? Istniejące heksy zachowają swoje dane.", "Usuń teren", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes) DeleteTerrain(id);
         }
         void DeleteTerrain(string id)
         {
+            if (PresetReadOnly) return;
             var p = ActivePreset(); int at = p.Terrains.FindIndex(t => t.TerrainId == id); if (at < 0) return;
             string selectedId = brushIndex < p.Terrains.Count ? p.Terrains[brushIndex].TerrainId : null;
             ChangePalette("Usunięcie terenu", () => { p.Terrains.RemoveAt(at); int selected = p.Terrains.FindIndex(t => t.TerrainId == selectedId); brushIndex = selected >= 0 ? selected : Math.Max(0, Math.Min(at, p.Terrains.Count - 1)); });

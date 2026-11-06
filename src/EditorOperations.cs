@@ -41,6 +41,9 @@ namespace HexMapEditor
         }
         void ApplyAction(EditAction action, bool after)
         {
+            // Nothing in memory or on either stack changes before the checked disk transition.
+            if (action.LibraryChange != null) ApplyIconLibrary(action.LibraryChange, after);
+            foreach (var asset in action.RequiredAssets) if (!map.IconAssets.Any(a => a.Id == asset.Id)) map.IconAssets.Add(asset);
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);
             if (action.BeforePalette != null) { (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex); RefreshPresetPicker(); }
@@ -60,7 +63,7 @@ namespace HexMapEditor
         }
         void FillRegion(int start)
         {
-            BeginMaterialStroke(start, currentTool); foreach (int index in MapLogic.Flood(map, start, currentTool == EditorTool.FogBucket)) PaintMaterial(index); FinishStroke();
+            BeginMaterialStroke(start, currentTool); VisitBucketRegion(start); FinishStroke(); strokeStarted = false;
         }
         void ResizeProject()
         {

@@ -181,13 +181,15 @@ namespace HexMapEditor
             foreach (var p in points) if (p.X >= 0 && p.Y >= 0 && p.X < map.Columns && p.Y < map.Rows) yield return p.Y * map.Columns + p.X;
         }
         public static List<int> Flood(MapData map, int start, bool byColor = false)
+        { return Flood(map, start, map.Cells.Select(c => new RegionState(c)).ToArray(), byColor); }
+        public static List<int> Flood(MapData map, int start, RegionState[] original, bool fog)
         {
             var result = new List<int>(); if (start < 0 || start >= map.Cells.Count) return result;
-            string variant = map.Cells[start].VariantId; var visited = new bool[map.Cells.Count]; var pending = new Queue<int>(); pending.Enqueue(start); visited[start] = true;
+            var seed = original[start]; var visited = new bool[map.Cells.Count]; var pending = new Queue<int>(); pending.Enqueue(start); visited[start] = true;
             while (pending.Count != 0)
             {
                 int current = pending.Dequeue(); result.Add(current);
-                foreach (int next in Neighbors(map, current)) if (!visited[next] && (byColor ? String.Equals(map.Cells[next].Color, map.Cells[start].Color, StringComparison.OrdinalIgnoreCase) : map.Cells[next].VariantId == variant)) { visited[next] = true; pending.Enqueue(next); }
+                foreach (int next in Neighbors(map, current)) if (!visited[next] && (fog ? original[next].Fog == seed.Fog && original[next].Terrain == seed.Terrain && String.Equals(original[next].Color, seed.Color, StringComparison.OrdinalIgnoreCase) : original[next].Variant == seed.Variant)) { visited[next] = true; pending.Enqueue(next); }
             }
             return result;
         }

@@ -72,25 +72,12 @@ namespace HexMapEditor
             }
             return list;
         }
-        public static List<IconAsset> LoadLibrary(string directory, out string warning)
-        {
-            Directory.CreateDirectory(directory); string marker = Path.Combine(directory, ".starter-icons-v1");
-            if (!File.Exists(marker)) { foreach (var asset in Starters()) { string file = Path.Combine(directory, asset.Id + ".json"); if (!File.Exists(file)) MapLogic.AtomicWrite(file, MapLogic.Serializer().Serialize(asset), false); } MapLogic.AtomicWrite(marker, "1", false); }
-            var result = new List<IconAsset>(); var errors = new List<string>();
-            foreach (var file in Directory.GetFiles(directory, "*.json", SearchOption.TopDirectoryOnly).OrderBy(f => f, StringComparer.OrdinalIgnoreCase)) try
-            {
-                if (new FileInfo(file).Length > 3 * 1024 * 1024) throw new InvalidDataException("Za duży plik ikony.");
-                var asset = MapLogic.Serializer().Deserialize<IconAsset>(File.ReadAllText(file)); using (var b = Decode(asset)) { }
-                if (result.Any(a => a.Id == asset.Id)) throw new InvalidDataException("Powtórzone ID ikony."); if (result.Count >= MaxAssets) throw new InvalidDataException("Limit biblioteki: 128 ikon."); result.Add(asset);
-            }
-            catch (Exception ex) { errors.Add(Path.GetFileName(file) + ": " + ex.Message); }
-            warning = String.Join(Environment.NewLine, errors); return result;
-        }
     }
     internal sealed class LayerChange
     {
         public string CellId, BeforeIcon, AfterIcon;
+        public string BeforeEntry, AfterEntry, BeforeName, AfterName;
         public bool BeforeFog, AfterFog, Icons, Fog;
-        public void Apply(CellData cell, bool after) { if (Icons) cell.IconId = after ? AfterIcon : BeforeIcon; if (Fog) cell.Fog = after ? AfterFog : BeforeFog; }
+        public void Apply(CellData cell, bool after) { if (Icons) { cell.IconId = after ? AfterIcon : BeforeIcon; cell.IconEntryId = after ? AfterEntry : BeforeEntry; cell.IconName = after ? AfterName : BeforeName; } if (Fog) cell.Fog = after ? AfterFog : BeforeFog; }
     }
 }

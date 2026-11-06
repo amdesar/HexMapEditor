@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 1.7, stan decyzji 6 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.3.0; pierwszeństwo mają ustalenia sekcji 24.
+Wersja: 1.8, stan decyzji 6 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.3.1; pierwszeństwo mają ustalenia sekcji 25.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -338,3 +338,48 @@ Format 3 dodaje IconId i Fog w każdym heksie oraz IconAssets: ID oparte na SHA-
 - Przeskok przycisków prawego nagłówka, siedem heksów w schemacie rozmiaru, wyróżnienie pól zagrożonych przycinaniem i dalsza stylistyka ostrzeżeń.
 
 Bez generatorów treści, spotkań, NPC i usług AI.
+## 25. Łatka 0.3.1 — obowiązujące decyzje
+
+Ta sekcja zastępuje sprzeczne ustalenia wcześniejsze, w szczególności zasady regionu mgły, roboczej edycji Domyślnego i dyskowej historii **ikon**. Bazą jest ukończona 0.3.0. Nie wracamy do zakończonych prac, zaakceptowanych geometrii ani przebudowy aplikacji. Format mapy pozostaje 3, presetu 1; nowy format opakowania bibliotecznej ikony 2. Źródła C# są w jednym `src/`, EXE/Build/README/docs/Library/tests pozostają w katalogu głównym. Build i skrypty używają src bez zmiany lokalizacji Library względem EXE.
+
+### Region mgły i gesty
+
+Region mgły jest spójny przez sześciu sąsiadów i wymaga jednocześnie koloru, dokładnej nazwy rodzaju terenu oraz początkowego stanu Fog zgodnych ze startem. Kolor porównujemy bez rozróżniania wielkości liter zapisu, nazwę terenu dokładnie. Nazwa oznacza np. Woda, nie nazwę własną heksa. Ikona, indywidualna nazwa i opis nie dzielą regionu; nie dodajemy warunku wariantu/ID. Woda i neutralny w tym samym kolorze są oddzielne, tak samo plamy mgły rozdzielone odkrytymi heksami. Granice są liczone z migawki **przed modyfikacją gestu**, więc kolejka nie rozszerza się wskutek własnych zmian.
+
+Istniejące Wiadro terenów/ikon i Wypełnienie mgłą działają także przez przeciąganie przez kolejne regiony. Jeden gest to jeden wpis wspólnej historii. Przetworzone regiony są pamiętane, nie przełączane wielokrotnie. Tryb ikon i mgły jest ustalony na początku całego gestu. Mgła pomija regiony o przeciwnym początkowym stanie, które już odpowiadają docelowemu stanowi. Tereny/ikony zachowują dotychczasowy predykat wariantu terenu i kolejkę/sąsiedztwo.
+
+Osiem geometrii, ich rozmiary, obrys i orientacje pozostają zaakceptowane. Punkt wyłącza Rozmiar i Wypełnienie, z wyjaśnieniem jednego heksa; inne figury przywracają właściwe kontrolki. Mgła malowana odciskiem nadal korzysta z istniejących kształtów. Nie naprawiamy nieistniejącego braku ich obsługi.
+
+Ciągłość pędzla jest małą lokalną poprawką: między otrzymanymi pozycjami próbkujemy odcinek w jednostkach mapy co najwyżej 0,4 bazowego promienia heksa i nakładamy ten sam odcisk. Wspólny visited zapobiega ponownemu przełączaniu ikon/mgły. Historia pozostaje jedna. Po wyjściu poza płótno/siatkę, MouseLeave, utracie capture lub nowym geście punkt poprzedni jest zerowany, aby nie rysować linii przy powrocie. Bez kampanii wydajnościowej i zmiany geometrii figur.
+
+### Panel i Domyślny
+
+Pod separatorami jest niewielki odstęp. Usuwamy tekstowy wiersz materiału pod Przybornikiem; pogrubiona złota ramka wskazuje teren **albo** ikonę, nigdy dwa równorzędne materiały. Obiekty pozostają placeholderem. Bez dwóch kolumn i pełnej przebudowy proporcji.
+
+Tereny zamiast standardowego pionowego scrollbara mają górną/dolną kompaktową strzałkę w stałym miejscu oraz kółko. Strzałki są nieaktywne na granicach, nie znikają i nie zmieniają zakresu/rozmiaru viewportu. Nie ma bocznego paska zabierającego szerokość kafelkom. Dodaj i inne sekcje pozostają nieruchome. Wyniku testu bounds nie przedstawiamy jako pełnej próby wizualnej.
+
+Zmiana zwinięcia panelu synchronizuje kompensację kamery i zmianę natywnego okna płótna w jednej synchronicznej sekcji z wyłączonym odrysowywaniem WM_SETREDRAW, następnie odrysowuje gotowy stan. SuspendLayout samo nie chroni przed odmalowaniem/ kopiowaniem pikseli w trakcie SetBounds. Bez timerów/opóźnień i automatycznego Dopasuj. Zachowujemy kompensację, Dopasuj, hit-testing i przeliczenie myszy. Test końcowego położenia nie dowodzi braku klatki przejściowej; ograniczenie narzędzia trzeba raportować.
+
+Domyślny jest całkowicie tylko do odczytu po ID: blokujemy nazwę, dodawanie/usuwanie/edycję wszystkich definicji, nadpisanie i usunięcie, także przez F2/Delete i metody. Można wybierać tereny i malować mapę, zapisać jako nowy własny preset i potem go edytować/nadpisywać. Własna kopia jest wybierana dopiero po udanym zapisie; błąd/anulowanie nie zmieniają Domyślnego. Nie resetujemy automatycznie własnych presetów ani nie blokujemy edycji mapy.
+
+### Edycja, tożsamość i pliki ikon
+
+Przy akcjach ikon jest ołówek Edytuj ikonę. Bez aktywnej ikony komunikat Zaznacz ikonę, bez wyjątku i zmiany materiału. Dialog: nazwa, grafika z pliku, zastępcza grafika z dostępnej biblioteki i checkbox Zaktualizuj wystąpienia na bieżącej mapie, przy każdym otwarciu wyłączony. Anulowanie dialogu/importu nie zmienia niczego. Bez checkboxa dawne wystąpienia zachowują grafikę/metadane. Z nim zmieniają się wystąpienia logicznego ID edytowanej pozycji w bieżącym dokumencie, także starsze warianty tej pozycji, wraz z ich nazwą. Nie skanujemy innych map. Nie zmieniamy terenu, Fog, własnej nazwy/opisu heksa. Cała edycja biblioteki i mapy to jedna operacja historii.
+
+LibraryIcon ma stałe logiczne ID, Name i Asset. Asset zachowuje content-hash i PNG; to odrębna tożsamość grafiki, deduplikowana przy osadzaniu w mapie. Wiele niezależnych pozycji może mieć takie same bajty i różne ID. Nie aktualizujemy wszystkich podobnych PNG przez przypadek. Heks ma opcjonalne IconEntryId i IconName, a IconId nadal wskazuje zasób. Stare dane formatu 3 bez nowych pól są dopuszczalne: stare content-ID określa dawną pojedynczą pozycję, nazwa jest z jej dawnego zasobu. To minimalne rozszerzenie formatu 3, bez migratora map i zależności od ścieżek biblioteki.
+
+Biblioteczny JSON ma IconFormatVersion 2 i powyższe opakowanie. Dotychczasowy płaski plik ikony jest czytany w pamięci, bez startowego kasowania/przemianowania. Dopiero świadoma edycja zapisuje nowe opakowanie i czytelny plik. Nazwy `icon-Czaszka.json`, `icon-Namiot.json`, `icon-Namiot (2).json`: zawsze mały prefiks icon-, pozostała wielkość liter i polskie znaki zgodne z nazwą użytkownika/źródła. Nazwa importu pochodzi ze źródła bez rozszerzenia. Normalizacja Windows i długości ścieżki oraz sufiksy kolizji bez nadpisania. Zmiana nazwy aktualizuje jeden właściwy plik, bez zbędnej aktywnej kopii i bez długiego hasha jako nazwy. Nie rozszerzamy selektora ani nie wdrażamy kadrowania.
+
+### Wspólna sesyjna historia ikon i bezpieczeństwo
+
+Świadomy wyjątek od wcześniejszej zasady: historia ikon odtwarza **również pliki** importu, usunięcia, nazwy i podmiany grafiki. Jest częścią tej samej chronologii co mapa, a opcjonalna aktualizacja wystąpień jest atomowym wpisem. Nie przenosimy tej reguły na pliki presetów. Nie ma drugiego stosu ani skrótu do wyboru.
+
+Migawki poprzednich/nowych bajtów, metadanych i ścieżek są w pamięci, dostępne tak długo jak odpowiadający wpis historii (do 300 wpisów). Usunięcie aktywnego pliku nie polega na odnajdywaniu go w Koszu; potwierdzenie mówi o kopii w pamięci, braku Kosza i utracie sesyjnego Undo po wyczyszczeniu historii. Undo usuwa/odtwarza pozycję i plik, Redo ponawia. Nowa/Otwórz zerują historię dopiero po sukcesie, błąd/anulowanie ją zachowuje. Zamknięcie/anulowanie zamknięcia respektuje pytania o zmiany mapy. Nie usuwamy aktywnych plików biblioteki podczas sprzątania historii; sprzątamy tylko własne dane tymczasowe.
+
+Przed przejściem porównujemy oczekiwane bajty istniejącego źródła i zajętość celu. Plik źródłowy jest etapowany pod unikalną nazwą, ponownie sprawdzany, a nowy plik zapisany/Flush/atomowo przeniesiony bez prawa nadpisania obcego celu. Błąd przywraca poprzednią ścieżkę; nieudany rollback wskazuje zachowany plik do odzyskania, bez nadpisania zajętej ścieżki. Pamięć mapy/lista i stos zmieniają się dopiero po udanym przejściu dyskowym. Konflikt zewnętrzny nie przesuwa historii jak po sukcesie. Biblioteczna zmiana bez wystąpień nie oznacza projektu gwiazdką. Mapa nadal osadza tylko użyte zasoby, bez zależności od biblioteki.
+
+### Poza zakresem i weryfikacja
+
+Pozostają odłożone: obiekty, dwie kolumny i podział wysokości panelu, graficzna mgła/szczegółowość, współrzędne na ikonach, kadrowanie/arkusze ikon, przebudowa pełnego selektora, optymalizacja dużych map, opisy/formatowanie i przeskok prawego nagłówka. Wymagania przyszłe z sekcji 24 pozostają. Typowe mapy użytkownika 60×60–70×70; brak kampanii 200×200 nie jest nowym zadaniem ani błędem łatki.
+
+Tylko minimalne celowane scenariusze nowych i zmienionych zachowań, bez Run-AllTests i równoważnej kampanii, również z powodu przenosin/modelu/historii. Nie usuwamy starych testów, nie przedstawiamy dawnych wyników jako nowych. Własne dane tylko tests/_work, bez prywatnej biblioteki i czyszczenia map. Krótka próba strzałek i ruchu panelu na zwykłym EXE; osobno metody/kontrolki i ograniczenia próbkowania obrazu. Bez push/tagu/Release'a. Pełny audyt wyłącznie na osobne polecenie.
