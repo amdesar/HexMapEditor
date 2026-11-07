@@ -20,7 +20,7 @@ namespace HexMapEditor
         public bool Locked { get; set; }
         public bool RevealsFog { get; set; }
         public int RevealRadius { get; set; }
-        public MapObject() { Id=Guid.NewGuid().ToString("N"); Name="Obiekt"; Size=48; Side="Neutral"; RevealRadius=1; }
+        public MapObject() { Id=Guid.NewGuid().ToString("N"); Name="Obiekt"; Size=30; Side="Neutral"; RevealRadius=1; }
         public MapObject Copy() { return (MapObject)MemberwiseClone(); }
     }
     internal sealed class ObjectChange
@@ -41,7 +41,9 @@ namespace HexMapEditor
         {
             if(map.Objects==null||map.Objects.Count>5000)throw new InvalidDataException("Nieprawidłowa lista obiektów (limit 5000).");
             var ids=new HashSet<string>();
-            foreach(var o in map.Objects) if(o==null||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||!ids.Add(o.Id)||String.IsNullOrWhiteSpace(o.TemplateId)||o.TemplateId.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200||!assets.Contains(o.AssetId??"")||!Finite(o.X)||!Finite(o.Y)||Math.Abs(o.X)>10000000||Math.Abs(o.Y)>10000000||!Finite(o.Size)||o.Size<8||o.Size>1024||!new[]{"Ally","Neutral","Enemy"}.Contains(o.Side)||o.RevealRadius<0||o.RevealRadius>20||o.Side!="Ally"&&o.RevealsFog)throw new InvalidDataException("Nieprawidłowe dane instancji obiektu.");
+            if(map.ObjectStates==null||map.Groups==null)throw new InvalidDataException("Brak stanów lub grup.");
+            foreach(var o in map.Objects) if(o==null||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||!ids.Add(o.Id)||String.IsNullOrWhiteSpace(o.TemplateId)||o.TemplateId.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200||!assets.Contains(o.AssetId??"")||!Finite(o.X)||!Finite(o.Y)||Math.Abs(o.X)>10000000||Math.Abs(o.Y)>10000000||!Finite(o.Size)||o.Size<8||o.Size>1024||!map.ObjectStates.Any(s=>s!=null&&s.Id==o.Side)||o.RevealRadius<0||o.RevealRadius>20||!GroupRules.Allows(map,o.Side)&&o.RevealsFog)throw new InvalidDataException("Nieprawidłowe dane instancji obiektu.");
+            GroupRules.Validate(map);
         }
         public static RectangleF Bounds(MapObject o,IconAsset asset)
         { float ratio=o.Size/Math.Max(asset.Width,asset.Height);return new RectangleF(o.X-asset.Width*ratio/2,o.Y-asset.Height*ratio/2,asset.Width*ratio,asset.Height*ratio); }
@@ -75,7 +77,7 @@ namespace HexMapEditor
         }
         public static HashSet<int> Reveal(MapData map,MapObject obj,PointF? from)
         {
-            var result=new HashSet<int>();if(obj.Side!="Ally"||!obj.RevealsFog)return result;
+            var result=new HashSet<int>();if(!GroupRules.Allows(map,obj.Side)||!obj.RevealsFog)return result;
             var end=new PointF(obj.X,obj.Y);var start=from??end;float dx=end.X-start.X,dy=end.Y-start.Y;
             // Clip sampling to a conservative map envelope, not to the nearest cell.
             // Very distant off-map objects must not create millions of empty samples.

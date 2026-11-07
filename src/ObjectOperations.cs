@@ -17,7 +17,7 @@ namespace HexMapEditor
         }
         void AddReveal(EditAction action,MapObject obj,PointF? from)
         {
-            foreach(int i in ObjectGeometry.Reveal(map,obj,from))if(map.Cells[i].Fog&&!action.Layers.Any(l=>l.CellId==map.Cells[i].Id&&l.Fog))action.Layers.Add(new LayerChange{CellId=map.Cells[i].Id,Fog=true,BeforeFog=true,AfterFog=false});
+            foreach(int i in ObjectGeometry.Reveal(map,GroupRules.Effective(map,obj),from))if(map.Cells[i].Fog&&!action.Layers.Any(l=>l.CellId==map.Cells[i].Id&&l.Fog))action.Layers.Add(new LayerChange{CellId=map.Cells[i].Id,Fog=true,BeforeFog=true,AfterFog=false});
         }
         MapObject PlaceObject(PointF point)
         {
@@ -26,34 +26,39 @@ namespace HexMapEditor
             var obj=new MapObject{TemplateId=template.Id,Name=template.Name,AssetId=template.Asset.Id,X=point.X,Y=point.Y};
             ObjectGeometry.Validate(new MapData{Objects=new List<MapObject>{obj}},new HashSet<string>{template.Asset.Id});
             var action=new EditAction{Label="Umieszczenie obiektu"};RequireObjectAsset(action,template.Asset);action.Objects.Add(new ObjectChange{After=obj,Index=map.Objects.Count});AddReveal(action,obj,null);
-            ApplyAction(action,true);PushAction(action);MarkDirty();return map.Objects.First(o=>o.Id==obj.Id);
+            CommitObjectTransaction(action);return map.Objects.First(o=>o.Id==obj.Id);
         }
         bool ChangeObject(MapObject next)
         {
-            EndCanvasGesture(true);var before=map.Objects.Single(o=>o.Id==next.Id);next=next.Copy();
-            if(next.Side!="Ally")next.RevealsFog=false;
-            ObjectGeometry.Validate(new MapData{Objects=new List<MapObject>{next}},new HashSet<string>(map.IconAssets.Select(a=>a.Id)));
+            EndCanvasGesture(true);return LiveChangeObject(next,null);
+        }
+        bool LiveChangeObject(MapObject next,string mergeKey)
+        {
+            var before=map.Objects.Single(o=>o.Id==next.Id);next=next.Copy();
+            if(!GroupRules.Allows(map,next.Side))next.RevealsFog=false;
             if(json.Serialize(before)==json.Serialize(next))return false;
             var action=new EditAction{Label="Właściwości obiektu"};action.Objects.Add(new ObjectChange{Before=before.Copy(),After=next,Index=map.Objects.IndexOf(before)});
-            if(next.Side=="Ally"&&next.RevealsFog&&(!before.RevealsFog||before.Side!="Ally"||next.RevealRadius>before.RevealRadius))AddReveal(action,next,null);
-            ApplyAction(action,true);PushAction(action);MarkDirty();return true;
+            return CommitObjectTransaction(action,mergeKey,before.Side!=next.Side||before.RevealsFog!=next.RevealsFog||before.RevealRadius!=next.RevealRadius);
         }
         void DeleteSelectedObjects()
         {
             EndCanvasGesture(true);var action=new EditAction{Label="Usunięcie instancji"};
             for(int i=0;i<map.Objects.Count;i++)if(selectedObjects.Contains(map.Objects[i].Id))action.Objects.Add(new ObjectChange{Before=map.Objects[i].Copy(),Index=i});
-            if(action.Objects.Count==0)return;ApplyAction(action,true);selectedObjects.Clear();PushAction(action);MarkDirty();
+            if(action.Objects.Count==0)return;
+            var remaining=map.Groups.Select(g=>g.Copy()).ToList();foreach(var g in remaining)g.Members.RemoveAll(selectedObjects.Contains);remaining.RemoveAll(g=>g.Members.Count==0);
+            if(json.Serialize(remaining)!=json.Serialize(map.Groups)){action.BeforeGroups=map.Groups.Select(g=>g.Copy()).ToList();action.AfterGroups=remaining;}
+            ApplyAction(action,true);selectedObjects.Clear();selectedGroupId=null;PushAction(action);MarkDirty();
         }
         List<ObjectChange> TransformObjects(MapData geometry,int dc,int dr)
         {
             var changes=new List<ObjectChange>();for(int i=0;i<map.Objects.Count;i++){var o=map.Objects[i];var p=ObjectGeometry.Transform(map,geometry,new PointF(o.X,o.Y),dc,dr);var next=o.Copy();next.X=p.X;next.Y=p.Y;changes.Add(new ObjectChange{Before=o.Copy(),After=next,Index=i});}return changes;
         }
-        void ResetObjectDocument(){selectedObjects.Clear();objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
+        void ResetObjectDocument(){selectedObjects.Clear();selectedGroupId=null;previewWithoutFog=false;if(fogPreviewButton!=null){fogPreviewButton.Checked=false;fogPreviewButton.BackColor=System.Drawing.Color.Transparent;}objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
         void FitEverything()
         {
-            EndCanvasGesture(true);if(map.Objects.Count==0){FitMap();return;}RectangleF bounds=MapBounds();foreach(var o in map.Objects)bounds=RectangleF.Union(bounds,ObjectBounds(o));FitWorldBounds(bounds,false);UpdateUI();
+            EndCanvasGesture(true);RectangleF bounds=MapBounds();foreach(var o in map.Objects)bounds=RectangleF.Union(bounds,ObjectBounds(o));FitBounds(bounds);UpdateUI();
         }
-        RectangleF ObjectBounds(MapObject o){return ObjectGeometry.Bounds(o,map.IconAssets.First(a=>a.Id==o.AssetId));}
+        RectangleF ObjectBounds(MapObject o){return ObjectGeometry.Bounds(GroupRules.Effective(map,o),map.IconAssets.First(a=>a.Id==o.AssetId));}
         void FitWorldBounds(RectangleF bounds,bool accountRight)
         {
             float width=canvas.ClientSize.Width-(accountRight&&right.Visible?right.Width:0);var viewport=new RectangleF(36,36,Math.Max(1,width-72),Math.Max(1,canvas.ClientSize.Height-72));
@@ -61,7 +66,7 @@ namespace HexMapEditor
         }
         void ShowObjectOnMap(string id)
         {
-            var obj=map.Objects.FirstOrDefault(o=>o.Id==id);if(obj==null)return;selectedObjects.Clear();selectedObjects.Add(id);selected=-1;rightPanelOpen=true;UpdateUI();
+            EndCanvasGesture(true);var obj=map.Objects.FirstOrDefault(o=>o.Id==id);if(obj==null)return;selectedObjects.Clear();selectedObjects.Add(id);selectedGroupId=null;selected=-1;rightPanelOpen=true;UpdateUI();
             var bounds=ObjectBounds(obj);float width=Math.Max(1,canvas.Width-(rightPanelOpen?right.Width:0));scale=Math.Min(2f,Math.Min(Math.Max(1,width-80)/Math.Max(1,bounds.Width),Math.Max(1,canvas.Height-80)/Math.Max(1,bounds.Height)));
             pan=new PointF(width/2-obj.X*scale,canvas.Height/2-obj.Y*scale);UpdateUI();
         }

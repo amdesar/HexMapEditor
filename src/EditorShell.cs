@@ -40,6 +40,8 @@ namespace HexMapEditor
                 else if (key == "open" || key == "library") { g.DrawLines(p, new[] { new Point(2, 18), new Point(2, 5), new Point(9, 5), new Point(11, 8), new Point(20, 8), new Point(17, 18), new Point(2, 18) }); }
                 else if (key == "save" || key == "saveas") { g.DrawRectangle(p, 3, 3, 16, 16); g.DrawRectangle(p, 7, 3, 8, 6); g.DrawRectangle(p, 7, 13, 8, 6); if (key == "saveas") g.DrawLine(p, 1, 20, 20, 1); }
                 else if (key == "select") g.DrawPolygon(p, new[] { new Point(4, 2), new Point(17, 12), new Point(11, 13), new Point(8, 19) });
+                else if(key=="rectangle"){p.DashStyle=DashStyle.Dash;g.DrawRectangle(p,3,4,16,14);}
+                else if(key=="lasso"){g.DrawEllipse(p,3,3,16,12);g.DrawBezier(p,new Point(8,14),new Point(2,22),new Point(16,21),new Point(12,15));}
                 else if (key == "hand") { g.DrawEllipse(p, 5, 8, 12, 12); for (int x = 5; x <= 17; x += 4) g.DrawLine(p, x, 10, x, 2 + Math.Abs(x - 11) / 2); }
                 else if (key == "brush") { using (var handle = new Pen(Color.FromArgb(218, 170, 91), 4)) g.DrawLine(handle, 18, 2, 10, 12); g.FillPolygon(Brushes.WhiteSmoke, new[] { new Point(8, 10), new Point(13, 14), new Point(10, 20), new Point(2, 20), new Point(5, 16) }); }
                 else if (key == "fog" || key == "fogbucket") { g.FillEllipse(Brushes.SlateGray, 1, 9, 20, 10); g.FillEllipse(Brushes.LightSlateGray, 4, 4, 10, 12); g.FillEllipse(Brushes.LightSlateGray, 10, 7, 10, 11); if (key == "fogbucket") g.DrawLine(p, 2, 21, 20, 21); }
@@ -90,6 +92,7 @@ namespace HexMapEditor
             ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
             var fitMenu=new ContextMenuStrip();fitMenu.Items.Add("Dopasuj mapę",null,(s,e)=>FitMap());fitMenu.Items.Add("Dopasuj wszystko",null,(s,e)=>FitEverything());
+            fitMenu.BackColor=Color.FromArgb(34,38,48);fitMenu.ForeColor=Color.WhiteSmoke;fitMenu.Renderer=new ToolStripProfessionalRenderer(new FitMenuColors());
             fitMenu.Opening+=(s,e)=>EndCanvasGesture(true);fitMenu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};
             ConfigureButton(fitButton, "Dopasuj", "fit", "Dopasuj mapę / Dopasuj wszystko", ()=>fitMenu.Show(fitButton,0,fitButton.Height), 94); view.Controls.Add(fitButton);
             ShellButton(view, "Rozmiar", "labels", "Dodaj lub usuń wiersze i kolumny", ResizeProject, 90);

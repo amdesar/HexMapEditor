@@ -55,3 +55,12 @@ Bez filtra runner obejmuje tylko powyższe nowe przypadki; nie wywołuje dawnych
 ## Testy historyczne
 
 Zachowano istniejące źródła i skrypty 0.1.x–0.2.3, w tym Run-AllTests. Nie uruchomiono ich ponownie w zadaniu 0.3.0. Założenia o odczycie/migracji map formatu 1/2 i nazwach `.terrainset.json` są **nieaktualne dla 0.3.0**: wymagania świadomie znoszą tę kompatybilność. Dawne fixture generators tworzące format 2 nie są generatorami map 0.3.0. Historyczne testy migracji pozostają świadectwem poprzednich wydań, a nie wymaganiem dodania fallbacku. Zestaw zbiorczy nie jest obecnie deklarowany jako zgodny ani zaliczony dla formatu 3; przegląd jego poszczególnych oczekiwań wymaga osobnego zakresu testowania.
+## 0.4.1 — trzy celowane scenariusze
+
+Run-Groups041Tests.ps1 wymaga jednego Case: model, fog albo controls. Nie wywołuje starych zestawów ani Run-AllTests. Osobny tests/_work/groups-041-GUID; po procesie pozostaje results.log.
+
+- model: początkowa grupa bez modyfikacji bazy, Ctrl/Alt, własne stany i nieinwazyjne nakładki, odłączanie (kategorie/keep/restore/cancel), rozwiązanie, czyszczenie referencji po Delete, Undo/Redo i przenośny format 5 bez biblioteki; odmowa wadliwego członkostwa.
+- fog: efektywny własny stan/grupa, ochrona aktywnego zasięgu przed ręcznym wiadrem i końcowa delta, ruch Rączką bez przebudowy heksowego panelu, Undo bez utraty dawnych odkryć, preview/odmowa/zgoda, maskowanie listy i zapis rzeczywistej mgły przy podglądzie.
+- controls: scalanie nazwy i wpisywanego tekstu liczbowego, dyskretny checkbox i gwiazdka, wspólny kadr (także efektywny rozmiar grupy), pusty klik, osobne narzędzia, nazwy instancji niezależne od edycji wzorca oraz aktywność kosza.
+
+Create-Groups041Ui.ps1 przygotowuje zwykły EXE i własną mapę w ui-041-GUID, nie jest testem interaktywnego okna. Faktyczne próby i ograniczenia: docs/raport-0.4.1.md. Historyczne fixture/oczekiwania formatu 4 pozostają w Git; nie są wymaganiem konwersji do 5 i nie zostały ponownie uruchomione. Nie uruchamiać całej kampanii z powodu zmiany modelu.

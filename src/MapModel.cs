@@ -274,10 +274,11 @@ namespace HexMapEditor
         static string CellKey(CellData cell) { return MapLogic.Hash(MapLogic.Serializer().Serialize(cell)); }
         static string Header(MapData map)
         {
-            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects });
+            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, map.ObjectStates });
         }
         public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); changed.Clear(); headerChanged = false; }
         public bool CheckCell(CellData cell) { string value; if (saved.TryGetValue(cell.Id, out value) && value == CellKey(cell)) changed.Remove(cell.Id); else changed.Add(cell.Id); return Dirty; }
+        public bool CheckHeader(MapData map){headerChanged=header!=Header(map);return Dirty;}
         public bool CheckAll(MapData map)
         {
             changed.Clear(); var ids = new HashSet<string>(); foreach (var cell in map.Cells) { ids.Add(cell.Id); CheckCell(cell); }

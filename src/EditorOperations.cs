@@ -8,12 +8,12 @@ namespace HexMapEditor
     {
         void NameEdited()
         {
-            if (updating || selected < 0 || map.Cells[selected].Fog) return; var cell = map.Cells[selected];
+            if (updating || selected < 0 || map.Cells[selected].Fog && !previewWithoutFog) return; var cell = map.Cells[selected];
             var history = textHistory.For(cell.Id, "name", cell.Name); history.Record(cellName.Text, cellName.EditKind); textHistory.Trim(); cell.Name = cellName.Text; MarkCellDirty(cell);
         }
         void DescriptionEdited(string document, string plain, string kind)
         {
-            if (updating || selected < 0 || map.Cells[selected].Fog) return; var cell = map.Cells[selected];
+            if (updating || selected < 0 || map.Cells[selected].Fog && !previewWithoutFog) return; var cell = map.Cells[selected];
             if (cell.RichDescription == null && document == NoteCodec.Write(NoteCodec.FromPlain(cell.Description))) return;
             string initial = DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, "description", initial); history.Record("rich:" + document, kind); textHistory.Trim();
@@ -21,7 +21,7 @@ namespace HexMapEditor
         }
         void TextUndo(string field, bool repeat)
         {
-            if (selected < 0 || map.Cells[selected].Fog) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
+            if (selected < 0 || map.Cells[selected].Fog && !previewWithoutFog) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
             string initial = field == "name" ? cell.Name : DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, field, initial); int before = history.Cursor;
             string value = repeat ? history.Redo() : history.Undo(); if (before == history.Cursor) return;
@@ -49,8 +49,11 @@ namespace HexMapEditor
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);
             if (action.BeforeOrientation != null) map.Orientation=after?action.AfterOrientation:action.BeforeOrientation;
+            if(action.BeforeGroups!=null)map.Groups=(after?action.AfterGroups:action.BeforeGroups).Select(g=>g.Copy()).ToList();
+            if(action.BeforeStates!=null)map.ObjectStates=(after?action.AfterStates:action.BeforeStates).Select(s=>s.Copy()).ToList();
             foreach(var change in action.Objects)change.Apply(map,after);
             selectedObjects.RemoveWhere(id=>!map.Objects.Any(o=>o.Id==id));
+            if(!map.Groups.Any(g=>g.Id==selectedGroupId))selectedGroupId=null;
             if (action.BeforePalette != null) (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex);
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);

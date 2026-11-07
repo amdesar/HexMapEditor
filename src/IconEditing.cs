@@ -14,6 +14,7 @@ namespace HexMapEditor
         readonly Dictionary<int, LayerChange> layerBefore = new Dictionary<int, LayerChange>();
         readonly HashSet<int> strokeVisited = new HashSet<int>();
         readonly HashSet<int> bucketProcessed = new HashSet<int>();
+        HashSet<int> protectedFogCells=new HashSet<int>();
         RegionState[] bucketOrigin;
         PointF? previousStrokePoint;
         bool iconMaterial, strokeIcons, strokeFog, strokeRemoveIcon, strokeFogValue, strokeStarted;
@@ -95,7 +96,7 @@ namespace HexMapEditor
         MapData MapForSave()
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), Objects=map.Objects };
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), Objects=map.Objects, Groups=map.Groups,ObjectStates=map.ObjectStates };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {
@@ -103,6 +104,7 @@ namespace HexMapEditor
             strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear();
             bucketProcessed.Clear(); bucketOrigin = tool == EditorTool.Bucket || tool == EditorTool.FogBucket ? map.Cells.Select(c => new RegionState(c)).ToArray() : null;
             strokeFog = tool == EditorTool.FogBrush || tool == EditorTool.FogBucket; strokeIcons = !strokeFog && iconMaterial;
+            protectedFogCells=strokeFog?EffectiveFogCoverage(map):new HashSet<int>();
             var entry = libraryIcons.FirstOrDefault(a => a.Id == activeIcon); strokeAsset = entry == null ? null : entry.Asset; strokeIcon = strokeAsset == null ? null : strokeAsset.Id; strokeEntry = entry == null ? null : entry.Id; strokeName = entry == null ? null : entry.Name;
             strokeRemoveIcon = strokeIcons && strokeIcon != null && (map.Cells[start].IconEntryId ?? map.Cells[start].IconId) == strokeEntry; strokeFogValue = !map.Cells[start].Fog;
         }
@@ -111,13 +113,14 @@ namespace HexMapEditor
             if (!strokeVisited.Add(index)) return;
             if (!strokeFog && !strokeIcons) { PaintCell(index); return; }
             var cell = map.Cells[index]; string nextIcon = strokeRemoveIcon ? ((cell.IconEntryId ?? cell.IconId) == strokeEntry ? null : cell.IconId) : strokeIcon;
-            if (strokeFog ? cell.Fog == strokeFogValue : strokeIcon == null || (cell.IconId == nextIcon && (strokeRemoveIcon || (cell.IconEntryId == strokeEntry && cell.IconName == strokeName)))) return;
+            bool targetFog=strokeFogValue&&!protectedFogCells.Contains(index);
+            if (strokeFog ? cell.Fog == targetFog : strokeIcon == null || (cell.IconId == nextIcon && (strokeRemoveIcon || (cell.IconEntryId == strokeEntry && cell.IconName == strokeName)))) return;
             if (strokeIcons && !strokeRemoveIcon && !map.IconAssets.Any(a => a.Id == strokeIcon))
             {
                 if (map.IconAssets.Count >= IconAssets.MaxAssets || map.IconAssets.Sum(a => (long)a.Png.Length) + strokeAsset.Png.Length > 44L * 1024 * 1024) { EndCanvasGesture(true); ShowEditorMessage("Limit zasobów ikon w sesji. Zapisz mapę i otwórz ponownie, aby zwolnić zasoby zachowane dla Undo.", "Limit ikon", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                 map.IconAssets.Add(strokeAsset);
             }
-            var change = new LayerChange { CellId = cell.Id, BeforeIcon = cell.IconId, BeforeFog = cell.Fog, Icons = strokeIcons, Fog = strokeFog, AfterIcon = nextIcon, AfterFog = strokeFogValue, BeforeEntry = cell.IconEntryId, BeforeName = cell.IconName, AfterEntry = nextIcon == null ? null : strokeRemoveIcon ? cell.IconEntryId : strokeEntry, AfterName = nextIcon == null ? null : strokeRemoveIcon ? cell.IconName : strokeName };
+            var change = new LayerChange { CellId = cell.Id, BeforeIcon = cell.IconId, BeforeFog = cell.Fog, Icons = strokeIcons, Fog = strokeFog, AfterIcon = nextIcon, AfterFog = targetFog, BeforeEntry = cell.IconEntryId, BeforeName = cell.IconName, AfterEntry = nextIcon == null ? null : strokeRemoveIcon ? cell.IconEntryId : strokeEntry, AfterName = nextIcon == null ? null : strokeRemoveIcon ? cell.IconName : strokeName };
             layerBefore.Add(index, change); change.Apply(cell, true); dirty = true;
             if (index == selected && strokeFog) { editorCellId = null; UpdateUI(); } else canvas.Invalidate();
         }

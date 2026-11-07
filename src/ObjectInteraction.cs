@@ -15,20 +15,32 @@ namespace HexMapEditor
         PointF? objectPreviousCursor;
         readonly List<PointF> selectionPath=new List<PointF>();
         bool objectSelecting,objectMoving,objectClick,selectionControl;
-        int selectionKind;
+        int selectionKind,skippedLocked;
+        static bool SelectionTool(EditorTool tool){return tool==EditorTool.Select||tool==EditorTool.RectangleSelect||tool==EditorTool.Lasso;}
         PointF World(Point p){return new PointF((p.X-pan.X)/scale,(p.Y-pan.Y)/scale);}
         PointF Screen(PointF p){return new PointF(pan.X+p.X*scale,pan.Y+p.Y*scale);}
-        bool HiddenPoint(PointF world){int at=ObjectGeometry.Hit(map,world);return at>=0&&map.Cells[at].Fog;}
-        Region VisibleObjectRegion()
+        bool HiddenPoint(PointF world){int at=ObjectGeometry.Hit(map,world);return !previewWithoutFog&&at>=0&&map.Cells[at].Fog;}
+        Region VisibleObjectRegion(bool real=false)
         {
-            var region=new Region();for(int i=0;i<map.Cells.Count;i++)if(map.Cells[i].Fog)using(var path=ObjectGeometry.Hex(map,BrushGeometry.Center(map,i%map.Columns,i/map.Columns),28.03f))region.Exclude(path);return region;
+            var region=new Region();if(previewWithoutFog&&!real)return region;for(int i=0;i<map.Cells.Count;i++)if(map.Cells[i].Fog)using(var path=ObjectGeometry.Hex(map,BrushGeometry.Center(map,i%map.Columns,i/map.Columns),28.03f))region.Exclude(path);return region;
         }
         bool ObjectVisible(MapObject o)
         {using(var region=VisibleObjectRegion()){region.Intersect(ObjectBounds(o));using(var matrix=new Matrix())return region.GetRegionScans(matrix).Any(r=>r.Width>.001f&&r.Height>.001f);}}
         MapObject HitObject(PointF world)
         {if(HiddenPoint(world))return null;return map.Objects.LastOrDefault(o=>ObjectBounds(o).Contains(world));}
         void ChooseObject(MapObject hit,bool control)
-        {if(control){if(!selectedObjects.Add(hit.Id))selectedObjects.Remove(hit.Id);}else if(!selectedObjects.Contains(hit.Id)){selectedObjects.Clear();selectedObjects.Add(hit.Id);}selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();}
+        {ChooseObjectMember(hit,control,(ModifierKeys&Keys.Alt)!=0);}
+        void ChooseObjectMember(MapObject hit,bool control,bool single)
+        {
+            EndObjectPropertyEdit();var unit=single?new HashSet<string>{hit.Id}:ExpandedObjects(new[]{hit.Id});
+            if(control){if(unit.IsSubsetOf(selectedObjects))selectedObjects.ExceptWith(unit);else selectedObjects.UnionWith(unit);}else if(single||!unit.IsSubsetOf(selectedObjects)){selectedObjects.Clear();selectedObjects.UnionWith(unit);}
+            if(single)selectedGroupId=null;else ResolveSelectedGroup();selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();
+        }
+        void BeginObjectMove(IEnumerable<string> ids,PointF point)
+        {
+            var targets=new HashSet<string>(ids);objectDragBefore=map.Objects.Where(o=>targets.Contains(o.Id)&&!GroupRules.Effective(map,o).Locked).ToDictionary(o=>o.Id,o=>o.Copy());objectDragStart=point;objectPreviousCursor=point;objectGesture=new EditAction{Label="Ruch obiektów"};objectMoving=true;skippedLocked=targets.Count-objectDragBefore.Count;
+            if(skippedLocked>0)statusLabel.Text="Pominięto zablokowane obiekty: "+skippedLocked;
+        }
         void DrawObjects(Graphics g)
         {
             var state=g.Save();g.TranslateTransform(pan.X,pan.Y);g.ScaleTransform(scale,scale);
@@ -41,20 +53,21 @@ namespace HexMapEditor
         bool ObjectMouseDown(MouseEventArgs e)
         {
             if(gestureTool==EditorTool.Brush&&objectMaterial){try{PlaceObject(World(e.Location));}catch(Exception ex){ShowEditorMessage(ex.Message,"Nie można umieścić obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}return true;}
-            if(gestureTool!=EditorTool.Select)return false;
+            if(!SelectionTool(gestureTool)&&gestureTool!=EditorTool.Hand)return false;
             var point=World(e.Location);var hit=HitObject(point);selectionControl=(ModifierKeys&Keys.Control)!=0;objectClick=hit!=null;objectMoving=false;objectSelecting=false;
+            if(gestureTool==EditorTool.Hand){if(hit==null)return false;BeginObjectMove(ExpandedObjects(new[]{hit.Id}),point);return true;}
+            selectionKind=gestureTool==EditorTool.Lasso?1:0;
             if(hit!=null){ChooseObject(hit,selectionControl);
                 if(selectedObjects.Contains(hit.Id)){
-                    objectDragBefore=map.Objects.Where(o=>selectedObjects.Contains(o.Id)&&!o.Locked).ToDictionary(o=>o.Id,o=>o.Copy());objectDragStart=point;objectPreviousCursor=point;objectGesture=new EditAction{Label="Ruch obiektów"};objectMoving=true;
-                    int locked=selectedObjects.Count-objectDragBefore.Count;if(locked>0)statusLabel.Text="Pominięto zablokowane obiekty: "+locked;
+                    BeginObjectMove(selectedObjects,point);
                 }return true;
             }
-            if(!selectionControl)selectedObjects.Clear();objectSelecting=true;selectionPath.Clear();selectionPath.Add(point);canvas.Invalidate();return true;
+            if(!selectionControl){selectedObjects.Clear();selectedGroupId=null;}objectSelecting=gestureTool!=EditorTool.Select;selectionPath.Clear();selectionPath.Add(point);canvas.Invalidate();return true;
         }
         bool ObjectMouseMove(MouseEventArgs e)
         {
             if(gestureTool==EditorTool.Brush&&objectMaterial)return true;
-            if(gestureTool!=EditorTool.Select)return false;
+            if(!SelectionTool(gestureTool)&&gestureTool!=EditorTool.Hand)return false;
             if(!canvas.ClientRectangle.Contains(e.Location)){objectPreviousCursor=null;return true;}
             var p=World(e.Location);if(objectMoving&&objectDragBefore!=null){
                 if(Math.Abs(e.X-dragOrigin.X)+Math.Abs(e.Y-dragOrigin.Y)<=3&&!dragging)return true;dragging=true;
@@ -67,16 +80,16 @@ namespace HexMapEditor
                 objectPreviousCursor=p;canvas.Invalidate();return true;
             }
             if(objectSelecting){if(Math.Abs(e.X-dragOrigin.X)+Math.Abs(e.Y-dragOrigin.Y)>3)dragging=true;if(selectionKind==1){if(selectionPath.Count==1||Distance(selectionPath.Last(),p)>3/scale)selectionPath.Add(p);}else{if(selectionPath.Count==1)selectionPath.Add(p);else selectionPath[1]=p;}canvas.Invalidate();return true;}
-            return objectClick;
+            if(Math.Abs(e.X-dragOrigin.X)+Math.Abs(e.Y-dragOrigin.Y)>3)dragging=true;return true;
         }
         static double Distance(PointF a,PointF b){return Math.Sqrt((a.X-b.X)*(a.X-b.X)+(a.Y-b.Y)*(a.Y-b.Y));}
         bool ObjectMouseUp(MouseEventArgs e)
         {
-            if(gestureTool!=EditorTool.Select)return false;
+            if(!SelectionTool(gestureTool)&&gestureTool!=EditorTool.Hand)return false;
             if(objectSelecting&&dragging){
                 var matches=new List<MapObject>();if(selectionKind==1&&selectionPath.Count>=3){using(var path=new GraphicsPath()){path.AddPolygon(selectionPath.ToArray());matches=map.Objects.Where(o=>path.IsVisible(o.X,o.Y)&&ObjectVisible(o)).ToList();}}
                 else if(selectionKind==0){var r=SelectionRectangle(selectionPath[0],World(e.Location));matches=map.Objects.Where(o=>r.Contains(o.X,o.Y)&&ObjectVisible(o)).ToList();}
-                if(!selectionControl)selectedObjects.Clear();foreach(var o in matches){if(selectionControl&&!selectedObjects.Add(o.Id))selectedObjects.Remove(o.Id);else selectedObjects.Add(o.Id);}selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();return true;
+                var targets=ExpandedObjects(matches.Select(o=>o.Id));if(!selectionControl){selectedObjects.Clear();selectedObjects.UnionWith(targets);}else foreach(var unit in targets.GroupBy(id=>{var g=GroupRules.For(map,id);return g==null?id:g.Id;})){var ids=new HashSet<string>(unit);if(ids.IsSubsetOf(selectedObjects))selectedObjects.ExceptWith(ids);else selectedObjects.UnionWith(ids);}ResolveSelectedGroup();selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();return true;
             }
             if(objectClick)return true;return false;
         }
@@ -84,7 +97,7 @@ namespace HexMapEditor
         {
             if(objectGesture!=null&&objectDragBefore!=null){
                 foreach(var before in objectDragBefore.Values){var now=map.Objects.FirstOrDefault(o=>o.Id==before.Id);if(now!=null&&(now.X!=before.X||now.Y!=before.Y))objectGesture.Objects.Add(new ObjectChange{Before=before,After=now.Copy(),Index=map.Objects.IndexOf(now)});}
-                if(commit&&(objectGesture.Objects.Count>0||objectGesture.Layers.Count>0)){PushAction(objectGesture);MarkDirty();}
+                if(commit&&(objectGesture.Objects.Count>0||objectGesture.Layers.Count>0)){ReconcileFog(objectGesture,map,true);PushAction(objectGesture);MarkDirty();if(skippedLocked>0)statusLabel.Text="Pominięto zablokowane obiekty: "+skippedLocked;}
                 else if(!commit){foreach(var before in objectDragBefore.Values){var index=map.Objects.FindIndex(o=>o.Id==before.Id);if(index>=0)map.Objects[index]=before.Copy();}foreach(var layer in objectGesture.Layers)layer.Apply(map.Cells.First(c=>c.Id==layer.CellId),false);}
             }
             objectGesture=null;objectDragBefore=null;objectMoving=false;objectSelecting=false;objectClick=false;objectPreviousCursor=null;selectionPath.Clear();canvas.Invalidate();

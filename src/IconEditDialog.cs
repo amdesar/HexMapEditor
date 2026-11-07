@@ -15,6 +15,7 @@ namespace HexMapEditor
         public bool UpdateMap { get { return update.Checked; } }
         public IconEditDialog(LibraryIcon icon, Func<IWin32Window, LibraryIcon> pick, Func<IWin32Window, LibraryIcon> other = null, string title = "Edytuj ikonę") : base(title,other == null ? 335 : 375)
         {
+            if(title!="Edytuj ikonę")update.Text="Zaktualizuj grafikę instancji na tej mapie";
             Asset=icon.Asset;name.Text=icon.Name;Row(0,"Nazwa",name,true);
             var file=new Button { Text="Grafika z pliku…" };Row(1,"Podmień",file,true);
             var choices=new Button { Text="Wybierz z biblioteki", AccessibleName="Wybierz grafikę z biblioteki" };Row(2,"Z biblioteki",choices,true);

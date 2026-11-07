@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja: 2.0, stan decyzji 6 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.4.0; pierwszeństwo mają ustalenia sekcji 27.
+Wersja: 2.1, stan decyzji 7 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.4.1; pierwszeństwo mają ustalenia sekcji 28.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -457,3 +457,55 @@ Format mapy 4 ma obowiązkowe Objects: wszystkie instancje, także poza mapą, i
 ### Granice
 
 Nie planujemy walki, statystyk, ekwipunku/inicjatywy, wyszukiwania ścieżek, animacji ruchu lub zaawansowanych tras; nie dopisujemy ich jako przyszłych zadań. Później: niezależna warstwa światła/ciemności, źródło/zasięg światła obiektu, ciemność powracająca po odejściu, niezależnie od trwałego odkrywania. Światła teraz nie implementujemy. Nadal odłożone: widok MG/gracza, tekstury/detail, zakładki, kadrowanie/arkusze, opisy, pełny redesign i wydajnościowa kampania dużych map. Testy tylko kilku nowych scenariuszy i krótki zwykły EXE; raport uczciwie oddziela metody/okno/pominięte obszary.
+
+## 28. Przyrost 0.4.1 — trwałe grupy, stany i podgląd mgły
+
+Ta sekcja zastępuje sprzeczne ustalenia sekcji 27: aplikacja 0.4.1, format mapy 5. Zachowujemy Windows Forms/GDI+, lokalny WPF opisu, offline, src i Library obok EXE. Bez usług, nowych zależności, konwerterów i masowych migracji.
+
+### Narzędzia i bieżące właściwości
+
+Osobne widoczne przyciski Zaznaczanie, Prostokąt i Lasso; prawy przycisk nie wybiera już wariantu. Przybornik ma dwa rzędy, podpowiedzi i aktywne ramki. Rączka nad dostępną instancją przesuwa ją lub jej grupę, nad tłem kamerę. Nie otwiera szczegółów ani nie zamyka panelu podczas panowania. Respektuje efektywne blokady i mgłę. Pusty klik poza mapą odznacza heks/zamyka jego szczegóły, bez edycji dokumentu; klik obiektu nie jest pustym kliknięciem.
+
+Właściwości instancji działają na bieżąco, bez Zastosuj. Checkbox/stan tworzy pojedynczą operację; nazwa i ciągła zmiana liczbowa są scalane do sesji pola. Sesję kończy inna operacja, utrata fokusu, wybór, zapis, historia lub zamknięcie. Puste/przejściowo niepoprawne wartości liczbowe i pusta nazwa nie trafiają do modelu; synchronizacja kontrolek nie wykonuje edycji. Nowe instancje mają rozmiar 30, istniejące pozostają bez zmian; zakres 8–1024 zachowany. Czerwony Usuń instancję dotyczy mapy, kosz wzorca jest nieaktywny bez jego wyboru.
+
+Nazwa wzorca jest tylko początkową nazwą nowej instancji. Późniejsze nazwy są niezależne. Aktualizacja wystąpień wzorca aktualizuje grafikę powiązanych TemplateId, bez przemianowania instancji; checkbox mówi o grafice. Reguły nazw ikon heksowych pozostają bez zmian.
+
+### Definicje stanów
+
+Sojusznik (zielony, pozwala odkrywać), Neutralny (niebieski, nie pozwala) i Wróg (czerwony, nie pozwala) są kafelkami z nazwą, podpowiedzią i ramką wyboru. Plus dodaje dokumentowy stan: nazwa, kolor i Pozwala odkrywać mgłę, ze stabilnym ID niezależnym od wyglądu. Kafelki zawijają się; plus idzie za ostatnim. Dodanie stanu nie przypisuje go automatycznie do instancji. Nie implementujemy edycji/usuwania definicji ani globalnej biblioteki stanów.
+
+Najpierw efektywny stan daje uprawnienie, następnie działa efektywny checkbox i promień 0–20. Stan bez uprawnienia zawsze blokuje skuteczne odkrywanie. Indywidualna zmiana na taki stan wyłącza bazowy checkbox; powrót go nie włącza. Kontrolki pozostają widoczne. Grupa może ograniczyć skuteczność bez niszczenia bazowego checkboxa. Promień 0 to heks pod środkiem, 1 pierwszy pierścień itd.; poza mapą nie ma najbliższego heksa.
+
+### Model i wybór trwałej grupy
+
+Grupa ma stabilne ID, nazwę i listę ID członków. Obiekt należy najwyżej do jednej grupy; brak zagnieżdżania. Grupuj wymaga co najmniej dwóch niezgrupowanych instancji. Mieszany wybór daje komunikat, bez ukrytego rozłączania. Nowa grupa nie zmienia właściwości członków i ma wszystkie nadpisania wyłączone.
+
+Klik członka wybiera grupę; Ctrl dodaje/odejmuje grupę lub niezgrupowany obiekt; Alt wybiera pojedynczego członka także przed wcześniejszym wyborem grupy. Prostokąt/lasso rozszerzają trafionego członka do grupy. Obrysy ukrytych członków pozostają przycięte mgłą. Panel członka pokazuje grupę, przejście do niej i Odłącz; panel grupy nazwę, członków, wybór pojedynczego, nakładki i Rozwiąż. Delete usuwa wybrane instancje jednym wpisem. Alt-wybór umożliwia usunięcie jednego; puste referencje/grupy są usuwane, jeden członek może pozostać grupą.
+
+### Odwracalne nakładki
+
+Bazowe właściwości instancji są zachowane. Grupa ma opcjonalne nadpisania stanu, blokady, odkrywania, promienia i rozmiaru, każde z Indywidualnie. Rozmiar: Indywidualnie, Przesunięcie od bazowego (±1016, wynik ograniczany do 8–1024) albo Wspólny (8–1024). Przeliczanie nie kumuluje offsetu, nie przesuwa środków i zachowuje proporcje. Jawna blokada true blokuje wszystkich; false może odblokować bazowo zablokowanego. Alt-edycja zmienia bazę, nie wyłącza nakładki. Panel członka wyjaśnia wartości efektywne.
+
+Odłącz/Rozwiąż pyta: Zachowaj wynikowe ustawienia / Przywróć indywidualne / Wybierz dla każdej właściwości / Anuluj. Kategorie: stan, rozmiar, blokada, odkrywanie, promień. Przy rozwiązaniu decyzja kategorii dotyczy całej grupy. Zachowaj zapisuje efektywne do bazy z respektowaniem uprawnień; Przywróć odsłania zachowaną bazę. Nazwy, pozycje i dawne odkrycia pozostają. Zmiana członkostwa, właściwości i wynikającej nowej mgły jest jednym Undo. Anulowanie niczego nie zmienia.
+
+### Aktywne odkrywanie i flaga widoku
+
+Po ręcznej mgle, ruchu/umieszczeniu, zmianach wpływających na odkrywanie i odłączeniu/rozwiązaniu uzgadniamy wynik ze wszystkimi aktualnymi efektywnymi zasięgami. Ich heksy pozostają odkryte także podczas ręcznego gestu. Nie ma pętli co klatkę. Jeden gest/ustawienie zawiera końcową deltę mgły, a Undo/Redo odtwarza tę deltę bez nowej operacji uzgadniania. Undo ruchu nadal nie zasłania wcześniejszych odkryć. Odczyt nie uruchamia ponownie odkrywania.
+
+Podgląd bez mgły to oznaczona flaga widoku: bez kopiowania mapy, zmiany Fog, historii, gwiazdki lub zapisu flagi. Pokazuje i pozwala edytować rzeczywiste heksy/obiekty. Ruch nadal odkrywa rzeczywiste Fog. Nowa/Otwórz po sukcesie wyłącza podgląd. Ręczny gest mgły pyta o normalną widoczność: odmowa nie zmienia danych; zgoda wyłącza podgląd, ale gest jest anulowany i trzeba go ponowić.
+
+### Lista i dopasowanie
+
+Lista: Nazwa z miniaturą / efektywny Stan / Pozycja / Mgła. Pozycja jest pusta na mapie, Poza mapą poza nią. Mgła: Widoczny / Częściowo ukryty / Ukryty. Częściowe i pełne zasłonięcie maskuje nazwę, stan i pozycję przez ???, daje neutralną miniaturę i nie ujawnia danych tooltipem. Klasyfikacja dotyczy przecięcia prostokąta grafiki z geometrią zasłoniętych heksów, bez analizy pikseli alfa. Poza mapą brak mgły. Podgląd pokazuje realne dane, lecz kolumna Mgła nadal opisuje zapisany stan, zgodnie z tytułem okna. Lista pozwala świadomie zaznaczyć/Pokaż ukryty obiekt bez odkrywania heksów. To narzędzie edytora, nie zabezpieczony widok gracza.
+
+Dopasuj mapę i wszystko celowo pomijają prawą nakładkę. Wspólna suma obwiedni i jeden algorytm/margines dają dokładnie identyczny kadr, jeśli efektywne prostokąty wszystkich grafik mieszczą się w obwiedni mapy. Wystające grafiki prawidłowo zmieniają kadr. Menu Dopasuj ma styl aplikacji; Otwórz nadal dopasowuje samą mapę.
+
+### Format i historia
+
+Format 5 dodaje obowiązkowe ObjectStates i Groups, zachowuje bazowe Objects i wspólny IconAssets. Side wskazuje ID stanu. Zapis zawiera członkostwo/nakładki i użyte osadzone grafiki, bez zależności od Library. Starsze mapy nie są konwertowane ani nadpisywane podczas odmowy odczytu. Walidacja przed podmianą obejmuje unikalne ID, poprawne referencje stanów/członków, brak wielu grup/nesting, skończone liczby i zakresy. Limity: 100 stanów, 2500 grup, 5000 instancji; dotychczasowe limity zasobów i bezpieczny zapis pozostają.
+
+Wspólna historia 300 obejmuje grupowanie/nakładki/odłączanie/własne stany/usunięcia i potrzebne delty mgły obok mapy oraz chronionych bajtowych operacji plików bibliotek. Wybór, kamera i podgląd nie są historią. Osobne historie nazwy/opisu heksa pozostają. Nowa/Otwórz resetują dokument po sukcesie, błąd/anulowanie go zachowuje.
+
+### Granice i weryfikacja
+
+Bez zagnieżdżonych grup, światła/ciemności, widoku MG/gracza, tekstur/detail, zakładek, kadrowania, redesignu i optymalizacji dużych map. Walki/statystyk/ekwipunku, tras/pathfindingu/animacji nie planujemy w tym programie. Nie wznawiamy zaakceptowanych prac 0.4.0. Testy tylko celowane nowych zachowań; raport rozdziela metody/kontrolki, faktyczne próby zwykłego EXE i niewykonane obszary, bez deklaracji kompleksowej weryfikacji.

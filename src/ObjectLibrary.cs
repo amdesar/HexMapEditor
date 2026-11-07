@@ -48,6 +48,7 @@ namespace HexMapEditor
     {
         readonly List<ObjectTemplate> libraryObjects=new List<ObjectTemplate>();
         FlowLayoutPanel objectPreview;
+        Button deleteObjectButton;
         string activeObject;
         bool objectMaterial,noMaterial;
         string ObjectsDirectory {get{return Path.Combine(LibraryPaths.Root,"Objects");}}
@@ -56,7 +57,7 @@ namespace HexMapEditor
         {using(var dialog=new IconPickerDialog(libraryObjects.Select(o=>o.Graphic()),IconButton,BackColor)){dialog.Text="Biblioteka obiektów — wybierz";return RunModal(()=>dialog.ShowDialog(owner))==DialogResult.OK?dialog.Chosen:null;}}
         void SelectObjectTemplate(string id){if(!libraryObjects.Any(o=>o.Id==id))return;EndCanvasGesture(true);activeObject=id;objectMaterial=true;noMaterial=false;iconMaterial=false;SelectTool(EditorTool.Brush);UpdateMaterialIndicator();}
         void RefreshObjectPreview(){if(objectPreview==null)return;foreach(Control c in objectPreview.Controls.Cast<Control>().ToArray())c.Dispose();objectPreview.Controls.Clear();foreach(var o in libraryObjects.Take(8)){var entry=o;var b=IconButton(o.Graphic(),()=>SelectObjectTemplate(entry.Id));b.AccessibleName="Obiekt: "+o.Name;objectPreview.Controls.Add(b);}RefreshObjectSelection();}
-        void RefreshObjectSelection(){if(objectPreview==null)return;foreach(Button b in objectPreview.Controls){bool selected=objectMaterial&&(string)b.Tag==activeObject;b.FlatAppearance.BorderSize=selected?3:1;b.FlatAppearance.BorderColor=selected?Color.Gold:Color.Gray;}}
+        void RefreshObjectSelection(){if(deleteObjectButton!=null)deleteObjectButton.Enabled=objectMaterial&&libraryObjects.Any(o=>o.Id==activeObject);if(objectPreview==null)return;foreach(Button b in objectPreview.Controls){bool selected=objectMaterial&&(string)b.Tag==activeObject;b.FlatAppearance.BorderSize=selected?3:1;b.FlatAppearance.BorderColor=selected?Color.Gold:Color.Gray;}}
         void OpenObjectLibrary(){var o=PickObjectGraphic(this);if(o!=null)SelectObjectTemplate(o.Id);}
         void AddObjectTemplate()
         {
@@ -79,7 +80,7 @@ namespace HexMapEditor
                 if(next!=null){next=next.Copy();next.Name=(next.Name??"").Trim();ObjectLibrary.Validate(next);if(before!=null&&before.Id!=next.Id||before==null&&libraryObjects.Any(o=>o.Id==next.Id))throw new IOException("Konflikt tożsamości wzorca.");next.FilePath=ObjectLibrary.Destination(directory,next.Name,before==null?null:before.FilePath);next.DiskBytes=new UTF8Encoding(false).GetBytes(json.Serialize(next));}
                 var action=new EditAction{Label=before==null?"Dodanie wzorca":next==null?"Usunięcie wzorca":"Edycja wzorca"};
                 if(update&&before!=null&&next!=null)foreach(var o in map.Objects.Where(o=>o.TemplateId==before.Id)){
-                    if(o.Name==next.Name&&o.AssetId==next.Asset.Id)continue;var after=o.Copy();after.Name=next.Name;after.AssetId=next.Asset.Id;action.Objects.Add(new ObjectChange{Before=o.Copy(),After=after,Index=map.Objects.IndexOf(o)});
+                    if(o.AssetId==next.Asset.Id)continue;var after=o.Copy();after.AssetId=next.Asset.Id;action.Objects.Add(new ObjectChange{Before=o.Copy(),After=after,Index=map.Objects.IndexOf(o)});
                 }
                 if(action.Objects.Count>0)RequireObjectAsset(action,next.Asset);
                 bool file=before==null||next==null||before.FilePath!=next.FilePath||!before.DiskBytes.SequenceEqual(next.DiskBytes);
