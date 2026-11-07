@@ -24,3 +24,5 @@ Główny EXE zbudowany już po ostatniej zmianie dirty i korekcie komunikatu for
 Pozostało: dokończyć oczekującą próbę UI zgodnie z odpowiedzią, zapisać raport 0.4.1 z dokładnym zakresem/ograniczeniami, startup końcowego EXE, cleanup wyłącznie własnych artefaktów po procesach (zachować results.log), diff/check-ignore/staging i lokalny commit. Stan bazowy master 8d422b1, wszystkie zmiany nasze; bez fetch/push/tagu/Release'a.
 
 Końcowy startup identycznej kopii głównego EXE w smoke-041-eca1077a3d6747458c007ea3e147b5cb PASS, czyste zamknięcie potwierdzone przez Sky. Własne smoke/build artefakty sprzątnięte; pozostał results.log. Raport zapisany. Tylko modal rozwiązania własnej grupy i końcowy cleanup ui-041 pozostają zależne od odpowiedzi. Nie powtarzać wykonanych prób.
+
+Commit implementacji: 7d07c59, staging sprawdzony bez Library/_work, diff --check bez błędów. Bez push/tagu/Release'a. Pozostaje wyłącznie odpowiedź na oczekującą próbę rozwiązania własnej grupy i jej cleanup, nie implementacja lub ponowne regresje. Końcowy lokalny commit dokumentacyjny odczytaj git log -1. Po wznowieniu nie uruchamiaj ponownie żadnego zaliczonego case ani startu EXE.
