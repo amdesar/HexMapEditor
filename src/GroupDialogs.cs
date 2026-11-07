@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -13,8 +13,39 @@ namespace HexMapEditor
         public string StateName{get{return name.Text.Trim();}}
         public string StateColor{get{return color;}}
         public bool Allows{get{return reveal.Checked;}}
-        public ObjectStateDialog():base("Nowy stan obiektu",195){Row(0,"Nazwa",name,true);var button=new Button{Text=color,BackColor=ColorTranslator.FromHtml(color)};Row(1,"Kolor",button,true);button.Click+=(s,e)=>{using(var dialog=new ColorDialog{Color=ColorTranslator.FromHtml(color),FullOpen=true})if(dialog.ShowDialog(this)==DialogResult.OK){color=ColorTranslator.ToHtml(Color.FromArgb(dialog.Color.R,dialog.Color.G,dialog.Color.B));if(!MapLogic.ValidColor(color))color="#"+dialog.Color.R.ToString("X2")+dialog.Color.G.ToString("X2")+dialog.Color.B.ToString("X2");button.Text=color;button.BackColor=dialog.Color;}};Layout.Controls.Add(reveal,0,2);Layout.SetColumnSpan(reveal,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,38));Buttons(3,()=>{if(StateName.Length>0)DialogResult=DialogResult.OK;});}
+        readonly CheckBox update = new CheckBox { Text = "Zaktualizuj definicję na bieżącej mapie", AutoSize = true };
+        public bool UpdateMap { get { return update.Checked; } }
+
+        public ObjectStateDialog(ObjectStateDefinition state = null)
+            : base(state == null ? "Nowy stan obiektu" : "Edytuj stan biblioteczny", state == null ? 195 : 233)
+        {
+            if (state != null) { name.Text = state.Name; color = state.Color; reveal.Checked = state.CanReveal; }
+            Row(0, "Nazwa", name, true);
+            var button = new Button { Text = color, BackColor = ColorTranslator.FromHtml(color) };
+            Row(1, "Kolor", button, true);
+            button.Click += (sender, args) =>
+            {
+                using (var dialog = new ColorDialog { Color = ColorTranslator.FromHtml(color), FullOpen = true })
+                    if (dialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        color = String.Format("#{0:X2}{1:X2}{2:X2}", dialog.Color.R, dialog.Color.G, dialog.Color.B);
+                        button.Text = color;
+                        button.BackColor = dialog.Color;
+                    }
+            };
+            AddOption(reveal, 2);
+            if (state != null) AddOption(update, 3);
+            Buttons(state == null ? 3 : 4, () => { if (StateName.Length > 0) DialogResult = DialogResult.OK; });
+        }
+
+        void AddOption(CheckBox option, int row)
+        {
+            Layout.Controls.Add(option, 0, row);
+            Layout.SetColumnSpan(option, 3);
+            Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        }
     }
+
     internal sealed class UngroupDialog : EditorDialog
     {
         readonly ComboBox mode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};

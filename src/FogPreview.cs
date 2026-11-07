@@ -1,7 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -18,14 +17,17 @@ namespace HexMapEditor
         // 0 visible, 1 partial, 2 hidden. Rectangular geometry only, no per-pixel scan.
         int ObjectFogLevel(MapObject obj)
         {
-            using(var visible=VisibleObjectRegion(true))using(var uncovered=new Region(ObjectBounds(obj)))using(var covered=new Region(ObjectBounds(obj)))using(var matrix=new Matrix()){
-                uncovered.Intersect(visible);covered.Exclude(visible);bool anyVisible=uncovered.GetRegionScans(matrix).Any(r=>r.Width>.001f&&r.Height>.001f);bool anyCovered=covered.GetRegionScans(matrix).Any(r=>r.Width>.001f&&r.Height>.001f);return !anyCovered?0:anyVisible?1:2;
-            }
+            double fraction = FogVisibility.VisibleFraction(map, ObjectBounds(obj));
+            return fraction == 1 ? 0 : fraction == 0 ? 2 : 1;
         }
-        static void ValidateGroupFields(Dictionary<string,object> raw)
+        static void ValidateGroupFields(Dictionary<string,object> raw, int format)
         {
             string[][] required={new[]{"ObjectStates","Id","Name","Color","CanReveal"},new[]{"Groups","Id","Name","Members","StateId","Locked","RevealsFog","RevealRadius","SizeMode","SizeValue"}};
-            foreach(var fields in required){var items=raw.ContainsKey(fields[0])?raw[fields[0]] as object[]:null;if(items==null||items.Any(o=>!(o is Dictionary<string,object>)||fields.Skip(1).Any(k=>!((Dictionary<string,object>)o).ContainsKey(k))))throw new InvalidDataException("Brak jawnych danych stanów/grup formatu 5.");}
+            foreach(var fields in required){var items=raw.ContainsKey(fields[0])?raw[fields[0]] as object[]:null;if(items==null||items.Any(o=>!(o is Dictionary<string,object>)||fields.Skip(1).Any(k=>!((Dictionary<string,object>)o).ContainsKey(k))))throw new InvalidDataException("Brak jawnych danych stanów lub grup.");}
+            if (format == 6 && ((object[])raw["Groups"]).Cast<Dictionary<string, object>>().Any(g =>
+                !g.ContainsKey("FrameEnabled") || !(g["FrameEnabled"] is bool) ||
+                !g.ContainsKey("FrameColor") || !(g["FrameColor"] is string)))
+                throw new InvalidDataException("Brak jawnych danych ramki grupy.");
         }
     }
 }

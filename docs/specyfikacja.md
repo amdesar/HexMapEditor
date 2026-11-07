@@ -1,6 +1,6 @@
-# Specyfikacja użytkowa — HexMapEditor
-Wersja: 2.1, stan decyzji 7 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost: 0.4.1; pierwszeństwo mają ustalenia sekcji 28.
+﻿# Specyfikacja użytkowa — HexMapEditor
+Wersja: 2.2, stan decyzji 7 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost 0.4.2. Pierwszeństwo mają ustalenia sekcji 29.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -509,3 +509,13 @@ Wspólna historia 300 obejmuje grupowanie/nakładki/odłączanie/własne stany/u
 ### Granice i weryfikacja
 
 Bez zagnieżdżonych grup, światła/ciemności, widoku MG/gracza, tekstur/detail, zakładek, kadrowania, redesignu i optymalizacji dużych map. Walki/statystyk/ekwipunku, tras/pathfindingu/animacji nie planujemy w tym programie. Nie wznawiamy zaakceptowanych prac 0.4.0. Testy tylko celowane nowych zachowań; raport rozdziela metody/kontrolki, faktyczne próby zwykłego EXE i niewykonane obszary, bez deklaracji kompleksowej weryfikacji.
+
+## 29. Przyrost 0.4.2
+
+- Program korzysta z dostarczonej ikony `assets/app/icon.ico`. Kompilator osadza ją w EXE. Okno odczytuje ICO bez blokady pliku i przy błędzie używa zasobu EXE. `Rebuild-Program.bat` uruchamia `Build.ps1` względem swojego katalogu. Wynik zastępuje poprzednią binarkę po udanej kompilacji.
+- `Library/Objects/States` przechowuje definicje w plikach `state-Nazwa.json`. Podstawowe ID można edytować i są chronione przed usunięciem. Czysta biblioteka bierze ich definicje z kodu. Nowa mapa bierze stany z biblioteki. Otwarta zachowuje swoje definicje. Plus dodaje stan w obu miejscach. Edycja aktualizuje mapę po zaznaczeniu checkboxa, a usunięcie pliku zachowuje definicję mapy. Stan z dokumentu można świadomie zapisać do biblioteki. Pliki, dokument i delty mgły podlegają wspólnej historii do 300 operacji.
+- Format 6 zapisuje ramki i definicje podstawowe z możliwością edycji. Odczyt formatu 5 przyjmuje brak ramki jako wyłączenie. Zapis osadza użyte grafiki, definicje podstawowe i własne stany użyte przez obiekt lub grupę. Uwzględnia bazę przykrytą nakładką i zapisuje pełną paletę terenów projektu.
+- Do zaznaczonej grupy można dodać niezgrupowane obiekty. Kilka zaznaczonych grup można połączyć, zachowując ID i ustawienia wybranej grupy lub tworząc nową nazwaną grupę ze świeżymi ustawieniami. Kolejność propozycji wynika z kolejności zaznaczenia, a przy pojedynczym geście obszarowym z kolejności grup w dokumencie. Operacja obejmuje wszystkie wybrane instancje, zachowuje bazę i uzgadnia mgłę w jednym wpisie. Opcjonalna kreskowana ramka z wybranym kolorem otacza każdą grafikę i jest przycinana przez mgłę.
+- Lista instancji maskuje dane i miniaturę do 50% widoczności włącznie. Liczy sumę przecięć prostokąta grafiki z rozłącznymi wnętrzami zasłoniętych heksów. Próg używa wartości przed zaokrągleniem. Etykieta częściowego ukrycia podaje całkowity procent ukrytej powierzchni, z połówką w górę. Podgląd ujawnia dane, a kolumna mgły zachowuje opis geometrii.
+- Usuwanie z mapy przez przycisk lub Delete prowadzi do jednego potwierdzenia. Ctrl+Z i Ctrl+Y rozpoznają dokładne modyfikatory. Ctrl+Shift+Z nie zmienia historii. Dopasuj przełącza menu tym samym przyciskiem. Minimalna wysokość okna wynosi 720 px.
+- Do późniejszej pracy: zapis ikon, wzorców obiektów i przyszłych tekstur lub tła z odebranej mapy do biblioteki, mapa jako wizualny katalog grafik, wybór sposobu odłączenia dla każdego członka, przeprojektowanie paneli, światło, tekstury, zakładki i kadrowanie.

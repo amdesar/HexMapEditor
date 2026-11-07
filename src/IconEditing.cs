@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -96,7 +96,7 @@ namespace HexMapEditor
         MapData MapForSave()
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), Objects=map.Objects, Groups=map.Groups,ObjectStates=map.ObjectStates };
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map) };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {

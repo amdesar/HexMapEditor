@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -87,14 +87,24 @@ namespace HexMapEditor
             ShellButton(file, "Zapisz jako", "saveas", "Zapisz jako (Ctrl+Shift+S)", () => SaveAsProject(), 100);
             ConfigureButton(undoButton, "", "undo", "Cofnij operację mapy", Undo, 32); file.Controls.Add(undoButton);
             ConfigureButton(redoButton, "", "redo", "Ponów operację mapy", Redo, 32); file.Controls.Add(redoButton);
-            ShellButton(file, "Biblioteka", "library", "Pokaż lokalizację biblioteki", () => ShowEditorMessage("Lokalna biblioteka:\n" + LibraryPaths.Root + "\n\nPresety terenów można zapisywać w panelu po lewej. Pozostałe katalogi są przygotowane na przyszłe funkcje.", "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Information), 98);
+            ShellButton(file, "Biblioteka", "library", "Pokaż lokalizację biblioteki", () => ShowEditorMessage("Lokalna biblioteka:\n" + LibraryPaths.Root + "\n\nPresety terenów można zapisywać w panelu po lewej. Stany obiektów są dostępne w menu kafelków w szczegółach instancji.", "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Information), 98);
             ConfigureButton(orientationToggle, "Pointy Top", "pointy", "Zmień orientację", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop"), 128); view.Controls.Add(orientationToggle);
             ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
             var fitMenu=new ContextMenuStrip();fitMenu.Items.Add("Dopasuj mapę",null,(s,e)=>FitMap());fitMenu.Items.Add("Dopasuj wszystko",null,(s,e)=>FitEverything());
             fitMenu.BackColor=Color.FromArgb(34,38,48);fitMenu.ForeColor=Color.WhiteSmoke;fitMenu.Renderer=new ToolStripProfessionalRenderer(new FitMenuColors());
             fitMenu.Opening+=(s,e)=>EndCanvasGesture(true);fitMenu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};
-            ConfigureButton(fitButton, "Dopasuj", "fit", "Dopasuj mapę / Dopasuj wszystko", ()=>fitMenu.Show(fitButton,0,fitButton.Height), 94); view.Controls.Add(fitButton);
+            var fitStrip = new ToolStrip { AutoSize = false, Size = new Size(94, 32), Margin = new Padding(1),
+                Padding = Padding.Empty, GripStyle = ToolStripGripStyle.Hidden, CanOverflow = false,
+                BackColor = Color.FromArgb(49, 54, 67), Renderer = new FitButtonRenderer() };
+            var fitButton = new ToolStripDropDownButton("Dopasuj", EditorIcons.Small("fit"))
+            {
+                AutoSize = false, Size = new Size(94, 32), Margin = Padding.Empty, ShowDropDownArrow = false,
+                ForeColor = ForeColor, AccessibleName = "Dopasuj mapę / Dopasuj wszystko",
+                ToolTipText = "Dopasuj mapę / Dopasuj wszystko", DropDown = fitMenu
+            };
+            fitStrip.Items.Add(fitButton);
+            view.Controls.Add(fitStrip);
             ShellButton(view, "Rozmiar", "labels", "Dodaj lub usuń wiersze i kolumny", ResizeProject, 90);
             mapName.TextAlign = ContentAlignment.MiddleCenter; mapName.Font = new Font(Font, FontStyle.Bold); mapName.AutoEllipsis = true; mapName.AccessibleName = "Nazwa projektu"; shellToolbar.Controls.Add(mapName);
             var status = new Panel { Dock = DockStyle.Bottom, Height = 27, BackColor = shellToolbar.BackColor }; statusLabel.Dock = DockStyle.Fill; statusLabel.Padding = new Padding(10, 4, 0, 0); status.Controls.Add(statusLabel); Controls.Add(status);

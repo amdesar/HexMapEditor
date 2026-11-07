@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace HexMapEditor
 {
@@ -35,11 +36,29 @@ namespace HexMapEditor
         bool LiveChangeObject(MapObject next,string mergeKey)
         {
             var before=map.Objects.Single(o=>o.Id==next.Id);next=next.Copy();
-            if(!GroupRules.Allows(map,next.Side))next.RevealsFog=false;
+            if (before.Side != next.Side && !AvailableStates().Any(s => s.Id == next.Side && s.CanReveal)) next.RevealsFog = false;
             if(json.Serialize(before)==json.Serialize(next))return false;
             var action=new EditAction{Label="Właściwości obiektu"};action.Objects.Add(new ObjectChange{Before=before.Copy(),After=next,Index=map.Objects.IndexOf(before)});
+            IncludeLibraryState(action, next.Side);
             return CommitObjectTransaction(action,mergeKey,before.Side!=next.Side||before.RevealsFog!=next.RevealsFog||before.RevealRadius!=next.RevealRadius);
         }
+        void ConfirmDeleteSelectedObjects()
+        {
+            DeleteObjectsAfterConfirmation(text => ShowEditorMessage(text, "Usuń instancje z mapy", MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.OK);
+        }
+
+        bool DeleteObjectsAfterConfirmation(Func<string, bool> confirm)
+        {
+            var objects = map.Objects.Where(obj => selectedObjects.Contains(obj.Id)).ToList();
+            if (objects.Count == 0) return false;
+            string what = objects.Count == 1 ? "instancję „" + (!previewWithoutFog && ObjectFogLevel(objects[0]) > 0 ? "???" : objects[0].Name) + "”" : objects.Count + " instancje";
+            if (!confirm("Usunąć z mapy " + what + "? Wzorce w bibliotece pozostaną. Operację można cofnąć.")) return false;
+            DeleteSelectedObjects();
+            canvas.Focus();
+            return true;
+        }
+
         void DeleteSelectedObjects()
         {
             EndCanvasGesture(true);var action=new EditAction{Label="Usunięcie instancji"};
@@ -53,7 +72,7 @@ namespace HexMapEditor
         {
             var changes=new List<ObjectChange>();for(int i=0;i<map.Objects.Count;i++){var o=map.Objects[i];var p=ObjectGeometry.Transform(map,geometry,new PointF(o.X,o.Y),dc,dr);var next=o.Copy();next.X=p.X;next.Y=p.Y;changes.Add(new ObjectChange{Before=o.Copy(),After=next,Index=i});}return changes;
         }
-        void ResetObjectDocument(){selectedObjects.Clear();selectedGroupId=null;previewWithoutFog=false;if(fogPreviewButton!=null){fogPreviewButton.Checked=false;fogPreviewButton.BackColor=System.Drawing.Color.Transparent;}objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
+        void ResetObjectDocument(){selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;previewWithoutFog=false;if(fogPreviewButton!=null){fogPreviewButton.Checked=false;fogPreviewButton.BackColor=System.Drawing.Color.Transparent;}objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
         void FitEverything()
         {
             EndCanvasGesture(true);RectangleF bounds=MapBounds();foreach(var o in map.Objects)bounds=RectangleF.Union(bounds,ObjectBounds(o));FitBounds(bounds);UpdateUI();

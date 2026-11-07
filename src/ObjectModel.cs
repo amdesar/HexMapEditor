@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -42,7 +42,7 @@ namespace HexMapEditor
             if(map.Objects==null||map.Objects.Count>5000)throw new InvalidDataException("Nieprawidłowa lista obiektów (limit 5000).");
             var ids=new HashSet<string>();
             if(map.ObjectStates==null||map.Groups==null)throw new InvalidDataException("Brak stanów lub grup.");
-            foreach(var o in map.Objects) if(o==null||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||!ids.Add(o.Id)||String.IsNullOrWhiteSpace(o.TemplateId)||o.TemplateId.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200||!assets.Contains(o.AssetId??"")||!Finite(o.X)||!Finite(o.Y)||Math.Abs(o.X)>10000000||Math.Abs(o.Y)>10000000||!Finite(o.Size)||o.Size<8||o.Size>1024||!map.ObjectStates.Any(s=>s!=null&&s.Id==o.Side)||o.RevealRadius<0||o.RevealRadius>20||!GroupRules.Allows(map,o.Side)&&o.RevealsFog)throw new InvalidDataException("Nieprawidłowe dane instancji obiektu.");
+            foreach(var o in map.Objects) if(o==null||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||!ids.Add(o.Id)||String.IsNullOrWhiteSpace(o.TemplateId)||o.TemplateId.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200||!assets.Contains(o.AssetId??"")||!Finite(o.X)||!Finite(o.Y)||Math.Abs(o.X)>10000000||Math.Abs(o.Y)>10000000||!Finite(o.Size)||o.Size<8||o.Size>1024||!map.ObjectStates.Any(s=>s!=null&&s.Id==o.Side)||o.RevealRadius<0||o.RevealRadius>20)throw new InvalidDataException("Nieprawidłowe dane instancji obiektu.");
             GroupRules.Validate(map);
         }
         public static RectangleF Bounds(MapObject o,IconAsset asset)

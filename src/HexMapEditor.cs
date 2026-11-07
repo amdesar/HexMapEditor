@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -22,7 +22,7 @@ namespace HexMapEditor
         public static void EnsureDirectories(string applicationDirectory)
         {
             string root = Path.Combine(applicationDirectory, "Library");
-            foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), "Icons", "Objects", "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
+            foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), "Icons", "Objects", Path.Combine("Objects", "States"), "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
                 Directory.CreateDirectory(Path.Combine(root, folder));
         }
     }
@@ -68,7 +68,7 @@ namespace HexMapEditor
         public List<MapObject> Objects { get; set; }
         public List<ObjectStateDefinition> ObjectStates { get; set; }
         public List<ObjectGroup> Groups { get; set; }
-        public MapData() { FormatVersion = 5; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); Groups=new List<ObjectGroup>(); }
+        public MapData() { FormatVersion = 6; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); Groups=new List<ObjectGroup>(); }
     }
 
     internal sealed class TerrainState
@@ -97,6 +97,7 @@ namespace HexMapEditor
         public IconLibraryChange LibraryChange;
         public PresetFileChange PresetChange;
         public ObjectLibraryChange ObjectLibraryChange;
+        public StateFileChange StateFileChange;
         public List<ObjectChange> Objects = new List<ObjectChange>();
         public string BeforeOrientation, AfterOrientation;
         public List<ObjectGroup> BeforeGroups, AfterGroups;
@@ -114,7 +115,7 @@ namespace HexMapEditor
         readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 64 };
         readonly Panel canvas = new BufferedPanel();
         readonly Panel left = new Panel();
-        readonly Panel right = new Panel();
+        readonly Panel right = new BufferedPanel();
         readonly Button leftToggle = new Button();
         readonly Button rightClose = new Button();
         readonly ComboBox terrainPicker = new ComboBox();
@@ -130,7 +131,6 @@ namespace HexMapEditor
         readonly Button undoButton = new Button();
         readonly Button redoButton = new Button();
         readonly Button zoomButton = new Button();
-        readonly Button fitButton = new Button();
         readonly ToolTip tips = new ToolTip();
         MapData map = NewMap(15, 10, "PointyTop");
         string currentPath;
@@ -149,7 +149,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.4.1";
+        const string AppVersion = "0.4.2";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -160,10 +160,11 @@ namespace HexMapEditor
 
         public MainWindow()
         {
-            Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 680); Size = new Size(1440, 940);
+            Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 720); Size = new Size(1440, 940);
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
+            LoadProgramIcon();
             InitializeShell();
-            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); LoadObjects(); };
+            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); LoadObjects(); LoadStateLibrary(); };
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
             CaptureSavedState(); UpdateUI();
         }
@@ -247,7 +248,6 @@ namespace HexMapEditor
                 tips.SetToolTip(labelToggle, map.LabelMode == "InCells" ? "Pełne współrzędne wewnątrz heksów (od 80% skali, jeśli cały napis mieści się w polu i oknie)." : map.LabelMode == "None" ? "Bez etykiet współrzędnych." : "Współrzędne na osiach mapy.");
                 bool objectDetails = selectedObjects.Count > 0;
                 if (hexDetailScroll != null) hexDetailScroll.Visible = !objectDetails;
-                if (objectDetailPanel != null) objectDetailPanel.Visible = objectDetails;
                 if (detailTitle != null) detailTitle.Text = objectDetails ? "Szczegóły obiektu" : "Szczegóły heksu";
                 if (objectDetails) { selected = -1; editorCellId = null; UpdateObjectDetails(); }
                 else if (selected >= 0 && selected < map.Cells.Count)
@@ -261,6 +261,7 @@ namespace HexMapEditor
                     detailIcon.Text = hidden ? "Ikona: ???" : "Ikona: " + (cell.IconId == null ? "brak" : cell.IconName ?? map.IconAssets.First(a=>a.Id==cell.IconId).Name);
                 }
                 else { selected = -1; rightPanelOpen = false; editorCellId = null; }
+                if (objectDetailPanel != null) objectDetailPanel.Visible = objectDetails;
                 right.Visible = rightPanelOpen && (selected >= 0 || objectDetails);
             }
             finally { updating = false; }
@@ -288,7 +289,7 @@ namespace HexMapEditor
         }
         void StartNewProject(int columns, int rows, string orientation, string name, TerrainPreset sourcePreset)
         {
-            EndCanvasGesture(true); ResetObjectDocument(); ClearDocumentIcons(); map = NewMap(columns, rows, orientation); map.Name = name;
+            EndCanvasGesture(true); ResetObjectDocument(); ClearDocumentIcons(); map = NewMap(columns, rows, orientation); map.Name = name; map.ObjectStates = NewStateDefinitions();
             var preset = sourcePreset.Copy(); map.Presets = new List<TerrainPreset> { preset }; map.ActivePresetId = preset.Id;
             currentPath = null; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
             CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
@@ -321,16 +322,17 @@ namespace HexMapEditor
                 if (new FileInfo(path).Length > 128L * 1024 * 1024) throw new InvalidDataException("Plik przekracza limit odczytu 128 MiB.");
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
-                if ((int)raw["FormatVersion"] != 5) throw new InvalidDataException("Ta wersja otwiera wyłącznie mapy formatu 5. Starszy plik pozostawiono bez zmian.");
+                int format = (int)raw["FormatVersion"];
+                if (format != 5 && format != 6) throw new InvalidDataException("Obsługiwane formaty mapy: 5 i 6.");
                 {
                     var cells = raw.ContainsKey("Cells") ? raw["Cells"] as object[] : null;
                     var objects=raw.ContainsKey("Objects")?raw["Objects"] as object[]:null;
                     string[] objectFields={"Id","TemplateId","Name","AssetId","X","Y","Size","Side","Locked","RevealsFog","RevealRadius"};
-                    if(objects==null||objects.Any(o=>!(o is Dictionary<string,object>)||objectFields.Any(key=>!((Dictionary<string,object>)o).ContainsKey(key))))throw new InvalidDataException("Niepełne dane instancji obiektu w formacie 5.");
-                    ValidateGroupFields(raw);
-                    if (cells == null || !raw.ContainsKey("Objects") || !raw.ContainsKey("IconAssets") || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision", "IconId", "Fog" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Format 5 wymaga jawnych danych heksów, zasobów, obiektów, stanów i grup.");
+                    if(objects==null||objects.Any(o=>!(o is Dictionary<string,object>)||objectFields.Any(key=>!((Dictionary<string,object>)o).ContainsKey(key))))throw new InvalidDataException("Niepełne dane instancji obiektu.");
+                    ValidateGroupFields(raw, format);
+                    if (cells == null || !raw.ContainsKey("Objects") || !raw.ContainsKey("IconAssets") || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision", "IconId", "Fog" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Brak jawnych danych heksów, zasobów, obiektów, stanów lub grup.");
                 }
-                var loaded = json.ConvertToType<MapData>(raw); ValidateMap(loaded);
+                var loaded = json.ConvertToType<MapData>(raw); ValidateMap(loaded); loaded.FormatVersion = 6;
                 EndCanvasGesture(false); ResetObjectDocument(); ClearDocumentIcons(); map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
                 CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); return true;
             }
@@ -420,7 +422,7 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 5) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion + ". Wymagany format 5.");
+            if (m.FormatVersion != 5 && m.FormatVersion != 6) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
             IconAssets.Validate(m.IconAssets); var iconIds = new HashSet<string>(m.IconAssets.Select(a => a.Id));
             ObjectGeometry.Validate(m,iconIds);
             if (m.Columns < 1 || m.Columns > 200 || m.Rows < 1 || m.Rows > 200) throw new InvalidDataException("Wymiary mapy muszą mieścić się w zakresie 1–200.");
@@ -450,19 +452,33 @@ namespace HexMapEditor
         void OnFormClosing(object sender, FormClosingEventArgs e) { EndCanvasGesture(true); if (!ConfirmDiscard()) e.Cancel = true; }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if ((e.KeyCode==Keys.Escape || e.KeyCode==Keys.Delete && selectedObjects.Count>0 && !left.ContainsFocus) && !TextInputFocused(this)) { if(e.KeyCode==Keys.Delete)DeleteSelectedObjects();else {EndCanvasGesture(true);selectedObjects.Clear();UpdateUI();} e.Handled=true;e.SuppressKeyPress=true;return; }
+            if ((e.KeyCode==Keys.Escape || e.KeyCode==Keys.Delete && selectedObjects.Count>0 && !left.ContainsFocus) && !TextInputFocused(this)) { if(e.KeyCode==Keys.Delete)ConfirmDeleteSelectedObjects();else {EndCanvasGesture(true);selectedObjects.Clear();UpdateUI();} e.Handled=true;e.SuppressKeyPress=true;return; }
             if (e.Control && e.Shift && e.KeyCode == Keys.S) { SaveAsProject(); e.Handled = true; e.SuppressKeyPress = true; }
             else if (e.Control && !e.Shift && e.KeyCode == Keys.S) { SaveProject(); e.Handled = true; e.SuppressKeyPress = true; }
-            else if (e.Control && (e.KeyCode == Keys.Z || e.KeyCode == Keys.Y))
+            else if (HandleHistoryShortcut(e.KeyData)) { e.Handled = true; e.SuppressKeyPress = true; }
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            return HandleHistoryShortcut(keyData) || base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        bool HandleHistoryShortcut(Keys keyData)
+        {
+            var key = keyData & Keys.KeyCode;
+            if ((key != Keys.Z && key != Keys.Y) || (keyData & Keys.Control) == 0) return false;
+            if ((keyData & Keys.Modifiers) != Keys.Control) return true;
+
+            bool repeat = key == Keys.Y;
+            if (cellName.ContainsFocus) TextUndo("name", repeat);
+            else if (cellDescription.ContainsFocus) TextUndo("description", repeat);
+            else if (objectDetailPanel.ContainsFocus || !TextInputFocused(this))
             {
-                bool repeat = e.KeyCode == Keys.Y;
-                if (cellName.ContainsFocus || ActiveControl == cellName) TextUndo("name", repeat);
-                else if (cellDescription.ContainsFocus) TextUndo("description", repeat);
-                else if (objectDetailPanel.ContainsFocus) { if(repeat)Redo();else Undo(); }
-                else if (TextInputFocused(this)) return;
-                else if (repeat) Redo(); else Undo();
-                e.Handled = true; e.SuppressKeyPress = true;
+                if (repeat) Redo();
+                else Undo();
             }
+            else return false;
+            return true;
         }
 
         string Coordinate(int index)

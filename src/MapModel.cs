@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -274,7 +274,7 @@ namespace HexMapEditor
         static string CellKey(CellData cell) { return MapLogic.Hash(MapLogic.Serializer().Serialize(cell)); }
         static string Header(MapData map)
         {
-            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, map.ObjectStates });
+            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, ObjectStates = StateLibrary.ForSave(map) });
         }
         public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); changed.Clear(); headerChanged = false; }
         public bool CheckCell(CellData cell) { string value; if (saved.TryGetValue(cell.Id, out value) && value == CellKey(cell)) changed.Remove(cell.Id); else changed.Add(cell.Id); return Dirty; }

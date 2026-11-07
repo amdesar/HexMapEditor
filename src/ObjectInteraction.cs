@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -33,8 +33,8 @@ namespace HexMapEditor
         void ChooseObjectMember(MapObject hit,bool control,bool single)
         {
             EndObjectPropertyEdit();var unit=single?new HashSet<string>{hit.Id}:ExpandedObjects(new[]{hit.Id});
-            if(control){if(unit.IsSubsetOf(selectedObjects))selectedObjects.ExceptWith(unit);else selectedObjects.UnionWith(unit);}else if(single||!unit.IsSubsetOf(selectedObjects)){selectedObjects.Clear();selectedObjects.UnionWith(unit);}
-            if(single)selectedGroupId=null;else ResolveSelectedGroup();selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();
+            if(control){if(unit.IsSubsetOf(selectedObjects))selectedObjects.ExceptWith(unit);else selectedObjects.UnionWith(unit);}else if(single||!unit.IsSubsetOf(selectedObjects)){selectedObjects.Clear();groupSelectionOrder.Clear();selectedObjects.UnionWith(unit);}
+            if(single){selectedGroupId=null;SelectedWholeGroups();}else ResolveSelectedGroup();selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();
         }
         void BeginObjectMove(IEnumerable<string> ids,PointF point)
         {
@@ -45,7 +45,27 @@ namespace HexMapEditor
         {
             var state=g.Save();g.TranslateTransform(pan.X,pan.Y);g.ScaleTransform(scale,scale);
             using(var visible=VisibleObjectRegion()){g.SetClip(visible,CombineMode.Intersect);
-                foreach(var o in map.Objects){var bounds=ObjectBounds(o);g.DrawImage(AssetBitmap(map.IconAssets.First(a=>a.Id==o.AssetId),false),bounds);if(selectedObjects.Contains(o.Id))using(var pen=new Pen(Color.Gold,2/scale))g.DrawRectangle(pen,bounds.X,bounds.Y,bounds.Width,bounds.Height);}
+                var frames = map.Groups.Where(group => group.FrameEnabled)
+                    .SelectMany(group => group.Members.Select(id => new { Id = id, group.FrameColor }))
+                    .ToDictionary(entry => entry.Id, entry => entry.FrameColor);
+                foreach (var obj in map.Objects)
+                {
+                    var bounds = ObjectBounds(obj);
+                    g.DrawImage(AssetBitmap(map.IconAssets.First(a => a.Id == obj.AssetId), false), bounds);
+                    string color;
+                    if (frames.TryGetValue(obj.Id, out color))
+                    {
+                        using (var pen = new Pen(ColorTranslator.FromHtml(color), 2 / scale))
+                        {
+                            pen.DashStyle = DashStyle.Dash;
+                            var frame = RectangleF.Inflate(bounds, 3 / scale, 3 / scale);
+                            g.DrawRectangle(pen, frame.X, frame.Y, frame.Width, frame.Height);
+                        }
+                    }
+                    if (selectedObjects.Contains(obj.Id))
+                        using (var pen = new Pen(Color.Gold, 2 / scale))
+                            g.DrawRectangle(pen, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+                }
             }g.Restore(state);
             if(objectSelecting&&selectionPath.Count>1)using(var pen=new Pen(Color.CornflowerBlue,1.5f)){var points=selectionPath.Select(Screen).ToArray();if(selectionKind==1){g.DrawLines(pen,points);g.DrawLine(pen,points[points.Length-1],points[0]);}else{var r=SelectionRectangle(selectionPath[0],selectionPath[selectionPath.Count-1]);var a=Screen(r.Location);g.DrawRectangle(pen,a.X,a.Y,r.Width*scale,r.Height*scale);}}
         }
@@ -62,7 +82,7 @@ namespace HexMapEditor
                     BeginObjectMove(selectedObjects,point);
                 }return true;
             }
-            if(!selectionControl){selectedObjects.Clear();selectedGroupId=null;}objectSelecting=gestureTool!=EditorTool.Select;selectionPath.Clear();selectionPath.Add(point);canvas.Invalidate();return true;
+            if(!selectionControl){selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;}objectSelecting=gestureTool!=EditorTool.Select;selectionPath.Clear();selectionPath.Add(point);canvas.Invalidate();return true;
         }
         bool ObjectMouseMove(MouseEventArgs e)
         {

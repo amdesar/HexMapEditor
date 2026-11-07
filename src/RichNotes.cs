@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -226,7 +226,7 @@ namespace HexMapEditor
                 if ((Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == 0) return;
                 if (HandlePlainPasteKey(e.Key, Keyboard.Modifiers)) { e.Handled = true; return; }
                 if (e.Key == Key.S) { e.Handled = true; if (SaveRequested != null) SaveRequested((Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0); return; }
-                if (e.Key == Key.Z || e.Key == Key.Y) { e.Handled = true; if (HistoryRequested != null) HistoryRequested(e.Key == Key.Y); return; }
+                if (HandleHistoryKey(e.Key, Keyboard.Modifiers)) { e.Handled = true; return; }
                 RoutedUICommand command = e.Key == Key.B ? EditingCommands.ToggleBold : e.Key == Key.I ? EditingCommands.ToggleItalic : e.Key == Key.U ? EditingCommands.ToggleUnderline : e.Key == Key.E ? EditingCommands.AlignCenter : e.Key == Key.L ? EditingCommands.AlignLeft : e.Key == Key.R ? EditingCommands.AlignRight : e.Key == Key.J ? EditingCommands.AlignJustify : null;
                 if (command != null) { e.Handled = true; Execute(command); }
             };
@@ -242,6 +242,14 @@ namespace HexMapEditor
             menu.Items.Add(new Separator()); menu.Items.Add(PlainPasteItem); PlainPasteItem.Click += (s, e) => Paste(true);
             menu.Opened += (s, e) => { try { PlainPasteItem.IsEnabled = HasPlainClipboardText(); } catch { PlainPasteItem.IsEnabled = false; } }; Box.ContextMenu = menu;
         }
+        internal bool HandleHistoryKey(Key key, System.Windows.Input.ModifierKeys modifiers)
+        {
+            const System.Windows.Input.ModifierKeys control = System.Windows.Input.ModifierKeys.Control;
+            if ((key != Key.Z && key != Key.Y) || (modifiers & control) == 0) return false;
+            if (modifiers == control && HistoryRequested != null) HistoryRequested(key == Key.Y);
+            return true;
+        }
+
         internal void FitTables() { FitTablesIn(Box.Document.Blocks); }
         static void FitTablesIn(BlockCollection blocks)
         {

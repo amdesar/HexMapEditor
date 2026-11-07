@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -45,6 +45,7 @@ namespace HexMapEditor
             if (action.LibraryChange != null) ApplyIconLibrary(action.LibraryChange, after);
             if (action.PresetChange != null) ApplyPresetLibrary(action.PresetChange, after);
             if (action.ObjectLibraryChange != null) ApplyObjectLibrary(action.ObjectLibraryChange, after);
+            if (action.StateFileChange != null) ApplyStateFile(action.StateFileChange, after);
             foreach (var asset in action.RequiredAssets) if (!map.IconAssets.Any(a => a.Id == asset.Id)) map.IconAssets.Add(asset);
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);
@@ -53,8 +54,9 @@ namespace HexMapEditor
             if(action.BeforeStates!=null)map.ObjectStates=(after?action.AfterStates:action.BeforeStates).Select(s=>s.Copy()).ToList();
             foreach(var change in action.Objects)change.Apply(map,after);
             selectedObjects.RemoveWhere(id=>!map.Objects.Any(o=>o.Id==id));
-            if(!map.Groups.Any(g=>g.Id==selectedGroupId))selectedGroupId=null;
+            if (!map.Groups.Any(g => g.Id == selectedGroupId && selectedObjects.SetEquals(g.Members))) selectedGroupId = null;
             if (action.BeforePalette != null) (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex);
+            if (action.Changes.Count != 0 || action.Layers.Count != 0)
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);
                 foreach (var change in action.Changes) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) (after ? change.After : change.Before).ApplyTo(cell); }

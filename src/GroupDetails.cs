@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -18,7 +18,8 @@ namespace HexMapEditor
         ListBox groupMembers;
         ComboBox groupState,groupLock,groupReveal,groupSizeMode;
         NumericUpDown groupRadius,groupSize;
-        CheckBox groupRadiusOverride;
+        CheckBox groupRadiusOverride, groupFrame;
+        Button groupFrameColor;
         string groupStateSignature,groupMembersSignature;
         ComboBox OverrideChoice(){var c=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};c.Items.AddRange(new object[]{"Indywidualnie","Tak","Nie"});c.SelectedIndex=0;return c;}
         void BuildGroupDetails(Control parent)
@@ -33,7 +34,12 @@ namespace HexMapEditor
             groupSize=new NumericUpDown{Minimum=-1016,Maximum=1024};PropertyRow(groupLayout,9,"Wartość",groupSize);
             SpanRow(groupLayout,10,new Label{Text="Nakładka nie zmienia wartości indywidualnych. Przesunięcie jest liczone od ich rozmiaru i ograniczane do 8–1024. Stan bez uprawnienia zawsze blokuje skuteczne odkrywanie.",AutoSize=true,MaximumSize=new Size(340,0)});
             SpanRow(groupLayout,11,PropertyButton("Rozwiąż grupę",()=>{var g=CurrentGroup();if(g!=null)UnlinkWithDialog(g,g.Members.ToArray());}));
-            SpanRow(groupLayout,12,PropertyButton("Usuń instancje grupy",DeleteSelectedObjects,true));
+            groupFrame = new CheckBox { Text = "Ramka członków", AutoSize = true };
+            SpanRow(groupLayout, 12, groupFrame);
+            groupFrameColor = PropertyButton("Wybierz kolor", ChooseFrameColor);
+            PropertyRow(groupLayout, 13, "Kolor ramki", groupFrameColor);
+            SpanRow(groupLayout,14,PropertyButton("Usuń instancje grupy",ConfirmDeleteSelectedObjects,true));
+            groupFrame.CheckedChanged += (s, e) => EditGroup("frame", g => g.FrameEnabled = groupFrame.Checked, false);
             groupName.TextChanged+=(s,e)=>{if(!String.IsNullOrWhiteSpace(groupName.Text))EditGroup("name",g=>g.Name=groupName.Text.Trim(),true);};
             groupState.SelectedIndexChanged+=(s,e)=>EditGroup("state",g=>g.StateId=groupState.SelectedIndex<=0?null:((ObjectStateDefinition)groupState.SelectedItem).Id,false);
             groupLock.SelectedIndexChanged+=(s,e)=>EditGroup("lock",g=>g.Locked=ReadOverride(groupLock),false);groupReveal.SelectedIndexChanged+=(s,e)=>EditGroup("reveal",g=>g.RevealsFog=ReadOverride(groupReveal),false);
@@ -53,18 +59,35 @@ namespace HexMapEditor
         void UpdateGroupDetails()
         {
             var g=CurrentGroup();if(g==null)return;if(propertyEditKey==null||!groupName.ContainsFocus)groupName.Text=g.Name;
-            string states=json.Serialize(map.ObjectStates);if(groupStateSignature!=states){groupState.Items.Clear();groupState.Items.Add("Indywidualnie");foreach(var state in map.ObjectStates)groupState.Items.Add(state);groupStateSignature=states;}
-            groupState.SelectedIndex=g.StateId==null?0:map.ObjectStates.FindIndex(s=>s.Id==g.StateId)+1;groupLock.SelectedIndex=OverrideIndex(g.Locked);groupReveal.SelectedIndex=OverrideIndex(g.RevealsFog);groupRadiusOverride.Checked=g.RevealRadius.HasValue;groupRadius.Value=g.RevealRadius??1;
+            var available = AvailableStates();
+            string states = json.Serialize(available);
+            if (groupStateSignature != states)
+            {
+                groupState.BeginUpdate();
+                groupState.Items.Clear();
+                groupState.Items.Add("Indywidualnie");
+                foreach (var state in available) groupState.Items.Add(state);
+                groupState.EndUpdate();
+                groupStateSignature = states;
+            }
+            groupFrame.Checked = g.FrameEnabled;
+            groupFrameColor.BackColor = ColorTranslator.FromHtml(g.FrameColor);
+            groupFrameColor.ForeColor = groupFrameColor.BackColor.GetBrightness() > .55 ? Color.Black : Color.White;
+            groupState.SelectedIndex=g.StateId==null?0:available.FindIndex(s=>s.Id==g.StateId)+1;groupLock.SelectedIndex=OverrideIndex(g.Locked);groupReveal.SelectedIndex=OverrideIndex(g.RevealsFog);groupRadiusOverride.Checked=g.RevealRadius.HasValue;groupRadius.Value=g.RevealRadius??1;
             bool allowed=g.StateId==null?g.Members.Any(id=>GroupRules.Allows(map,map.Objects.Single(o=>o.Id==id).Side)):GroupRules.Allows(map,g.StateId);groupReveal.Enabled=allowed;groupRadiusOverride.Enabled=allowed;groupRadius.Enabled=allowed&&groupRadiusOverride.Checked;
             groupSizeMode.SelectedIndex=Array.IndexOf(new[]{"Individual","Offset","Common"},g.SizeMode);groupSize.Minimum=-1016;groupSize.Maximum=1024;groupSize.Value=(decimal)g.SizeValue;if(g.SizeMode=="Common")groupSize.Minimum=8;else if(g.SizeMode=="Offset")groupSize.Maximum=1016;groupSize.Enabled=g.SizeMode!="Individual";
             var members=g.Members.Select(id=>{var obj=map.Objects.Single(o=>o.Id==id);return new GroupMemberChoice{Id=id,Name=!previewWithoutFog&&ObjectFogLevel(obj)>0?"???":obj.Name};}).ToList();string signature=g.Id+":"+json.Serialize(members.Select(m=>new[]{m.Id,m.Name}).ToArray());
             if(groupMembersSignature!=signature){string chosen=(groupMembers.SelectedItem as GroupMemberChoice)==null?null:((GroupMemberChoice)groupMembers.SelectedItem).Id;groupMembers.Items.Clear();foreach(var member in members)groupMembers.Items.Add(member);groupMembers.SelectedIndex=Math.Max(0,members.FindIndex(m=>m.Id==chosen));groupMembersSignature=signature;}
         }
-        void SelectGroup(ObjectGroup group){EndCanvasGesture(true);selectedObjects.Clear();selectedObjects.UnionWith(group.Members);selectedGroupId=group.Id;selected=-1;rightPanelOpen=true;UpdateUI();}
-        void CreateGroupFromSelection()
+        void SelectGroup(ObjectGroup group){EndCanvasGesture(true);selectedObjects.Clear();selectedObjects.UnionWith(group.Members);groupSelectionOrder.Clear();groupSelectionOrder.Add(group.Id);selectedGroupId=group.Id;selected=-1;rightPanelOpen=true;UpdateUI();}
+        void ChooseFrameColor()
         {
-            EndCanvasGesture(true);if(selectedObjects.Count<2)return;if(map.Groups.Any(g=>g.Members.Any(selectedObjects.Contains))){ShowEditorMessage("Część wybranych obiektów już należy do grupy. Najpierw świadomie odłącz je lub rozwiąż grupę. Nie zmieniono członkostwa.","Grupowanie",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
-            using(var d=new NameDialog("Nowa trwała grupa","Grupa"))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)CreateObjectGroup(d.Value);
+            var group = CurrentGroup();
+            if (group == null) return;
+            using (var dialog = new ColorDialog { Color = ColorTranslator.FromHtml(group.FrameColor), FullOpen = true })
+                if (RunModal(() => dialog.ShowDialog(this)) == DialogResult.OK)
+                    EditGroup("frame-color", g => g.FrameColor = String.Format("#{0:X2}{1:X2}{2:X2}",
+                        dialog.Color.R, dialog.Color.G, dialog.Color.B), false);
         }
         void UnlinkWithDialog(ObjectGroup group,IEnumerable<string> members)
         {var ids=members.ToArray();using(var d=new UngroupDialog(ids.Length==group.Members.Count))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)DetachObjects(group.Id,ids,d.Keep);}

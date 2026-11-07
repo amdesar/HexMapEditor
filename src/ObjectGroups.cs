@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,7 +27,9 @@ namespace HexMapEditor
         public int? RevealRadius {get;set;}
         public string SizeMode {get;set;}
         public float SizeValue {get;set;}
-        public ObjectGroup(){Id=Guid.NewGuid().ToString("N");Name="Grupa";Members=new List<string>();SizeMode="Individual";}
+        public bool FrameEnabled { get; set; }
+        public string FrameColor { get; set; }
+        public ObjectGroup(){Id=Guid.NewGuid().ToString("N");Name="Grupa";Members=new List<string>();SizeMode="Individual";FrameColor="#4BBBCD";}
         public ObjectGroup Copy(){var copy=(ObjectGroup)MemberwiseClone();copy.Members=new List<string>(Members);return copy;}
     }
     internal static class GroupRules
@@ -46,10 +48,10 @@ namespace HexMapEditor
         {
             if(map.ObjectStates==null||map.ObjectStates.Count<3||map.ObjectStates.Count>100||map.Groups==null||map.Groups.Count>2500)throw new InvalidDataException("Nieprawidłowe definicje stanów/grup.");
             var states=new HashSet<string>();foreach(var state in map.ObjectStates)if(state==null||String.IsNullOrWhiteSpace(state.Id)||state.Id.Length>200||!states.Add(state.Id)||String.IsNullOrWhiteSpace(state.Name)||state.Name.Length>200||!MapLogic.ValidColor(state.Color))throw new InvalidDataException("Nieprawidłowy lub powtórzony stan obiektu.");
-            foreach(var builtin in ObjectStateDefinition.Defaults()){var state=map.ObjectStates.FirstOrDefault(s=>s.Id==builtin.Id);if(state==null||state.Name!=builtin.Name||state.Color!=builtin.Color||state.CanReveal!=builtin.CanReveal)throw new InvalidDataException("Brak lub zmieniona wbudowana definicja stanu.");}
+            if (ObjectStateDefinition.Defaults().Any(s => !states.Contains(s.Id))) throw new InvalidDataException("Brak podstawowej definicji stanu.");
             var objects=new HashSet<string>(map.Objects.Select(o=>o.Id));var groups=new HashSet<string>();var assigned=new HashSet<string>();
             foreach(var group in map.Groups){
-                if(group==null||String.IsNullOrWhiteSpace(group.Id)||group.Id.Length>200||objects.Contains(group.Id)||!groups.Add(group.Id)||String.IsNullOrWhiteSpace(group.Name)||group.Name.Length>200||group.Members==null||group.Members.Count==0||group.Members.Any(id=>!objects.Contains(id)||!assigned.Add(id))||group.StateId!=null&&!states.Contains(group.StateId)||group.RevealRadius.HasValue&&(group.RevealRadius<0||group.RevealRadius>20)||!new[]{"Individual","Offset","Common"}.Contains(group.SizeMode)||!ObjectGeometry.Finite(group.SizeValue)||group.SizeValue< -1016||group.SizeValue>1024||group.SizeMode=="Offset"&&Math.Abs(group.SizeValue)>1016||group.SizeMode=="Common"&&(group.SizeValue<8||group.SizeValue>1024))throw new InvalidDataException("Nieprawidłowa grupa, członkostwo lub nadpisanie.");
+                if(group==null||!MapLogic.ValidColor(group.FrameColor)||String.IsNullOrWhiteSpace(group.Id)||group.Id.Length>200||objects.Contains(group.Id)||!groups.Add(group.Id)||String.IsNullOrWhiteSpace(group.Name)||group.Name.Length>200||group.Members==null||group.Members.Count==0||group.Members.Any(id=>!objects.Contains(id)||!assigned.Add(id))||group.StateId!=null&&!states.Contains(group.StateId)||group.RevealRadius.HasValue&&(group.RevealRadius<0||group.RevealRadius>20)||!new[]{"Individual","Offset","Common"}.Contains(group.SizeMode)||!ObjectGeometry.Finite(group.SizeValue)||group.SizeValue< -1016||group.SizeValue>1024||group.SizeMode=="Offset"&&Math.Abs(group.SizeValue)>1016||group.SizeMode=="Common"&&(group.SizeValue<8||group.SizeValue>1024))throw new InvalidDataException("Nieprawidłowa grupa, członkostwo lub nadpisanie.");
             }
         }
     }
@@ -74,7 +76,8 @@ namespace HexMapEditor
         bool CommitObjectTransaction(EditAction action,string mergeKey=null,bool reconcile=true)
         {
             var model=ProspectiveObjects(action);GroupRules.Validate(model);ObjectGeometry.Validate(model,new HashSet<string>(map.IconAssets.Select(a=>a.Id).Concat(action.RequiredAssets.Select(a=>a.Id))));
-            if(reconcile)ReconcileFog(action,model,false);ApplyAction(action,true);
+            if(reconcile)ReconcileFog(action,model,false);
+            ApplyAction(action,true);
             if(mergeKey!=null&&mergeKey==propertyEditKey&&propertyEditAction!=null&&undo.Count>0&&Object.ReferenceEquals(undo.Peek(),propertyEditAction)&&redo.Count==0){
                 foreach(var change in action.Objects){var old=propertyEditAction.Objects.FirstOrDefault(c=>(c.After??c.Before).Id==(change.After??change.Before).Id);if(old!=null)old.After=change.After;else propertyEditAction.Objects.Add(change);}
                 if(action.AfterGroups!=null)propertyEditAction.AfterGroups=action.AfterGroups;
@@ -83,7 +86,14 @@ namespace HexMapEditor
                 if(empty){undo.Pop();EndObjectPropertyEdit();}
             }else{EndObjectPropertyEdit();PushAction(action);if(mergeKey!=null){propertyEditKey=mergeKey;propertyEditAction=action;}}
             // Live property edits must not hash every hex/description for each character.
-            var changedCells=new HashSet<string>(action.Layers.Select(l=>l.CellId));foreach(var cell in map.Cells.Where(c=>changedCells.Contains(c.Id)))savedState.CheckCell(cell);dirty=savedState.CheckHeader(map);UpdateUI();return true;
+            if (action.Layers.Count != 0)
+            {
+                var changedCells = new HashSet<string>(action.Layers.Select(l => l.CellId));
+                foreach (var cell in map.Cells.Where(c => changedCells.Contains(c.Id))) savedState.CheckCell(cell);
+            }
+            dirty = savedState.CheckHeader(map);
+            UpdateUI();
+            return true;
         }
         bool CreateObjectGroup(string name)
         {
@@ -94,12 +104,15 @@ namespace HexMapEditor
         bool ChangeObjectGroup(ObjectGroup group,string mergeKey=null)
         {
             var before=map.Groups.First(g=>g.Id==group.Id);if(json.Serialize(before)==json.Serialize(group))return false;
-            var action=new EditAction{Label="Właściwości grupy",BeforeGroups=map.Groups.Select(g=>g.Copy()).ToList(),AfterGroups=map.Groups.Select(g=>g.Id==group.Id?group.Copy():g.Copy()).ToList()};return CommitObjectTransaction(action,mergeKey,before.StateId!=group.StateId||before.RevealsFog!=group.RevealsFog||before.RevealRadius!=group.RevealRadius);
+            var action=new EditAction{Label="Właściwości grupy",BeforeGroups=map.Groups.Select(g=>g.Copy()).ToList(),AfterGroups=map.Groups.Select(g=>g.Id==group.Id?group.Copy():g.Copy()).ToList()};
+            IncludeLibraryState(action, group.StateId);
+            return CommitObjectTransaction(action,mergeKey,before.StateId!=group.StateId||before.RevealsFog!=group.RevealsFog||before.RevealRadius!=group.RevealRadius);
         }
         string AddObjectState(string name,string color,bool allows)
         {
-            EndCanvasGesture(true);var definition=new ObjectStateDefinition{Name=name.Trim(),Color=color,CanReveal=allows};var after=map.ObjectStates.Select(s=>s.Copy()).ToList();after.Add(definition);
-            var action=new EditAction{Label="Nowy stan obiektu",BeforeStates=map.ObjectStates.Select(s=>s.Copy()).ToList(),AfterStates=after};GroupRules.Validate(ProspectiveObjects(action));ApplyAction(action,true);PushAction(action);MarkDirty();return definition.Id;
+            var definition = new ObjectStateDefinition { Name = name.Trim(), Color = color, CanReveal = allows };
+            ChangeStateFile(definition, definition.Id, true, StatesDirectory);
+            return definition.Id;
         }
         bool DetachObjects(string groupId,IEnumerable<string> members,bool[] keep)
         {
@@ -113,6 +126,10 @@ namespace HexMapEditor
         }
         HashSet<string> ExpandedObjects(IEnumerable<string> ids)
         {var result=new HashSet<string>(ids);foreach(var group in map.Groups)if(group.Members.Any(result.Contains))result.UnionWith(group.Members);return result;}
-        void ResolveSelectedGroup(){selectedGroupId=map.Groups.FirstOrDefault(g=>selectedObjects.SetEquals(g.Members))==null?null:map.Groups.First(g=>selectedObjects.SetEquals(g.Members)).Id;}
+        void ResolveSelectedGroup()
+        {
+            var group = SelectedWholeGroups().FirstOrDefault(g => selectedObjects.SetEquals(g.Members));
+            selectedGroupId = group == null ? null : group.Id;
+        }
     }
 }

@@ -1,10 +1,10 @@
-# HexMapEditor 0.4.1
+﻿# HexMapEditor 0.4.2
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.4.1**, mapy **formatu 5**, presety **1**, ikony biblioteczne **2**, wzorce obiektów **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.4.2**, zapis map w **formacie 6**, presety **1**, ikony biblioteczne **2**, wzorce obiektów **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,7 +12,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-**0.4.1 otwiera tylko format 5.** Nowe obowiązkowe grupy i definicje stanów uzasadniają zmianę formatu: starszy program mógłby zgubić te dane. Nie ma konwersji map 1–4; błędny/starszy plik nie zmienia otwartego dokumentu ani źródła. Zachowaj starszy program dla dawnych map.
+Aplikacja otwiera formaty 5 i 6. W formacie 5 ramki są domyślnie wyłączone. Zapis w formacie 6 chroni ramki i zmienione definicje podstawowe przed utratą w wersji 0.4.1.
+
+## Podmiana ikony programu
+
+Zamknij HexMapEditor, podmień plik `assets/app/icon.ico`, uruchom `Rebuild-Program.bat` z katalogu głównego, a następnie uruchom program. BAT korzysta z `Build.ps1`, źródeł `src` i lokalnego kompilatora .NET Framework. Parametr `/nopause` wyłącza oczekiwanie na klawisz przy uruchomieniu z konsoli. Nowy EXE zastępuje stary po udanej kompilacji.
+
+Okno odczytuje ICO z katalogu programu. Przy braku lub błędzie odczytu używa ikony osadzonej w EXE. Ikona samego pliku w Eksploratorze wymaga przebudowy. Windows może przez pewien czas pokazywać ikonę z pamięci podręcznej.
 
 ## Narzędzia, kamera i materiał
 
@@ -35,11 +41,15 @@ Biblioteki ikon/obiektów mają dodawanie z pliku lub grafiki drugiej biblioteki
 
 ## Stany i trwałe grupy
 
-Wbudowane kafelki: zielony Sojusznik (pozwala odkrywać), niebieski Neutralny i czerwony Wróg (nie pozwalają). Nazwa, podpowiedź i aktywna ramka uzupełniają kolor. Plus dodaje własny stan dokumentu: nazwę, kolor i Pozwala odkrywać mgłę. Nowy kafelek zajmuje miejsce plusa, który przechodzi dalej; sekcja zawija się. ID stanu jest stabilne i niezależne od nazwy/koloru. Samo utworzenie stanu nie przypisuje go do obiektu. Nie ma teraz edycji/usuwania definicji ani globalnej biblioteki stanów.
+Plus w szczegółach instancji tworzy stan w `Library/Objects/States` i udostępnia go bieżącej mapie. Prawy przycisk na kafelku otwiera edycję bibliotecznej nazwy, koloru i uprawnienia do odkrywania, usuwanie albo zapis stanu dostępnego tylko w dokumencie. Można edytować trzy podstawowe wzorce. Ich stabilne ID chronią je przed usunięciem.
+
+Nowa mapa przyjmuje aktualne definicje biblioteki. Otwarta mapa daje pierwszeństwo własnej definicji przy tym samym ID. Edycja biblioteki aktualizuje otwartą mapę po zaznaczeniu opcji „Zaktualizuj definicję na bieżącej mapie”. Wyłączenie uprawnienia wstrzymuje odkrywanie. Checkbox i nakładka zachowują wartości. Usunięcie pliku zachowuje definicję dokumentową. Pliki `state-Nazwa.json` mają bezpieczne sufiksy przy kolizji i sesyjne Undo/Redo.
 
 Prostokąt/lasso wybierają centra. Zwykły klik członka wybiera całą trwałą grupę; Ctrl dodaje/odejmuje grupę lub pojedynczy niezgrupowany obiekt. **Alt+klik** wybiera pojedynczego członka również przed wcześniejszym wyborem grupy; nie rozwiązuje jej. Obszarowy wybór rozszerza trafionego członka do grupy. Mgła nadal przycina obrysy ukrytych członków. Ruch wielu obiektów ma jeden wpis historii i zachowuje ich rozstawienie; zablokowani są pomijani. Delete na wyborze grupy usuwa instancje razem, Alt-wybór pozwala usunąć jednego. Puste grupy są usuwane, grupa z jednym członkiem zachowuje ustawienia.
 
-Grupuj wybrane jest dostępne dla co najmniej dwóch instancji. Wymagane są niezgrupowane obiekty: mieszany wybór daje komunikat, bez ukrytego rozłączania. Grupa ma ID, nazwę i członków, bez grup w grupach. Panel grupy: nazwa, lista, wybór pojedynczego członka, nakładki i Rozwiąż grupę. Panel członka pokazuje grupę, przejście do niej i Odłącz.
+Grupuj wybrane tworzy grupę z niezgrupowanych instancji. Zaznacz całą grupę i dodatkowe obiekty, aby użyć „Dodaj do grupy”. Przy kilku pełnych grupach użyj „Połącz grupy”. Pierwsza świadomie zaznaczona grupa jest pierwszą i domyślną opcją. Przy jednoczesnym zaznaczeniu obszarem obowiązuje kolejność grup w dokumencie. Wybrana grupa zachowuje ID, nazwę, ramkę i nakładki. „Świeże ustawienia” tworzą nową nazwaną grupę z ustawieniami indywidualnymi. Baza członków i przydział mgły podlegają wspólnej historii.
+
+Panel grupy zawiera opcjonalną kolorową ramkę każdego członka. Jest kreskowana i odsunięta od zaznaczenia, a mgła przycina ją tak samo jak grafikę. Po odłączeniu ramka grupowa znika. Panel członka pokazuje grupę, przejście do niej i Odłącz.
 
 **Nakładki nie zmieniają bazy członków.** Każda może być Indywidualnie: stan, blokada, odkrywanie, promień i rozmiar. Nowa grupa ma wszystko wyłączone. Rozmiar może być przesunięciem od bazowego (np. +10) z clamp 8–1024 albo wspólnym (np. 40); nie kumuluje się i nie przesuwa środków. Grupowa blokada true blokuje wszystkich, jawne false może odblokować indywidualnie zablokowanego. Alt-edycja zmienia bazę, nie wyłącza nakładek. Panel członka wyraźnie pokazuje wartości efektywne, które mogą przykrywać edytowaną bazę.
 
@@ -55,17 +65,19 @@ Promień 0 = rzeczywisty heks pod środkiem grafiki, 1 = pierwszy pierścień sz
 
 **Podgląd bez mgły** to wyraźnie oznaczona flaga widoku, bez historii/gwiazdki/zmiany Fog i bez kopii całej mapy. Pokazuje rzeczywiste grafiki i szczegóły oraz pozwala edytować normalnie ukryte dane; ruch nadal może odkrywać rzeczywiste Fog. Zapis zachowuje mgłę. Udane Nowa/Otwórz wyłącza podgląd. Ręczna próba mgły pyta o przywrócenie widoczności: Nie nic nie zmienia, Tak przywraca widoczność i **wymaga ponownego gestu**.
 
-Lista instancji: Nazwa z miniaturą / Stan efektywny / Pozycja (Poza mapą lub pusto) / Mgła (Widoczny, Częściowo ukryty, Ukryty). Częściowe/pełne zasłonięcie maskuje nazwę, stan i pozycję przez ??? oraz używa neutralnej miniatury. Rozróżnienie wynika z geometrycznego clippingu, bez analizy pikseli. Poza mapą nie ma mgły, wystająca grafika może być częściowo ukryta. Podgląd pokazuje realne dane, a kolumna Mgła nadal stan rzeczywisty, zgodnie z tytułem listy. Świadomy wybór/Pokaż nadal znajduje ukrytą instancję bez zmiany Fog. Nie jest to widok zabezpieczony dla gracza; mgła nie szyfruje pliku.
+Lista instancji: Nazwa z miniaturą / Stan efektywny / Pozycja (Poza mapą lub pusto) / Mgła (Widoczny, Częściowo ukryty, Ukryty). Gdy widoczne jest najwyżej 50% prostokąta grafiki, lista maskuje nazwę, stan i pozycję przez ??? oraz używa neutralnej miniatury. Próg używa powierzchni przed zaokrągleniem. Kolumna Mgła podaje zaokrąglony procent ukrycia przy częściowym zasłonięciu. Poza mapą nie ma mgły, wystająca grafika może być częściowo ukryta. Podgląd pokazuje realne dane, a kolumna Mgła nadal stan rzeczywisty, zgodnie z tytułem listy. Świadomy wybór/Pokaż nadal znajduje ukrytą instancję bez zmiany Fog. Nie jest to widok zabezpieczony dla gracza; mgła nie szyfruje pliku.
 
 ## Zapis, geometria i historia
 
-Format **5** zachowuje Objects z bazowymi właściwościami, ObjectStates i Groups z ID/członkami/nakładkami. Side instancji jest ID definicji stanu. IconAssets nadal deduplikuje użyte PNG ikon/obiektów po SHA-256 bez łączenia ich edycji; nie zapisuje całej biblioteki. Sam plik mapy wystarcza, również dla obiektów poza mapą. Walidacja sprawdza ID, referencje, pojedyncze członkostwo, brak zagnieżdżeń, skończone pozycje/rozmiary/promienie przed podmianą. Podgląd nie jest danymi mapy. Limity: 5000 instancji, 2500 grup, 100 stanów, świat ±10 000 000, 128 wspólnych zasobów, 2 MiB PNG/zasób i około 32 MiB PNG łącznie; plik do 128 MiB. Bezpieczny zapis, pojedyncze potwierdzenie końcowej ścieżki i ochrona gestów dialogów pozostają.
+Format **6** zachowuje Objects z bazowymi właściwościami, ObjectStates oraz Groups z ID, członkami, nakładkami i ramką. Zapis zawiera trzy podstawowe definicje oraz własne stany użyte przez instancje lub grupy, w tym stany bazowe przykryte nakładką. Side instancji jest ID definicji stanu. IconAssets nadal deduplikuje użyte PNG ikon/obiektów po SHA-256 bez łączenia ich edycji; nie zapisuje całej biblioteki. Sam plik mapy wystarcza, również dla obiektów poza mapą. Walidacja sprawdza ID, referencje, pojedyncze członkostwo, brak zagnieżdżeń, skończone pozycje/rozmiary/promienie przed podmianą. Podgląd nie jest danymi mapy. Limity: 5000 instancji, 2500 grup, 100 stanów, świat ±10 000 000, 128 wspólnych zasobów, 2 MiB PNG/zasób i około 32 MiB PNG łącznie; plik do 128 MiB. Bezpieczny zapis, pojedyncze potwierdzenie końcowej ścieżki i ochrona gestów dialogów pozostają.
 
 Resize/orientacja zachowują zaakceptowane zasady obiektów i lokalnych osi offsetu; crop ich nie usuwa. Techniczne przeliczenie nie odkrywa nowej drogi. Wspólna historia 300 obejmuje mapę, instancje, grupy/stany, końcowe delty mgły i pliki bibliotek. Nazwa/pole liczbowe ma logiczną sesję; pusty/niezmieniony zapis nie tworzy operacji. Sam wybór/nawigacja/podgląd bez historii. Pliki bibliotek są cofane z bajtów sesji przez LibraryFiles, bez Kosza i cichego nadpisania obcego celu; konflikt nie przesuwa stosu, można ponowić. Reset/limit/zamknięcie usuwa możliwość cofania, nie aktywne pliki. Udane Nowa/Otwórz zeruje historie/wybór, błąd/anulowanie zachowuje dokument.
 
 Zachowano chroniony Domyślny, czytelne presety i odświeżanie, osiem geometrii figur i ciągłość pędzla, regiony wiader terenów/ikon/mgły, osobne historie tekstu, formatowane opisy i Ctrl+Shift+V. Nazwa projektu nadal pochodzi z pliku; nowy projekt proponuje 15×10, orientację/preset i etykiety Osie. Nie diagnozowano ponownie zaakceptowanych obszarów 0.4.0.
 
 ## Biblioteka, testy i dalsza praca
+
+Celowane scenariusze 0.4.2 uruchamia `tests/Run-Patch042Tests.ps1 -Case states|groups|controls|render` z pojedynczym wybranym przypadkiem. `fixture` przygotowuje mapę do prób okna. Szczegóły wykonanych prób zawiera `docs/raport-0.4.2.md`.
 
 Library jest lokalne/ignorowane; program tworzy brakujące Backgrounds, Terrains/Presets, Icons, Objects, Hexmaps, Exports/Images, Exports/Text bez kasowania danych. Nowy projekt proponuje Hexmaps, otwarty respektuje swoją ścieżkę. Prywatna biblioteka nie służy do testów.
 
@@ -80,6 +92,8 @@ Case: model / fog / controls, bez automatycznej pełnej kampanii. Źródła/skry
 Poza zakresem pozostają zagnieżdżone grupy, światło/ciemność, widok MG/gracza, tekstury/detail, zakładki, kadrowanie, przebudowa opisów i pełny redesign. Nie planujemy walki/statystyk/ekwipunku, tras/pathfindingu/animacji. Bez usług AI. Warstwa światła jest przyszłym, niezależnym od trwałego odkrywania wymaganiem.
 
 ## Historia zmian
+
+- **0.4.2** — własna ikona EXE, przebudowa przez BAT, biblioteka stanów, dodawanie i łączenie grup, ramki, próg maskowania 50%, stabilniejszy panel oraz poprawki potwierdzeń i skrótów. Zapis formatu 6, odczyt 5 i 6.
 
 - **0.4.1** — trwałe grupy i odwracalne nakładki, własne stany, bieżące właściwości, osobne zaznaczanie/prostokąt/lasso, kontekstowa Rączka, ochrona aktywnych zasięgów, podgląd bez mgły i maskowana lista, wspólny kadr Dopasuj; format mapy 5.
 
