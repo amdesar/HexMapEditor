@@ -43,7 +43,7 @@ Skrypt `tests/Run-Patch042Tests.ps1` uruchamia jeden wybrany przypadek. Próby i
 - Zaznaczenie obszarem objęło cztery instancje dwóch grup. Dialog proponował najpierw Zielonych. Połączenie zachowało ich nazwę i ramkę dla czterech grafik. Ctrl+Z przywróciło dwie grupy. Obserwacja panelu po cofnięciu ujawniła rozbieżność podgrupy i zaznaczenia. Poprawkę sprawdzono celowaną metodą. Sprawdzono przejście grupy do panelu pojedynczej instancji.
 - Lista pokazała ciemne nagłówki i tło oraz zamaskowany wiersz przy 57% ukrycia. Wycentrowano znak zapytania. Dodatkowo poszerzono ostatnią kolumnę po obserwacji jasnego skrawka końca nagłówka.
 - Pierwsza wersja przełącznika otwierała menu ponownie. Po przejściu na natywny przycisk drugi klik zamknął menu. Escape oraz klik poza menu zamknęły je w kopii końcowego EXE.
-- Usunięcie z okna oczekuje na zgodę w dialogu „Usuń instancje z mapy” dla „Próba usunięcia 0.4.2”. Potwierdzenie i natychmiastowe Ctrl+Z są jeszcze przed wykonaniem. Odmowę, zatwierdzenie i skróty sprawdzono metodami.
+- 8 listopada 2026 uzupełniono próbę w kopii końcowego EXE 0.4.2.0 z commita 6ccbda5. Na własnej mapie z jedną instancją „Próba usunięcia 0.4.2” kliknięcie OK usunęło ją z płótna i pokazało gwiazdkę. Następną akcją było pojedyncze Ctrl+Z bez klikania płótna. Instancja wróciła na swoje miejsce, a gwiazdka zniknęła. Próba przeszła. Zamknięto testowe okno i usunięto katalog tego przebiegu w tests/_work.
 
 ## Krótka checklista
 

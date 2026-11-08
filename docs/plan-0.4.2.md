@@ -11,4 +11,4 @@ Baza `4c0a7ff`. Zastane pliki `icon.ico` i `icon.png` są materiałami użytkown
 
 Implementacja, celowane próby states/groups/controls/render oraz build przez BAT zakończone. Sprawdzono ikonę osadzoną w zwykłym EXE, dodanie stanu, łączenie grup, listę i przełącznik Dopasuj. Wyniki i ograniczenia są w raporcie.
 
-Jedyny oczekujący dialog jest w własnym oknie z katalogu tests/_work/patch-042-e3b7a71b9a384f10916c69b7ee5b720a. Chodzi o zatwierdzenie usunięcia „Próba usunięcia 0.4.2” i natychmiastowe Ctrl+Z. Wysłano pytanie o zgodę w chwili akcji. Po odpowiedzi należy odświeżyć widok dialogu, wykonać zatwierdzoną próbę i uzupełnić raport. Zaliczonych prób nie trzeba powtarzać.
+Próbę usunięcia i natychmiastowego Ctrl+Z zakończono 8 listopada 2026 po ponownym uruchomieniu komputera. Odtworzono scenariusz na jednoobiektowej mapie w tests/_work z kopią końcowego EXE. Po udanej próbie zamknięto okno, usunięto katalog tego przebiegu i uzupełniono raport.
