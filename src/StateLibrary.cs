@@ -223,6 +223,60 @@ namespace HexMapEditor
             if (entry != null) IncludeState(action, entry.Definition, false);
         }
 
+        IEnumerable<StateFile> RestorableStates()
+        {
+            var excluded = new HashSet<string>(map.ExcludedStateIds);
+            return libraryStates.Where(entry => excluded.Contains(entry.Definition.Id) && File.Exists(entry.Path));
+        }
+
+        bool RestoreDocumentState(string id)
+        {
+            var entry = RestorableStates().FirstOrDefault(s => s.Definition.Id == id);
+            if (entry == null) return false;
+            if (!File.ReadAllBytes(entry.Path).SequenceEqual(entry.Bytes))
+                throw new IOException("Definicja zmieniła się poza programem. Otwórz ponownie aplikację, aby odczytać aktualną bibliotekę.");
+            var existing = map.ObjectStates.FirstOrDefault(s => s.Id == id);
+            if (existing != null && json.Serialize(existing) != json.Serialize(entry.Definition))
+                throw new InvalidDataException("Mapa i biblioteka zawierają różne definicje o tym samym ID. Zachowano obie definicje.");
+            var action = new EditAction
+            {
+                Label = "Dodaj stan z biblioteki",
+                BeforeExcludedStates = new List<string>(map.ExcludedStateIds),
+                AfterExcludedStates = map.ExcludedStateIds.Where(item => item != id).ToList()
+            };
+            // The library definition is available once the exclusion is lifted.
+            // It becomes a document definition on explicit assignment, as usual.
+            return CommitObjectTransaction(action, null, false);
+        }
+
+        void AttachStateRestoreMenu(Button button)
+        {
+            var menu = new ContextMenuStrip();
+            button.ContextMenuStrip = menu;
+            button.Disposed += (s, e) => menu.Dispose();
+            menu.Opening += (s, e) =>
+            {
+                foreach (ToolStripItem item in menu.Items.Cast<ToolStripItem>().ToArray()) item.Dispose();
+                var restore = new ToolStripMenuItem("Dodaj stan z biblioteki");
+                foreach (var entry in RestorableStates())
+                {
+                    var state = entry.Definition;
+                    var choice = new ToolStripMenuItem(state.Name) { ToolTipText = "ID: " + state.Id };
+                    choice.Click += (sender, args) =>
+                    {
+                        try
+                        {
+                            if (!RestoreDocumentState(state.Id)) throw new IOException("Plik stanu nie jest już dostępny.");
+                        }
+                        catch (Exception ex) { ShowEditorMessage(ex.Message, restore.Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                    };
+                    restore.DropDownItems.Add(choice);
+                }
+                if (restore.DropDownItems.Count == 0) restore.DropDownItems.Add(new ToolStripMenuItem("Brak stanów do przywrócenia") { Enabled = false });
+                menu.Items.Add(restore);
+            };
+        }
+
         void ChangeStateFromMenu(string id, bool remove)
         {
             var library = libraryStates.FirstOrDefault(s => s.Definition.Id == id);

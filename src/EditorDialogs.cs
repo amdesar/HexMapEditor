@@ -30,13 +30,46 @@ namespace HexMapEditor
     internal sealed class TerrainDialog : EditorDialog
     {
         readonly TextBox name = new TextBox(); readonly Button color = new Button(); readonly CheckBox apply = new CheckBox { Text = "Zastosuj do bieżącej mapy", AutoSize = true };
+        readonly ComboBox fill = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        IconAsset texture;
+        internal Func<TerrainDialog, bool, IconAsset> ChooseGraphic;
+        internal IconAsset Texture { get { return fill.SelectedIndex == 1 ? texture : null; } }
         public Func<bool> CanAccept;
         public string TerrainName { get { return name.Text.Trim(); } } public string TerrainColor { get; private set; } public bool ApplyToMap { get { return apply.Checked; } }
-        public TerrainDialog(TerrainDefinition terrain, bool existing) : base(existing ? "Edycja terenu" : "Nowy teren", 205)
+        public TerrainDialog(TerrainDefinition terrain, bool existing, bool flat = false) : base(existing ? "Edycja terenu" : "Nowy teren", 370)
         {
             name.Text = terrain.Name; name.MaxLength = 200; TerrainColor = terrain.Color; color.Text = terrain.Color; color.BackColor = ColorTranslator.FromHtml(terrain.Color); color.ForeColor = Color.Black;
-            Row(0, "Nazwa", name, true); Row(1, "Kolor", color, true); color.Click += (s, e) => { using (var d = new ColorDialog { Color = ColorTranslator.FromHtml(TerrainColor), FullOpen = true }) if (d.ShowDialog(this) == DialogResult.OK) { TerrainColor = "#" + d.Color.R.ToString("X2") + d.Color.G.ToString("X2") + d.Color.B.ToString("X2"); color.Text = TerrainColor; color.BackColor = d.Color; } };
-            apply.Checked = false; apply.Enabled = existing; Layout.Controls.Add(apply, 0, 2); Layout.SetColumnSpan(apply, 3); Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); Buttons(3, () => { if (TerrainName.Length > 0 && (CanAccept == null || CanAccept())) DialogResult = DialogResult.OK; });
+            texture = terrain.Texture;
+            fill.Items.AddRange(new object[] { "Kolor", "Grafika" });
+            fill.SelectedIndex = texture == null ? 0 : 1;
+            var graphic = new FlowLayoutPanel { WrapContents = false };
+            var library = new Button { Text = "Z biblioteki…", Width = 105 };
+            var import = new Button { Text = "Importuj…", Width = 100 };
+            graphic.Controls.AddRange(new Control[] { library, import });
+            var preview = new TerrainPreview(flat) { Dock = DockStyle.Fill, AccessibleName = "Podgląd wypełnienia heksa" };
+            var textureName = new Label { AutoEllipsis = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
+            Action refresh = () =>
+            {
+                graphic.Enabled = fill.SelectedIndex == 1;
+                color.Enabled = fill.SelectedIndex == 0;
+                textureName.Text = fill.SelectedIndex == 0 ? "" : texture == null ? "Wybierz grafikę." : texture.Name;
+                preview.ShowFill(ColorTranslator.FromHtml(TerrainColor), Texture);
+                Ok.Enabled = fill.SelectedIndex == 0 || Texture != null;
+            };
+            Action<bool> pick = isImport => { var next = ChooseGraphic == null ? null : ChooseGraphic(this, isImport); if (next != null) { texture = next; refresh(); } };
+            fill.SelectedIndexChanged += (s, e) => refresh();
+            library.Click += (s, e) => pick(false);
+            import.Click += (s, e) => pick(true);
+            color.Click += (s, e) => { using (var d = new EditorColorDialog(ColorTranslator.FromHtml(TerrainColor))) if (d.ShowDialog(this) == DialogResult.OK) { TerrainColor = d.Hex; color.Text = TerrainColor; color.BackColor = d.SelectedColor; refresh(); } };
+            Row(0, "Nazwa", name, true);
+            Row(1, "Wypełnienie", fill, true);
+            Row(2, "Kolor", color, true);
+            Row(3, "Grafika", graphic, true);
+            Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 25)); Layout.Controls.Add(textureName, 1, 4); Layout.SetColumnSpan(textureName, 2);
+            Layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); Layout.Controls.Add(preview, 0, 5); Layout.SetColumnSpan(preview, 3);
+            apply.Enabled = existing; Layout.Controls.Add(apply, 0, 6); Layout.SetColumnSpan(apply, 3); Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            Buttons(7, () => { if (TerrainName.Length > 0 && (fill.SelectedIndex == 0 || Texture != null) && (CanAccept == null || CanAccept())) DialogResult = DialogResult.OK; });
+            refresh();
         }
     }
     internal sealed class SavePresetDialog : EditorDialog

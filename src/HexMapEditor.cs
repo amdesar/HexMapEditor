@@ -19,10 +19,11 @@ namespace HexMapEditor
         public static string Root { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Library"); } }
         public static string Hexmaps { get { return Path.Combine(Root, "Hexmaps"); } }
         public static string Presets { get { return Path.Combine(Root, "Terrains", "Presets"); } }
+        public static string TerrainGraphics { get { return Path.Combine(Root, "Terrains", "Graphics"); } }
         public static void EnsureDirectories(string applicationDirectory)
         {
             string root = Path.Combine(applicationDirectory, "Library");
-            foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), "Icons", "Objects", Path.Combine("Objects", "States"), "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
+            foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), Path.Combine("Terrains", "Graphics"), "Icons", "Objects", Path.Combine("Objects", "States"), "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
                 Directory.CreateDirectory(Path.Combine(root, folder));
         }
     }
@@ -39,6 +40,8 @@ namespace HexMapEditor
         public string VariantId { get; set; }
         public int TerrainRevision { get; set; }
         public string Terrain { get; set; }
+        public string TextureId { get; set; }
+        internal IconAsset Texture;
         public string Color { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
@@ -65,11 +68,12 @@ namespace HexMapEditor
         public string ActivePresetId { get; set; }
         public List<TerrainPreset> Presets { get; set; }
         public List<IconAsset> IconAssets { get; set; }
+        public List<IconAsset> TerrainAssets { get; set; }
         public List<MapObject> Objects { get; set; }
         public List<ObjectStateDefinition> ObjectStates { get; set; }
         public List<string> ExcludedStateIds { get; set; }
         public List<ObjectGroup> Groups { get; set; }
-        public MapData() { FormatVersion = 6; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
+        public MapData() { FormatVersion = 7; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); TerrainAssets = new List<IconAsset>(); Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
     }
 
     internal sealed class TerrainState
@@ -77,10 +81,12 @@ namespace HexMapEditor
         public readonly string Terrain;
         public readonly string Color;
         public readonly string TerrainId, VariantId;
+        readonly IconAsset texture;
+        readonly string textureId;
         public readonly int Revision;
-        public TerrainState(CellData cell) { Terrain = cell.Terrain; Color = cell.Color; TerrainId = cell.TerrainId; VariantId = cell.VariantId; Revision = cell.TerrainRevision; }
-        public bool Matches(CellData cell) { return VariantId == cell.VariantId && TerrainId == cell.TerrainId && Revision == cell.TerrainRevision && String.Equals(Terrain, cell.Terrain, StringComparison.Ordinal) && String.Equals(Color, cell.Color, StringComparison.OrdinalIgnoreCase); }
-        public void ApplyTo(CellData cell) { cell.Terrain = Terrain; cell.Color = Color; cell.TerrainId = TerrainId; cell.VariantId = VariantId; cell.TerrainRevision = Revision; }
+        public TerrainState(CellData cell) { Terrain = cell.Terrain; Color = cell.Color; TerrainId = cell.TerrainId; VariantId = cell.VariantId; Revision = cell.TerrainRevision; texture = cell.Texture; textureId = cell.TextureId; }
+        public bool Matches(CellData cell) { return VariantId == cell.VariantId && TerrainId == cell.TerrainId && Revision == cell.TerrainRevision && textureId == cell.TextureId && String.Equals(Terrain, cell.Terrain, StringComparison.Ordinal) && String.Equals(Color, cell.Color, StringComparison.OrdinalIgnoreCase); }
+        public void ApplyTo(CellData cell) { cell.Terrain = Terrain; cell.Color = Color; cell.TerrainId = TerrainId; cell.VariantId = VariantId; cell.TerrainRevision = Revision; cell.Texture = texture; cell.TextureId = textureId; }
     }
 
     internal sealed class CellChange
@@ -105,6 +111,7 @@ namespace HexMapEditor
         public List<ObjectStateDefinition> BeforeStates, AfterStates;
         public List<string> BeforeExcludedStates, AfterExcludedStates;
         public List<IconAsset> RequiredAssets = new List<IconAsset>();
+        public TerrainGraphicChange TerrainGraphicChange;
         public string Label;
         public ResizeState BeforeResize, AfterResize;
         public PaletteState BeforePalette, AfterPalette;
@@ -117,7 +124,7 @@ namespace HexMapEditor
         readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 64 };
         readonly Panel canvas = new BufferedPanel();
         readonly Panel left = new Panel();
-        readonly DetailsOverlay right = new DetailsOverlay();
+        readonly BufferedPanel right = new BufferedPanel();
         readonly Button leftToggle = new Button();
         readonly Button rightClose = new Button();
         readonly ComboBox terrainPicker = new ComboBox();
@@ -151,7 +158,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.4.3";
+        const string AppVersion = "0.5.0";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -217,7 +224,7 @@ namespace HexMapEditor
 
         void CloseDetailsPanel()
         {
-            EndObjectPropertyEdit(); selected = -1; selectedObjects.Clear(); selectedGroupId=null; rightPanelOpen = false; right.Visible = false; UpdateUI();
+            EndObjectPropertyEdit(); textHistory.BreakGroups(); selected = -1; selectedObjects.Clear(); groupSelectionOrder.Clear(); selectedGroupId=null; rightPanelOpen = false; right.Visible = false; UpdateUI();
         }
 
         void MarkDirty() { dirty = savedState.CheckAll(map); UpdateUI(); }
@@ -237,6 +244,7 @@ namespace HexMapEditor
         void UpdateUI()
         {
             bool opening = rightPanelOpen && !right.Visible;
+            bool showingHex = selectedObjects.Count == 0 && selected >= 0 && hexDetailScroll != null && !hexDetailScroll.Visible;
             updating = true;
             right.SuspendLayout();
             try
@@ -250,9 +258,10 @@ namespace HexMapEditor
                 labelToggle.Text = map.LabelMode == "InCells" ? "W heksach" : map.LabelMode == "None" ? "Brak" : "Osie";
                 tips.SetToolTip(labelToggle, map.LabelMode == "InCells" ? "Pełne współrzędne wewnątrz heksów (od 80% skali, jeśli cały napis mieści się w polu i oknie)." : map.LabelMode == "None" ? "Bez etykiet współrzędnych." : "Współrzędne na osiach mapy.");
                 bool objectDetails = selectedObjects.Count > 0;
-                if (hexDetailScroll != null) hexDetailScroll.Visible = !objectDetails;
+                if (objectDetails && hexDetailScroll != null) hexDetailScroll.Hide();
+                if (!objectDetails && objectDetailPanel != null) objectDetailPanel.Hide();
                 if (detailTitle != null) detailTitle.Text = objectDetails ? "Szczegóły obiektu" : "Szczegóły heksu";
-                if (objectDetails) { selected = -1; editorCellId = null; UpdateObjectDetails(); }
+                if (objectDetails) { if (selected >= 0) textHistory.BreakGroups(); selected = -1; UpdateObjectDetails(); }
                 else if (selected >= 0 && selected < map.Cells.Count)
                 {
                     var cell = map.Cells[selected];
@@ -263,13 +272,19 @@ namespace HexMapEditor
                     detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = hidden ? "Mgła wojny — dane ukryte" : "Teren: " + cell.Terrain;
                     detailIcon.Text = hidden ? "Ikona: ???" : "Ikona: " + (cell.IconId == null ? "brak" : cell.IconName ?? map.IconAssets.First(a=>a.Id==cell.IconId).Name);
                 }
-                else { selected = -1; rightPanelOpen = false; editorCellId = null; }
+                else { selected = -1; rightPanelOpen = false; textHistory.BreakGroups(); }
+                if (!objectDetails && hexDetailScroll != null) hexDetailScroll.Visible = selected >= 0;
                 if (objectDetailPanel != null) objectDetailPanel.Visible = objectDetails;
             }
             finally { right.ResumeLayout(true); updating = false; }
             PositionOverlays();
             right.Visible = rightPanelOpen && (selected >= 0 || selectedObjects.Count > 0);
-            if (opening || detailStructureChanged) right.PaintTree();
+            if (opening || showingHex || detailStructureChanged)
+            {
+                right.Invalidate();
+                if (selectedObjects.Count > 0 && objectDetailPanel != null) objectDetailPanel.PaintTree();
+                else if (hexDetailScroll != null) hexDetailScroll.Invalidate(true);
+            }
             detailStructureChanged = false;
             canvas.Invalidate();
         }
@@ -329,7 +344,8 @@ namespace HexMapEditor
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
                 int format = (int)raw["FormatVersion"];
-                if (format != 5 && format != 6) throw new InvalidDataException("Obsługiwane formaty mapy: 5 i 6.");
+                if (format != 5 && format != 6 && format != 7) throw new InvalidDataException("Obsługiwane formaty mapy: 5, 6 i 7.");
+                if (format == 7 && !raw.ContainsKey("TerrainAssets")) throw new InvalidDataException("Brak tabeli grafik terenów.");
                 {
                     var cells = raw.ContainsKey("Cells") ? raw["Cells"] as object[] : null;
                     var objects=raw.ContainsKey("Objects")?raw["Objects"] as object[]:null;
@@ -338,7 +354,8 @@ namespace HexMapEditor
                     ValidateGroupFields(raw, format);
                     if (cells == null || !raw.ContainsKey("Objects") || !raw.ContainsKey("IconAssets") || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision", "IconId", "Fog" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Brak jawnych danych heksów, zasobów, obiektów, stanów lub grup.");
                 }
-                var loaded = json.ConvertToType<MapData>(raw); ValidateMap(loaded); loaded.FormatVersion = 6;
+                var loaded = json.ConvertToType<MapData>(raw); ValidateMap(loaded); loaded.FormatVersion = 7;
+                loaded.TerrainAssets.Clear(); // References now belong to the cells and palette variants.
                 EndCanvasGesture(false); ResetObjectDocument(); ClearDocumentIcons(); map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
                 CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); return true;
             }
@@ -428,7 +445,9 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 5 && m.FormatVersion != 6) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
+            if (m.FormatVersion != 5 && m.FormatVersion != 6 && m.FormatVersion != 7) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
+            var textures = TerrainTextures.ReadTable(m.TerrainAssets);
+            if (m.FormatVersion < 7 && textures.Count != 0) throw new InvalidDataException("Grafiki terenów wymagają formatu mapy 7.");
             IconAssets.Validate(m.IconAssets); var iconIds = new HashSet<string>(m.IconAssets.Select(a => a.Id));
             ObjectGeometry.Validate(m,iconIds);
             if (m.Columns < 1 || m.Columns > 200 || m.Rows < 1 || m.Rows > 200) throw new InvalidDataException("Wymiary mapy muszą mieścić się w zakresie 1–200.");
@@ -439,18 +458,26 @@ namespace HexMapEditor
             foreach (var c in m.Cells)
             {
                 if (c == null || String.IsNullOrWhiteSpace(c.Id) || !ids.Add(c.Id) || String.IsNullOrWhiteSpace(c.Terrain) || !MapLogic.ValidColor(c.Color) || String.IsNullOrWhiteSpace(c.TerrainId) || String.IsNullOrWhiteSpace(c.VariantId) || c.TerrainRevision < 1) throw new InvalidDataException("Nieprawidłowe dane heksu lub terenu.");
-                CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color);
+                c.Texture = TerrainTextures.Resolve(textures, c.TextureId);
+                CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color, c.TextureId);
                 if (c.IconId != null && !iconIds.Contains(c.IconId)) throw new InvalidDataException("Brak osadzonego zasobu ikony.");
                 if ((c.IconName != null && (String.IsNullOrWhiteSpace(c.IconName) || c.IconName.Length > 200)) || (c.IconEntryId != null && (String.IsNullOrWhiteSpace(c.IconEntryId) || c.IconEntryId.Length > 200)) || (c.IconId == null && (c.IconName != null || c.IconEntryId != null))) throw new InvalidDataException("Nieprawidłowe metadane wystąpienia ikony.");
                 if (c.NotesFormat == "richDocument1") { NoteCodec.Read(c.RichDescription); if (c.Description != NoteCodec.Plain(c.RichDescription)) throw new InvalidDataException("Zwykły tekst nie odpowiada formatowanemu opisowi."); }
                 else if (c.NotesFormat != "plainText" || !String.IsNullOrEmpty(c.RichDescription)) throw new InvalidDataException("Nieobsługiwany format notatek.");
             }
             if (m.Presets == null || m.Presets.Count == 0 || m.Presets.Count > 100 || !m.Presets.Any(p => p.Id == m.ActivePresetId)) throw new InvalidDataException("Brak aktywnej palety projektu.");
-            var presets = new HashSet<string>(); foreach (var p in m.Presets) { PresetCatalog.Validate(p); if (!presets.Add(p.Id)) throw new InvalidDataException("Powtórzony identyfikator presetu."); foreach (var t in p.Terrains) CheckVariant(variants, t.VariantId, t.TerrainId, t.Revision, t.Name, t.Color); }
+            var presets = new HashSet<string>();
+            foreach (var p in m.Presets)
+            {
+                TerrainTextures.Attach(p, textures);
+                PresetCatalog.Validate(p);
+                if (!presets.Add(p.Id)) throw new InvalidDataException("Powtórzony identyfikator presetu.");
+                foreach (var t in p.Terrains) CheckVariant(variants, t.VariantId, t.TerrainId, t.Revision, t.Name, t.Color, t.TextureId);
+            }
         }
-        static void CheckVariant(Dictionary<string, string> variants, string variant, string terrain, int revision, string name, string color)
+        static void CheckVariant(Dictionary<string, string> variants, string variant, string terrain, int revision, string name, string color, string textureId)
         {
-            string signature = MapLogic.Serializer().Serialize(new[] { terrain, revision.ToString(System.Globalization.CultureInfo.InvariantCulture), name, color.ToUpperInvariant() }); string previous;
+            string signature = MapLogic.Serializer().Serialize(new[] { terrain, revision.ToString(System.Globalization.CultureInfo.InvariantCulture), name, color.ToUpperInvariant(), textureId }); string previous;
             if (variants.TryGetValue(variant, out previous) && previous != signature) throw new InvalidDataException("Sprzeczne właściwości tej samej wersji terenu: " + variant);
             variants[variant] = signature;
         }
@@ -553,6 +580,8 @@ namespace HexMapEditor
                 using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
                 {
                     e.Graphics.FillPath(brush, path);
+                    if (!hideTerrain && (!map.Cells[i].Fog || previewWithoutFog) && map.Cells[i].Texture != null)
+                        DrawTerrainTexture(e.Graphics, path, c, BaseRadius * scale, map.Cells[i].Texture);
                     if (!map.Cells[i].Fog || previewWithoutFog) { if (!hideIcons) DrawCellIcon(e.Graphics, map.Cells[i], c); if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle); }
                     // Fog is the final content layer, below only the working grid.
                     if (map.Cells[i].Fog && !previewWithoutFog) using (var fog = new SolidBrush(Color.FromArgb(101, 107, 117))) e.Graphics.FillPath(fog, path);
@@ -700,7 +729,7 @@ namespace HexMapEditor
             if (index < 0 || index >= map.Cells.Count) return;
             var palette = ActivePreset(); if (palette.Terrains.Count == 0) return;
             var terrain = palette.Terrains[Math.Max(0, Math.Min(brushIndex, palette.Terrains.Count - 1))]; var cell = map.Cells[index];
-            if (cell.VariantId == terrain.VariantId && cell.Terrain == terrain.Name && String.Equals(cell.Color, terrain.Color, StringComparison.OrdinalIgnoreCase)) return;
+            if (cell.VariantId == terrain.VariantId && cell.TextureId == terrain.TextureId && cell.Terrain == terrain.Name && String.Equals(cell.Color, terrain.Color, StringComparison.OrdinalIgnoreCase)) return;
             if (!strokeBefore.ContainsKey(index)) strokeBefore[index] = new TerrainState(cell);
             MapLogic.ApplyTerrain(cell, terrain); dirty = true; canvas.Invalidate();
         }

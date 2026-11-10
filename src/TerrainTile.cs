@@ -12,6 +12,7 @@ namespace HexMapEditor
     {
         internal readonly Button Choose = new Button(), Edit = new Button(), Delete = new Button();
         readonly ToolTip tips = new ToolTip();
+        string thumbnailId, thumbnailColor;
         public string TerrainId;
         public TerrainTile(Action<string> choose, Action<string> edit, Action<string> delete)
         {
@@ -23,7 +24,7 @@ namespace HexMapEditor
             Controls.Add(Choose); Controls.Add(Edit); Controls.Add(Delete); Edit.BringToFront(); Delete.BringToFront();
             Choose.Click += (s, e) => choose(TerrainId); Edit.Click += (s, e) => edit(TerrainId); Delete.Click += (s, e) => delete(TerrainId);
             Choose.KeyDown += (s, e) => { if (e.KeyCode == Keys.F2 || e.KeyCode == Keys.Delete) { e.Handled = true; e.SuppressKeyPress = true; if (e.KeyCode == Keys.F2) edit(TerrainId); else delete(TerrainId); } };
-            Disposed += (s, e) => tips.Dispose();
+            Disposed += (s, e) => { tips.Dispose(); if (Choose.Image != null) Choose.Image.Dispose(); };
         }
         internal void ResizeRow(int width)
         {
@@ -33,9 +34,25 @@ namespace HexMapEditor
         public void UpdateTerrain(TerrainDefinition terrain, bool selected)
         {
             TerrainId = terrain.TerrainId; Choose.Text = terrain.Name; var color = ColorTranslator.FromHtml(terrain.Color); Choose.BackColor = color; Choose.ForeColor = color.R * .299 + color.G * .587 + color.B * .114 > 145 ? Color.Black : Color.White;
+            if (thumbnailId != terrain.TextureId || thumbnailColor != terrain.Color)
+            {
+                var old = Choose.Image;
+                Choose.Image = null;
+                if (old != null) old.Dispose();
+                thumbnailId = terrain.TextureId; thumbnailColor = terrain.Color;
+                if (terrain.Texture != null)
+                {
+                    var thumb = new Bitmap(24, 24);
+                    using (var g = Graphics.FromImage(thumb))
+                    using (var source = TerrainTextures.Decode(terrain.Texture))
+                        TerrainPreview.PaintHex(g, new PointF(12, 12), 10, false, color, source);
+                    Choose.Image = thumb;
+                    Choose.TextImageRelation = TextImageRelation.ImageBeforeText;
+                }
+            }
             Choose.FlatAppearance.BorderColor = selected ? Color.Gold : Color.Gray; Choose.FlatAppearance.BorderSize = selected ? 3 : 1; Choose.AccessibleName = "Teren: " + terrain.Name; Choose.AccessibleDescription = selected ? "Wybrany" : "Niewybrany";
             Edit.AccessibleName = "Edytuj teren " + terrain.Name; Delete.AccessibleName = "Usuń teren " + terrain.Name;
-            tips.SetToolTip(Choose, terrain.Name + " · wersja " + terrain.Revision); tips.SetToolTip(Edit, "Edytuj teren (F2)"); tips.SetToolTip(Delete, "Usuń teren (Delete)");
+            tips.SetToolTip(Choose, terrain.Name + " · wersja " + terrain.Revision + (terrain.Texture == null ? "" : " · grafika: " + terrain.Texture.Name)); tips.SetToolTip(Edit, "Edytuj teren (F2)"); tips.SetToolTip(Delete, "Usuń teren (Delete)");
         }
     }
 }

@@ -99,10 +99,9 @@ namespace HexMapEditor
         {
             var group = CurrentGroup();
             if (group == null || !GuardLayer(MapLayer.Objects)) return;
-            using (var dialog = new ColorDialog { Color = ColorTranslator.FromHtml(group.FrameColor), FullOpen = true })
+            using (var dialog = new EditorColorDialog(ColorTranslator.FromHtml(group.FrameColor)))
                 if (RunModal(() => dialog.ShowDialog(this)) == DialogResult.OK)
-                    EditGroup("frame-color", g => g.FrameColor = String.Format("#{0:X2}{1:X2}{2:X2}",
-                        dialog.Color.R, dialog.Color.G, dialog.Color.B), false);
+                    EditGroup("frame-color", g => g.FrameColor = dialog.Hex, false);
         }
         void UnlinkWithDialog(ObjectGroup group,IEnumerable<string> members)
         {if (!GuardLayer(MapLayer.Objects)) return;var ids=members.ToArray();using(var d=new UngroupDialog(ids.Length==group.Members.Count))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)DetachObjects(group.Id,ids,d.Keep);}

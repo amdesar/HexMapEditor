@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.4.3
+﻿# HexMapEditor 0.5.0
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.4.3**, zapis map w **formacie 6**, presety **1**, ikony biblioteczne **2**, wzorce obiektów **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.0** zapisuje mapy w **formacie 7**, presety w formacie **2**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,7 +12,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-Aplikacja otwiera formaty 5 i 6. W formacie 5 ramki są domyślnie wyłączone. Zapis w formacie 6 chroni ramki i zmienione definicje podstawowe przed utratą w wersji 0.4.1.
+Aplikacja otwiera mapy w formatach 5–7 i presety w formatach 1–2. W formacie 5 ramki są domyślnie wyłączone. Zapis mapy lub presetu z 0.5.0 wymaga wersji obsługującej nowy format.
 
 ## Podmiana ikony programu
 
@@ -23,6 +23,18 @@ Okno odczytuje ICO z katalogu programu. Przy braku lub błędzie odczytu używa 
 ## Widok warstw
 
 Menu **Widok** na górnym pasku przełącza Tereny, Ikony, Obiekty i Mgłę. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
+
+## Tekstury terenów i wybór koloru
+
+Własny preset pozwala wybrać **Kolor** albo **Grafika** w edycji terenu. Ołówek na terenie presetu Domyślny wyświetla wskazówkę o utworzeniu lub wyborze własnego presetu. W trybie Grafika otwórz bibliotekę miniatur albo zaimportuj plik. W kadrowaniu przeciągaj obraz pod nieruchomą maską i używaj kółka do zmiany przybliżenia. Przełącznik Pointy Top / Flat Top zmienia obrys podglądu przy zachowaniu kadru. Zatwierdź zapisuje wycinek. Anuluj zamyka kadrowanie bez zapisu.
+
+Źródłem może być nieruchomy PNG, JPEG, BMP lub GIF do 4096 × 4096 i 16 MiB. Program zapisuje kwadratowy PNG **256 × 256** z przezroczystością i zwalnia plik źródłowy. Ten sam kwadrat ma wspólny środek i skalę w obu orientacjach. Siatka przycina go do kształtu heksa bez obrotu i rozciągania. Mgła go zasłania, a wyłączenie Terenów pokazuje neutralne wypełnienie.
+
+Biblioteka przechowuje `Library/Terrains/Graphics/terrain-Nazwa.json` z ID, nazwą, kolejnością i osadzonym PNG. Użycie w palecie zapamiętuje konkretny wycinek. Późniejsza zmiana lub usunięcie biblioteczne pozostawia dotychczasowe mapy i presety czytelne. Zatwierdzony import biblioteczny jest osobnym wpisem historii względem edycji terenu. Ponowne kadrowanie wycinka obejmuje dostępny kwadrat. Aby odzyskać inny fragment obrazu, wskaż plik źródłowy. Pliki bibliotek cofają się w granicach historii sesji.
+
+Pędzel i Wiadro korzystają z tej samej palety. W edycji terenu opcja „Zastosuj do bieżącej mapy” aktualizuje heksy danego wariantu. Plik mapy zawiera grafiki pól i zapisanych palet projektu, a samodzielny plik presetu grafiki swojej palety. Każda tabela deduplikuje PNG według zawartości. Jedna mapa lub preset może zawierać do 128 grafik i 44 MiB ich Base64. Limit całego presetu to 48 MiB, a mapy 128 MiB.
+
+Wybór koloru terenu, stanu i ramki grupy korzysta z tego samego ciemnego dialogu. Wybierz odcień, nasycenie i jasność albo wpisz `#RRGGBB` małymi lub wielkimi literami. Podgląd pokazuje poprzednią i nową wartość. Zatwierdź wymaga sześciu cyfr szesnastkowych.
 
 ## Narzędzia, kamera i materiał
 
@@ -45,7 +57,7 @@ Biblioteki ikon/obiektów mają dodawanie z pliku lub grafiki drugiej biblioteki
 
 ## Stany i trwałe grupy
 
-Plus w szczegółach instancji tworzy stan w `Library/Objects/States` i udostępnia go bieżącej mapie. Prawy przycisk na kafelku otwiera edycję bibliotecznej nazwy, koloru i uprawnienia do odkrywania, usuwanie albo zapis stanu dostępnego tylko w dokumencie. Można edytować trzy podstawowe wzorce. Ich stabilne ID chronią je przed usunięciem.
+Plus w szczegółach instancji tworzy stan w `Library/Objects/States` i udostępnia go bieżącej mapie. Prawy klik plusa udostępnia wykluczony stan, jeśli jego definicja nadal jest w bibliotece. Przywrócenie nie przypisuje stanu obiektom i można je cofnąć. Prawy przycisk na kafelku otwiera edycję bibliotecznej nazwy, koloru i uprawnienia do odkrywania, usuwanie albo zapis stanu dostępnego tylko w dokumencie. Można edytować trzy podstawowe wzorce. Ich stabilne ID chronią je przed usunięciem.
 
 Nowa mapa przyjmuje aktualne definicje biblioteki. Otwarta mapa daje pierwszeństwo własnej definicji przy tym samym ID. Edycja biblioteki aktualizuje otwartą mapę po zaznaczeniu opcji „Zaktualizuj definicję na bieżącej mapie”. Wyłączenie uprawnienia wstrzymuje odkrywanie. Checkbox i nakładka zachowują wartości. **Usuń stan z mapy** pokazuje referencje obiektów i grup oraz wybór zamiennika z domyślnym ID Neutral. Własny stan znika z tej mapy także po ponownym otwarciu. Opcjonalne usunięcie jego pliku i wymiana referencji podlegają jednemu Undo. Pliki `state-Nazwa.json` mają bezpieczne sufiksy przy kolizji i sesyjne Undo/Redo.
 
@@ -83,7 +95,7 @@ Zachowano chroniony Domyślny, czytelne presety i odświeżanie, osiem geometrii
 
 Celowane scenariusze 0.4.2 uruchamia `tests/Run-Patch042Tests.ps1 -Case states|groups|controls|render` z pojedynczym wybranym przypadkiem. `fixture` przygotowuje mapę do prób okna. Szczegóły wykonanych prób zawiera `docs/raport-0.4.2.md`.
 
-Library jest lokalne/ignorowane; program tworzy brakujące Backgrounds, Terrains/Presets, Icons, Objects, Hexmaps, Exports/Images, Exports/Text bez kasowania danych. Nowy projekt proponuje Hexmaps, otwarty respektuje swoją ścieżkę. Prywatna biblioteka nie służy do testów.
+Library jest lokalne i ignorowane przez Git. Program tworzy brakujące Backgrounds, Terrains/Presets, Terrains/Graphics, Icons, Objects/States, Hexmaps, Exports/Images i Exports/Text. Nowy projekt proponuje Hexmaps, a otwarty zachowuje swoją ścieżkę.
 
 Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego polecenia.** Nowe scenariusze wybierane pojedynczo:
 
@@ -91,13 +103,15 @@ Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego p
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Groups041Tests.ps1 -Case model
 ```
 
-Case: model / fog / controls, bez automatycznej pełnej kampanii. Źródła/skrypty są śledzone, artefakty tylko w ignorowanym tests/_work z osobnymi podkatalogami przebiegów. Create-Groups041Ui.ps1 przygotowuje zwykły EXE i własną mapę; to nie test okna. Wyniki i ograniczenia: docs/raport-0.4.1.md; plan: docs/plan-0.4.1.md; bieżąca specyfikacja: sekcja 28. Paczka programu bez tests/artefaktów/prywatnej Library, główny bin niepotrzebny.
+Przypadki starszego przyrostu to model, fog i controls. Źródła i skrypty są śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 31 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
-Poza zakresem pozostają zagnieżdżone grupy, światło/ciemność, widok MG/gracza, tekstury/detail, zakładki, kadrowanie, przebudowa opisów i pełny redesign. Nie planujemy walki/statystyk/ekwipunku, tras/pathfindingu/animacji. Bez usług AI. Warstwa światła jest przyszłym, niezależnym od trwałego odkrywania wymaganiem.
+Na później pozostają m.in. światło i ciemność, widok MG/gracza, tło całej mapy, poziomy szczegółowości tekstur, zakładki, przebudowa opisów i drżenie nagłówka prawego panelu. Celowane próby 0.5.0 uruchamia `tests/Run-Patch050Tests.ps1`. Wyniki i ograniczenia są w `docs/raport-0.5.0.md`.
 
 Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejności dodania. Starsze wpisy bez kolejności startują według stabilnego ID. Edycja zachowuje pozycję. Kolejność terenów jest kolejnością tablicy w palecie. Lista obiektów na mapie ma odrębny cykl sortowania rosnąco, malejąco i w kolejności dokumentu. Pokazuje grupę i znacznik efektywnego stanu. Sortuje maskowane teksty według widocznego `???` i mgłę liczbowo.
 
 ## Historia zmian
+
+- **0.5.0** — widoczny edytor WPF, tekstury z kadrowaniem i biblioteką, mapy i presety z osadzonymi grafikami, wspólny HSV/HEX, ponowne kliknięcie odznaczające obiekt lub grupę i przywracanie stanów z biblioteki.
 
 - **0.4.3** — warstwy Widoku, lista obiektów z sortowaniem, usuwanie i zastępowanie stanów, trwała kolejność bibliotek, obrysy grup i kompozycja prawego panelu. Komunikaty przebudowy wskazują plik ICO i wynikowy EXE.
 

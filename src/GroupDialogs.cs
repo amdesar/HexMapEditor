@@ -26,12 +26,12 @@ namespace HexMapEditor
             Row(1, "Kolor", button, true);
             button.Click += (sender, args) =>
             {
-                using (var dialog = new ColorDialog { Color = ColorTranslator.FromHtml(color), FullOpen = true })
+                using (var dialog = new EditorColorDialog(ColorTranslator.FromHtml(color)))
                     if (dialog.ShowDialog(this) == DialogResult.OK)
                     {
-                        color = String.Format("#{0:X2}{1:X2}{2:X2}", dialog.Color.R, dialog.Color.G, dialog.Color.B);
+                        color = dialog.Hex;
                         button.Text = color;
-                        button.BackColor = dialog.Color;
+                        button.BackColor = dialog.SelectedColor;
                     }
             };
             AddOption(reveal, 2);

@@ -8,7 +8,7 @@ namespace HexMapEditor
 {
     public sealed partial class MainWindow
     {
-        Panel objectDetailPanel;
+        DetailsOverlay objectDetailPanel;
         Control hexDetailScroll;
         Label detailTitle;
         readonly Label detailIcon=new Label();
@@ -36,7 +36,7 @@ namespace HexMapEditor
         Button PropertyButton(string text,Action action,bool red=false){var b=new Button{Text=text,Height=30,FlatStyle=FlatStyle.Flat,AutoSize=true};StyleButton(b);if(red){b.BackColor=Color.FromArgb(140,44,44);b.TextAlign=ContentAlignment.MiddleCenter;}b.Click+=(s,e)=>action();return b;}
         void BuildObjectDetails()
         {
-            objectDetailPanel=new BufferedPanel{Dock=DockStyle.Fill,Padding=new Padding(16),AutoScroll=true,Visible=false};right.Controls.Add(objectDetailPanel);objectDetailPanel.BringToFront();
+            objectDetailPanel=new DetailsOverlay{Dock=DockStyle.Fill,Padding=new Padding(16),AutoScroll=true,Visible=false};right.Controls.Add(objectDetailPanel);objectDetailPanel.BringToFront();
             var container=new BufferedPanel{Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink};objectDetailPanel.Controls.Add(container);
             var top=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false};objectDetailPanel.Controls.Add(top);top.SendToBack();
             objectCount=new Label{AutoSize=true};top.Controls.Add(objectCount);groupSelectionButton=PropertyButton("Grupuj wybrane",JoinGroupsFromPanel);top.Controls.Add(groupSelectionButton);
@@ -47,7 +47,8 @@ namespace HexMapEditor
             addStateTile.Width = 34;
             addStateTile.AutoSize = false;
             addStateTile.AccessibleName = "Dodaj stan do biblioteki";
-            tips.SetToolTip(addStateTile, addStateTile.AccessibleName);
+            tips.SetToolTip(addStateTile, "Kliknij, aby utworzyć stan. Prawy przycisk: Dodaj stan z biblioteki.");
+            AttachStateRestoreMenu(addStateTile);
             stateTiles.Controls.Add(addStateTile);
             PropertyRow(instanceLayout,2,"Rozmiar",objectSize);PropertyRow(instanceLayout,3,"Ruch",objectLocked);PropertyRow(instanceLayout,4,"Mgła",objectReveal);PropertyRow(instanceLayout,5,"Promień",objectRadius);
             effectiveLabel=new Label{AutoSize=true,MaximumSize=new Size(350,0)};SpanRow(instanceLayout,6,effectiveLabel);

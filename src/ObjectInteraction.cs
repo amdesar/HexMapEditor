@@ -15,6 +15,7 @@ namespace HexMapEditor
         PointF? objectPreviousCursor;
         readonly List<PointF> selectionPath=new List<PointF>();
         bool objectSelecting,objectMoving,objectClick,selectionControl;
+        string objectClickToClear;
         int selectionKind,skippedLocked;
         static bool SelectionTool(EditorTool tool){return tool==EditorTool.Select||tool==EditorTool.RectangleSelect||tool==EditorTool.Lasso;}
         PointF World(Point p){return new PointF((p.X-pan.X)/scale,(p.Y-pan.Y)/scale);}
@@ -32,7 +33,7 @@ namespace HexMapEditor
         {ChooseObjectMember(hit,control,(ModifierKeys&Keys.Alt)!=0);}
         void ChooseObjectMember(MapObject hit,bool control,bool single)
         {
-            EndObjectPropertyEdit();var unit=single?new HashSet<string>{hit.Id}:ExpandedObjects(new[]{hit.Id});
+            EndObjectPropertyEdit();textHistory.BreakGroups();var unit=single?new HashSet<string>{hit.Id}:ExpandedObjects(new[]{hit.Id});
             if(control){if(unit.IsSubsetOf(selectedObjects))selectedObjects.ExceptWith(unit);else selectedObjects.UnionWith(unit);}else if(single||!unit.IsSubsetOf(selectedObjects)){selectedObjects.Clear();groupSelectionOrder.Clear();selectedObjects.UnionWith(unit);}
             if(single){selectedGroupId=null;SelectedWholeGroups();}else ResolveSelectedGroup();selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();
         }
@@ -80,7 +81,10 @@ namespace HexMapEditor
             var point=World(e.Location);var hit=HitObject(point);selectionControl=(ModifierKeys&Keys.Control)!=0;objectClick=hit!=null;objectMoving=false;objectSelecting=false;
             if(gestureTool==EditorTool.Hand){if(hit==null)return false;BeginObjectMove(ExpandedObjects(new[]{hit.Id}),point);return true;}
             selectionKind=gestureTool==EditorTool.Lasso?1:0;
-            if(hit!=null){ChooseObject(hit,selectionControl);
+            if(hit!=null){
+                if (!selectionControl && (ModifierKeys & Keys.Alt) == 0 && selectedObjects.SetEquals(ExpandedObjects(new[]{hit.Id})))
+                    objectClickToClear = hit.Id;
+                ChooseObject(hit,selectionControl);
                 if(selectedObjects.Contains(hit.Id)){
                     BeginObjectMove(selectedObjects,point);
                 }return true;
@@ -114,6 +118,12 @@ namespace HexMapEditor
                 else if(selectionKind==0){var r=SelectionRectangle(selectionPath[0],World(e.Location));matches=map.Objects.Where(o=>r.Contains(o.X,o.Y)&&ObjectVisible(o)).ToList();}
                 var targets=ExpandedObjects(matches.Select(o=>o.Id));if(!selectionControl){selectedObjects.Clear();selectedObjects.UnionWith(targets);}else foreach(var unit in targets.GroupBy(id=>{var g=GroupRules.For(map,id);return g==null?id:g.Id;})){var ids=new HashSet<string>(unit);if(ids.IsSubsetOf(selectedObjects))selectedObjects.ExceptWith(ids);else selectedObjects.UnionWith(ids);}ResolveSelectedGroup();selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();return true;
             }
+            if (objectClickToClear != null && !dragging &&
+                Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) <= 3)
+            {
+                var hit = HitObject(World(e.Location));
+                if (hit != null && hit.Id == objectClickToClear) CloseDetailsPanel();
+            }
             if(objectClick)return true;return false;
         }
         void FinishObjectGesture(bool commit)
@@ -123,7 +133,7 @@ namespace HexMapEditor
                 if(commit&&(objectGesture.Objects.Count>0||objectGesture.Layers.Count>0)){ReconcileFog(objectGesture,map,true);PushAction(objectGesture);MarkDirty();if(skippedLocked>0)statusLabel.Text="Pominięto zablokowane obiekty: "+skippedLocked;}
                 else if(!commit){foreach(var before in objectDragBefore.Values){var index=map.Objects.FindIndex(o=>o.Id==before.Id);if(index>=0)map.Objects[index]=before.Copy();}foreach(var layer in objectGesture.Layers)layer.Apply(map.Cells.First(c=>c.Id==layer.CellId),false);}
             }
-            objectGesture=null;objectDragBefore=null;objectMoving=false;objectSelecting=false;objectClick=false;objectPreviousCursor=null;selectionPath.Clear();canvas.Invalidate();
+            objectGesture=null;objectDragBefore=null;objectMoving=false;objectSelecting=false;objectClick=false;objectClickToClear=null;objectPreviousCursor=null;selectionPath.Clear();canvas.Invalidate();
         }
     }
 }

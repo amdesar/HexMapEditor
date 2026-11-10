@@ -47,6 +47,7 @@ namespace HexMapEditor
             if (action.PresetChange != null) ApplyPresetLibrary(action.PresetChange, after);
             if (action.ObjectLibraryChange != null) ApplyObjectLibrary(action.ObjectLibraryChange, after);
             if (action.StateFileChange != null) ApplyStateFile(action.StateFileChange, after);
+            if (action.TerrainGraphicChange != null) ApplyTerrainGraphic(action.TerrainGraphicChange, after);
             foreach (var asset in action.RequiredAssets) if (!map.IconAssets.Any(a => a.Id == asset.Id)) map.IconAssets.Add(asset);
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);

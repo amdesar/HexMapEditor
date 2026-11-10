@@ -4,6 +4,8 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
+    // Use only for the native WinForms branch. ElementHost owns a WPF
+    // rendering surface that must not sit under WS_EX_COMPOSITED.
     internal sealed class DetailsOverlay : BufferedPanel
     {
         protected override CreateParams CreateParams

@@ -57,21 +57,31 @@ namespace HexMapEditor
         }
         void UpdateTerrainSelection()
         {
-            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex); tile.Edit.Enabled = tile.Delete.Enabled = !PresetReadOnly; }
+            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex); tile.Delete.Enabled = !PresetReadOnly; }
         }
         void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; objectMaterial=false;noMaterial=false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); } }
         void MaterialChosen() { if (!updating && (currentTool == EditorTool.FogBrush || currentTool == EditorTool.FogBucket)) SelectTool(EditorTool.Brush); }
         void SelectPreset(string id)
         {
             if (id == map.ActivePresetId) return; var chosen = AvailablePresets().First(p => p.Id == id);
-            ChangePalette("Wybór presetu", () => { if (!map.Presets.Any(p => p.Id == id)) map.Presets.Add(chosen.Copy()); map.ActivePresetId = id; brushIndex = 0; });
+            try
+            {
+                CheckTextureBudget(chosen.Terrains.Select(t => t.Texture));
+                ChangePalette("Wybór presetu", () => { if (!map.Presets.Any(p => p.Id == id)) map.Presets.Add(chosen.Copy()); map.ActivePresetId = id; brushIndex = 0; });
+            }
+            catch (InvalidDataException ex)
+            {
+                RefreshPresetPicker();
+                ShowEditorMessage(ex.Message, "Wybór presetu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
+        string PresetContent(TerrainPreset preset) { return json.Serialize(new { preset.Name, preset.Terrains }); }
         void UpdatePresetStatus()
         {
             var p = ActivePreset(); var stored = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
             if (renamePresetButton != null) renamePresetButton.Enabled = !PresetReadOnly;
             if (addTerrainButton != null) addTerrainButton.Enabled = !PresetReadOnly;
-            bool differs = p.Id == PresetCatalog.DefaultId ? json.Serialize(p) != json.Serialize(PresetCatalog.Default()) : stored == null || json.Serialize(p) != json.Serialize(stored);
+            bool differs = p.Id == PresetCatalog.DefaultId ? PresetContent(p) != PresetContent(PresetCatalog.Default()) : stored == null || PresetContent(p) != PresetContent(stored);
             string status = p.Id == PresetCatalog.DefaultId ? (differs ? "Kopia robocza wzorca Domyślny *" : "Domyślny: chroniony wzorzec") : stored == null ? "Preset niezapisany w bibliotece" : differs ? "Paleta różni się od zapisanego presetu *" : "Paleta zgodna z zapisanym presetem";
             presetStateLabel.Text = status; presetStateLabel.ForeColor = differs ? Color.FromArgb(246, 207, 124) : ForeColor; tips.SetToolTip(presetStateLabel, status + "\nNazwa robocza: " + p.Name); presetStateLabel.AccessibleName = status;
             if (deletePresetButton != null) { deletePresetButton.Enabled = p.Id != PresetCatalog.DefaultId && stored != null; tips.SetToolTip(deletePresetButton, p.Id == PresetCatalog.DefaultId ? "Chronionego wzorca Domyślny nie można usunąć." : stored == null ? "Ten roboczy preset nie ma pliku w bibliotece." : "Usuń własny preset z biblioteki; dane mapy pozostaną."); }
@@ -189,25 +199,39 @@ namespace HexMapEditor
         void EditTerrain(bool add) { EditTerrainDialog(add, null); }
         void EditTerrainDialog(bool add, string id)
         {
-            if (PresetReadOnly) return;
+            if (PresetReadOnly)
+            {
+                if (!add) ShowEditorMessage("Nie można edytować chronionego presetu Domyślny.\nUtwórz nowy preset, zapisz własną kopię lub wybierz inny preset.",
+                    "Chroniony preset", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
             var p = ActivePreset(); var old = add ? new TerrainDefinition() : p.Terrains.FirstOrDefault(t => t.TerrainId == id);
             if (old == null) return;
-            using (var d = new TerrainDialog(old, !add))
+            using (var d = new TerrainDialog(old, !add, map.Orientation == "FlatTop"))
             {
-                d.CanAccept = () => !d.ApplyToMap || !map.Cells.Any(c => c.VariantId == old.VariantId) || GuardLayer(MapLayer.Terrain, d);
+                d.ChooseGraphic = ChooseTerrainGraphic;
+                d.CanAccept = () =>
+                {
+                    try { CheckTextureBudget(new[] { d.Texture }); }
+                    catch (InvalidDataException ex) { MessageBox.Show(d, ex.Message, "Limit grafik", MessageBoxButtons.OK, MessageBoxIcon.Warning); return false; }
+                    return !d.ApplyToMap || !map.Cells.Any(c => c.VariantId == old.VariantId) || GuardLayer(MapLayer.Terrain, d);
+                };
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
                 var next = old.Copy(); next.Name = d.TerrainName; next.Color = d.TerrainColor;
+                next.Texture = d.Texture; next.TextureId = d.Texture == null ? null : d.Texture.Id; next.FillKind = d.Texture == null ? "color" : "graphic";
                 if (add) AddTerrain(next);
-                else if (next.Name != old.Name || !String.Equals(next.Color, old.Color, StringComparison.OrdinalIgnoreCase)) { next.VariantId = Guid.NewGuid().ToString("N"); next.Revision++; UpdateTerrain(old, next, d.ApplyToMap); }
+                else if (!SameTerrainAppearance(old, next)) { next.VariantId = Guid.NewGuid().ToString("N"); next.Revision++; UpdateTerrain(old, next, d.ApplyToMap); }
             }
         }
+        static bool SameTerrainAppearance(TerrainDefinition old, TerrainDefinition next)
+        { return old.Name == next.Name && String.Equals(old.Color, next.Color, StringComparison.OrdinalIgnoreCase) && old.TextureId == next.TextureId; }
         void AddTerrain(TerrainDefinition terrain)
         { if (PresetReadOnly) return; ChangePalette("Dodanie terenu", () => { var p = ActivePreset(); p.Terrains.Add(terrain.Copy()); brushIndex = p.Terrains.Count - 1; }); }
         void UpdateTerrain(TerrainDefinition old, TerrainDefinition next, bool apply)
         {
             if (PresetReadOnly) return;
             var p = ActivePreset(); int at = p.Terrains.FindIndex(t => t.TerrainId == old.TerrainId && t.VariantId == old.VariantId); if (at < 0) throw new InvalidOperationException("Brak wersji terenu.");
-            if (old.Name == next.Name && String.Equals(old.Color, next.Color, StringComparison.OrdinalIgnoreCase)) return;
+            if (SameTerrainAppearance(old, next)) return;
             ChangePalette("Edycja terenu" + (apply ? " i mapy" : ""), () => p.Terrains[at] = next.Copy(), action =>
             {
                 if (!apply) return;

@@ -1,6 +1,6 @@
 ﻿# Specyfikacja użytkowa — HexMapEditor
-Wersja 2.3. Stan decyzji 10 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost 0.4.3. Pierwszeństwo mają ustalenia sekcji 30.
+Wersja 2.4. Stan decyzji 10 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.5.0. Pierwszeństwo mają ustalenia sekcji 31.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -530,3 +530,16 @@ Bez zagnieżdżonych grup, światła/ciemności, widoku MG/gracza, tekstur/detai
 - Menu Widok pozostaje otwarte po przełączeniu warstwy. Flagi Tereny, Ikony, Obiekty i Mgła dotyczą widoku. Edycja ukrytej warstwy może przywrócić jej widoczność, po czym wymaga ponowienia operacji. Aktualizacja mapy z dialogu biblioteki sprawdza warstwę przed zamknięciem dialogu.
 - Budowanie oczekuje `assets/app/icon.ico`. Weryfikuje format i publikuje EXE po kompilacji. Eksplorator może odczytywać ikonę z pamięci podręcznej powłoki.
 - Na później pozostają bardziej intuicyjne akcje edycji i usuwania stanów dostępne bez prawego przycisku.
+
+## 31. Przyrost 0.5.0
+
+- Kompozycja HWND obejmuje tylko natywne szczegóły obiektów. ElementHost i WPF w szczegółach heksa są poza tą gałęzią. Ponowne pokazanie już załadowanego opisu zachowuje jego treść i historię. Zmiana heksa lub stanu mgły może załadować właściwy opis.
+- Ponowny zwykły klik wybranej instancji lub członka dokładnie wybranej grupy odznacza ją i zamyka szczegóły. Decyzja zapada na końcu gestu, po odróżnieniu kliknięcia od przesunięcia. Ctrl i Alt zachowują swoje role. Lista używa efektywnego stanu grupowego, a mgła zachowuje dotychczasowy próg maskowania 50%.
+- Prawy klik plusa stanów pozwala świadomie usunąć wykluczenie po stabilnym ID, jeżeli w bibliotece pozostaje plik stanu. Cofnięcie przywraca wykluczenie. Wybór nie przypisuje stanu obiektom i nie nadpisuje skonfliktowanej definicji. Lewy klik tworzy nowy stan.
+- Teren ma jednolity kolor albo kwadratowy wycinek PNG 256 × 256. Obie orientacje korzystają z tego samego środka, skali i nieobróconego obrazu. Maski odcinają tylko fragmenty poza heksami. Przezroczystość źródłowa jest zachowana, a pod grafiką pozostaje kolor podkładu terenu.
+- Import nieruchomych PNG, JPEG, BMP i GIF ma limit 16 MiB i 4096 × 4096. Wypełnij ustawia początkowy kadr z pokryciem całego kwadratu. Przeciągnięcie przesuwa obraz pod nieruchomą maską, a kółko zmienia przybliżenie. Maska Pointy Top / Flat Top nie resetuje kadru. Zatwierdzenie zapisuje wycinek do biblioteki i zwalnia źródło. Anulowanie kadru niczego nie zapisuje.
+- `Library/Terrains/Graphics` zawiera `terrain-Nazwa.json` z ID, nazwą, kolejnością i osadzonym PNG. Wybór, dodawanie, edycja i usuwanie są dostępne z edycji terenu. Można kadrować zapisany wycinek lub ponownie wskazać źródło. Sesyjna historia plików chroni obce zmiany i zajęte ścieżki. Potwierdzone zapisy do biblioteki są odrębne od zatwierdzenia edycji terenu.
+- Heks i paleta odwołują się do treści wycinka. Zmiana zasobu biblioteki nie przemalowuje heksów ani nie zmienia zapisanych presetów. Zmiana terenu na mapie zachowuje inne warstwy. Region Wiadra terenu zależy od wariantu, a Wiadra mgły od dotychczasowych danych regionu. Widok Tereny zastępuje teksturę neutralnym kolorem bez utraty danych. Mgła zasłania teksturę.
+- Mapa 7 zapisuje jedną tabelę `TerrainAssets` dla grafik heksów i wszystkich palet dokumentu. Preset 2 ma własną tabelę dla swojej palety. Odwołania `TextureId` pozwalają deduplikować dane według zawartości. Pliki są niezależne od biblioteki. Limity to 128 grafik i 44 MiB Base64 na tabelę, 48 MiB na preset i 128 MiB na mapę. Program zachowuje odczyt map 5–6 i presetów 1.
+- Teren, stan i ramka grupy używają wspólnego dialogu HSV z podglądem poprzedniego i nowego koloru. Pole HEX przyjmuje dokładnie `#RRGGBB` bez rozróżniania wielkości liter. Niepełny lub błędny HEX blokuje zatwierdzenie. Ołówek terenu Domyślnego pokazuje wyjaśnienie i nie otwiera edycji.
+- Odłożono poziomy szczegółowości, tło mapy, światło, zakładki, przebudowę opisów i paneli, drżenie nagłówka prawego panelu, dalszą diagnozę ikony powłoki oraz zapis osadzonych zasobów z otrzymanej mapy do biblioteki.
