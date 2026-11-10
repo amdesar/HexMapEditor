@@ -91,6 +91,7 @@ namespace HexMapEditor
             ConfigureButton(orientationToggle, "Pointy Top", "pointy", "Zmień orientację", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop"), 128); view.Controls.Add(orientationToggle);
             ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
+            BuildViewMenu(view);
             var fitMenu=new ContextMenuStrip();fitMenu.Items.Add("Dopasuj mapę",null,(s,e)=>FitMap());fitMenu.Items.Add("Dopasuj wszystko",null,(s,e)=>FitEverything());
             fitMenu.BackColor=Color.FromArgb(34,38,48);fitMenu.ForeColor=Color.WhiteSmoke;fitMenu.Renderer=new ToolStripProfessionalRenderer(new FitMenuColors());
             fitMenu.Opening+=(s,e)=>EndCanvasGesture(true);fitMenu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};
@@ -114,6 +115,7 @@ namespace HexMapEditor
             left.BackColor = shellToolbar.BackColor; left.AutoScroll = false; Controls.Add(left);
             leftToggle.FlatStyle = FlatStyle.Flat; StyleButton(leftToggle); leftToggle.AccessibleName = "Zwiń lub rozwiń paletę"; tips.SetToolTip(leftToggle, leftToggle.AccessibleName); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; PositionOverlays(); canvas.Invalidate(); }; Controls.Add(leftToggle);
             BuildPalettePanel(); BuildDetailsPanel(); Controls.Add(right);
+            left.BringToFront(); right.BringToFront(); leftToggle.BringToFront();
         }
         void LayoutMainToolbar()
         {

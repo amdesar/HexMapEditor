@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,10 +12,11 @@ namespace HexMapEditor
         public string Id { get; set; }
         public string Name { get; set; }
         public IconAsset Asset { get; set; }
+        public long LibraryOrder { get; set; }
         internal string FilePath;
         internal byte[] DiskBytes;
         public LibraryIcon() { IconFormatVersion = 2; Id = Guid.NewGuid().ToString("N"); }
-        internal LibraryIcon Copy() { return new LibraryIcon { Id = Id, Name = Name, Asset = Asset, FilePath = FilePath, DiskBytes = DiskBytes }; }
+        internal LibraryIcon Copy() { return new LibraryIcon { Id = Id, Name = Name, Asset = Asset, LibraryOrder = LibraryOrder, FilePath = FilePath, DiskBytes = DiskBytes }; }
     }
     internal static class IconLibrary
     {
@@ -62,7 +63,7 @@ namespace HexMapEditor
                 if (result.Count >= IconAssets.MaxAssets) throw new InvalidDataException("Limit biblioteki: 128 ikon."); result.Add(entry);
             }
             catch(Exception ex) { errors.Add(Path.GetFileName(path)+": "+ex.Message); }
-            warning = String.Join(Environment.NewLine,errors); return result;
+            warning = String.Join(Environment.NewLine,errors); return LibrarySequence.Sort(result, i => i.LibraryOrder, i => i.Id);
         }
     }
     internal sealed class IconLibraryChange

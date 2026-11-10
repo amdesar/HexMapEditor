@@ -80,8 +80,10 @@ namespace HexMapEditor
         {
             var entry = iconMaterial ? libraryIcons.FirstOrDefault(a => a.Id == activeIcon) : null;
             if (entry == null) { ShowEditorMessage("Zaznacz ikonę", "Edytuj ikonę", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            using (var d = new IconEditDialog(entry, PickLibraryIcon, PickObjectGraphic)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
+            using (var d = new IconEditDialog(entry, PickLibraryIcon, PickObjectGraphic))
             {
+                d.CanAccept = () => !d.UpdateMap || !map.Cells.Any(c => c.IconId != null && (c.IconEntryId ?? c.IconId) == entry.Id) || GuardLayer(MapLayer.Icons, d);
+                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
                 var next = entry.Copy(); next.Name = d.IconName; next.Asset = d.Asset; string error;
                 clearAfterIconEdit=true;
                 try { if (!TryChangeLibraryIcon(entry,next,d.UpdateMap,Path.GetDirectoryName(entry.FilePath),out error)) ShowEditorMessage(error,"Nie można edytować ikony",MessageBoxButtons.OK,MessageBoxIcon.Error); else ClearIconMaterial(); }
@@ -96,7 +98,7 @@ namespace HexMapEditor
         MapData MapForSave()
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map) };
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {

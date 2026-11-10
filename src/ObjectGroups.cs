@@ -49,6 +49,10 @@ namespace HexMapEditor
             if(map.ObjectStates==null||map.ObjectStates.Count<3||map.ObjectStates.Count>100||map.Groups==null||map.Groups.Count>2500)throw new InvalidDataException("Nieprawidłowe definicje stanów/grup.");
             var states=new HashSet<string>();foreach(var state in map.ObjectStates)if(state==null||String.IsNullOrWhiteSpace(state.Id)||state.Id.Length>200||!states.Add(state.Id)||String.IsNullOrWhiteSpace(state.Name)||state.Name.Length>200||!MapLogic.ValidColor(state.Color))throw new InvalidDataException("Nieprawidłowy lub powtórzony stan obiektu.");
             if (ObjectStateDefinition.Defaults().Any(s => !states.Contains(s.Id))) throw new InvalidDataException("Brak podstawowej definicji stanu.");
+            if (map.ExcludedStateIds == null || map.ExcludedStateIds.Count > 5000 ||
+                map.ExcludedStateIds.Distinct().Count() != map.ExcludedStateIds.Count ||
+                map.ExcludedStateIds.Any(id => String.IsNullOrWhiteSpace(id) || id.Length > 200 || StateLibrary.IsBuiltin(id) || states.Contains(id)))
+                throw new InvalidDataException("Nieprawidłowa lista wyłączonych stanów.");
             var objects=new HashSet<string>(map.Objects.Select(o=>o.Id));var groups=new HashSet<string>();var assigned=new HashSet<string>();
             foreach(var group in map.Groups){
                 if(group==null||!MapLogic.ValidColor(group.FrameColor)||String.IsNullOrWhiteSpace(group.Id)||group.Id.Length>200||objects.Contains(group.Id)||!groups.Add(group.Id)||String.IsNullOrWhiteSpace(group.Name)||group.Name.Length>200||group.Members==null||group.Members.Count==0||group.Members.Any(id=>!objects.Contains(id)||!assigned.Add(id))||group.StateId!=null&&!states.Contains(group.StateId)||group.RevealRadius.HasValue&&(group.RevealRadius<0||group.RevealRadius>20)||!new[]{"Individual","Offset","Common"}.Contains(group.SizeMode)||!ObjectGeometry.Finite(group.SizeValue)||group.SizeValue< -1016||group.SizeValue>1024||group.SizeMode=="Offset"&&Math.Abs(group.SizeValue)>1016||group.SizeMode=="Common"&&(group.SizeValue<8||group.SizeValue>1024))throw new InvalidDataException("Nieprawidłowa grupa, członkostwo lub nadpisanie.");
@@ -60,7 +64,7 @@ namespace HexMapEditor
         string selectedGroupId;
         MapData ProspectiveObjects(EditAction action)
         {
-            var model=new MapData{Columns=map.Columns,Rows=map.Rows,Orientation=map.Orientation,RowParity=map.RowParity,ColumnParity=map.ColumnParity,Cells=map.Cells,IconAssets=map.IconAssets,Objects=map.Objects.Select(o=>o.Copy()).ToList(),ObjectStates=action.AfterStates??map.ObjectStates,Groups=action.AfterGroups??map.Groups};
+            var model=new MapData{Columns=map.Columns,Rows=map.Rows,Orientation=map.Orientation,RowParity=map.RowParity,ColumnParity=map.ColumnParity,Cells=map.Cells,IconAssets=map.IconAssets,Objects=map.Objects.Select(o=>o.Copy()).ToList(),ObjectStates=action.AfterStates??map.ObjectStates,Groups=action.AfterGroups??map.Groups, ExcludedStateIds=action.AfterExcludedStates??map.ExcludedStateIds};
             foreach(var c in action.Objects)c.Apply(model,true);return model;
         }
         void ReconcileFog(EditAction action,MapData model,bool alreadyApplied)

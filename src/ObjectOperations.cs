@@ -51,7 +51,7 @@ namespace HexMapEditor
         bool DeleteObjectsAfterConfirmation(Func<string, bool> confirm)
         {
             var objects = map.Objects.Where(obj => selectedObjects.Contains(obj.Id)).ToList();
-            if (objects.Count == 0) return false;
+            if (objects.Count == 0 || !GuardLayer(MapLayer.Objects)) return false;
             string what = objects.Count == 1 ? "instancję „" + (!previewWithoutFog && ObjectFogLevel(objects[0]) > 0 ? "???" : objects[0].Name) + "”" : objects.Count + " instancje";
             if (!confirm("Usunąć z mapy " + what + "? Wzorce w bibliotece pozostaną. Operację można cofnąć.")) return false;
             DeleteSelectedObjects();
@@ -72,7 +72,7 @@ namespace HexMapEditor
         {
             var changes=new List<ObjectChange>();for(int i=0;i<map.Objects.Count;i++){var o=map.Objects[i];var p=ObjectGeometry.Transform(map,geometry,new PointF(o.X,o.Y),dc,dr);var next=o.Copy();next.X=p.X;next.Y=p.Y;changes.Add(new ObjectChange{Before=o.Copy(),After=next,Index=i});}return changes;
         }
-        void ResetObjectDocument(){selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;previewWithoutFog=false;if(fogPreviewButton!=null){fogPreviewButton.Checked=false;fogPreviewButton.BackColor=System.Drawing.Color.Transparent;}objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
+        void ResetObjectDocument(){selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;previewWithoutFog=hideTerrain=hideIcons=hideObjects=false;UpdateLayerChecks();objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
         void FitEverything()
         {
             EndCanvasGesture(true);RectangleF bounds=MapBounds();foreach(var o in map.Objects)bounds=RectangleF.Union(bounds,ObjectBounds(o));FitBounds(bounds);UpdateUI();

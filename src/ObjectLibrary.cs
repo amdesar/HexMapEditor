@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -14,6 +14,7 @@ namespace HexMapEditor
         public string Id {get;set;}
         public string Name {get;set;}
         public IconAsset Asset {get;set;}
+        public long LibraryOrder { get; set; }
         internal string FilePath; internal byte[] DiskBytes;
         public ObjectTemplate(){ObjectFormatVersion=1;Id=Guid.NewGuid().ToString("N");}
         internal ObjectTemplate Copy(){return (ObjectTemplate)MemberwiseClone();}
@@ -41,7 +42,7 @@ namespace HexMapEditor
             }
             var result=new List<ObjectTemplate>();var errors=new List<string>();
             foreach(var path in Directory.GetFiles(directory,"*.json").OrderBy(p=>p,StringComparer.OrdinalIgnoreCase))try{var o=Read(path);if(result.Count>=128||result.Any(p=>p.Id==o.Id))throw new InvalidDataException("Limit 128 wzorców lub powtórzone ID.");result.Add(o);}catch(Exception ex){errors.Add(Path.GetFileName(path)+": "+ex.Message);}
-            warning=String.Join("\n",errors);return result;
+            warning=String.Join("\n",errors);return LibrarySequence.Sort(result, o => o.LibraryOrder, o => o.Id);
         }
     }
     public sealed partial class MainWindow
@@ -68,7 +69,14 @@ namespace HexMapEditor
             }
         }
         void ImportObjectFile(){using(var d=new OpenFileDialog{Title="Dodaj wzorzec obiektu",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)try{var asset=IconAssets.Import(d.FileName);SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false);}catch(Exception ex){ShowEditorMessage(ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
-        void EditObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial){ShowEditorMessage("Zaznacz wzorzec obiektu","Edytuj obiekt",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}using(var d=new IconEditDialog(before.Graphic(),PickObjectGraphic,PickLibraryIcon,"Edytuj wzorzec obiektu"))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK){var next=before.Copy();next.Name=d.IconName;next.Asset=d.Asset;SaveObjectTemplate(before,next,d.UpdateMap);}}
+        void EditObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial){ShowEditorMessage("Zaznacz wzorzec obiektu","Edytuj obiekt",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}using(var d=new IconEditDialog(before.Graphic(),PickObjectGraphic,PickLibraryIcon,"Edytuj wzorzec obiektu")){
+                d.CanAccept = () => !d.UpdateMap || !map.Objects.Any(obj => obj.TemplateId == before.Id) || GuardLayer(MapLayer.Objects, d);
+                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
+                var next = before.Copy();
+                next.Name = d.IconName;
+                next.Asset = d.Asset;
+                SaveObjectTemplate(before, next, d.UpdateMap);
+            }}
         void DeleteObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial)return;if(ShowEditorMessage("Usunąć wzorzec „"+before.Name+"”? Instancje na mapie pozostaną.\nBez Kosza: kopia w pamięci Undo, do 300 wpisów. Nowa/Otwórz, wypadnięcie wpisu lub zamknięcie programu usuwa możliwość cofnięcia.","Usuń wzorzec",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)SaveObjectTemplate(before,null,false);}
         void SaveObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update){string error;if(!TryChangeObjectTemplate(before,next,update,ObjectsDirectory,out error))ShowEditorMessage(error,"Nie można zmienić wzorca",MessageBoxButtons.OK,MessageBoxIcon.Error);}
         bool TryChangeObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update,string directory,out string error)
@@ -77,7 +85,7 @@ namespace HexMapEditor
                 directory=Path.GetFullPath(directory);Directory.CreateDirectory(directory);
                 if(before!=null&&(!libraryObjects.Any(o=>o.Id==before.Id)||!String.Equals(Path.GetDirectoryName(before.FilePath),directory,StringComparison.OrdinalIgnoreCase)))throw new IOException("Wzorzec zmienił się. Wybierz ponownie.");
                 if(before==null&&libraryObjects.Count>=128)throw new IOException("Limit 128 wzorców.");
-                if(next!=null){next=next.Copy();next.Name=(next.Name??"").Trim();ObjectLibrary.Validate(next);if(before!=null&&before.Id!=next.Id||before==null&&libraryObjects.Any(o=>o.Id==next.Id))throw new IOException("Konflikt tożsamości wzorca.");next.FilePath=ObjectLibrary.Destination(directory,next.Name,before==null?null:before.FilePath);next.DiskBytes=new UTF8Encoding(false).GetBytes(json.Serialize(next));}
+                if(next!=null){next=next.Copy();next.Name=(next.Name??"").Trim();ObjectLibrary.Validate(next);if(before!=null&&before.Id!=next.Id||before==null&&libraryObjects.Any(o=>o.Id==next.Id))throw new IOException("Konflikt tożsamości wzorca.");next.FilePath=ObjectLibrary.Destination(directory,next.Name,before==null?null:before.FilePath);next.LibraryOrder = before == null ? LibrarySequence.Next(libraryObjects.Select(o => o.LibraryOrder)) : before.LibraryOrder;next.DiskBytes=new UTF8Encoding(false).GetBytes(json.Serialize(next));}
                 var action=new EditAction{Label=before==null?"Dodanie wzorca":next==null?"Usunięcie wzorca":"Edycja wzorca"};
                 if(update&&before!=null&&next!=null)foreach(var o in map.Objects.Where(o=>o.TemplateId==before.Id)){
                     if(o.AssetId==next.Asset.Id)continue;var after=o.Copy();after.AssetId=next.Asset.Id;action.Objects.Add(new ObjectChange{Before=o.Copy(),After=after,Index=map.Objects.IndexOf(o)});

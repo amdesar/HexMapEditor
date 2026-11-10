@@ -157,7 +157,7 @@ namespace HexMapEditor.Tests
                 var below = (ListViewItem)Call(w, "ObjectListItem", a);
                 a.Y = 26;
                 var above = (ListViewItem)Call(w, "ObjectListItem", a);
-                Require(below.Text == "???" && above.Text == a.Name && above.SubItems[3].Text.Contains("% ukrycia"), "Maskowanie listy");
+                Require(below.Text == "???" && above.Text == a.Name && above.SubItems[4].Text.Contains("% ukrycia"), "Maskowanie listy");
             }
         }
 

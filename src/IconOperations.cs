@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -22,6 +22,7 @@ namespace HexMapEditor
                     if (before != null && before.Id != next.Id) throw new IOException("Edycja nie może zmieniać tożsamości ikony.");
                     if (before == null && libraryIcons.Any(i => i.Id == next.Id)) throw new IOException("Powtórzone ID ikony.");
                     Directory.CreateDirectory(directory); next.FilePath = IconLibrary.Destination(directory,next.Name,before == null ? null : before.FilePath);
+                    next.LibraryOrder = before == null ? LibrarySequence.Next(libraryIcons.Select(i => i.LibraryOrder)) : before.LibraryOrder;
                     next.DiskBytes = new UTF8Encoding(false).GetBytes(json.Serialize(next));
                 }
                 var action = new EditAction { Label = before == null ? "Dodanie ikony" : next == null ? "Usunięcie ikony" : "Edycja ikony" };

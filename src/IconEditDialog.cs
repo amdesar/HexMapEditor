@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -12,6 +12,7 @@ namespace HexMapEditor
         readonly PictureBox preview = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom };
         public string IconName { get { return name.Text.Trim(); } }
         public IconAsset Asset { get; private set; }
+        public Func<bool> CanAccept;
         public bool UpdateMap { get { return update.Checked; } }
         public IconEditDialog(LibraryIcon icon, Func<IWin32Window, LibraryIcon> pick, Func<IWin32Window, LibraryIcon> other = null, string title = "Edytuj ikonę") : base(title,other == null ? 335 : 375)
         {
@@ -22,7 +23,7 @@ namespace HexMapEditor
             int row=3; Button cross=null;
             if(other!=null){cross=new Button{Text=title=="Edytuj ikonę"?"Z biblioteki obiektów":"Z biblioteki ikon"};Row(row++,"Inna biblioteka",cross,true);}
             Row(row,"Podgląd",preview,true);Layout.RowStyles[row++].Height=90;
-            Layout.Controls.Add(update,0,row++);Layout.SetColumnSpan(update,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Buttons(row,()=>{if(IconName.Length>0)DialogResult=DialogResult.OK;});
+            Layout.Controls.Add(update,0,row++);Layout.SetColumnSpan(update,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Buttons(row,()=>{if(IconName.Length>0 && (CanAccept == null || CanAccept()))DialogResult=DialogResult.OK;});
             Action show=()=>{var old=preview.Image;preview.Image=IconAssets.Decode(Asset);if(old!=null)old.Dispose();};show();
             choices.Click+=(s,e)=>{var chosen=pick(this);if(chosen!=null){Asset=chosen.Asset;show();}};
             if(cross!=null)cross.Click+=(s,e)=>{var chosen=other(this);if(chosen!=null){Asset=chosen.Asset;show();}};

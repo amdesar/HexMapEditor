@@ -67,8 +67,9 @@ namespace HexMapEditor
         public List<IconAsset> IconAssets { get; set; }
         public List<MapObject> Objects { get; set; }
         public List<ObjectStateDefinition> ObjectStates { get; set; }
+        public List<string> ExcludedStateIds { get; set; }
         public List<ObjectGroup> Groups { get; set; }
-        public MapData() { FormatVersion = 6; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); Groups=new List<ObjectGroup>(); }
+        public MapData() { FormatVersion = 6; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
     }
 
     internal sealed class TerrainState
@@ -102,6 +103,7 @@ namespace HexMapEditor
         public string BeforeOrientation, AfterOrientation;
         public List<ObjectGroup> BeforeGroups, AfterGroups;
         public List<ObjectStateDefinition> BeforeStates, AfterStates;
+        public List<string> BeforeExcludedStates, AfterExcludedStates;
         public List<IconAsset> RequiredAssets = new List<IconAsset>();
         public string Label;
         public ResizeState BeforeResize, AfterResize;
@@ -115,7 +117,7 @@ namespace HexMapEditor
         readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 64 };
         readonly Panel canvas = new BufferedPanel();
         readonly Panel left = new Panel();
-        readonly Panel right = new BufferedPanel();
+        readonly DetailsOverlay right = new DetailsOverlay();
         readonly Button leftToggle = new Button();
         readonly Button rightClose = new Button();
         readonly ComboBox terrainPicker = new ComboBox();
@@ -149,7 +151,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.4.2";
+        const string AppVersion = "0.4.3";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -204,7 +206,6 @@ namespace HexMapEditor
             leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : 220, top, 18, height);
             leftToggle.Text = leftCollapsed ? "›" : "‹"; left.Visible = !leftCollapsed;
             int width = ClampRightWidth(requestedRightWidth); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
-            left.BringToFront(); if (right.Visible) right.BringToFront(); leftToggle.BringToFront();
             }
         }
 
@@ -235,7 +236,9 @@ namespace HexMapEditor
 
         void UpdateUI()
         {
+            bool opening = rightPanelOpen && !right.Visible;
             updating = true;
+            right.SuspendLayout();
             try
             {
                 UpdateCaption(); undoButton.Enabled = undo.Count > 0; redoButton.Enabled = redo.Count > 0;
@@ -262,10 +265,13 @@ namespace HexMapEditor
                 }
                 else { selected = -1; rightPanelOpen = false; editorCellId = null; }
                 if (objectDetailPanel != null) objectDetailPanel.Visible = objectDetails;
-                right.Visible = rightPanelOpen && (selected >= 0 || objectDetails);
             }
-            finally { updating = false; }
-            PositionOverlays(); canvas.Invalidate();
+            finally { right.ResumeLayout(true); updating = false; }
+            PositionOverlays();
+            right.Visible = rightPanelOpen && (selected >= 0 || selectedObjects.Count > 0);
+            if (opening || detailStructureChanged) right.PaintTree();
+            detailStructureChanged = false;
+            canvas.Invalidate();
         }
 
         bool ConfirmDiscard()
@@ -543,11 +549,11 @@ namespace HexMapEditor
                 if (!e.ClipRectangle.IntersectsWith(Rectangle.Ceiling(new RectangleF(c.X - BaseRadius * scale - 3, c.Y - BaseRadius * scale - 3, 2 * BaseRadius * scale + 6, 2 * BaseRadius * scale + 6)))) continue;
                 int i = row * map.Columns + col;
                 using (var path = HexPath(c, BaseRadius * scale))
-                using (var brush = new SolidBrush(ParseColor(map.Cells[i].Color)))
+                using (var brush = new SolidBrush(ParseColor(hideTerrain ? TerrainColors[0] : map.Cells[i].Color)))
                 using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
                 {
                     e.Graphics.FillPath(brush, path);
-                    if (!map.Cells[i].Fog || previewWithoutFog) { DrawCellIcon(e.Graphics, map.Cells[i], c); if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle); }
+                    if (!map.Cells[i].Fog || previewWithoutFog) { if (!hideIcons) DrawCellIcon(e.Graphics, map.Cells[i], c); if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle); }
                     // Fog is the final content layer, below only the working grid.
                     if (map.Cells[i].Fog && !previewWithoutFog) using (var fog = new SolidBrush(Color.FromArgb(101, 107, 117))) e.Graphics.FillPath(fog, path);
                     e.Graphics.DrawPath(pen, path);
@@ -565,7 +571,7 @@ namespace HexMapEditor
                 }
             }
             DrawBrushPreview(e.Graphics);
-            DrawObjects(e.Graphics);
+            if (!hideObjects) DrawObjects(e.Graphics);
         }
 
         GraphicsPath HexPath(PointF center, float radius)
@@ -626,7 +632,7 @@ namespace HexMapEditor
             if (requireFreshCanvasDown && e.Clicks != 1) return;
             if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle) return;
             requireFreshCanvasDown = false; EndObjectPropertyEdit();
-            if (previewWithoutFog && (currentTool==EditorTool.FogBrush || currentTool==EditorTool.FogBucket) && e.Button==MouseButtons.Left) { AskFogVisibility(); return; }
+            if (e.Button == MouseButtons.Left && !GuardCanvasLayer()) return;
             gestureButton = e.Button; gestureTool = currentTool;
             dragging = false; dragOrigin = e.Location; panOrigin = pan;
             canvas.Focus();

@@ -10,9 +10,7 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         bool previewWithoutFog;
-        CheckBox fogPreviewButton;
-        void SetFogPreview(bool value){EndCanvasGesture(true);previewWithoutFog=value;if(fogPreviewButton!=null){fogPreviewButton.Checked=value;fogPreviewButton.BackColor=value?Color.FromArgb(103,78,26):Color.Transparent;}editorCellId=null;UpdateUI();}
-        void AskFogVisibility(){ResolvePreviewFogRequest(ShowEditorMessage("Ręczna edycja mgły wymaga normalnej widoczności. Wyłączyć podgląd bez mgły?\nPo zgodzie ponów gest na płótnie.","Podgląd bez mgły",MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)==DialogResult.Yes);}
+        void SetFogPreview(bool value) { SetLayerVisible(MapLayer.Fog, !value); }
         void ResolvePreviewFogRequest(bool accept){if(accept)SetFogPreview(false);}
         // 0 visible, 1 partial, 2 hidden. Rectangular geometry only, no per-pixel scan.
         int ObjectFogLevel(MapObject obj)

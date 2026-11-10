@@ -12,6 +12,7 @@ namespace HexMapEditor
         public ObjectStateDefinition Definition;
         public string Path;
         public byte[] Bytes;
+        public long LibraryOrder;
     }
 
     internal sealed class StateFileChange
@@ -64,7 +65,7 @@ namespace HexMapEditor
                 throw new InvalidDataException("Brak jawnej definicji stanu.");
             var definition = json.ConvertToType<ObjectStateDefinition>(raw);
             Validate(definition);
-            return new StateFile { Definition = definition, Path = path, Bytes = bytes };
+            return new StateFile { Definition = definition, Path = path, Bytes = bytes, LibraryOrder = LibrarySequence.Read(raw) };
         }
 
         public static List<StateFile> Defaults()
@@ -97,7 +98,7 @@ namespace HexMapEditor
                 catch (Exception ex) { errors.Add(System.IO.Path.GetFileName(path) + ": " + ex.Message); }
             }
             warning = String.Join("\n", errors);
-            return result;
+            return result.Take(3).Concat(LibrarySequence.Sort(result.Skip(3), s => s.LibraryOrder, s => s.Definition.Id)).ToList();
         }
 
         public static List<ObjectStateDefinition> ForSave(MapData map)
@@ -120,9 +121,18 @@ namespace HexMapEditor
 
         List<ObjectStateDefinition> AvailableStates()
         {
-            var ids = new HashSet<string>(map.ObjectStates.Select(s => s.Id));
-            return map.ObjectStates.Concat(libraryStates.Where(s => !ids.Contains(s.Definition.Id))
-                .Select(s => s.Definition)).ToList();
+            var available = new List<ObjectStateDefinition>(map.ObjectStates);
+            var hidden = new HashSet<string>(map.ExcludedStateIds);
+            // Keep document definitions in their original order. Insert local-only entries
+            // before their next library neighbour, without replacing a document definition.
+            for (int i = libraryStates.Count - 1, at = available.Count; i >= 0; i--)
+            {
+                var definition = libraryStates[i].Definition;
+                int existing = available.FindIndex(state => state.Id == definition.Id);
+                if (existing >= 0) at = existing;
+                else if (!hidden.Contains(definition.Id)) available.Insert(at, definition);
+            }
+            return available;
         }
 
         void LoadStateLibrary()
@@ -166,7 +176,9 @@ namespace HexMapEditor
                 string path = PresetFiles.Destination(directory, "state-" + PresetFiles.Stem(next.Name), before == null ? null : before.Path);
                 if (!Path.GetFileName(path).StartsWith("state-", StringComparison.Ordinal))
                     throw new IOException("Za długa ścieżka stanu.");
-                after = new StateFile { Definition = next.Copy(), Path = path, Bytes = new UTF8Encoding(false).GetBytes(json.Serialize(next)) };
+                long order = before == null ? LibrarySequence.Next(libraryStates.Select(item => item.LibraryOrder)) : before.LibraryOrder;
+                after = new StateFile { Definition = next.Copy(), Path = path, LibraryOrder = order,
+                    Bytes = new UTF8Encoding(false).GetBytes(json.Serialize(new { next.Id, next.Name, next.Color, next.CanReveal, LibraryOrder = order })) };
             }
             if (before == null || after == null || before.Path != after.Path || !before.Bytes.SequenceEqual(after.Bytes))
                 action.StateFileChange = new StateFileChange { Before = before, After = after, Index = index < 0 ? libraryStates.Count : index };
@@ -217,16 +229,7 @@ namespace HexMapEditor
             var document = map.ObjectStates.FirstOrDefault(s => s.Id == id);
             try
             {
-                if (remove)
-                {
-                    if (library == null || StateLibrary.IsBuiltin(id)) return;
-                    string text = "Usunąć z biblioteki stan „" + library.Definition.Name + "”? Mapa zachowa swoją definicję. " +
-                        "Plik zostanie usunięty bez Kosza. Cofnięcie jest dostępne w historii tej sesji (do 300 wpisów).";
-                    if (ShowEditorMessage(text, "Usuń stan z biblioteki", MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
-                        ChangeStateFile(null, id, false, StatesDirectory);
-                    return;
-                }
+                if (remove) { RemoveDocumentStateFromMenu(id, library); return; }
                 if (library == null && document != null)
                 {
                     ChangeStateFile(document, id, false, StatesDirectory);
@@ -234,6 +237,7 @@ namespace HexMapEditor
                 }
                 using (var dialog = new ObjectStateDialog(library == null ? null : library.Definition))
                 {
+                    dialog.CanAccept = () => !dialog.UpdateMap || !StateUsed(id) || GuardLayer(MapLayer.Objects, dialog);
                     if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;
                     if (id == null) AddObjectState(dialog.StateName, dialog.StateColor, dialog.Allows);
                     else

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -43,8 +43,7 @@ namespace HexMapEditor
             tips.SetToolTip(sizePicker, "1–15. Heksagon: promień w pierścieniach + pole środkowe. Pozostałe: wymiar figury w odstępach siatki. Punkt zawsze 1 heks."); tips.SetToolTip(heightPicker, "Drugi wymiar prostokąta: wysokość 1–15");
             Action settings = () => { EndCanvasGesture(true); brushShape = (BrushShape)shapePicker.SelectedIndex; brushSize = (int)sizePicker.Value; brushHeight = (int)heightPicker.Value; brushFilled = fillPicker.Checked; heightPicker.Visible = brushShape == BrushShape.Rectangle; UpdateBrushAvailability(); tips.SetToolTip(sizeLabel, brushShape == BrushShape.Point ? "Punkt obejmuje zawsze jeden heks; rozmiar i wypełnienie nie mają zastosowania." : "Wymiar figury w jednostkach siatki: 1–15."); canvas.Invalidate(); };
             shapePicker.SelectedIndexChanged += (s, e) => settings(); sizePicker.ValueChanged += (s, e) => settings(); heightPicker.ValueChanged += (s, e) => settings(); fillPicker.CheckedChanged += (s, e) => settings(); settings();
-            fogPreviewButton=new CheckBox{Text="Podgląd bez mgły",AutoSize=false,Height=18,AccessibleName="Tymczasowy podgląd bez mgły",Font=new Font(Font,FontStyle.Bold)};toolbox.Controls.Add(fogPreviewButton);fogPreviewButton.CheckedChanged+=(s,e)=>{if(fogPreviewButton.Checked!=previewWithoutFog)SetFogPreview(fogPreviewButton.Checked);};
-            toolbox.Layout+=(s,e)=>{int w=toolbox.ClientSize.Width;foreach(Control b in paletteTools.Controls){b.Width=(w-8)/4;b.Height=26;}shapeLabel.Location=new Point(0,59);shapePicker.SetBounds(52,57,Math.Max(80,w-52),22);sizeLabel.Location=new Point(0,82);sizePicker.Location=new Point(52,80);heightPicker.Location=new Point(w-60,80);fillPicker.Location=new Point(0,103);fogPreviewButton.SetBounds(0,122,w,18);};
+            toolbox.Layout+=(s,e)=>{int w=toolbox.ClientSize.Width;foreach(Control b in paletteTools.Controls){b.Width=(w-8)/4;b.Height=26;}shapeLabel.Location=new Point(0,59);shapePicker.SetBounds(52,57,Math.Max(80,w-52),22);sizeLabel.Location=new Point(0,82);sizePicker.Location=new Point(52,80);heightPicker.Location=new Point(w-60,80);fillPicker.Location=new Point(0,103);};
             var presets = Section("Presety", 1);
             presetPickerRow = new Panel { Dock = DockStyle.Top, Height = 28 }; presets.Controls.Add(presetPickerRow);
             terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name"; terrainPicker.AccessibleName = "Presety"; presetPickerRow.Controls.Add(terrainPicker);
@@ -66,7 +65,7 @@ namespace HexMapEditor
             IconAction(actions, "new", "Dodaj ikonę z pliku", ImportIcon); IconAction(actions, "pencil", "Edytuj ikonę", EditLibraryIcon); deleteIconButton = IconAction(actions, "trash", "Usuń wybraną ikonę z biblioteki", DeleteLibraryIcon); var more = SmallButton(actions, "…", OpenIconLibrary, 40); more.AccessibleName = "Pełna biblioteka ikon"; tips.SetToolTip(more, more.AccessibleName);
             iconPreview = new BufferedFlowPanel { Dock = DockStyle.Fill, WrapContents = true, AutoScroll = false, Padding = Padding.Empty }; iconSection.Controls.Add(iconPreview); iconPreview.BringToFront();
             var objects=Section("Obiekty",4);var objectActions=new FlowLayoutPanel{Dock=DockStyle.Top,Height=30,WrapContents=false};objects.Controls.Add(objectActions);
-            IconAction(objectActions,"new","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);deleteObjectButton=IconAction(objectActions,"trash","Usuń wzorzec obiektu",DeleteObjectTemplate);SmallButton(objectActions,"…",OpenObjectLibrary,32);IconAction(objectActions,"labels","Lista instancji na mapie",OpenObjectInstances);
+            IconAction(objectActions,"new","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);deleteObjectButton=IconAction(objectActions,"trash","Usuń wzorzec obiektu",DeleteObjectTemplate);SmallButton(objectActions,"…",OpenObjectLibrary,32);IconAction(objectActions,"labels","Lista obiektów na mapie",OpenObjectInstances);
             objectPreview=new BufferedFlowPanel{Dock=DockStyle.Fill,AutoScroll=false,WrapContents=true};objects.Controls.Add(objectPreview);objectPreview.BringToFront();
             SelectTool(EditorTool.Select); LayoutPalette(); RefreshPresetPicker(); UpdateMaterialIndicator();
             canvas.MouseLeave += (s, e) => { previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };

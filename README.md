@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.4.2
+﻿# HexMapEditor 0.4.3
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.4.2**, zapis map w **formacie 6**, presety **1**, ikony biblioteczne **2**, wzorce obiektów **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.4.3**, zapis map w **formacie 6**, presety **1**, ikony biblioteczne **2**, wzorce obiektów **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -19,6 +19,10 @@ Aplikacja otwiera formaty 5 i 6. W formacie 5 ramki są domyślnie wyłączone. 
 Zamknij HexMapEditor, podmień plik `assets/app/icon.ico`, uruchom `Rebuild-Program.bat` z katalogu głównego, a następnie uruchom program. BAT korzysta z `Build.ps1`, źródeł `src` i lokalnego kompilatora .NET Framework. Parametr `/nopause` wyłącza oczekiwanie na klawisz przy uruchomieniu z konsoli. Nowy EXE zastępuje stary po udanej kompilacji.
 
 Okno odczytuje ICO z katalogu programu. Przy braku lub błędzie odczytu używa ikony osadzonej w EXE. Ikona samego pliku w Eksploratorze wymaga przebudowy. Windows może przez pewien czas pokazywać ikonę z pamięci podręcznej.
+
+## Widok warstw
+
+Menu **Widok** na górnym pasku przełącza Tereny, Ikony, Obiekty i Mgłę. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
 
 ## Narzędzia, kamera i materiał
 
@@ -43,7 +47,7 @@ Biblioteki ikon/obiektów mają dodawanie z pliku lub grafiki drugiej biblioteki
 
 Plus w szczegółach instancji tworzy stan w `Library/Objects/States` i udostępnia go bieżącej mapie. Prawy przycisk na kafelku otwiera edycję bibliotecznej nazwy, koloru i uprawnienia do odkrywania, usuwanie albo zapis stanu dostępnego tylko w dokumencie. Można edytować trzy podstawowe wzorce. Ich stabilne ID chronią je przed usunięciem.
 
-Nowa mapa przyjmuje aktualne definicje biblioteki. Otwarta mapa daje pierwszeństwo własnej definicji przy tym samym ID. Edycja biblioteki aktualizuje otwartą mapę po zaznaczeniu opcji „Zaktualizuj definicję na bieżącej mapie”. Wyłączenie uprawnienia wstrzymuje odkrywanie. Checkbox i nakładka zachowują wartości. Usunięcie pliku zachowuje definicję dokumentową. Pliki `state-Nazwa.json` mają bezpieczne sufiksy przy kolizji i sesyjne Undo/Redo.
+Nowa mapa przyjmuje aktualne definicje biblioteki. Otwarta mapa daje pierwszeństwo własnej definicji przy tym samym ID. Edycja biblioteki aktualizuje otwartą mapę po zaznaczeniu opcji „Zaktualizuj definicję na bieżącej mapie”. Wyłączenie uprawnienia wstrzymuje odkrywanie. Checkbox i nakładka zachowują wartości. **Usuń stan z mapy** pokazuje referencje obiektów i grup oraz wybór zamiennika z domyślnym ID Neutral. Własny stan znika z tej mapy także po ponownym otwarciu. Opcjonalne usunięcie jego pliku i wymiana referencji podlegają jednemu Undo. Pliki `state-Nazwa.json` mają bezpieczne sufiksy przy kolizji i sesyjne Undo/Redo.
 
 Prostokąt/lasso wybierają centra. Zwykły klik członka wybiera całą trwałą grupę; Ctrl dodaje/odejmuje grupę lub pojedynczy niezgrupowany obiekt. **Alt+klik** wybiera pojedynczego członka również przed wcześniejszym wyborem grupy; nie rozwiązuje jej. Obszarowy wybór rozszerza trafionego członka do grupy. Mgła nadal przycina obrysy ukrytych członków. Ruch wielu obiektów ma jeden wpis historii i zachowuje ich rozstawienie; zablokowani są pomijani. Delete na wyborze grupy usuwa instancje razem, Alt-wybór pozwala usunąć jednego. Puste grupy są usuwane, grupa z jednym członkiem zachowuje ustawienia.
 
@@ -91,7 +95,11 @@ Case: model / fog / controls, bez automatycznej pełnej kampanii. Źródła/skry
 
 Poza zakresem pozostają zagnieżdżone grupy, światło/ciemność, widok MG/gracza, tekstury/detail, zakładki, kadrowanie, przebudowa opisów i pełny redesign. Nie planujemy walki/statystyk/ekwipunku, tras/pathfindingu/animacji. Bez usług AI. Warstwa światła jest przyszłym, niezależnym od trwałego odkrywania wymaganiem.
 
+Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejności dodania. Starsze wpisy bez kolejności startują według stabilnego ID. Edycja zachowuje pozycję. Kolejność terenów jest kolejnością tablicy w palecie. Lista obiektów na mapie ma odrębny cykl sortowania rosnąco, malejąco i w kolejności dokumentu. Pokazuje grupę i znacznik efektywnego stanu. Sortuje maskowane teksty według widocznego `???` i mgłę liczbowo.
+
 ## Historia zmian
+
+- **0.4.3** — warstwy Widoku, lista obiektów z sortowaniem, usuwanie i zastępowanie stanów, trwała kolejność bibliotek, obrysy grup i kompozycja prawego panelu. Komunikaty przebudowy wskazują plik ICO i wynikowy EXE.
 
 - **0.4.2** — własna ikona EXE, przebudowa przez BAT, biblioteka stanów, dodawanie i łączenie grup, ramki, próg maskowania 50%, stabilniejszy panel oraz poprawki potwierdzeń i skrótów. Zapis formatu 6, odczyt 5 i 6.
 

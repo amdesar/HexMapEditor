@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -52,6 +53,7 @@ namespace HexMapEditor
             if (action.BeforeOrientation != null) map.Orientation=after?action.AfterOrientation:action.BeforeOrientation;
             if(action.BeforeGroups!=null)map.Groups=(after?action.AfterGroups:action.BeforeGroups).Select(g=>g.Copy()).ToList();
             if(action.BeforeStates!=null)map.ObjectStates=(after?action.AfterStates:action.BeforeStates).Select(s=>s.Copy()).ToList();
+            if (action.BeforeExcludedStates != null) map.ExcludedStateIds = new List<string>(after ? action.AfterExcludedStates : action.BeforeExcludedStates);
             foreach(var change in action.Objects)change.Apply(map,after);
             selectedObjects.RemoveWhere(id=>!map.Objects.Any(o=>o.Id==id));
             if (!map.Groups.Any(g => g.Id == selectedGroupId && selectedObjects.SetEquals(g.Members))) selectedGroupId = null;

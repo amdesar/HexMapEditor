@@ -25,9 +25,9 @@ namespace HexMapEditor
             var region=new Region();if(previewWithoutFog&&!real)return region;for(int i=0;i<map.Cells.Count;i++)if(map.Cells[i].Fog)using(var path=ObjectGeometry.Hex(map,BrushGeometry.Center(map,i%map.Columns,i/map.Columns),28.03f))region.Exclude(path);return region;
         }
         bool ObjectVisible(MapObject o)
-        {using(var region=VisibleObjectRegion()){region.Intersect(ObjectBounds(o));using(var matrix=new Matrix())return region.GetRegionScans(matrix).Any(r=>r.Width>.001f&&r.Height>.001f);}}
+        {if(hideObjects)return false;using(var region=VisibleObjectRegion()){region.Intersect(ObjectBounds(o));using(var matrix=new Matrix())return region.GetRegionScans(matrix).Any(r=>r.Width>.001f&&r.Height>.001f);}}
         MapObject HitObject(PointF world)
-        {if(HiddenPoint(world))return null;return map.Objects.LastOrDefault(o=>ObjectBounds(o).Contains(world));}
+        {if(hideObjects || HiddenPoint(world))return null;return map.Objects.LastOrDefault(o=>ObjectBounds(o).Contains(world));}
         void ChooseObject(MapObject hit,bool control)
         {ChooseObjectMember(hit,control,(ModifierKeys&Keys.Alt)!=0);}
         void ChooseObjectMember(MapObject hit,bool control,bool single)
@@ -55,16 +55,19 @@ namespace HexMapEditor
                     string color;
                     if (frames.TryGetValue(obj.Id, out color))
                     {
-                        using (var pen = new Pen(ColorTranslator.FromHtml(color), 2 / scale))
+                        using (var pen = new Pen(ColorTranslator.FromHtml(color), 3 / scale))
                         {
                             pen.DashStyle = DashStyle.Dash;
-                            var frame = RectangleF.Inflate(bounds, 3 / scale, 3 / scale);
+                            var frame = RectangleF.Inflate(bounds, 1 / scale, 1 / scale);
                             g.DrawRectangle(pen, frame.X, frame.Y, frame.Width, frame.Height);
                         }
                     }
                     if (selectedObjects.Contains(obj.Id))
+                    {
+                        var outline = RectangleF.Inflate(bounds, 6 / scale, 6 / scale);
                         using (var pen = new Pen(Color.Gold, 2 / scale))
-                            g.DrawRectangle(pen, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+                            g.DrawRectangle(pen, outline.X, outline.Y, outline.Width, outline.Height);
+                    }
                 }
             }g.Restore(state);
             if(objectSelecting&&selectionPath.Count>1)using(var pen=new Pen(Color.CornflowerBlue,1.5f)){var points=selectionPath.Select(Screen).ToArray();if(selectionKind==1){g.DrawLines(pen,points);g.DrawLine(pen,points[points.Length-1],points[0]);}else{var r=SelectionRectangle(selectionPath[0],selectionPath[selectionPath.Count-1]);var a=Screen(r.Location);g.DrawRectangle(pen,a.X,a.Y,r.Width*scale,r.Height*scale);}}

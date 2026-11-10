@@ -1,6 +1,6 @@
 ﻿# Specyfikacja użytkowa — HexMapEditor
-Wersja: 2.2, stan decyzji 7 listopada 2026.
-Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost 0.4.2. Pierwszeństwo mają ustalenia sekcji 29.
+Wersja 2.3. Stan decyzji 10 listopada 2026.
+Istniejący projekt: HexMapEditor-Codex. Bieżący przyrost 0.4.3. Pierwszeństwo mają ustalenia sekcji 30.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -519,3 +519,14 @@ Bez zagnieżdżonych grup, światła/ciemności, widoku MG/gracza, tekstur/detai
 - Lista instancji maskuje dane i miniaturę do 50% widoczności włącznie. Liczy sumę przecięć prostokąta grafiki z rozłącznymi wnętrzami zasłoniętych heksów. Próg używa wartości przed zaokrągleniem. Etykieta częściowego ukrycia podaje całkowity procent ukrytej powierzchni, z połówką w górę. Podgląd ujawnia dane, a kolumna mgły zachowuje opis geometrii.
 - Usuwanie z mapy przez przycisk lub Delete prowadzi do jednego potwierdzenia. Ctrl+Z i Ctrl+Y rozpoznają dokładne modyfikatory. Ctrl+Shift+Z nie zmienia historii. Dopasuj przełącza menu tym samym przyciskiem. Minimalna wysokość okna wynosi 720 px.
 - Do późniejszej pracy: zapis ikon, wzorców obiektów i przyszłych tekstur lub tła z odebranej mapy do biblioteki, mapa jako wizualny katalog grafik, wybór sposobu odłączenia dla każdego członka, przeprojektowanie paneli, światło, tekstury, zakładki i kadrowanie.
+
+## 30. Przyrost 0.4.3
+
+- Przerywana ramka grupy jest bliżej grafiki, złoty obrys wyboru dalej. Obrysy są odrębne dla każdego członka i przycinane przez mgłę.
+- Lista obiektów na mapie pokazuje miniaturę, nazwę, efektywny stan z kolorowym znacznikiem, grupę, pozycję i mgłę. Maskowane teksty oraz znaczniki nie ujawniają danych. Nagłówki przełączają rosnąco, malejąco i porządek dokumentu. Klucz tekstowy to tekst widoczny, a klucz mgły to liczbowy udział zakrycia. Remisy zachowują kolejność dokumentu. Zaznacz i Pokaż używają ID.
+- Prawy panel jest pozycjonowany przed pokazaniem. Tło i natywne kontrolki tworzą kompozytową gałąź okien z pełnym synchronicznym odrysowaniem przy otwarciu i zmianie struktury. Istniejące kontrolki oraz WPF pozostają w tym samym drzewie.
+- Usuń stan z mapy pokazuje referencje i zamiennik przed zmianą. Domyślne ID to Neutral. Chronione ID są wyłączone z usuwania. Jedna transakcja zastępuje referencje bazowe i grupowe, uwzględnia mgłę i opcjonalnie usuwa plik. Format 6 może zawierać `ExcludedStateIds`, aby biblioteka nie przywracała usuniętego stanu tej mapie. Odczyt 5 i 6 traktuje brak pola jako pustą listę.
+- Pliki bibliotek mogą zawierać `LibraryOrder`. Dodawanie dopisuje po bieżącej kolejności, edycja zachowuje klucz, a historia przywraca plik i pozycję. Starsze pozycje mają deterministyczny porządek ID. Domyślne stany i preset pozostają na początku. Tereny zachowują kolejność tablicy w palecie. Rozruch nie dopisuje klucza dawnym plikom.
+- Menu Widok pozostaje otwarte po przełączeniu warstwy. Flagi Tereny, Ikony, Obiekty i Mgła dotyczą widoku. Edycja ukrytej warstwy może przywrócić jej widoczność, po czym wymaga ponowienia operacji. Aktualizacja mapy z dialogu biblioteki sprawdza warstwę przed zamknięciem dialogu.
+- Budowanie oczekuje `assets/app/icon.ico`. Weryfikuje format i publikuje EXE po kompilacji. Eksplorator może odczytywać ikonę z pamięci podręcznej powłoki.
+- Na później pozostają bardziej intuicyjne akcje edycji i usuwania stanów dostępne bez prawego przycisku.

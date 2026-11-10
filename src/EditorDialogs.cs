@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -30,12 +30,13 @@ namespace HexMapEditor
     internal sealed class TerrainDialog : EditorDialog
     {
         readonly TextBox name = new TextBox(); readonly Button color = new Button(); readonly CheckBox apply = new CheckBox { Text = "Zastosuj do bieżącej mapy", AutoSize = true };
+        public Func<bool> CanAccept;
         public string TerrainName { get { return name.Text.Trim(); } } public string TerrainColor { get; private set; } public bool ApplyToMap { get { return apply.Checked; } }
         public TerrainDialog(TerrainDefinition terrain, bool existing) : base(existing ? "Edycja terenu" : "Nowy teren", 205)
         {
             name.Text = terrain.Name; name.MaxLength = 200; TerrainColor = terrain.Color; color.Text = terrain.Color; color.BackColor = ColorTranslator.FromHtml(terrain.Color); color.ForeColor = Color.Black;
             Row(0, "Nazwa", name, true); Row(1, "Kolor", color, true); color.Click += (s, e) => { using (var d = new ColorDialog { Color = ColorTranslator.FromHtml(TerrainColor), FullOpen = true }) if (d.ShowDialog(this) == DialogResult.OK) { TerrainColor = "#" + d.Color.R.ToString("X2") + d.Color.G.ToString("X2") + d.Color.B.ToString("X2"); color.Text = TerrainColor; color.BackColor = d.Color; } };
-            apply.Checked = false; apply.Enabled = existing; Layout.Controls.Add(apply, 0, 2); Layout.SetColumnSpan(apply, 3); Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); Buttons(3, () => { if (TerrainName.Length > 0) DialogResult = DialogResult.OK; });
+            apply.Checked = false; apply.Enabled = existing; Layout.Controls.Add(apply, 0, 2); Layout.SetColumnSpan(apply, 3); Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); Buttons(3, () => { if (TerrainName.Length > 0 && (CanAccept == null || CanAccept())) DialogResult = DialogResult.OK; });
         }
     }
     internal sealed class SavePresetDialog : EditorDialog

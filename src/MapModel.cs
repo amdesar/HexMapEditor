@@ -29,8 +29,9 @@ namespace HexMapEditor
         public List<TerrainDefinition> Terrains { get; set; }
         internal string FilePath;
         internal byte[] DiskBytes;
+        internal long LibraryOrder;
         public TerrainPreset() { PresetFormatVersion = 1; Id = Guid.NewGuid().ToString("N"); Name = "Nowy preset"; Terrains = new List<TerrainDefinition>(); }
-        public TerrainPreset Copy() { return new TerrainPreset { Id = Id, Name = Name, Terrains = Terrains.Select(t => t.Copy()).ToList(), FilePath = FilePath, DiskBytes = DiskBytes }; }
+        public TerrainPreset Copy() { return new TerrainPreset { Id = Id, Name = Name, Terrains = Terrains.Select(t => t.Copy()).ToList(), FilePath = FilePath, DiskBytes = DiskBytes, LibraryOrder = LibraryOrder }; }
     }
 
     internal static class PresetCatalog
@@ -70,7 +71,7 @@ namespace HexMapEditor
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(file) + ": " + ex.Message); }
             }
-            warning = String.Join("\n", errors); return result;
+            warning = String.Join("\n", errors); return result.Take(1).Concat(LibrarySequence.Sort(result.Skip(1), p => p.LibraryOrder, p => p.Id)).ToList();
         }
         public static TerrainPreset ReadFile(string file)
         {
@@ -78,10 +79,10 @@ namespace HexMapEditor
             byte[] bytes = File.ReadAllBytes(file); string text; using (var stream = new MemoryStream(bytes)) using (var reader = new StreamReader(stream, Encoding.UTF8, true)) text = reader.ReadToEnd();
             var json = MapLogic.Serializer(); var raw = json.DeserializeObject(text) as Dictionary<string, object>;
             string[] fields = { "PresetFormatVersion", "Id", "Name", "Terrains" };
-            if (raw == null || fields.Any(k => !raw.ContainsKey(k)) || raw.Keys.Any(k => !fields.Contains(k))) throw new InvalidDataException("Brak wymaganych pól lub nieobsługiwane dodatkowe pola presetu; plik pozostawiono bez zmian.");
+            if (raw == null || fields.Any(k => !raw.ContainsKey(k)) || raw.Keys.Any(k => k != "LibraryOrder" && !fields.Contains(k))) throw new InvalidDataException("Brak wymaganych pól lub nieobsługiwane dodatkowe pola presetu; plik pozostawiono bez zmian.");
             var terrains = raw["Terrains"] as object[]; string[] terrainFields = { "TerrainId", "VariantId", "Revision", "Name", "Color", "FillKind" };
             if (terrains == null || terrains.Any(t => !(t is Dictionary<string, object>) || terrainFields.Any(k => !((Dictionary<string, object>)t).ContainsKey(k)) || ((Dictionary<string, object>)t).Keys.Any(k => !terrainFields.Contains(k)))) throw new InvalidDataException("Niepełna lub nieobsługiwana definicja terenu; plik pozostawiono bez zmian.");
-            var preset = json.ConvertToType<TerrainPreset>(raw); Validate(preset); preset.FilePath = Path.GetFullPath(file); preset.DiskBytes = bytes; return preset;
+            var preset = json.ConvertToType<TerrainPreset>(raw); Validate(preset); preset.LibraryOrder = LibrarySequence.Read(raw); preset.FilePath = Path.GetFullPath(file); preset.DiskBytes = bytes; return preset;
         }
         public static string FindFile(string directory, string id)
         {
@@ -114,12 +115,13 @@ namespace HexMapEditor
             var targets = records.Where(r => r.Value.Id == preset.Id).ToArray(); string path;
             if (overwrite) { if (targets.Length != 1) throw new InvalidDataException("Nie można jednoznacznie wskazać zapisanego presetu. Zapisz jako nowy preset."); path = targets[0].Key; }
             else { if (targets.Length != 0) throw new InvalidDataException("Identyfikator presetu jest już zapisany; wymagany jest jawny wybór nadpisania."); path = null; }
-            string serialized = MapLogic.Serializer().Serialize(preset);
+            var before = path == null ? null : targets[0].Value;
+            long order = before == null ? LibrarySequence.Next(records.Select(r => r.Value.LibraryOrder)) : before.LibraryOrder;
+            string serialized = MapLogic.Serializer().Serialize(new { preset.PresetFormatVersion, preset.Id, preset.Name, preset.Terrains, LibraryOrder = order });
             if (Encoding.UTF8.GetByteCount(serialized) > 4 * 1024 * 1024) throw new InvalidDataException("Preset przekracza limit zapisu/odczytu 4 MiB.");
             string destination = PresetFiles.Destination(directory, preset.Name, path);
-            var before = path == null ? null : targets[0].Value;
             if (expected != null && (before == null || !String.Equals(expected.FilePath,before.FilePath,StringComparison.OrdinalIgnoreCase) || !expected.DiskBytes.SequenceEqual(before.DiskBytes))) throw new IOException("Plik presetu zmienił się poza programem. Zachowano plik, projekt i historię. Odśwież presety i sprawdź dane przed ponownym zapisem.");
-            var after = preset.Copy(); after.FilePath = destination; after.DiskBytes = new UTF8Encoding(false).GetBytes(serialized);
+            var after = preset.Copy(); after.LibraryOrder = order; after.FilePath = destination; after.DiskBytes = new UTF8Encoding(false).GetBytes(serialized);
             return new PresetFileChange { Before = before, After = after };
         }
         public static bool SameName(string a, string b) { return String.Equals((a ?? "").Trim().Normalize(), (b ?? "").Trim().Normalize(), StringComparison.OrdinalIgnoreCase); }
@@ -274,7 +276,7 @@ namespace HexMapEditor
         static string CellKey(CellData cell) { return MapLogic.Hash(MapLogic.Serializer().Serialize(cell)); }
         static string Header(MapData map)
         {
-            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, ObjectStates = StateLibrary.ForSave(map) });
+            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, ObjectStates = StateLibrary.ForSave(map), map.ExcludedStateIds });
         }
         public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); changed.Clear(); headerChanged = false; }
         public bool CheckCell(CellData cell) { string value; if (saved.TryGetValue(cell.Id, out value) && value == CellKey(cell)) changed.Remove(cell.Id); else changed.Add(cell.Id); return Dirty; }

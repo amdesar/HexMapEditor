@@ -54,6 +54,7 @@ namespace HexMapEditor
                     "Grupowanie", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
+            if (!GuardLayer(MapLayer.Objects)) return;
             try
             {
                 if (groups.Count == 1) { JoinSelectedGroups(groups[0].Id, null); return; }

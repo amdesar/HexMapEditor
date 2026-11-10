@@ -19,6 +19,7 @@ namespace HexMapEditor
         FlowLayoutPanel stateTiles;
         Button addStateTile;
         bool? showingGroupDetails;
+        bool detailStructureChanged;
         TableLayoutPanel instanceLayout;
         Button instanceDelete,groupSelectionButton,memberToGroup,memberDetach;
         string stateTileSignature,propertyEditKey;
@@ -63,7 +64,7 @@ namespace HexMapEditor
         MapObject SingleSelectedObject(){return selectedGroupId==null&&selectedObjects.Count==1?map.Objects.FirstOrDefault(o=>selectedObjects.Contains(o.Id)):null;}
         void EditInstance(string field,Action<MapObject> edit,bool merge)
         {
-            if(updating)return;var obj=SingleSelectedObject();if(obj==null||!previewWithoutFog&&ObjectFogLevel(obj)>0)return;if(!merge)EndObjectPropertyEdit();var next=obj.Copy();edit(next);try{LiveChangeObject(next,merge?obj.Id+":"+field:null);}catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
+            if(updating)return;var obj=SingleSelectedObject();if(obj==null||!previewWithoutFog&&ObjectFogLevel(obj)>0)return;if (!GuardLayer(MapLayer.Objects)) { UpdateUI(); return; } if(!merge)EndObjectPropertyEdit();var next=obj.Copy();edit(next);try{LiveChangeObject(next,merge?obj.Id+":"+field:null);}catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
         }
         void RefreshStateTiles()
         {
@@ -111,13 +112,13 @@ namespace HexMapEditor
         {
             var menu = new ContextMenuStrip();
             var edit = menu.Items.Add("Edytuj stan biblioteczny", null, (s, e) => ChangeStateFromMenu(id, false));
-            var remove = menu.Items.Add("Usuń stan z biblioteki", null, (s, e) => ChangeStateFromMenu(id, true));
+            var remove = menu.Items.Add("Usuń stan z mapy", null, (s, e) => ChangeStateFromMenu(id, true));
             menu.Opening += (s, e) =>
             {
                 EndCanvasGesture(true);
                 bool stored = libraryStates.Any(state => state.Definition.Id == id);
                 edit.Text = stored ? "Edytuj stan biblioteczny" : "Zapisz stan w bibliotece";
-                remove.Enabled = stored && !StateLibrary.IsBuiltin(id);
+                remove.Enabled = !StateLibrary.IsBuiltin(id);
             };
             menu.Closed += (s, e) =>
             {
@@ -134,24 +135,22 @@ namespace HexMapEditor
             bool instance = !group && selectedObjects.Count == 1;
             bool structureChanges = showingGroupDetails != group || instanceLayout.Visible != instance
                 || (instance && stateTileSignature != json.Serialize(AvailableStates()));
-            using (new CanvasUpdate(objectDetailPanel, structureChanges))
+            detailStructureChanged |= structureChanges;
+            objectDetailPanel.SuspendLayout();
+            groupLayout.SuspendLayout();
+            instanceLayout.SuspendLayout();
+            try
             {
-                objectDetailPanel.SuspendLayout();
-                groupLayout.SuspendLayout();
-                instanceLayout.SuspendLayout();
-                try
-                {
-                    groupLayout.Visible = group;
-                    instanceLayout.Visible = instance;
-                    showingGroupDetails = group;
-                    UpdateDetailValues(group, groups.Count);
-                }
-                finally
-                {
-                    groupLayout.ResumeLayout(group);
-                    instanceLayout.ResumeLayout(instance);
-                    objectDetailPanel.ResumeLayout(true);
-                }
+                groupLayout.Visible = group;
+                instanceLayout.Visible = instance;
+                showingGroupDetails = group;
+                UpdateDetailValues(group, groups.Count);
+            }
+            finally
+            {
+                groupLayout.ResumeLayout(group);
+                instanceLayout.ResumeLayout(instance);
+                objectDetailPanel.ResumeLayout(true);
             }
         }
 

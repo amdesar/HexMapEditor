@@ -54,7 +54,7 @@ namespace HexMapEditor
         ObjectGroup CurrentGroup(){return map.Groups.FirstOrDefault(g=>g.Id==selectedGroupId);}
         void EditGroup(string field,Action<ObjectGroup> edit,bool merge)
         {
-            if(updating)return;var group=CurrentGroup();if(group==null)return;if(!merge)EndObjectPropertyEdit();var next=group.Copy();edit(next);try{ChangeObjectGroup(next,merge?group.Id+":"+field:null);}catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości grupy",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
+            if(updating)return;var group=CurrentGroup();if(group==null)return;if (!GuardLayer(MapLayer.Objects)) { UpdateUI(); return; } if(!merge)EndObjectPropertyEdit();var next=group.Copy();edit(next);try{ChangeObjectGroup(next,merge?group.Id+":"+field:null);}catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości grupy",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
         }
         void UpdateGroupDetails()
         {
@@ -77,19 +77,34 @@ namespace HexMapEditor
             bool allowed=g.StateId==null?g.Members.Any(id=>GroupRules.Allows(map,map.Objects.Single(o=>o.Id==id).Side)):GroupRules.Allows(map,g.StateId);groupReveal.Enabled=allowed;groupRadiusOverride.Enabled=allowed;groupRadius.Enabled=allowed&&groupRadiusOverride.Checked;
             groupSizeMode.SelectedIndex=Array.IndexOf(new[]{"Individual","Offset","Common"},g.SizeMode);groupSize.Minimum=-1016;groupSize.Maximum=1024;groupSize.Value=(decimal)g.SizeValue;if(g.SizeMode=="Common")groupSize.Minimum=8;else if(g.SizeMode=="Offset")groupSize.Maximum=1016;groupSize.Enabled=g.SizeMode!="Individual";
             var members=g.Members.Select(id=>{var obj=map.Objects.Single(o=>o.Id==id);return new GroupMemberChoice{Id=id,Name=!previewWithoutFog&&ObjectFogLevel(obj)>0?"???":obj.Name};}).ToList();string signature=g.Id+":"+json.Serialize(members.Select(m=>new[]{m.Id,m.Name}).ToArray());
-            if(groupMembersSignature!=signature){string chosen=(groupMembers.SelectedItem as GroupMemberChoice)==null?null:((GroupMemberChoice)groupMembers.SelectedItem).Id;groupMembers.Items.Clear();foreach(var member in members)groupMembers.Items.Add(member);groupMembers.SelectedIndex=Math.Max(0,members.FindIndex(m=>m.Id==chosen));groupMembersSignature=signature;}
+            if (groupMembersSignature != signature)
+            {
+                detailStructureChanged = true;
+                var chosen = groupMembers.SelectedItem as GroupMemberChoice;
+                int oldTop = groupMembers.TopIndex;
+                groupMembers.BeginUpdate();
+                try
+                {
+                    groupMembers.Items.Clear();
+                    groupMembers.Items.AddRange(members.Cast<object>().ToArray());
+                    groupMembers.SelectedIndex = Math.Max(0, members.FindIndex(m => chosen != null && m.Id == chosen.Id));
+                    if (members.Count > 0) groupMembers.TopIndex = Math.Min(oldTop, members.Count - 1);
+                }
+                finally { groupMembers.EndUpdate(); }
+                groupMembersSignature = signature;
+            }
         }
         void SelectGroup(ObjectGroup group){EndCanvasGesture(true);selectedObjects.Clear();selectedObjects.UnionWith(group.Members);groupSelectionOrder.Clear();groupSelectionOrder.Add(group.Id);selectedGroupId=group.Id;selected=-1;rightPanelOpen=true;UpdateUI();}
         void ChooseFrameColor()
         {
             var group = CurrentGroup();
-            if (group == null) return;
+            if (group == null || !GuardLayer(MapLayer.Objects)) return;
             using (var dialog = new ColorDialog { Color = ColorTranslator.FromHtml(group.FrameColor), FullOpen = true })
                 if (RunModal(() => dialog.ShowDialog(this)) == DialogResult.OK)
                     EditGroup("frame-color", g => g.FrameColor = String.Format("#{0:X2}{1:X2}{2:X2}",
                         dialog.Color.R, dialog.Color.G, dialog.Color.B), false);
         }
         void UnlinkWithDialog(ObjectGroup group,IEnumerable<string> members)
-        {var ids=members.ToArray();using(var d=new UngroupDialog(ids.Length==group.Members.Count))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)DetachObjects(group.Id,ids,d.Keep);}
+        {if (!GuardLayer(MapLayer.Objects)) return;var ids=members.ToArray();using(var d=new UngroupDialog(ids.Length==group.Members.Count))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)DetachObjects(group.Id,ids,d.Keep);}
     }
 }

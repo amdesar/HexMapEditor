@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -13,7 +13,11 @@ namespace HexMapEditor
         Button deletePresetButton;
         TerrainPreset ActivePreset() { return map.Presets.First(p => p.Id == map.ActivePresetId); }
         bool PresetReadOnly { get { return map.ActivePresetId == PresetCatalog.DefaultId; } }
-        List<TerrainPreset> AvailablePresets() { return map.Presets.Concat(libraryPresets.Where(p => !map.Presets.Any(m => m.Id == p.Id))).ToList(); }
+        List<TerrainPreset> AvailablePresets()
+        {
+            return libraryPresets.Select(p => map.Presets.FirstOrDefault(m => m.Id == p.Id) ?? p)
+                .Concat(map.Presets.Where(p => !libraryPresets.Any(item => item.Id == p.Id))).ToList();
+        }
         void RefreshPresetPicker()
         {
             bool previous = updating; updating = true;
@@ -188,8 +192,10 @@ namespace HexMapEditor
             if (PresetReadOnly) return;
             var p = ActivePreset(); var old = add ? new TerrainDefinition() : p.Terrains.FirstOrDefault(t => t.TerrainId == id);
             if (old == null) return;
-            using (var d = new TerrainDialog(old, !add)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK)
+            using (var d = new TerrainDialog(old, !add))
             {
+                d.CanAccept = () => !d.ApplyToMap || !map.Cells.Any(c => c.VariantId == old.VariantId) || GuardLayer(MapLayer.Terrain, d);
+                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
                 var next = old.Copy(); next.Name = d.TerrainName; next.Color = d.TerrainColor;
                 if (add) AddTerrain(next);
                 else if (next.Name != old.Name || !String.Equals(next.Color, old.Color, StringComparison.OrdinalIgnoreCase)) { next.VariantId = Guid.NewGuid().ToString("N"); next.Revision++; UpdateTerrain(old, next, d.ApplyToMap); }

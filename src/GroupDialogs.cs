@@ -15,6 +15,7 @@ namespace HexMapEditor
         public bool Allows{get{return reveal.Checked;}}
         readonly CheckBox update = new CheckBox { Text = "Zaktualizuj definicję na bieżącej mapie", AutoSize = true };
         public bool UpdateMap { get { return update.Checked; } }
+        public Func<bool> CanAccept;
 
         public ObjectStateDialog(ObjectStateDefinition state = null)
             : base(state == null ? "Nowy stan obiektu" : "Edytuj stan biblioteczny", state == null ? 195 : 233)
@@ -35,7 +36,7 @@ namespace HexMapEditor
             };
             AddOption(reveal, 2);
             if (state != null) AddOption(update, 3);
-            Buttons(state == null ? 3 : 4, () => { if (StateName.Length > 0) DialogResult = DialogResult.OK; });
+            Buttons(state == null ? 3 : 4, () => { if (StateName.Length > 0 && (CanAccept == null || CanAccept())) DialogResult = DialogResult.OK; });
         }
 
         void AddOption(CheckBox option, int row)
