@@ -34,9 +34,16 @@ Porównanie bezpośrednich bajtów RT_GROUP_ICON/RT_ICON wykazało zgodność za
 - `Test-Patch043Icon.ps1` PASS. Odczyt PE, przebudowa przez BAT w osobnym katalogu, błędny ICO i zachowanie EXE.
 - Pełny zestaw, stare kampanie i kampania DPI pozostały poza zakresem próby.
 
-## Zwykły EXE i punkt wznowienia
+## Próby interaktywne w zwykłym EXE
 
-Uruchomiono zwykłą kopię EXE w `tests/_work/ui-043-c5bb66e950e34bcfb661f1096db5cd71` i zaobserwowano ekran początkowy z przyciskiem Widok. Kliknięcie i próba ponownej aktywacji zwróciły `failed to activate captured window`. Wysłano prośbę o przywrócenie własnego okna na pierwszy plan. Próby przełączników, sortowania, usuwania stanu i wielokrotnego otwarcia panelu w zwykłym oknie pozostają niewykonane. Kopia może pozostać otwarta. Ostatnia korekta grupowania listy członków jest w głównym buildzie. Nie było nagrania przejścia klatka po klatce.
+Po wcześniejszym błędzie `failed to activate captured window` wznowiono pracę w istniejącym oknie z `tests/_work/ui-043-c5bb66e950e34bcfb661f1096db5cd71`. Jedna próba aktywacji wystarczyła. Użyta kopia 0.4.3 miała SHA-256 `8143C763DB510887D7C862CEF36A119A318018302FB9A70747AAFC0609558874` i pochodziła sprzed ostatniej korekty listy członków grupy. Próby odbyły się na własnej mapie `Próba 0.4.3.hexmap` z odrębną biblioteką.
+
+- **Prawy panel.** Ze stanu zamkniętego dwa razy otwarto szczegóły pojedynczej instancji i po jednym razie szczegóły grup Zieloni i Niebiescy. Każdy zrzut po otwarciu pokazywał kompletny, nieprzezroczysty panel. Dostępne były zrzuty po akcjach. Krótkie prześwity i etapowe odrysowanie w trakcie otwierania pozostają niezweryfikowane, podobnie jak zachowanie ostatniej korekty listy członków z głównego EXE.
+- **Widok.** Wyłączono Tereny, wyłączono i włączono Obiekty w tym samym otwartym menu. Ponowne kliknięcie Widok je zamknęło. Przy próbie malowania ukrytych terenów odpowiedź Nie pozostawiła warstwę ukrytą, co potwierdziło ponowne wyświetlenie pytania. Odpowiedź Tak zamknęła pytanie bez widocznego pomalowania heksa i bez gwiazdki. Escape i kliknięcie poza menu pozostały poza tą próbą.
+- **Lista obiektów.** Nagłówek Nazwa dał kolejno porządek rosnący, malejący i bazowy. Maskowany wpis miał `???` i pokazywał 57% ukrycia. Po ponownym sortowaniu akcja Zaznacz bez centrowania otworzyła właściwą instancję „Próba usunięcia 0.4.2” z przesuniętego wiersza.
+- **Usunięcie stanu.** Po zgodzie usunięto używany „Stan próby 0.4.3” z zamiennikiem Neutralny. Opcja usunięcia pliku była nieaktywna. Kafelek zniknął, instancja otrzymała Neutralny i pojawiła się gwiazdka. Jedno Ctrl+Z przywróciło kafelek, przypisanie i stan bez gwiazdki. Jedno Ctrl+Y ponownie zastosowało zamiennik i oznaczyło mapę jako zmienioną.
+
+Zapisano wyłącznie własną mapę testową i zamknięto własne okno. W tej sesji wykonano tylko powyższe próby interaktywne.
 
 ## Checklista
 
