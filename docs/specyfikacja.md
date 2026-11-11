@@ -1,6 +1,6 @@
-﻿# Specyfikacja użytkowa — HexMapEditor
-Wersja 2.4. Stan decyzji 10 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.5.0. Pierwszeństwo mają ustalenia sekcji 31.
+# Specyfikacja użytkowa — HexMapEditor
+Wersja 2.5. Stan decyzji 11 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.5.1. Pierwszeństwo mają ustalenia sekcji 32.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -543,3 +543,25 @@ Bez zagnieżdżonych grup, światła/ciemności, widoku MG/gracza, tekstur/detai
 - Mapa 7 zapisuje jedną tabelę `TerrainAssets` dla grafik heksów i wszystkich palet dokumentu. Preset 2 ma własną tabelę dla swojej palety. Odwołania `TextureId` pozwalają deduplikować dane według zawartości. Pliki są niezależne od biblioteki. Limity to 128 grafik i 44 MiB Base64 na tabelę, 48 MiB na preset i 128 MiB na mapę. Program zachowuje odczyt map 5–6 i presetów 1.
 - Teren, stan i ramka grupy używają wspólnego dialogu HSV z podglądem poprzedniego i nowego koloru. Pole HEX przyjmuje dokładnie `#RRGGBB` bez rozróżniania wielkości liter. Niepełny lub błędny HEX blokuje zatwierdzenie. Ołówek terenu Domyślnego pokazuje wyjaśnienie i nie otwiera edycji.
 - Odłożono poziomy szczegółowości, tło mapy, światło, zakładki, przebudowę opisów i paneli, drżenie nagłówka prawego panelu, dalszą diagnozę ikony powłoki oraz zapis osadzonych zasobów z otrzymanej mapy do biblioteki.
+
+## 32. Przyrost 0.5.1 — pełne źródła, pule i tło
+
+Ta sekcja zastępuje zapis wyłącznie małego wycinka z sekcji 31. Każde źródło zachowuje oryginalne bajty nieruchomego PNG/JPEG/BMP/GIF (16 MiB, do 4096×4096); treściowa tożsamość SHA-256 jest potwierdzana długością i bajtami. Logiczna pozycja biblioteki ma niezależne ID. Źródło jest wspólne, nie tożsamość edycyjna. Duplikat definicji wymaga identycznych źródeł, obu transformacji i połączenia; dialog daje istniejącą/nową/anuluj, z miniaturami i nazwami. Inny kadr nie jest identyczną definicją. Bez podobieństwa wizualnego i automatycznego czyszczenia.
+
+Dwa podglądy obok siebie: Pointy Top, Flat Top. Transformacje zachowują znormalizowany środek, zoom 1–24 z ograniczeniem pokrycia i obrót modulo 360°. Lewy/środkowy przycisk przesuwa obraz, kółko zmienia zoom, suwak obrót, reset daje 0°. Nowy import jest połączony. Połączenie/rozłączenie nie resetuje wcześniejszych różnic. Obrót stosuje deltę, zoom wspólny współczynnik, ruch wspólną deltę źródła ograniczoną przez oba kadry; pokrycie obróconego kwadratu może wymagać wspólnego zwiększenia skali. Wybór orientacji mapy używa właściwego kadru, bez automatycznych 30°. Ponowna edycja korzysta z pełnego źródła i poprzednich parametrów, także bez biblioteki.
+
+Teren ma 1–32 warianty kolor/grafika/mieszanka, edytowane kafelkami i plusem. Można zmienić typ; nie można usunąć ostatniego. Nie ma globalnego przełącznika typu całego terenu. Anuluj wariantu nie zmienia puli. Zatwierdzony import biblioteczny pozostaje niezależną operacją. Kafelek terenu pokazuje pierwszy wariant, pełne proporcjonalnie przycięte tło i pogrubioną nazwę na ciemnym podkładzie; miniatura nie losuje.
+
+Warianty mają równe prawdopodobieństwo, niezależne losowanie bez wymuszonej równowagi. Heks przechowuje wybrany ID i migawkę wyglądu. Jeden gest odwiedza pole raz; redraw/orientacja/odczyt/Redo niczego nie losują. Pula może zmieniać przyszłe malowanie bez przemalowania starych pól; jawna aktualizacja ma jedno Undo i zapamiętane wyniki. Regiony terenu/ikon używają logicznego TerrainId, a mgły TerrainId i początkowego Fog. Nazwa, kolor lub tekstura wybranego wyglądu nie rozbijają jednego rodzaju terenu. Nie analizujemy pikseli.
+
+Prawy klik narzędzi mgły otwiera Wygląd mgły, wspólny edytor wariantów. Domyślnie szarość. Losowanie następuje przy rzeczywistym nałożeniu Fog i jest zapisywane; pod PNG zawsze nieprzezroczysta baza. Edycja puli przyszła, jawny domyślnie wyłączony checkbox może zmienić wygląd już zasłoniętych heksów w jednym Undo, bez zasłaniania nowych. Ochrona odkrywców i warstwy pozostają.
+
+Tło obok Biblioteki zachowuje pełne źródło i prostokąt Left/Top/Width/Height. Przycinanie narożnikami lub nowym prostokątem myszy, proporcjonalne cover, krycie 0–100, nasycenie 0–200 (0 szarość), rozmycie 0–24. Efekty nie zmieniają źródła. Obraz wypełnia ekranowy obszar płótna, nie zależy od pan/zoom i nie wchodzi do obwiedni Dopasuj. Bufor efektów odbudowywany po ustawieniach/rozmiarze, nie po każdym MouseMove. Edycja/usunięcie jedno Undo, Anuluj niczego nie zmienia. Widok → Tło jest flagą bez gwiazdki/historii; Nowa/Otwórz przywracają widoczność.
+
+Mapa 8 i preset 3 przechowują deduplikowane GraphicSources oraz TerrainAssets z dwoma kadrami. Uwzględniają zastosowane wyglądy, wszystkie palety projektu, mgłę i tło; nie całą bibliotekę. Cache jest pochodny. Źródło raz na tabelę, nie raz na heks. Biblioteka format 2: terrain-Nazwa.json + Sources/source-SHA256.json, bezwzględne ścieżki nie trafiają do danych. Czytelne sufiksy, kolejność i LibraryFiles pozostają. Magazyn Sources jest niezmienny i zachowuje źródła do ponownego użycia po cofnięciu/usunięciu wpisu; brak automatycznego sprzątania prywatnych danych.
+
+Budżety: 64 pełne źródła /64 MiB danych, 256 definicji, 128 aktywnych wpisów biblioteki, 32 warianty/pulę, mapa 128 MiB, preset 112 MiB. Wyniki 256×256, LRU do 256 kafelków/64 MiB; bufor tła do 2048 w większym wymiarze. Przekroczenie odrzuca operację czytelnym błędem. Przyjęto jawnie nowe formaty bez odczytu starych map/presetów/wycinków. Stare pliki nie są usuwane ani migrowane; nie odtwarzamy utraconego pełnego źródła.
+
+Minimalne testy mają jawny Case; brak parametru nie uruchamia kampanii. Raport rozdziela metody i zwykły EXE. Bez pełnych testów, DPI i benchmarków. Odłożone: high/low detail, światło, widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi, przebudowa opisów, nagłówek prawego panelu i dalsza diagnoza ikony powłoki. Bez ogólnego edytora obrazów, AI, walki, tras i animacji.
+
+Zasada wydania: funkcje, poprawki i uzgodnione audyty kończą się przed 1.0.0. Sam przyszły numer 1.0.0 oznacza wyłącznie zmianę oznaczeń, bez dodatkowych funkcji lub stylistyki. Nie wykonujemy teraz tego przejścia ani audytu.

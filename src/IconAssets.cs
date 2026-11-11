@@ -78,6 +78,8 @@ namespace HexMapEditor
         public string CellId, BeforeIcon, AfterIcon;
         public string BeforeEntry, AfterEntry, BeforeName, AfterName;
         public bool BeforeFog, AfterFog, Icons, Fog;
-        public void Apply(CellData cell, bool after) { if (Icons) { cell.IconId = after ? AfterIcon : BeforeIcon; cell.IconEntryId = after ? AfterEntry : BeforeEntry; cell.IconName = after ? AfterName : BeforeName; } if (Fog) cell.Fog = after ? AfterFog : BeforeFog; }
+        public FillVariant BeforeFill, AfterFill;
+        public bool FogAppearance;
+        public void Apply(CellData cell, bool after) { if (Icons) { cell.IconId = after ? AfterIcon : BeforeIcon; cell.IconEntryId = after ? AfterEntry : BeforeEntry; cell.IconName = after ? AfterName : BeforeName; } if (Fog) cell.Fog = after ? AfterFog : BeforeFog; if (FogAppearance) cell.FogFill = (after ? AfterFill : BeforeFill).Copy(); }
     }
 }

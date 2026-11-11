@@ -72,7 +72,7 @@ namespace HexMapEditor
         {
             var changes=new List<ObjectChange>();for(int i=0;i<map.Objects.Count;i++){var o=map.Objects[i];var p=ObjectGeometry.Transform(map,geometry,new PointF(o.X,o.Y),dc,dr);var next=o.Copy();next.X=p.X;next.Y=p.Y;changes.Add(new ObjectChange{Before=o.Copy(),After=next,Index=i});}return changes;
         }
-        void ResetObjectDocument(){selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;previewWithoutFog=hideTerrain=hideIcons=hideObjects=false;UpdateLayerChecks();objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
+        void ResetObjectDocument(){selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;previewWithoutFog=hideTerrain=hideIcons=hideObjects=hideBackground=false;UpdateLayerChecks();objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
         void FitEverything()
         {
             EndCanvasGesture(true);RectangleF bounds=MapBounds();foreach(var o in map.Objects)bounds=RectangleF.Union(bounds,ObjectBounds(o));FitBounds(bounds);UpdateUI();

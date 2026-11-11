@@ -5,6 +5,6 @@ namespace HexMapEditor
     {
         public readonly string Variant, Color, Terrain;
         public readonly bool Fog;
-        public RegionState(CellData cell) { Variant = cell.VariantId; Color = cell.Color; Terrain = cell.Terrain; Fog = cell.Fog; }
+        public RegionState(CellData cell) { Variant = cell.TerrainId; Color = cell.Color; Terrain = cell.Terrain; Fog = cell.Fog; }
     }
 }

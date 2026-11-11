@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 
@@ -11,87 +10,90 @@ namespace HexMapEditor
     internal static class TerrainTextures
     {
         internal const int Resolution = 256;
-        internal const int MaxPresetBytes = 48 * 1024 * 1024;
-        const int MaxEncodedBytes = 44 * 1024 * 1024;
-
-        internal static List<IconAsset> Collect(IEnumerable<IconAsset> assets)
+        internal const int MaxPresetBytes = 112 * 1024 * 1024;
+        internal static bool Same(GraphicDefinition a, GraphicDefinition b)
         {
-            var result = assets.Where(a => a != null).GroupBy(a => a.Id).Select(g => g.First()).ToList();
-            CheckBudget(result);
-            return result;
+            return a.Id == b.Id && a.SourceId == b.SourceId && GraphicSources.Same(a.Source, b.Source) &&
+                MapLogic.Serializer().Serialize(new { a.Pointy, a.Flat, a.Linked }) == MapLogic.Serializer().Serialize(new { b.Pointy, b.Flat, b.Linked });
         }
-
-        static void CheckBudget(ICollection<IconAsset> assets)
+        internal static List<GraphicDefinition> Collect(IEnumerable<GraphicDefinition> assets)
         {
-            if (assets.Count > 128 || assets.Any(a => a == null || a.Png == null) ||
-                assets.Sum(a => (long)a.Png.Length) > MaxEncodedBytes)
-                throw new InvalidDataException("Limit grafik terenów to 128 zasobów i 44 MiB danych Base64.");
+            var result = new Dictionary<string, GraphicDefinition>();
+            foreach (var asset in assets.Where(a => a != null))
+            {
+                if (asset.Id == null) throw new InvalidDataException("Brak ID definicji grafiki.");
+                GraphicDefinition previous;
+                if (result.TryGetValue(asset.Id, out previous))
+                {
+                    if (!Same(previous, asset)) throw new InvalidDataException("Konflikt identyfikatora grafiki.");
+                }
+                else result.Add(asset.Id, asset);
+            }
+            if (result.Count > 256) throw new InvalidDataException("Limit 256 definicji grafik.");
+            GraphicSources.Collect(result.Values.Select(a => a.Source));
+            return result.Values.ToList();
         }
-
-        internal static Dictionary<string, IconAsset> ReadTable(List<IconAsset> assets)
+        internal static Dictionary<string, GraphicDefinition> ReadTable(List<GraphicDefinition> assets, List<GraphicSource> sources)
         {
-            if (assets == null) throw new InvalidDataException("Brak tabeli grafik terenów.");
-            CheckBudget(assets);
-            var table = new Dictionary<string, IconAsset>();
+            if (assets == null) throw new InvalidDataException("Brak tabeli grafik.");
+            var table = GraphicSources.ReadTable(sources);
+            var result = new Dictionary<string, GraphicDefinition>();
             foreach (var asset in assets)
             {
-                if (asset.Id == null || table.ContainsKey(asset.Id)) throw new InvalidDataException("Powtórzona lub brakująca tożsamość grafiki terenu.");
-                using (var bitmap = Decode(asset)) { }
-                table.Add(asset.Id, asset);
+                GraphicSource source;
+                if (asset == null || asset.SourceId == null || !table.TryGetValue(asset.SourceId, out source) || asset.Id == null || result.ContainsKey(asset.Id))
+                    throw new InvalidDataException("Nieprawidłowe odwołanie grafiki.");
+                asset.Source = source; Validate(asset); result.Add(asset.Id, asset);
             }
-            return table;
+            Collect(result.Values);
+            return result;
         }
-
-        internal static Bitmap Decode(IconAsset asset)
+        internal static void Validate(GraphicDefinition asset)
         {
-            if (asset == null || asset.Width != Resolution || asset.Height != Resolution)
-                throw new InvalidDataException("Grafika terenu musi być kwadratowym PNG 256 × 256.");
-            return IconAssets.Decode(asset);
+            if (asset == null || asset.Source == null || asset.SourceId != asset.Source.Id || String.IsNullOrWhiteSpace(asset.Name) || asset.Name.Length > 200)
+                throw new InvalidDataException("Nieprawidłowa definicja grafiki.");
+            CropMath.Validate(asset.Pointy, asset.Source); CropMath.Validate(asset.Flat, asset.Source);
+            var copy = asset.Copy(); copy.Seal();
+            if (copy.Id != asset.Id) throw new InvalidDataException("Parametry grafiki nie odpowiadają identyfikatorowi.");
         }
-
-        internal static IconAsset Resolve(Dictionary<string, IconAsset> assets, string id)
+        internal static Bitmap Decode(GraphicDefinition asset, bool flat = false)
+        {
+            Validate(asset);
+            using (var source = GraphicSources.Decode(asset.Source))
+            {
+                var result = new Bitmap(Resolution, Resolution);
+                try
+                {
+                    using (var g = Graphics.FromImage(result)) CropMath.Draw(g, source, flat ? asset.Flat : asset.Pointy, new RectangleF(0, 0, Resolution, Resolution));
+                    return result;
+                }
+                catch { result.Dispose(); throw; }
+            }
+        }
+        internal static GraphicDefinition Resolve(Dictionary<string, GraphicDefinition> assets, string id)
         {
             if (id == null) return null;
-            IconAsset asset;
-            if (!assets.TryGetValue(id, out asset)) throw new InvalidDataException("Brak grafiki terenu: " + id);
+            GraphicDefinition asset;
+            if (!assets.TryGetValue(id, out asset)) throw new InvalidDataException("Brak grafiki: " + id);
             return asset;
         }
-
-        internal static void Attach(TerrainPreset preset, Dictionary<string, IconAsset> assets)
+        internal static void Attach(TerrainPreset preset, Dictionary<string, GraphicDefinition> assets)
         {
             if (preset == null || preset.Terrains == null) return;
-            foreach (var terrain in preset.Terrains)
-                if (terrain != null) terrain.Texture = Resolve(assets, terrain.TextureId);
+            foreach (var terrain in preset.Terrains) if (terrain != null)
+            {
+                terrain.Texture = Resolve(assets, terrain.TextureId);
+                FillRules.Attach(terrain.Variants, assets);
+                var first = terrain.Variants.FirstOrDefault();
+                if (first == null || terrain.Color != first.Color || terrain.TextureId != first.GraphicId)
+                    throw new InvalidDataException("Niespójna reprezentacja pierwszego wariantu.");
+            }
         }
-
         internal static bool ValidFill(TerrainDefinition terrain)
         {
             if (terrain.FillKind == "color") return terrain.Texture == null && terrain.TextureId == null;
             return terrain.FillKind == "graphic" && terrain.Texture != null && terrain.Texture.Id == terrain.TextureId;
         }
-
-        internal static Bitmap ReadSource(string path)
-        {
-            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-            {
-                if (stream.Length > 16 * 1024 * 1024) throw new InvalidDataException("Plik źródłowy może mieć najwyżej 16 MiB.");
-                using (var source = Image.FromStream(stream, true, false))
-                {
-                    if (source is Metafile || source.Width < 1 || source.Height < 1 || source.Width > 4096 || source.Height > 4096 ||
-                        !new[] { ImageFormat.Png.Guid, ImageFormat.Jpeg.Guid, ImageFormat.Bmp.Guid, ImageFormat.Gif.Guid }.Contains(source.RawFormat.Guid) ||
-                        source.GetFrameCount(new FrameDimension(source.FrameDimensionsList[0])) != 1)
-                        throw new InvalidDataException("Wybierz nieruchome PNG, JPEG, BMP lub GIF o wymiarach do 4096 × 4096.");
-                    var bitmap = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
-                    try
-                    {
-                        using (var g = Graphics.FromImage(bitmap)) { g.CompositingMode = CompositingMode.SourceCopy; g.DrawImageUnscaled(source, 0, 0); }
-                        return bitmap;
-                    }
-                    catch { bitmap.Dispose(); throw; }
-                }
-            }
-        }
-
         internal static GraphicsPath Mask(PointF center, float radius, bool flat)
         {
             var vertices = new PointF[6];
@@ -100,48 +102,45 @@ namespace HexMapEditor
                 double angle = (60 * i - (flat ? 0 : 30)) * Math.PI / 180;
                 vertices[i] = new PointF(center.X + radius * (float)Math.Cos(angle), center.Y + radius * (float)Math.Sin(angle));
             }
-            var mask = new GraphicsPath();
-            mask.AddPolygon(vertices);
-            return mask;
+            var mask = new GraphicsPath(); mask.AddPolygon(vertices); return mask;
         }
-
         internal static void Draw(Graphics g, GraphicsPath mask, Bitmap bitmap, RectangleF square)
         {
             var state = g.Save();
-            try
-            {
-                g.SetClip(mask, CombineMode.Intersect);
-                g.DrawImage(bitmap, square);
-            }
+            try { g.SetClip(mask, CombineMode.Intersect); g.DrawImage(bitmap, square); }
             finally { g.Restore(state); }
         }
     }
-
     public sealed partial class MainWindow
     {
         readonly Dictionary<string, Bitmap> terrainBitmaps = new Dictionary<string, Bitmap>();
-
+        readonly Dictionary<string, long> terrainBitmapUses = new Dictionary<string, long>();
+        long terrainBitmapClock;
         void ClearTerrainBitmaps()
         {
             foreach (var bitmap in terrainBitmaps.Values) bitmap.Dispose();
-            terrainBitmaps.Clear();
+            terrainBitmaps.Clear(); terrainBitmapUses.Clear();
         }
-
-        void DrawTerrainTexture(Graphics g, GraphicsPath mask, PointF center, float radius, IconAsset asset)
+        void DrawTerrainTexture(Graphics g, GraphicsPath mask, PointF center, float radius, GraphicDefinition asset)
         {
+            string key = asset.Id + ":" + map.Orientation;
             Bitmap bitmap;
-            if (!terrainBitmaps.TryGetValue(asset.Id, out bitmap))
+            if (!terrainBitmaps.TryGetValue(key, out bitmap))
             {
-                if (terrainBitmaps.Count >= 128) ClearTerrainBitmaps();
-                terrainBitmaps.Add(asset.Id, bitmap = TerrainTextures.Decode(asset));
+                if (terrainBitmaps.Count >= 256)
+                {
+                    string oldest = terrainBitmapUses.OrderBy(item => item.Value).First().Key;
+                    terrainBitmaps[oldest].Dispose(); terrainBitmaps.Remove(oldest); terrainBitmapUses.Remove(oldest);
+                }
+                terrainBitmaps.Add(key, bitmap = TerrainTextures.Decode(asset, map.Orientation == "FlatTop"));
             }
+            terrainBitmapUses[key] = ++terrainBitmapClock;
             TerrainTextures.Draw(g, mask, bitmap, new RectangleF(center.X - radius, center.Y - radius, radius * 2, radius * 2));
         }
-
-        void CheckTextureBudget(IEnumerable<IconAsset> added)
+        void CheckTextureBudget(IEnumerable<GraphicDefinition> added)
         {
-            TerrainTextures.Collect(map.Cells.Select(c => c.Texture)
-                .Concat(map.Presets.SelectMany(p => p.Terrains).Select(t => t.Texture)).Concat(added));
+            var definitions = TerrainTextures.Collect(DocumentGraphics().Concat(added));
+            GraphicSources.Collect(definitions.Select(d => d.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source }));
         }
     }
 }

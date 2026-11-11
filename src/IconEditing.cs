@@ -24,7 +24,7 @@ namespace HexMapEditor
         int brushSize = 1, brushHeight = 1, previewCell = -1;
         bool brushFilled = true;
 
-        void ClearDocumentIcons() { ClearTerrainBitmaps(); foreach (var image in documentBitmaps.Values) image.Dispose(); documentBitmaps.Clear(); layerBefore.Clear(); strokeVisited.Clear(); previewCell = -1; iconMaterial = false; activeIcon = null; UpdateMaterialIndicator(); }
+        void ClearDocumentIcons() { ClearBackgroundCache(); ClearTerrainBitmaps(); foreach (var image in documentBitmaps.Values) image.Dispose(); documentBitmaps.Clear(); layerBefore.Clear(); strokeVisited.Clear(); previewCell = -1; iconMaterial = false; activeIcon = null; UpdateMaterialIndicator(); }
         Bitmap AssetBitmap(IconAsset asset, bool library)
         { var cache = library ? libraryBitmaps : documentBitmaps; Bitmap image; if (!cache.TryGetValue(asset.Id, out image)) { image = IconAssets.Decode(asset); cache.Add(asset.Id, image); } return image; }
         void LoadIcons()
@@ -98,7 +98,8 @@ namespace HexMapEditor
         MapData MapForSave()
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), TerrainAssets = TerrainTextures.Collect(map.Cells.Select(c => c.Texture).Concat(map.Presets.SelectMany(p => p.Terrains).Select(t => t.Texture))), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
+            var terrainAssets = TerrainTextures.Collect(DocumentGraphics());
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), FogPalette = map.FogPalette, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {
@@ -123,6 +124,10 @@ namespace HexMapEditor
                 map.IconAssets.Add(strokeAsset);
             }
             var change = new LayerChange { CellId = cell.Id, BeforeIcon = cell.IconId, BeforeFog = cell.Fog, Icons = strokeIcons, Fog = strokeFog, AfterIcon = nextIcon, AfterFog = targetFog, BeforeEntry = cell.IconEntryId, BeforeName = cell.IconName, AfterEntry = nextIcon == null ? null : strokeRemoveIcon ? cell.IconEntryId : strokeEntry, AfterName = nextIcon == null ? null : strokeRemoveIcon ? cell.IconName : strokeName };
+            if (strokeFog && targetFog)
+            {
+                change.FogAppearance = true; change.BeforeFill = cell.FogFill.Copy(); change.AfterFill = NextFill(map.FogPalette);
+            }
             layerBefore.Add(index, change); change.Apply(cell, true); dirty = true;
             if (index == selected && strokeFog) { editorCellId = null; UpdateUI(); } else canvas.Invalidate();
         }

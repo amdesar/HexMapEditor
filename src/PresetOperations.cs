@@ -66,7 +66,7 @@ namespace HexMapEditor
             if (id == map.ActivePresetId) return; var chosen = AvailablePresets().First(p => p.Id == id);
             try
             {
-                CheckTextureBudget(chosen.Terrains.Select(t => t.Texture));
+                CheckTextureBudget(chosen.Terrains.SelectMany(t => t.Variants).Select(f => f.Graphic));
                 ChangePalette("Wybór presetu", () => { if (!map.Presets.Any(p => p.Id == id)) map.Presets.Add(chosen.Copy()); map.ActivePresetId = id; brushIndex = 0; });
             }
             catch (InvalidDataException ex)
@@ -207,24 +207,24 @@ namespace HexMapEditor
             }
             var p = ActivePreset(); var old = add ? new TerrainDefinition() : p.Terrains.FirstOrDefault(t => t.TerrainId == id);
             if (old == null) return;
-            using (var d = new TerrainDialog(old, !add, map.Orientation == "FlatTop"))
+            using (var d = new AppearancePoolDialog(add ? "Nowy teren" : "Edycja terenu", old.Name, old.Variants, !add, map.Orientation == "FlatTop", "Zastosuj do bieżącej mapy"))
             {
                 d.ChooseGraphic = ChooseTerrainGraphic;
+                d.EditCrop = ShowTerrainCrop;
                 d.CanAccept = () =>
                 {
-                    try { CheckTextureBudget(new[] { d.Texture }); }
+                    try { CheckTextureBudget(d.Fills.Select(f => f.Graphic)); }
                     catch (InvalidDataException ex) { MessageBox.Show(d, ex.Message, "Limit grafik", MessageBoxButtons.OK, MessageBoxIcon.Warning); return false; }
                     return !d.ApplyToMap || !map.Cells.Any(c => c.VariantId == old.VariantId) || GuardLayer(MapLayer.Terrain, d);
                 };
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
-                var next = old.Copy(); next.Name = d.TerrainName; next.Color = d.TerrainColor;
-                next.Texture = d.Texture; next.TextureId = d.Texture == null ? null : d.Texture.Id; next.FillKind = d.Texture == null ? "color" : "graphic";
+                var next = old.Copy(); next.Name = d.TerrainName; FillRules.SetPool(next, d.Fills);
                 if (add) AddTerrain(next);
                 else if (!SameTerrainAppearance(old, next)) { next.VariantId = Guid.NewGuid().ToString("N"); next.Revision++; UpdateTerrain(old, next, d.ApplyToMap); }
             }
         }
         static bool SameTerrainAppearance(TerrainDefinition old, TerrainDefinition next)
-        { return old.Name == next.Name && String.Equals(old.Color, next.Color, StringComparison.OrdinalIgnoreCase) && old.TextureId == next.TextureId; }
+        { return old.Name == next.Name && FillRules.Signature(old.Variants) == FillRules.Signature(next.Variants); }
         void AddTerrain(TerrainDefinition terrain)
         { if (PresetReadOnly) return; ChangePalette("Dodanie terenu", () => { var p = ActivePreset(); p.Terrains.Add(terrain.Copy()); brushIndex = p.Terrains.Count - 1; }); }
         void UpdateTerrain(TerrainDefinition old, TerrainDefinition next, bool apply)
@@ -235,7 +235,7 @@ namespace HexMapEditor
             ChangePalette("Edycja terenu" + (apply ? " i mapy" : ""), () => p.Terrains[at] = next.Copy(), action =>
             {
                 if (!apply) return;
-                foreach (var cell in map.Cells.Where(c => c.VariantId == old.VariantId)) { var before = new TerrainState(cell); MapLogic.ApplyTerrain(cell, next); action.Changes.Add(new CellChange { CellId = cell.Id, Before = before, After = new TerrainState(cell) }); }
+                foreach (var cell in map.Cells.Where(c => c.VariantId == old.VariantId)) { var before = new TerrainState(cell); MapLogic.ApplyTerrain(cell, next, NextFill(next.Variants)); action.Changes.Add(new CellChange { CellId = cell.Id, Before = before, After = new TerrainState(cell) }); }
             });
         }
         void RemoveTerrainById(string id)

@@ -4,13 +4,13 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal enum MapLayer { Terrain, Icons, Objects, Fog }
+    internal enum MapLayer { Terrain, Icons, Objects, Fog, Background }
 
     public sealed partial class MainWindow
     {
         bool hideTerrain, hideIcons, hideObjects;
         ToolStripMenuItem[] layerItems;
-        static readonly string[] LayerNames = { "Tereny", "Ikony", "Obiekty", "Mgła" };
+        static readonly string[] LayerNames = { "Tereny", "Ikony", "Obiekty", "Mgła", "Tło" };
 
         bool LayerVisible(MapLayer layer)
         {
@@ -19,6 +19,7 @@ namespace HexMapEditor
                 case MapLayer.Terrain: return !hideTerrain;
                 case MapLayer.Icons: return !hideIcons;
                 case MapLayer.Objects: return !hideObjects;
+                case MapLayer.Background: return !hideBackground;
                 default: return !previewWithoutFog;
             }
         }
@@ -31,6 +32,7 @@ namespace HexMapEditor
                 case MapLayer.Terrain: hideTerrain = !visible; break;
                 case MapLayer.Icons: hideIcons = !visible; break;
                 case MapLayer.Objects: hideObjects = !visible; break;
+                case MapLayer.Background: hideBackground = !visible; break;
                 default: previewWithoutFog = !visible; editorCellId = null; break;
             }
             UpdateLayerChecks();

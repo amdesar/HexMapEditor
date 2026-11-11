@@ -48,6 +48,12 @@ namespace HexMapEditor
             if (action.ObjectLibraryChange != null) ApplyObjectLibrary(action.ObjectLibraryChange, after);
             if (action.StateFileChange != null) ApplyStateFile(action.StateFileChange, after);
             if (action.TerrainGraphicChange != null) ApplyTerrainGraphic(action.TerrainGraphicChange, after);
+            if (action.BeforeFogPalette != null) map.FogPalette = FillRules.Copy(after ? action.AfterFogPalette : action.BeforeFogPalette);
+            if (action.BackgroundChange)
+            {
+                var background = after ? action.AfterBackground : action.BeforeBackground;
+                map.Background = background == null ? null : background.Copy(); ClearBackgroundCache();
+            }
             foreach (var asset in action.RequiredAssets) if (!map.IconAssets.Any(a => a.Id == asset.Id)) map.IconAssets.Add(asset);
             string selectedId = selected < 0 ? null : map.Cells[selected].Id;
             if (action.BeforeResize != null) (after ? action.AfterResize : action.BeforeResize).Apply(map);

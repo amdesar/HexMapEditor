@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -12,10 +12,10 @@ namespace HexMapEditor
         readonly bool flat;
         Bitmap image;
         internal TerrainPreview(bool flat) { this.flat = flat; DoubleBuffered = true; }
-        internal void ShowFill(Color color, IconAsset asset)
+        internal void ShowFill(Color color, GraphicDefinition asset)
         {
             if (image != null) image.Dispose();
-            image = asset == null ? null : TerrainTextures.Decode(asset);
+            image = asset == null ? null : TerrainTextures.Decode(asset, flat);
             BackColor = color;
             Invalidate();
         }
@@ -124,8 +124,8 @@ namespace HexMapEditor
     internal sealed class TerrainGraphicEditDialog : EditorDialog
     {
         readonly TextBox name = new TextBox { MaxLength = 200 };
-        internal Func<bool, IconAsset> ChooseImage;
-        internal IconAsset Asset { get; private set; }
+        internal Func<bool, GraphicDefinition> ChooseImage;
+        internal GraphicDefinition Asset { get; private set; }
         internal string GraphicName { get { return name.Text.Trim(); } }
 
         internal TerrainGraphicEditDialog(TerrainGraphic item, bool flat) : base("Edytuj grafikę terenu", 300)

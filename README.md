@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.5.0
+# HexMapEditor 0.5.1
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.0** zapisuje mapy w **formacie 7**, presety w formacie **2**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.1** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,7 +12,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-Aplikacja otwiera mapy w formatach 5–7 i presety w formatach 1–2. W formacie 5 ramki są domyślnie wyłączone. Zapis mapy lub presetu z 0.5.0 wymaga wersji obsługującej nowy format.
+Ta wersja odczytuje mapy 8 i presety 3. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
 
 ## Podmiana ikony programu
 
@@ -22,19 +22,27 @@ Okno odczytuje ICO z katalogu programu. Przy braku lub błędzie odczytu używa 
 
 ## Widok warstw
 
-Menu **Widok** na górnym pasku przełącza Tereny, Ikony, Obiekty i Mgłę. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
+Menu **Widok** na górnym pasku przełącza Tereny, Ikony, Obiekty, Mgłę i Tło. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
 
-## Tekstury terenów i wybór koloru
+## Pule wyglądu, źródła i kadrowanie
 
-Własny preset pozwala wybrać **Kolor** albo **Grafika** w edycji terenu. Ołówek na terenie presetu Domyślny wyświetla wskazówkę o utworzeniu lub wyborze własnego presetu. W trybie Grafika otwórz bibliotekę miniatur albo zaimportuj plik. W kadrowaniu przeciągaj obraz pod nieruchomą maską i używaj kółka do zmiany przybliżenia. Przełącznik Pointy Top / Flat Top zmienia obrys podglądu przy zachowaniu kadru. Zatwierdź zapisuje wycinek. Anuluj zamyka kadrowanie bez zapisu.
+W edycji własnego terenu kliknij kafelek wariantu albo plus. Pula ma 1–32 kolory, grafiki lub ich mieszankę. Prawy klik usuwa wariant, poza ostatnim. Ołówek Domyślnego nadal wyjaśnia ochronę wzorca. Zmiany puli dotyczą przyszłego malowania; „Zastosuj do bieżącej mapy” świadomie aktualizuje właściwy wariant terenu.
 
-Źródłem może być nieruchomy PNG, JPEG, BMP lub GIF do 4096 × 4096 i 16 MiB. Program zapisuje kwadratowy PNG **256 × 256** z przezroczystością i zwalnia plik źródłowy. Ten sam kwadrat ma wspólny środek i skalę w obu orientacjach. Siatka przycina go do kształtu heksa bez obrotu i rozciągania. Mgła go zasłania, a wyłączenie Terenów pokazuje neutralne wypełnienie.
+Pędzel i Wiadro niezależnie losują pozycję z równym prawdopodobieństwem dla każdego malowanego heksa. Powtórzenia są dozwolone. Wynik zostaje w heksie; odrysowanie i Redo nie losują go ponownie, a ponowna wizyta w jednym geście nie zmienia wyboru. Warianty wyglądu nie dzielą regionu jednego TerrainId. Wiadro mgły używa TerrainId i początkowego Fog, a nie widocznego koloru/obrazu.
 
-Biblioteka przechowuje `Library/Terrains/Graphics/terrain-Nazwa.json` z ID, nazwą, kolejnością i osadzonym PNG. Użycie w palecie zapamiętuje konkretny wycinek. Późniejsza zmiana lub usunięcie biblioteczne pozostawia dotychczasowe mapy i presety czytelne. Zatwierdzony import biblioteczny jest osobnym wpisem historii względem edycji terenu. Ponowne kadrowanie wycinka obejmuje dostępny kwadrat. Aby odzyskać inny fragment obrazu, wskaż plik źródłowy. Pliki bibliotek cofają się w granicach historii sesji.
+Import zachowuje pełne, oryginalne bajty nieruchomego PNG/JPEG/BMP/GIF do 16 MiB i 4096 × 4096. Dwa podglądy Pointy Top / Flat Top mają osobny środek, skalę i obrót. Przeciągaj obraz, używaj kółka i suwaka 0–360°. Połącz kadry zachowuje dotychczasowe różnice: ruch daje wspólną deltę znormalizowaną względem źródła, zoom wspólny współczynnik, obrót wspólną deltę. Pokrycie po obrocie ogranicza odsunięcie/oddalenie. Ponowne połączenie niczego nie wyrównuje. „Kadruj…” przy wariancie otwiera pełne źródło osadzone także w przeniesionej mapie, bez biblioteki. Anulowanie nie zmienia wariantu.
 
-Pędzel i Wiadro korzystają z tej samej palety. W edycji terenu opcja „Zastosuj do bieżącej mapy” aktualizuje heksy danego wariantu. Plik mapy zawiera grafiki pól i zapisanych palet projektu, a samodzielny plik presetu grafiki swojej palety. Każda tabela deduplikuje PNG według zawartości. Jedna mapa lub preset może zawierać do 128 grafik i 44 MiB ich Base64. Limit całego presetu to 48 MiB, a mapy 128 MiB.
+Biblioteka: `Library/Terrains/Graphics/terrain-Nazwa.json` zawiera logiczne ID, nazwę, kolejność i oba kadry; `Sources/source-SHA256.json` współdzieli pełne źródło. Mapa i preset zawierają własne deduplikowane tabele potrzebnych źródeł/definicji, także dla palet projektu. Cache nie jest zapisywany. Edycja biblioteki nie zmienia historycznie namalowanego wariantu. SHA-256 wskazuje kandydatów, potem sprawdzane są bajty i parametry. Identyczna pozycja daje wybór Użyj istniejącej / Importuj jako nową / Anuluj. Nowa pozycja ma niezależne ID, współdzieląc źródło. Zatwierdzony import pozostaje operacją biblioteczną nawet po późniejszym anulowaniu terenu.
 
-Wybór koloru terenu, stanu i ramki grupy korzysta z tego samego ciemnego dialogu. Wybierz odcień, nasycenie i jasność albo wpisz `#RRGGBB` małymi lub wielkimi literami. Podgląd pokazuje poprzednią i nową wartość. Zatwierdź wymaga sześciu cyfr szesnastkowych.
+Limity nowych źródeł: 64 obrazy i 64 MiB bajtów łącznie na dokument/preset lub magazyn biblioteki; do 256 definicji kadru, 128 aktywnych wpisów biblioteki. Magazyn Sources zachowuje niezmienne źródła również po Undo/usunięciu pozycji; nie czyścimy danych automatycznie. Po osiągnięciu limitu nowy import daje błąd. Mapa do 128 MiB, preset do 112 MiB. Wyniki kadrów to odbudowywalne 256 × 256; cache LRU do 256 kafelków (64 MiB), osobno dla obu orientacji. Grafiki nie są dekodowane dla każdego heksa w każdej klatce.
+
+Picker terenu, stanu i ramki pozostaje wspólnym HSV/HEX: `#RRGGBB`, sześć cyfr, stare/nowe, Zatwierdź/Anuluj.
+
+## Wygląd mgły i statyczne tło
+
+Prawy klik narzędzia mgły → **Wygląd mgły…** otwiera ten sam edytor puli. Domyślnie jest dotychczasowa szarość. Nałożenie wybiera i zapamiętuje wariant; pod grafiką zawsze jest nieprzezroczysta baza. Domyślnie wyłączone „Zastosuj wygląd do obecnie zasłoniętych heksów” zmienia wyłącznie istniejący wygląd w jednym Undo. Aktywni odkrywcy nadal chronią swój zasięg.
+
+**Tło** obok Biblioteki: import/zmiana, prostokątne przycięcie myszą (narożniki albo nowy prostokąt), krycie 0–100%, nasycenie 0–200% i rozmycie 0–24 px. Zachowujemy pełne źródło i parametry. Tło proporcjonalnie wypełnia płótno, niezależnie od kamery; pan i zoom mapy go nie ruszają. Dopasowania je pomijają. Efekty są buforowane do rozmiaru płótna (największy wymiar bufora do 2048). Zatwierdzenie/usunięcie ma jedno Undo; Anuluj nie zmienia mapy. Widok → Tło jest wyłącznie flagą widoku. Nie ma osobnej biblioteki teł.
 
 ## Narzędzia, kamera i materiał
 
@@ -85,7 +93,7 @@ Lista instancji: Nazwa z miniaturą / Stan efektywny / Pozycja (Poza mapą lub p
 
 ## Zapis, geometria i historia
 
-Format **6** zachowuje Objects z bazowymi właściwościami, ObjectStates oraz Groups z ID, członkami, nakładkami i ramką. Zapis zawiera trzy podstawowe definicje oraz własne stany użyte przez instancje lub grupy, w tym stany bazowe przykryte nakładką. Side instancji jest ID definicji stanu. IconAssets nadal deduplikuje użyte PNG ikon/obiektów po SHA-256 bez łączenia ich edycji; nie zapisuje całej biblioteki. Sam plik mapy wystarcza, również dla obiektów poza mapą. Walidacja sprawdza ID, referencje, pojedyncze członkostwo, brak zagnieżdżeń, skończone pozycje/rozmiary/promienie przed podmianą. Podgląd nie jest danymi mapy. Limity: 5000 instancji, 2500 grup, 100 stanów, świat ±10 000 000, 128 wspólnych zasobów, 2 MiB PNG/zasób i około 32 MiB PNG łącznie; plik do 128 MiB. Bezpieczny zapis, pojedyncze potwierdzenie końcowej ścieżki i ochrona gestów dialogów pozostają.
+Format **8** zachowuje Objects z bazowymi właściwościami, ObjectStates oraz Groups z ID, członkami, nakładkami i ramką. Zapis zawiera trzy podstawowe definicje oraz własne stany użyte przez instancje lub grupy, w tym stany bazowe przykryte nakładką. Side instancji jest ID definicji stanu. IconAssets nadal deduplikuje użyte PNG ikon/obiektów po SHA-256 bez łączenia ich edycji; nie zapisuje całej biblioteki. Sam plik mapy wystarcza, również dla obiektów poza mapą. Walidacja sprawdza ID, referencje, pojedyncze członkostwo, brak zagnieżdżeń, skończone pozycje/rozmiary/promienie przed podmianą. Podgląd nie jest danymi mapy. Limity: 5000 instancji, 2500 grup, 100 stanów, świat ±10 000 000, 128 wspólnych zasobów, 2 MiB PNG/zasób i około 32 MiB PNG łącznie; plik do 128 MiB. Bezpieczny zapis, pojedyncze potwierdzenie końcowej ścieżki i ochrona gestów dialogów pozostają.
 
 Resize/orientacja zachowują zaakceptowane zasady obiektów i lokalnych osi offsetu; crop ich nie usuwa. Techniczne przeliczenie nie odkrywa nowej drogi. Wspólna historia 300 obejmuje mapę, instancje, grupy/stany, końcowe delty mgły i pliki bibliotek. Nazwa/pole liczbowe ma logiczną sesję; pusty/niezmieniony zapis nie tworzy operacji. Sam wybór/nawigacja/podgląd bez historii. Pliki bibliotek są cofane z bajtów sesji przez LibraryFiles, bez Kosza i cichego nadpisania obcego celu; konflikt nie przesuwa stosu, można ponowić. Reset/limit/zamknięcie usuwa możliwość cofania, nie aktywne pliki. Udane Nowa/Otwórz zeruje historie/wybór, błąd/anulowanie zachowuje dokument.
 
@@ -103,13 +111,17 @@ Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego p
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Groups041Tests.ps1 -Case model
 ```
 
-Przypadki starszego przyrostu to model, fog i controls. Źródła i skrypty są śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 31 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
+Przypadki starszego przyrostu to model, fog i controls. Źródła i skrypty są śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 32 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
-Na później pozostają m.in. światło i ciemność, widok MG/gracza, tło całej mapy, poziomy szczegółowości tekstur, zakładki, przebudowa opisów i drżenie nagłówka prawego panelu. Celowane próby 0.5.0 uruchamia `tests/Run-Patch050Tests.ps1`. Wyniki i ograniczenia są w `docs/raport-0.5.0.md`.
+Na później pozostają światło/ciemność, widok gracza, high/low detail, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 
 Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejności dodania. Starsze wpisy bez kolejności startują według stabilnego ID. Edycja zachowuje pozycję. Kolejność terenów jest kolejnością tablicy w palecie. Lista obiektów na mapie ma odrębny cykl sortowania rosnąco, malejąco i w kolejności dokumentu. Pokazuje grupę i znacznik efektywnego stanu. Sortuje maskowane teksty według widocznego `???` i mgłę liczbowo.
 
+Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
+
 ## Historia zmian
+
+- **0.5.1** — pełne współdzielone źródła, dwa niedestrukcyjne kadry i względne połączenie, mieszane pule terenu/mgły ze stabilnym losowaniem, wybór duplikatów, pełne kafelki oraz ekranowe tło z efektami. Mapa 8, preset 3, grafika biblioteki 2.
 
 - **0.5.0** — widoczny edytor WPF, tekstury z kadrowaniem i biblioteką, mapy i presety z osadzonymi grafikami, wspólny HSV/HEX, ponowne kliknięcie odznaczające obiekt lub grupę i przywracanie stanów z biblioteki.
 

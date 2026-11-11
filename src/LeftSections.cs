@@ -35,6 +35,7 @@ namespace HexMapEditor
             string[] names={"Zaznaczanie","Prostokąt","Lasso","Rączka","Pędzel","Wiadro","Mgła wojny","Wypełnienie mgłą"},icons={"select","rectangle","lasso","hand","brush","bucket","fog","fogbucket"};
             var tools=new[]{EditorTool.Select,EditorTool.RectangleSelect,EditorTool.Lasso,EditorTool.Hand,EditorTool.Brush,EditorTool.Bucket,EditorTool.FogBrush,EditorTool.FogBucket};
             for(int i=0;i<tools.Length;i++){var tool=tools[i];var b=ShellButton(paletteTools,"",icons[i],names[i],()=>SelectTool(tool),48);b.Height=26;toolButtons.Add(tool,b);}
+            AttachFogAppearanceMenu();
             var shapeLabel = new Label { Text = "Kształt", Width = 52, Height = 22 }; toolbox.Controls.Add(shapeLabel);
             shapePicker = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Kształt pędzla" }; shapePicker.Items.AddRange(new object[] { "Punkt", "Kwadrat", "Prostokąt", "Koło", "Heksagon", "Pięciokąt foremny", "Linia pozioma", "Linia pionowa" }); shapePicker.SelectedIndex = 0; toolbox.Controls.Add(shapePicker);
             var sizeLabel = new Label { Text = "Rozmiar", Width = 52, Height = 22 }; toolbox.Controls.Add(sizeLabel);

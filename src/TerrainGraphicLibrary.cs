@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -10,12 +10,14 @@ namespace HexMapEditor
 {
     public sealed class TerrainGraphic
     {
+        public int GraphicFormatVersion { get; set; }
         public string Id { get; set; }
         public string Name { get; set; }
-        public IconAsset Asset { get; set; }
+        public GraphicDefinition Asset { get; set; }
         public long LibraryOrder { get; set; }
         internal string Path;
         internal byte[] Bytes;
+        public TerrainGraphic() { GraphicFormatVersion = 2; }
     }
 
     internal sealed class TerrainGraphicChange
@@ -28,6 +30,7 @@ namespace HexMapEditor
             var to = forward ? After : Before;
             if (to != null)
             {
+                TerrainGraphicLibrary.StoreSource(Path.GetDirectoryName(to.Path), to.Asset.Source);
                 foreach (string path in TerrainGraphicLibrary.Files(Path.GetDirectoryName(to.Path)))
                 {
                     if (from != null && String.Equals(path, from.Path, StringComparison.OrdinalIgnoreCase)) continue;
@@ -47,14 +50,51 @@ namespace HexMapEditor
         {
             if (new FileInfo(path).Length > 1024 * 1024) throw new InvalidDataException("Za duży plik grafiki terenu.");
             var bytes = File.ReadAllBytes(path);
-            var item = MapLogic.Serializer().Deserialize<TerrainGraphic>(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF'));
-            if (item == null || String.IsNullOrWhiteSpace(item.Id) || item.Id.Length > 200 ||
+            var serializer = MapLogic.Serializer();
+            var raw = serializer.DeserializeObject(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF')) as Dictionary<string, object>;
+            if (raw == null || !raw.ContainsKey("Asset")) throw new InvalidDataException("Brak definicji kadrów.");
+            GraphicSchema.Definition(raw["Asset"]);
+            var item = serializer.ConvertToType<TerrainGraphic>(raw);
+            if (item == null || item.GraphicFormatVersion != 2 || String.IsNullOrWhiteSpace(item.Id) || item.Id.Length > 200 ||
                 String.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 200 || item.LibraryOrder < 0)
                 throw new InvalidDataException("Nieprawidłowe metadane grafiki terenu.");
-            using (var image = TerrainTextures.Decode(item.Asset)) { }
+            if (item.Asset == null) throw new InvalidDataException("Brak definicji kadrów.");
+            item.Asset.Source = ReadSource(Path.GetDirectoryName(path), item.Asset.SourceId);
+            TerrainTextures.Validate(item.Asset);
             item.Path = Path.GetFullPath(path);
             item.Bytes = bytes;
             return item;
+        }
+        static string SourcePath(string directory, string id)
+        {
+            if (id == null || !id.StartsWith("source-", StringComparison.Ordinal) || id.Length != 71 || !id.Substring(7).All(Uri.IsHexDigit))
+                throw new InvalidDataException("Nieprawidłowy identyfikator źródła.");
+            return Path.Combine(directory, "Sources", id + ".json");
+        }
+        static GraphicSource ReadSource(string directory, string id)
+        {
+            string path = SourcePath(directory, id);
+            if (new FileInfo(path).Length > 23L * 1024 * 1024) throw new InvalidDataException("Za duży plik źródła.");
+            var source = MapLogic.Serializer().Deserialize<GraphicSource>(File.ReadAllText(path));
+            if (source == null || source.Id != id) throw new InvalidDataException("Sprzeczny identyfikator źródła.");
+            using (var bitmap = GraphicSources.Decode(source)) { }
+            return source;
+        }
+        internal static void StoreSource(string directory, GraphicSource source)
+        {
+            string path = SourcePath(directory, source.Id);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            if (File.Exists(path))
+            {
+                if (!GraphicSources.Same(ReadSource(directory, source.Id), source)) throw new IOException("Konflikt bajtów źródła.");
+                return;
+            }
+            var stored = new DirectoryInfo(Path.GetDirectoryName(path)).GetFiles("source-*.json");
+            if (stored.Length >= GraphicSources.MaxSources || stored.Sum(f => f.Length) +
+                source.Data.Length > GraphicSources.MaxTotalBytes * 4 / 3 + 65536)
+                throw new IOException("Magazyn źródeł biblioteki osiągnął limit 64 obrazów / 64 MiB. Zachowano dotychczasowe wpisy i historię.");
+            // Immutable content store. Undo removes the logical entry, retaining reusable source bytes.
+            MapLogic.AtomicWrite(path, MapLogic.Serializer().Serialize(source), false);
         }
 
         internal static List<TerrainGraphic> Load(string directory, out string warning)
@@ -69,6 +109,7 @@ namespace HexMapEditor
                 {
                     var item = Read(path);
                     if (items.Count >= 128 || !ids.Add(item.Id)) throw new InvalidDataException("Powtórzone ID lub przekroczony limit 128 grafik.");
+                    GraphicSources.Collect(items.Select(e => e.Asset.Source).Concat(new[] { item.Asset.Source }));
                     items.Add(item);
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(path) + ": " + ex.Message); }
@@ -77,8 +118,10 @@ namespace HexMapEditor
             return LibrarySequence.Sort(items, i => i.LibraryOrder, i => i.Id).ToList();
         }
 
-        internal static TerrainGraphic Prepare(string directory, TerrainGraphic before, string name, IconAsset asset, IEnumerable<TerrainGraphic> entries)
+        internal static TerrainGraphic Prepare(string directory, TerrainGraphic before, string name, GraphicDefinition asset, IEnumerable<TerrainGraphic> entries)
         {
+            TerrainTextures.Validate(asset);
+            GraphicSources.Collect(entries.Where(e => before == null || e.Id != before.Id).Select(e => e.Asset.Source).Concat(new[] { asset.Source }));
             var path = PresetFiles.Destination(directory, "terrain-" + PresetFiles.Stem(name), before == null ? null : before.Path);
             if (!Path.GetFileName(path).StartsWith("terrain-", StringComparison.Ordinal))
                 throw new IOException("Za długa ścieżka biblioteki grafik terenów.");
@@ -116,7 +159,7 @@ namespace HexMapEditor
             UpdateUI();
         }
 
-        IconAsset ChooseTerrainGraphic(TerrainDialog owner, bool import)
+        GraphicDefinition ChooseTerrainGraphic(IWin32Window owner, bool import)
         {
             try
             {
@@ -153,29 +196,52 @@ namespace HexMapEditor
 
         TerrainGraphic ImportTerrainGraphic(IWin32Window owner)
         {
-            if (terrainGraphics.Count >= 128) throw new InvalidOperationException("Biblioteka mieści najwyżej 128 grafik terenów.");
             var asset = CropTerrainFile(owner);
             if (asset == null) return null;
-            var item = TerrainGraphicLibrary.Prepare(LibraryPaths.TerrainGraphics, null, asset.Name, asset, terrainGraphics);
+            return CommitGraphicImport(asset, (existing, proposed) =>
+            {
+                using (var dialog = new GraphicDuplicateDialog(existing, proposed)) return dialog.ShowDialog(owner);
+            }, LibraryPaths.TerrainGraphics);
+        }
+        TerrainGraphic CommitGraphicImport(GraphicDefinition asset, Func<TerrainGraphic, GraphicDefinition, DialogResult> decide, string directory)
+        {
+            var duplicate = FindGraphicDuplicate(terrainGraphics, asset);
+            if (duplicate != null)
+            {
+                var decision = decide(duplicate, asset);
+                if (decision == DialogResult.Yes) return duplicate;
+                if (decision != DialogResult.No) return null;
+            }
+            if (terrainGraphics.Count >= 128) throw new InvalidOperationException("Biblioteka mieści najwyżej 128 grafik terenów.");
+            string name = asset.Name;
+            for (int suffix = 2; terrainGraphics.Any(g => PresetCatalog.SameName(g.Name, name)); suffix++) name = asset.Name + " (" + suffix + ")";
+            var item = TerrainGraphicLibrary.Prepare(directory, null, name, asset, terrainGraphics);
             ChangeTerrainGraphic(null, item);
             return item;
         }
+        internal static TerrainGraphic FindGraphicDuplicate(IEnumerable<TerrainGraphic> entries, GraphicDefinition graphic)
+        {
+            return entries.FirstOrDefault(entry => entry.Asset.SourceId == graphic.SourceId &&
+                entry.Asset.Id == graphic.Id && TerrainTextures.Same(entry.Asset, graphic));
+        }
 
-        IconAsset CropTerrainFile(IWin32Window owner)
+        GraphicDefinition CropTerrainFile(IWin32Window owner)
         {
             using (var file = new OpenFileDialog { Filter = "Grafiki (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif", RestoreDirectory = true })
             {
                 if (file.ShowDialog(owner) != DialogResult.OK) return null;
                 string name = Path.GetFileNameWithoutExtension(file.FileName).Trim();
                 if (name.Length == 0) name = "Grafika terenu";
-                using (var bitmap = TerrainTextures.ReadSource(file.FileName))
-                    return ShowTerrainCrop(owner, bitmap, name.Substring(0, Math.Min(200, name.Length)));
+                var source = GraphicSources.Import(file.FileName);
+                var graphic = new GraphicDefinition { Source = source, SourceId = source.Id, Name = name.Substring(0, Math.Min(200, name.Length)) };
+                graphic.Seal();
+                return ShowTerrainCrop(owner, graphic);
             }
         }
 
-        IconAsset ShowTerrainCrop(IWin32Window owner, Bitmap bitmap, string name)
+        GraphicDefinition ShowTerrainCrop(IWin32Window owner, GraphicDefinition graphic)
         {
-            using (var crop = new TerrainCropDialog(bitmap, name, map.Orientation == "FlatTop"))
+            using (var crop = new TerrainCropDialog(graphic))
                 return crop.ShowDialog(owner) == DialogResult.OK ? crop.Result : null;
         }
 
@@ -186,8 +252,7 @@ namespace HexMapEditor
                 dialog.ChooseImage = useCrop =>
                 {
                     if (!useCrop) return CropTerrainFile(dialog);
-                    using (var image = TerrainTextures.Decode(dialog.Asset))
-                        return ShowTerrainCrop(dialog, image, dialog.GraphicName.Length == 0 ? item.Name : dialog.GraphicName);
+                    return ShowTerrainCrop(dialog, dialog.Asset);
                 };
                 if (dialog.ShowDialog(owner) != DialogResult.OK) return item;
                 if (dialog.GraphicName == item.Name && dialog.Asset.Id == item.Asset.Id) return item;
