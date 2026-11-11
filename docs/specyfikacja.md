@@ -565,3 +565,7 @@ Budżety: 64 pełne źródła /64 MiB danych, 256 definicji, 128 aktywnych wpis�
 Minimalne testy mają jawny Case; brak parametru nie uruchamia kampanii. Raport rozdziela metody i zwykły EXE. Bez pełnych testów, DPI i benchmarków. Odłożone: high/low detail, światło, widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi, przebudowa opisów, nagłówek prawego panelu i dalsza diagnoza ikony powłoki. Bez ogólnego edytora obrazów, AI, walki, tras i animacji.
 
 Zasada wydania: funkcje, poprawki i uzgodnione audyty kończą się przed 1.0.0. Sam przyszły numer 1.0.0 oznacza wyłącznie zmianę oznaczeń, bez dodatkowych funkcji lub stylistyki. Nie wykonujemy teraz tego przejścia ani audytu.
+
+### Poprawka 0.5.2 — zapis presetów przy pominiętych wpisach
+
+Inwentaryzacja kolizji plików presetów jest oddzielna od importu. Czytelne ID i nazwa pominiętego wpisu rezerwują tożsamość, lecz jego nieobsługiwane tereny nie blokują utworzenia innego poprawnego presetu. Nie traktujemy pominiętej zawartości jako poprawnie zaimportowanej. Brak możliwej do sprawdzenia tożsamości, kolizja ID/nazwy lub zewnętrzna zmiana nadal odrzuca operację bez połowicznej zmiany projektu/historii/dysku. Kandydat i rzeczywiście nadpisywany plik przechodzą pełną walidację aktualnego formatu. Ta sama reguła dotyczy odtwarzania historii pliku. Bez migracji, kasowania prywatnych danych i zmiany formatów: mapa 8, preset 3, grafika biblioteki 2.

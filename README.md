@@ -1,10 +1,10 @@
-# HexMapEditor 0.5.1
+# HexMapEditor 0.5.2
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.1** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.2** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -120,6 +120,8 @@ Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejn
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 ## Historia zmian
+
+- **0.5.2** — naprawa tworzenia/zapisu presetów blokowanych przez niezwiązany, pominięty wpis biblioteki. Kontrola kolizji rezerwuje jego ID/nazwę bez importowania zawartości; pełna walidacja odczytu i ochrona nadpisania pozostają. Nie trzeba kasować Library. Formaty bez zmian. Celowane próby: tests/Run-Patch052Tests.ps1 -Case regression|lifecycle|safety, wyniki w docs/raport-0.5.2.md.
 
 - **0.5.1** — pełne współdzielone źródła, dwa niedestrukcyjne kadry i względne połączenie, mieszane pule terenu/mgły ze stabilnym losowaniem, wybór duplikatów, pełne kafelki oraz ekranowe tło z efektami. Mapa 8, preset 3, grafika biblioteki 2.
 
