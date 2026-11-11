@@ -113,23 +113,40 @@ namespace HexMapEditor
             var plan = PrepareWrite(preset,directory,overwrite,null);
             LibraryFiles.Transition(plan.Before == null ? null : plan.Before.FilePath, plan.Before == null ? null : plan.Before.DiskBytes,plan.After.FilePath,plan.After.DiskBytes);
         }
+        internal sealed class CatalogIdentity
+        {
+            internal string Id, Name;
+            internal long Order;
+        }
+        // Collision inventory is not an import. Reserve even a skipped file's identity,
+        // without requiring its unrelated terrain payload to use the current format.
+        internal static CatalogIdentity ReadIdentity(string path)
+        {
+            if (new FileInfo(path).Length > TerrainTextures.MaxPresetBytes) throw new InvalidDataException("Nie można sprawdzić tożsamości zbyt dużego pliku presetu: " + path);
+            var raw = MapLogic.Serializer().DeserializeObject(File.ReadAllText(path).TrimStart('\uFEFF')) as Dictionary<string, object>;
+            object id, name;
+            if (raw == null || !raw.TryGetValue("Id", out id) || !(id is string) || String.IsNullOrWhiteSpace((string)id) ||
+                !raw.TryGetValue("Name", out name) || !(name is string) || String.IsNullOrWhiteSpace((string)name))
+                throw new InvalidDataException("Nie można bezpiecznie sprawdzić ID i nazwy pliku presetu. Nie zmieniono danych: " + path);
+            return new CatalogIdentity { Id = (string)id, Name = (string)name, Order = LibrarySequence.Read(raw) };
+        }
         internal static PresetFileChange PrepareWrite(TerrainPreset preset, string directory, bool overwrite, TerrainPreset expected)
         {
             Validate(preset);
             if (preset.Id == DefaultId) throw new InvalidDataException("Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset.");
             Directory.CreateDirectory(directory);
-            var records = new List<KeyValuePair<string, TerrainPreset>>();
+            var records = new List<KeyValuePair<string, CatalogIdentity>>();
             foreach (string file in Directory.GetFiles(directory, "*.json"))
             {
-                // Do not save through an unreadable catalog which may hide a collision.
-                var p = ReadFile(file); records.Add(new KeyValuePair<string, TerrainPreset>(file, p));
+                var identity = ReadIdentity(file); records.Add(new KeyValuePair<string, CatalogIdentity>(file, identity));
             }
             if (SameName(preset.Name, Default().Name) || records.Any(r => r.Value.Id != preset.Id && SameName(r.Value.Name, preset.Name))) throw new InvalidDataException("Nazwa presetu jest już używana. Wybierz inną nazwę; żaden plik nie został nadpisany.");
             var targets = records.Where(r => r.Value.Id == preset.Id).ToArray(); string path;
             if (overwrite) { if (targets.Length != 1) throw new InvalidDataException("Nie można jednoznacznie wskazać zapisanego presetu. Zapisz jako nowy preset."); path = targets[0].Key; }
             else { if (targets.Length != 0) throw new InvalidDataException("Identyfikator presetu jest już zapisany; wymagany jest jawny wybór nadpisania."); path = null; }
-            var before = path == null ? null : targets[0].Value;
-            long order = before == null ? LibrarySequence.Next(records.Select(r => r.Value.LibraryOrder)) : before.LibraryOrder;
+            // A file actually being overwritten still needs complete current validation.
+            var before = path == null ? null : ReadFile(path);
+            long order = before == null ? LibrarySequence.Next(records.Select(r => r.Value.Order)) : before.LibraryOrder;
             var assets = TerrainTextures.Collect(preset.Terrains.SelectMany(t => t.Variants).Select(f => f.Graphic));
             var serialized = MapLogic.Serializer().Serialize(new { PresetFormatVersion = 3, preset.Id, preset.Name, preset.Terrains, TerrainAssets = assets, GraphicSources = GraphicSources.Collect(assets.Select(a => a.Source)), LibraryOrder = order });
             if (Encoding.UTF8.GetByteCount(serialized) > TerrainTextures.MaxPresetBytes) throw new InvalidDataException("Preset przekracza limit zapisu/odczytu 112 MiB.");

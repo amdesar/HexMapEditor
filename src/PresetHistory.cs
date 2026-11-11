@@ -18,7 +18,7 @@ namespace HexMapEditor
             foreach (string path in Directory.GetFiles(directory,"*.json"))
             {
                 if (String.Equals(path,source,StringComparison.OrdinalIgnoreCase)) continue;
-                var other = PresetCatalog.ReadFile(path);
+                var other = PresetCatalog.ReadIdentity(path);
                 if ((from != null && other.Id == from.Id) || (to != null && (other.Id == to.Id || PresetCatalog.SameName(other.Name,to.Name)))) throw new IOException("Konflikt ID lub nazwy presetu w bibliotece. Nie zmieniono plików ani historii.\n"+path);
             }
             LibraryFiles.Transition(source,from == null ? null : from.DiskBytes,target,to == null ? null : to.DiskBytes);
