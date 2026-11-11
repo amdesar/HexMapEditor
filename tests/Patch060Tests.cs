@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -143,6 +143,21 @@ namespace HexMapEditor.Tests
             }
             Console.WriteLine("gestures PASS: light movement one Undo/Redo, preserved darkness, visited appearance RNG, fog protection, masked group, ink bounds/history, pointer idle, limits.");
         }
+        static void InkPreview(string root)
+        {
+            using(var w=new MainWindow())
+            {
+                Start(w);Set(w,"currentTool",EditorTool.Stylus);Set(w,"inkWidth",20f);Set(w,"scale",2f);
+                string before=Json(Model(w));int history=UndoCount(w);
+                Call(w,"CanvasMouseMove",null,new MouseEventArgs(MouseButtons.None,0,100,100,0));
+                Check((Point?)Get(w,"inkCursor")==new Point(100,100),"Stylus hover position missing");
+                using(var image=new Bitmap(240,240))using(var g=Graphics.FromImage(image))
+                {Call(w,"DrawInk",g);Check(image.GetPixel(120,100).A>0&&image.GetPixel(100,100).A==0,"World thickness preview radius / center");}
+                Check(before==Json(Model(w))&&history==UndoCount(w),"Hover edited model/history");
+                Set(w,"hideInk",true);using(var image=new Bitmap(240,240))using(var g=Graphics.FromImage(image)){Call(w,"DrawInk",g);Check(image.GetPixel(120,100).A==0,"Hidden ink preview still drawn");}
+            }
+            Console.WriteLine("ink-preview PASS: hover, world thickness scaled to screen, no data/history, hidden layer.");
+        }
         static void Fixture(string root)
         {
             using(var w=new MainWindow())
@@ -154,7 +169,7 @@ namespace HexMapEditor.Tests
         }
         [STAThread] static int Main(string[] args)
         {
-            try{if(args.Length!=1||!new[]{"acceptance","ink","pointer","darkness","visibility","gestures","fixture"}.Contains(args[0]))throw new ArgumentException("Wymagany pojedynczy Case: acceptance|ink|pointer|darkness|visibility|gestures|fixture");Application.EnableVisualStyles();string root=AppDomain.CurrentDomain.BaseDirectory;switch(args[0]){case "acceptance":Acceptance(root);break;case "ink":Ink(root);break;case "pointer":Pointer(root);break;case "darkness":Darkness(root);break;case "visibility":Visibility(root);break;case "gestures":Gestures(root);break;case "fixture":Fixture(root);break;}return 0;}
+            try{if(args.Length!=1||!new[]{"acceptance","ink","pointer","darkness","visibility","gestures","ink-preview","fixture"}.Contains(args[0]))throw new ArgumentException("Wymagany pojedynczy Case: acceptance|ink|pointer|darkness|visibility|gestures|ink-preview|fixture");Application.EnableVisualStyles();string root=AppDomain.CurrentDomain.BaseDirectory;switch(args[0]){case "acceptance":Acceptance(root);break;case "ink":Ink(root);break;case "pointer":Pointer(root);break;case "darkness":Darkness(root);break;case "visibility":Visibility(root);break;case "gestures":Gestures(root);break;case "ink-preview":InkPreview(root);break;case "fixture":Fixture(root);break;}return 0;}
             catch(Exception ex){Console.Error.WriteLine(ex);return 1;}
         }
     }

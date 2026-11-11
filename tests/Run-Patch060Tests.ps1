@@ -1,6 +1,6 @@
-param([string]$Case)
+﻿param([string]$Case)
 $ErrorActionPreference='Stop'
-if($Case -notin @('acceptance','ink','pointer','darkness','visibility','gestures','fixture')) {throw 'Wymagany pojedynczy Case: acceptance|ink|pointer|darkness|visibility|gestures|fixture. Nie uruchomiono testów.'}
+if($Case -notin @('acceptance','ink','pointer','darkness','visibility','gestures','ink-preview','fixture')) {throw 'Wymagany pojedynczy Case: acceptance|ink|pointer|darkness|visibility|gestures|ink-preview|fixture. Nie uruchomiono testów.'}
 $run=Join-Path $PSScriptRoot ('_work/patch-060-'+$Case+'-'+[Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($run)|Out-Null
 $exe=Join-Path $run 'Patch060Tests.exe'

@@ -90,7 +90,13 @@ namespace HexMapEditor
             foreach(var s in map.Ink.Where(s=>clip.IntersectsWith(InkGeometry.Bounds(s))))using(var pen=new Pen(ColorTranslator.FromHtml(s.Color),s.Width){StartCap=LineCap.Round,EndCap=LineCap.Round,LineJoin=LineJoin.Round})
             {if(s.Points.Count==1){var p=s.Points[0];using(var b=new SolidBrush(pen.Color))graphics.FillEllipse(b,p.X-s.Width/2,p.Y-s.Width/2,s.Width,s.Width);}else graphics.DrawLines(pen,s.Points.Select(p=>p.Point).ToArray());}
             graphics.Restore(state);
-            if(currentTool==EditorTool.Eraser&&inkCursor.HasValue){float r=eraserSize*scale/2;using(var pen=new Pen(Color.White,1.5f)){pen.DashStyle=DashStyle.Dash;graphics.DrawEllipse(pen,inkCursor.Value.X-r,inkCursor.Value.Y-r,2*r,2*r);}}
+            if((currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus)&&inkCursor.HasValue&&!pointerActive)
+            {
+                float r=(currentTool==EditorTool.Eraser?eraserSize:inkWidth)*scale/2;
+                var p=inkCursor.Value;
+                using(var edge=new Pen(Color.Black,3))graphics.DrawEllipse(edge,p.X-r,p.Y-r,2*r,2*r);
+                using(var pen=new Pen(Color.White,1.3f)){if(currentTool==EditorTool.Eraser)pen.DashStyle=DashStyle.Dash;graphics.DrawEllipse(pen,p.X-r,p.Y-r,2*r,2*r);}
+            }
             if(pointerTrail.Count==0&&!pointerActive)return;
             var color=ColorTranslator.FromHtml(pointerColor);
             for(int i=1;i<pointerTrail.Count;i++){int alpha=(int)(220*Math.Max(0,1-(PointerTime-pointerTrail[i].Time)/1000.0));using(var pen=new Pen(Color.FromArgb(alpha,color),4))graphics.DrawLine(pen,pointerTrail[i-1].Point,pointerTrail[i].Point);}

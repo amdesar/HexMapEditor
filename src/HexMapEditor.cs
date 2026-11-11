@@ -736,7 +736,7 @@ namespace HexMapEditor
             if (modalDepth > 0 || rightResizing) return;
             int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
             if (previewCell != hit) { previewCell = hit; canvas.Invalidate(); }
-            if(currentTool==EditorTool.Eraser){inkCursor=e.Location;canvas.Invalidate();}
+            if(currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus){inkCursor=e.Location;canvas.Invalidate();}
             if (e.Button == MouseButtons.None) { waitingForMouseRelease = false; if (gestureButton != MouseButtons.None) EndCanvasGesture(true); return; }
             // A pressed button alone is not an editing gesture: its Down must belong to this canvas.
             if (waitingForMouseRelease || gestureButton == MouseButtons.None || (e.Button & gestureButton) == MouseButtons.None) return;
