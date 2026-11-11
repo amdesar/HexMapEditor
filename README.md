@@ -1,10 +1,10 @@
-# HexMapEditor 0.5.3
+# HexMapEditor 0.5.4
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.3** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.4** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -26,11 +26,17 @@ Menu **Widok** na górnym pasku przełącza kolejno Tło, Tereny, Ikony, Obiekty
 
 ## Pule wyglądu, źródła i kadrowanie
 
-W edycji własnego terenu kliknij kafelek wariantu albo plus. Pula ma 1–32 kolory, grafiki lub ich mieszankę. Prawy klik usuwa wariant, poza ostatnim. Ołówek Domyślnego nadal wyjaśnia ochronę wzorca. Zmiany puli dotyczą przyszłego malowania; „Zastosuj do bieżącej mapy” świadomie aktualizuje pola edytowanej wersji. Domyślnie zaznaczone „Zachowaj rozmieszczenie wariantów” przypisuje zmiany po stabilnych ID, również po zmianie typu lub kolejności. Dodany wariant nie zajmuje starych pól; usunięty zachowuje na nich historyczną migawkę i zasoby. Wyłączenie zachowania układu pozwala jawnie przelosować pasujące pola; Redo odtwarza wynik.
+Nowa mapa i rozszerzane brzegi mają stan **Niepomalowany**, niezależny od neutralnego terenu presetu, choć oba mogą wyglądać identycznie. Aktualizacja neutralnego zmienia tylko faktycznie pomalowane nim pola. Wiadro rozróżnia te regiony. Odczyt nie zgaduje po kolorze, które dawne pola były puste; ich zapisane ID pozostają.
+
+W edycji własnego terenu kliknij kwadratowy kafelek wariantu albo taki sam plus. Pula ma 1–32 kolory, grafiki lub ich mieszankę. Widoczny czerwony × usuwa pozycję bez pytania, poza ostatnią; prawy klik korzysta z tej samej operacji. Lokalne przyciski Cofnij/Ponów oraz Ctrl+Z, Ctrl+Y i Ctrl+Shift+Z obejmują 100 roboczych operacji tego edytora, także kadrowanie i usunięte ID. Pole nazwy zachowuje tekstowe Undo, a aktywny dialog potomny własne skróty. Ta historia nie cofa plików biblioteki. Zatwierdzenie przekazuje jedną zmianę dokumentu; Anuluj odrzuca pulę, ponowne otwarcie ma pustą historię. Ołówek Domyślnego nadal wyjaśnia ochronę wzorca.
+
+Zmiany puli dotyczą przyszłego malowania; „Zastosuj do bieżącej mapy” świadomie aktualizuje pola edytowanej wersji. Domyślnie zaznaczone „Zachowaj rozmieszczenie wariantów” przypisuje zmiany po stabilnych ID, również po zmianie typu lub kolejności. Dodany wariant nie zajmuje starych pól; usunięty zachowuje na nich historyczną migawkę i zasoby. Wyłączenie zachowania układu pozwala jawnie przelosować pasujące pola; Redo odtwarza wynik.
 
 Pędzel i Wiadro niezależnie losują pozycję z równym prawdopodobieństwem dla każdego malowanego heksa. Powtórzone identyczne grafiki pozostają osobnymi losami z własnymi ID. Wynik zostaje w heksie; odrysowanie i Redo nie losują go ponownie, a ponowna wizyta w jednym geście nie zmienia wyboru. Region Wiadra wymaga tego samego TerrainId i zastosowanej wersji VariantId. Losowane wyglądy jednej wersji nie rozbijają regionu, ale nowsza wersja może tworzyć przegrodę. Wiadro mgły dodatkowo respektuje początkowy Fog. Sama nazwa i kolejność puli nie tworzą nowej wersji powierzchni; zmiana jej zawartości tak.
 
-Import zachowuje pełne, oryginalne bajty nieruchomego PNG/JPEG/BMP/GIF do 32 MiB i 4096 × 4096. Dwa podglądy Pointy Top / Flat Top mają osobny środek, skalę i obrót. Przeciągaj obraz, używaj kółka i suwaka 0–360°. Połącz kadry zachowuje dotychczasowe różnice: ruch daje wspólną deltę znormalizowaną względem źródła, zoom wspólny współczynnik, obrót wspólną deltę. Pokrycie po obrocie ogranicza odsunięcie/oddalenie. Ponowne połączenie niczego nie wyrównuje. „Kadruj…” przy wariancie otwiera pełne źródło osadzone także w przeniesionej mapie, bez biblioteki. Podgląd korzysta z bufora do 1024 px; źródło i wynik zapisu zachowują pełne dane. Anulowanie nie zmienia wariantu.
+Import zachowuje pełne, oryginalne bajty nieruchomego PNG/JPEG/BMP/GIF do 32 MiB i 4096 × 4096. Jeden większy podgląd przełączasz między Pointy Top i Flat Top; startuje w orientacji mapy, której ten przełącznik nie zmienia. Przeciągaj obraz, używaj kółka i suwaka 0–360°/resetu. W nowym imporcie zmiany aktualizują oba zestawy parametrów do pierwszego przełączenia orientacji. To przełączenie rozłącza je bez resetu; później pozostają niezależne. Ponowna edycja zapisanej grafiki jest niezależna od początku, także przy dawnym Linked. Nie ma ponownego łączenia ani automatycznego obrotu. „Kadruj…” otwiera pełne osadzone źródło i obie transformacje. Renderuje się wyłącznie wybrany podgląd z bufora do 1024 px; źródło i wynik zapisu zachowują pełne dane. Anulowanie nie zmienia wariantu, a OK bez zmiany parametrów nie tworzy kroku.
+
+Przycisk terenu pokazuje stabilną mozaikę dwóch rzędów regularnych miniheksów, do 12 różnych reprezentantów puli. Małe pule pokazują każdą pozycję; większe stabilny podzbiór. Nazwa, hover, zaznaczenie i repaint nie losują układu ani nie zużywają generatora malowania. Orientacja wybiera właściwy kadr. Tooltip podaje pełną liczbę wariantów.
 
 Biblioteka: `Library/Terrains/Graphics/terrain-Nazwa.json` zawiera logiczne ID, nazwę, kolejność i oba kadry; `Sources/source-SHA256.json` współdzieli pełne źródło. Mapa i preset zawierają własne deduplikowane tabele potrzebnych źródeł/definicji, także dla palet projektu. Cache nie jest zapisywany. Edycja biblioteki nie zmienia historycznie namalowanego wariantu. SHA-256 wskazuje kandydatów, potem sprawdzane są bajty i parametry. Identyczna pozycja daje wybór Użyj istniejącej / Importuj jako nową / Anuluj. Nowa pozycja ma niezależne ID, współdzieląc źródło. Zatwierdzony import pozostaje operacją biblioteczną nawet po późniejszym anulowaniu terenu.
 
@@ -40,9 +46,11 @@ Picker terenu, stanu i ramki pozostaje wspólnym HSV/HEX: `#RRGGBB`, sześć cyf
 
 ## Wygląd mgły i statyczne tło
 
-Prawy klik narzędzia mgły → **Wygląd mgły…** otwiera ten sam edytor puli. Domyślnie jest dotychczasowa szarość. Nałożenie wybiera i zapamiętuje wariant; pod grafiką zawsze jest nieprzezroczysta baza. Domyślnie wyłączone „Zastosuj wygląd do obecnie zasłoniętych heksów” zmienia wyłącznie istniejący wygląd w jednym Undo. Zależna opcja zachowania rozmieszczenia działa po ID jak dla terenu, a usunięta pozycja pozostawia stare migawki. Aktywni odkrywcy nadal chronią swój zasięg.
+Prawy klik narzędzia mgły → **Wygląd mgły…** otwiera ten sam edytor puli i lokalną historię. Domyślnie jest dotychczasowa szarość. Nałożenie wybiera i zapamiętuje wariant. Grafika zachowuje alpha **bez nieprzezroczystej bazy**: warstwy pod nią mogą prześwitywać. Pole nadal ma logiczny Fog, więc alpha nie ujawnia danych w szczegółach/listach ani nie zmienia hit-testu i reguł odkrywania. Nie analizujemy pikseli do maskowania. Domyślnie wyłączone „Zastosuj wygląd do obecnie zasłoniętych heksów” zmienia wyłącznie istniejący wygląd w jednym Undo. Zależna opcja zachowania rozmieszczenia działa po ID jak dla terenu, a usunięta pozycja pozostawia stare migawki. Aktywni odkrywcy nadal chronią swój zasięg.
 
 **Tło** obok Biblioteki: import/zmiana, prostokątne przycięcie myszą (narożniki, środki czterech krawędzi albo nowy prostokąt), krycie 0–100%, nasycenie 0–200% z resetem 100% i rozmycie 0–24 px. „Podgląd na płótnie” zachowuje proporcje aktualnego obszaru mapy i tę samą logikę cover/centrowania. Zachowujemy pełne źródło i parametry. Tło proporcjonalnie wypełnia płótno, niezależnie od kamery; pan i zoom mapy go nie ruszają. Dopasowania je pomijają. Efekty są buforowane do rozmiaru płótna (największy wymiar bufora do 2048). Zatwierdzenie/usunięcie ma jedno Undo; Anuluj nie zmienia mapy. Widok → Tło jest wyłącznie flagą widoku. Nie ma osobnej biblioteki teł.
+
+Obie zewnętrzne powierzchnie edytora tła mają równe wymiary. W czasie gestu suwaka stosowany jest lżejszy podgląd najnowszej wartości, po puszczeniu dokładny renderer podglądu; wynik dokumentu nie jest pomniejszanym obrazem podglądu.
 
 ## Narzędzia, kamera i materiał
 
@@ -120,6 +128,8 @@ Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejn
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 ## Historia zmian
+
+- **0.5.4** — niepomalowane pola niezależne od neutralnego presetu; kwadraty/× i lokalne Undo/Redo100 wariantów; deterministyczna mozaika; jeden przełączany podgląd kadru, jednorazowa inicjalizacja nowego importu; symetryczne tło i lżejsze nasycenie; alpha grafiki mgły oddzielona od logicznego Fog. Odchudzono wyłącznie odtwarzalne artefakty _work, zachowując testy i logi. Formaty i limity bez zmian. Celowane scenariusze: `tests/Run-Patch054Tests.ps1 -Case empty` (albo editor, crop, presentation, background-perf). Raport: `docs/raport-0.5.4.md`.
 
 - **0.5.3** — regiony historycznych wersji terenów, zachowanie rozmieszczenia wariantów terenu/mgły, lżejsze podglądy i walidacja współdzielonych źródeł, osłona wejścia po dialogu, kontrastowe nazwy bez podkładu, uchwyty/proporcje/efekty tła. Źródło do 32 MiB; spójne budżety dokumentu/biblioteki. Formaty bez zmian. Celowane próby: `tests/Run-Patch053Tests.ps1 -Case boundaries|updates|local|safety|perf|regions` (jeden Case na wywołanie). Wyniki i ograniczenia w `docs/raport-0.5.3.md`; bez pełnej kampanii.
 

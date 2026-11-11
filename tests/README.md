@@ -2,6 +2,18 @@
 
 Źródła i skrypty pozostają w Git. Każdy przebieg tworzy własne EXE/dane tylko w `tests/_work/<rodzaj>-<GUID>/`. Logi są ignorowane; procesy należy zakończyć przed usunięciem katalogów. Nie używamy użytkowego Library, głównego bin ani globalnego TEMP/TMP.
 
+## 0.5.4 — selektywne próby i artefakty
+
+`Run-Patch054Tests.ps1 -Case empty|editor|crop|presentation|background-perf` wymaga jednego Case. Nie uruchamia całego zestawu bez parametru. Samodzielnie buduje testowy EXE i tworzy własne PNG/mapy/presety w świeżym patch-054-Case-GUID; żaden dawny katalog _work nie jest wymaganym fixture. `presentation` tworzy Fixture054.hexmap i Stripes.png do krótkiej próby zwykłego EXE. Oba można odtworzyć tym przypadkiem, nie trzeba projektować danych od nowa.
+
+- empty: odrębne ID pustych pól i neutralnego, apply/wiadro/resize/Undo/Redo/round-trip;
+- editor: kwadraty/×/plus, stabilne ID/źródła/kadry w lokalnej historii100 i jedna zmiana główna;
+- crop: jeden renderer, inicjalizacja nowego importu do pierwszego przełączenia, niezależny re-edit mimo Linked, no-op OK i obie transformacje w zapisie;
+- presentation: mozaika bez Random mapy, symetria/proporcje i dokładne końcowe nasycenie, render alpha kontra maskowanie logicznego Fog;
+- background-perf: krótki pomiar20 aktualizacji nasycenia w jednej sesji suwaka, bez benchmarku wszystkich filtrów.
+
+W sprzątaniu 0.5.4 zachowano wszystkie śledzone źródła, runnery (w tym Run-AllTests), tę dokumentację i małe logi. Usunięto tylko zidentyfikowane odtwarzalne wyniki zakończonych prób; niejednoznaczne backupy i starsze ręczne materiały pozostawiono. Manifest jest ignorowany w _work/cleanup-054-*. Nie uruchamiać pełnej kampanii dla odbudowania usuniętych plików. Świadome nowe zachowanie zastępuje dawną asercję nieprzezroczystej **grafiki** mgły w Patch051Tests; kolorowa mgła nadal jest nieprzezroczysta. Wykonano tylko jego bezpośrednio zmieniony Case fog. Historyczne testy dwóch kontrolek kadru/trybu ponownego łączenia (np. 051 crop, 053 local) opisują dawny UI, nie wymagają pozostawienia niewidocznego drugiego renderera ani dawnej semantyki. Nie deklarujemy ich ponownego wykonania lub zgodności bez osobnego dostosowania.
+
 ## 0.4.0 — nowe, selektywne scenariusze
 
 Run-Object040Tests.ps1 wymaga jednego Case, bez automatycznego uruchamiania wszystkich. Własne kompilacje/mapy/grafiki/logi tylko tests/_work/object-040-GUID; po zakończeniu pozostaje results.log.
