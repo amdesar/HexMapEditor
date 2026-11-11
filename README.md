@@ -1,10 +1,10 @@
-# HexMapEditor 0.5.2
+# HexMapEditor 0.5.3
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.2** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.3** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -22,27 +22,27 @@ Okno odczytuje ICO z katalogu programu. Przy braku lub błędzie odczytu używa 
 
 ## Widok warstw
 
-Menu **Widok** na górnym pasku przełącza Tereny, Ikony, Obiekty, Mgłę i Tło. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
+Menu **Widok** na górnym pasku przełącza kolejno Tło, Tereny, Ikony, Obiekty i Mgłę. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
 
 ## Pule wyglądu, źródła i kadrowanie
 
-W edycji własnego terenu kliknij kafelek wariantu albo plus. Pula ma 1–32 kolory, grafiki lub ich mieszankę. Prawy klik usuwa wariant, poza ostatnim. Ołówek Domyślnego nadal wyjaśnia ochronę wzorca. Zmiany puli dotyczą przyszłego malowania; „Zastosuj do bieżącej mapy” świadomie aktualizuje właściwy wariant terenu.
+W edycji własnego terenu kliknij kafelek wariantu albo plus. Pula ma 1–32 kolory, grafiki lub ich mieszankę. Prawy klik usuwa wariant, poza ostatnim. Ołówek Domyślnego nadal wyjaśnia ochronę wzorca. Zmiany puli dotyczą przyszłego malowania; „Zastosuj do bieżącej mapy” świadomie aktualizuje pola edytowanej wersji. Domyślnie zaznaczone „Zachowaj rozmieszczenie wariantów” przypisuje zmiany po stabilnych ID, również po zmianie typu lub kolejności. Dodany wariant nie zajmuje starych pól; usunięty zachowuje na nich historyczną migawkę i zasoby. Wyłączenie zachowania układu pozwala jawnie przelosować pasujące pola; Redo odtwarza wynik.
 
-Pędzel i Wiadro niezależnie losują pozycję z równym prawdopodobieństwem dla każdego malowanego heksa. Powtórzenia są dozwolone. Wynik zostaje w heksie; odrysowanie i Redo nie losują go ponownie, a ponowna wizyta w jednym geście nie zmienia wyboru. Warianty wyglądu nie dzielą regionu jednego TerrainId. Wiadro mgły używa TerrainId i początkowego Fog, a nie widocznego koloru/obrazu.
+Pędzel i Wiadro niezależnie losują pozycję z równym prawdopodobieństwem dla każdego malowanego heksa. Powtórzone identyczne grafiki pozostają osobnymi losami z własnymi ID. Wynik zostaje w heksie; odrysowanie i Redo nie losują go ponownie, a ponowna wizyta w jednym geście nie zmienia wyboru. Region Wiadra wymaga tego samego TerrainId i zastosowanej wersji VariantId. Losowane wyglądy jednej wersji nie rozbijają regionu, ale nowsza wersja może tworzyć przegrodę. Wiadro mgły dodatkowo respektuje początkowy Fog. Sama nazwa i kolejność puli nie tworzą nowej wersji powierzchni; zmiana jej zawartości tak.
 
-Import zachowuje pełne, oryginalne bajty nieruchomego PNG/JPEG/BMP/GIF do 16 MiB i 4096 × 4096. Dwa podglądy Pointy Top / Flat Top mają osobny środek, skalę i obrót. Przeciągaj obraz, używaj kółka i suwaka 0–360°. Połącz kadry zachowuje dotychczasowe różnice: ruch daje wspólną deltę znormalizowaną względem źródła, zoom wspólny współczynnik, obrót wspólną deltę. Pokrycie po obrocie ogranicza odsunięcie/oddalenie. Ponowne połączenie niczego nie wyrównuje. „Kadruj…” przy wariancie otwiera pełne źródło osadzone także w przeniesionej mapie, bez biblioteki. Anulowanie nie zmienia wariantu.
+Import zachowuje pełne, oryginalne bajty nieruchomego PNG/JPEG/BMP/GIF do 32 MiB i 4096 × 4096. Dwa podglądy Pointy Top / Flat Top mają osobny środek, skalę i obrót. Przeciągaj obraz, używaj kółka i suwaka 0–360°. Połącz kadry zachowuje dotychczasowe różnice: ruch daje wspólną deltę znormalizowaną względem źródła, zoom wspólny współczynnik, obrót wspólną deltę. Pokrycie po obrocie ogranicza odsunięcie/oddalenie. Ponowne połączenie niczego nie wyrównuje. „Kadruj…” przy wariancie otwiera pełne źródło osadzone także w przeniesionej mapie, bez biblioteki. Podgląd korzysta z bufora do 1024 px; źródło i wynik zapisu zachowują pełne dane. Anulowanie nie zmienia wariantu.
 
 Biblioteka: `Library/Terrains/Graphics/terrain-Nazwa.json` zawiera logiczne ID, nazwę, kolejność i oba kadry; `Sources/source-SHA256.json` współdzieli pełne źródło. Mapa i preset zawierają własne deduplikowane tabele potrzebnych źródeł/definicji, także dla palet projektu. Cache nie jest zapisywany. Edycja biblioteki nie zmienia historycznie namalowanego wariantu. SHA-256 wskazuje kandydatów, potem sprawdzane są bajty i parametry. Identyczna pozycja daje wybór Użyj istniejącej / Importuj jako nową / Anuluj. Nowa pozycja ma niezależne ID, współdzieląc źródło. Zatwierdzony import pozostaje operacją biblioteczną nawet po późniejszym anulowaniu terenu.
 
-Limity nowych źródeł: 64 obrazy i 64 MiB bajtów łącznie na dokument/preset lub magazyn biblioteki; do 256 definicji kadru, 128 aktywnych wpisów biblioteki. Magazyn Sources zachowuje niezmienne źródła również po Undo/usunięciu pozycji; nie czyścimy danych automatycznie. Po osiągnięciu limitu nowy import daje błąd. Mapa do 128 MiB, preset do 112 MiB. Wyniki kadrów to odbudowywalne 256 × 256; cache LRU do 256 kafelków (64 MiB), osobno dla obu orientacji. Grafiki nie są dekodowane dla każdego heksa w każdej klatce.
+Limity źródeł: 64 obrazy i 96 MiB bajtów łącznie na dokument/preset, 64 obrazy i 192 MiB na magazyn biblioteki (także nieaktywne); do 256 definicji kadru, 128 aktywnych wpisów biblioteki. Katalog biblioteki zwalnia pełne bajty po walidacji; wybór przypina niezależne dane do dokumentu. Magazyn Sources zachowuje niezmienne źródła również po Undo/usunięciu pozycji; nie czyścimy danych automatycznie. Po osiągnięciu limitu nowy import daje błąd. Mapa do 256 MiB, preset do 160 MiB, z zapasem na Base64 i metadane. Wyniki kadrów to odbudowywalne 256 × 256; cache LRU do 256 kafelków (64 MiB) łącznie dla kluczy obu orientacji. Limity bajtów źródła dotyczą plików skompresowanych, nie pamięci bitmap: obraz 4096² RGBA to około 64 MiB. Grafiki nie są dekodowane dla każdego heksa w każdej klatce. Pełna tabela limitów i wyniki prób: `docs/raport-0.5.3.md`.
 
 Picker terenu, stanu i ramki pozostaje wspólnym HSV/HEX: `#RRGGBB`, sześć cyfr, stare/nowe, Zatwierdź/Anuluj.
 
 ## Wygląd mgły i statyczne tło
 
-Prawy klik narzędzia mgły → **Wygląd mgły…** otwiera ten sam edytor puli. Domyślnie jest dotychczasowa szarość. Nałożenie wybiera i zapamiętuje wariant; pod grafiką zawsze jest nieprzezroczysta baza. Domyślnie wyłączone „Zastosuj wygląd do obecnie zasłoniętych heksów” zmienia wyłącznie istniejący wygląd w jednym Undo. Aktywni odkrywcy nadal chronią swój zasięg.
+Prawy klik narzędzia mgły → **Wygląd mgły…** otwiera ten sam edytor puli. Domyślnie jest dotychczasowa szarość. Nałożenie wybiera i zapamiętuje wariant; pod grafiką zawsze jest nieprzezroczysta baza. Domyślnie wyłączone „Zastosuj wygląd do obecnie zasłoniętych heksów” zmienia wyłącznie istniejący wygląd w jednym Undo. Zależna opcja zachowania rozmieszczenia działa po ID jak dla terenu, a usunięta pozycja pozostawia stare migawki. Aktywni odkrywcy nadal chronią swój zasięg.
 
-**Tło** obok Biblioteki: import/zmiana, prostokątne przycięcie myszą (narożniki albo nowy prostokąt), krycie 0–100%, nasycenie 0–200% i rozmycie 0–24 px. Zachowujemy pełne źródło i parametry. Tło proporcjonalnie wypełnia płótno, niezależnie od kamery; pan i zoom mapy go nie ruszają. Dopasowania je pomijają. Efekty są buforowane do rozmiaru płótna (największy wymiar bufora do 2048). Zatwierdzenie/usunięcie ma jedno Undo; Anuluj nie zmienia mapy. Widok → Tło jest wyłącznie flagą widoku. Nie ma osobnej biblioteki teł.
+**Tło** obok Biblioteki: import/zmiana, prostokątne przycięcie myszą (narożniki, środki czterech krawędzi albo nowy prostokąt), krycie 0–100%, nasycenie 0–200% z resetem 100% i rozmycie 0–24 px. „Podgląd na płótnie” zachowuje proporcje aktualnego obszaru mapy i tę samą logikę cover/centrowania. Zachowujemy pełne źródło i parametry. Tło proporcjonalnie wypełnia płótno, niezależnie od kamery; pan i zoom mapy go nie ruszają. Dopasowania je pomijają. Efekty są buforowane do rozmiaru płótna (największy wymiar bufora do 2048). Zatwierdzenie/usunięcie ma jedno Undo; Anuluj nie zmienia mapy. Widok → Tło jest wyłącznie flagą widoku. Nie ma osobnej biblioteki teł.
 
 ## Narzędzia, kamera i materiał
 
@@ -120,6 +120,8 @@ Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejn
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 ## Historia zmian
+
+- **0.5.3** — regiony historycznych wersji terenów, zachowanie rozmieszczenia wariantów terenu/mgły, lżejsze podglądy i walidacja współdzielonych źródeł, osłona wejścia po dialogu, kontrastowe nazwy bez podkładu, uchwyty/proporcje/efekty tła. Źródło do 32 MiB; spójne budżety dokumentu/biblioteki. Formaty bez zmian. Celowane próby: `tests/Run-Patch053Tests.ps1 -Case boundaries|updates|local|safety|perf|regions` (jeden Case na wywołanie). Wyniki i ograniczenia w `docs/raport-0.5.3.md`; bez pełnej kampanii.
 
 - **0.5.2** — naprawa tworzenia/zapisu presetów blokowanych przez niezwiązany, pominięty wpis biblioteki. Kontrola kolizji rezerwuje jego ID/nazwę bez importowania zawartości; pełna walidacja odczytu i ochrona nadpisania pozostają. Nie trzeba kasować Library. Formaty bez zmian. Celowane próby: tests/Run-Patch052Tests.ps1 -Case regression|lifecycle|safety, wyniki w docs/raport-0.5.2.md.
 
