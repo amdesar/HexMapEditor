@@ -53,7 +53,7 @@ namespace HexMapEditor
         public string IconEntryId { get; set; }
         public string IconName { get; set; }
         public bool Fog { get; set; }
-        public CellData() { Id = Guid.NewGuid().ToString("N"); TerrainId = PresetCatalog.NeutralId; VariantId = PresetCatalog.NeutralVariant; TerrainRevision = 1; Terrain = "Teren neutralny"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; FillVariantId = "default-neutral-fill"; FogFill = FillRules.FogDefault(); }
+        public CellData() { Id = Guid.NewGuid().ToString("N"); TerrainId = UnpaintedTerrain.Id; VariantId = UnpaintedTerrain.Version; TerrainRevision = 1; Terrain = "Niepomalowany"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; FillVariantId = UnpaintedTerrain.Fill; FogFill = FillRules.FogDefault(); }
     }
 
     public sealed class MapData
@@ -167,7 +167,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.5.3";
+        const string AppVersion = "0.5.4";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -479,6 +479,7 @@ namespace HexMapEditor
                 if (c == null || String.IsNullOrWhiteSpace(c.Id) || !ids.Add(c.Id) || String.IsNullOrWhiteSpace(c.Terrain) || !MapLogic.ValidColor(c.Color) || String.IsNullOrWhiteSpace(c.TerrainId) || String.IsNullOrWhiteSpace(c.VariantId) || c.TerrainRevision < 1) throw new InvalidDataException("Nieprawidłowe dane heksu lub terenu.");
                 c.Texture = TerrainTextures.Resolve(textures, c.TextureId);
                 if (String.IsNullOrWhiteSpace(c.FillVariantId)) throw new InvalidDataException("Brak utrwalonego wariantu wyglądu.");
+                if ((c.TerrainId == UnpaintedTerrain.Id || c.VariantId == UnpaintedTerrain.Version) && !MapLogic.IsUnpainted(c)) throw new InvalidDataException("Sprzeczny stan niepomalowanego pola.");
                 FillRules.Attach(new[] { c.FogFill }, textures); FillRules.Validate(c.FogFill);
                 CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color, c.TextureId);
                 if (c.IconId != null && !iconIds.Contains(c.IconId)) throw new InvalidDataException("Brak osadzonego zasobu ikony.");
@@ -603,17 +604,11 @@ namespace HexMapEditor
                 using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
                 {
                     e.Graphics.FillPath(brush, path);
-                    if (!hideTerrain && (!map.Cells[i].Fog || previewWithoutFog) && map.Cells[i].Texture != null)
+                    if (!hideTerrain && map.Cells[i].Texture != null)
                         DrawTerrainTexture(e.Graphics, path, c, BaseRadius * scale, map.Cells[i].Texture);
-                    if (!map.Cells[i].Fog || previewWithoutFog) { if (!hideIcons) DrawCellIcon(e.Graphics, map.Cells[i], c); if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle); }
-                    // Fog is the final content layer, below only the working grid.
-                    if (map.Cells[i].Fog && !previewWithoutFog)
-                    {
-                        var fill = map.Cells[i].FogFill;
-                        using (var fog = new SolidBrush(ColorTranslator.FromHtml(fill.Color))) e.Graphics.FillPath(fog, path);
-                        if (fill.Graphic != null) DrawTerrainTexture(e.Graphics, path, c, BaseRadius * scale, fill.Graphic);
-                    }
-                    e.Graphics.DrawPath(pen, path);
+                    if (!hideIcons) DrawCellIcon(e.Graphics, map.Cells[i], c);
+                    if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle);
+                    if (!map.Cells[i].Fog || previewWithoutFog) e.Graphics.DrawPath(pen, path);
                 }
             }
             if (map.LabelMode == "Axes" && map.Columns * map.Rows <= 1400)
@@ -627,8 +622,27 @@ namespace HexMapEditor
                     for (int r = 0; r < map.Rows; r++) { var p = ScreenCenter(0, r); e.Graphics.DrawString((r + 1).ToString(), f, b, labelsLeft, p.Y - 8); }
                 }
             }
-            DrawBrushPreview(e.Graphics);
             if (!hideObjects) DrawObjects(e.Graphics);
+            DrawFog(e.Graphics, e.ClipRectangle);
+            DrawBrushPreview(e.Graphics);
+        }
+
+        void DrawFog(Graphics graphics, Rectangle clip)
+        {
+            if (previewWithoutFog) return;
+            for (int i = 0; i < map.Cells.Count; i++)
+            {
+                if (!map.Cells[i].Fog) continue;
+                var center = ScreenCenter(i % map.Columns, i / map.Columns); float radius = BaseRadius * scale;
+                if (!clip.IntersectsWith(Rectangle.Ceiling(new RectangleF(center.X-radius-3,center.Y-radius-3,2*radius+6,2*radius+6)))) continue;
+                using (var path = HexPath(center, radius))
+                {
+                    var fill = map.Cells[i].FogFill;
+                    if (fill.Graphic != null) DrawTerrainTexture(graphics, path, center, radius, fill.Graphic);
+                    else using (var brush = new SolidBrush(ColorTranslator.FromHtml(fill.Color))) graphics.FillPath(brush, path);
+                    using (var pen = new Pen(i == selected ? Color.FromArgb(255,239,190,89) : Color.FromArgb(135,19,23,30), i == selected ? 2.4f : 1.2f)) graphics.DrawPath(pen,path);
+                }
+            }
         }
 
         GraphicsPath HexPath(PointF center, float radius)

@@ -63,6 +63,7 @@ namespace HexMapEditor
             var ids = new HashSet<string>(); var variants = new HashSet<string>();
             foreach (var t in preset.Terrains)
                 if (t == null || String.IsNullOrWhiteSpace(t.TerrainId) || String.IsNullOrWhiteSpace(t.VariantId) || t.Revision < 1 || String.IsNullOrWhiteSpace(t.Name) || !MapLogic.ValidColor(t.Color) || !TerrainTextures.ValidFill(t) || !ids.Add(t.TerrainId) || !variants.Add(t.VariantId)) throw new InvalidDataException("Nieprawidłowy lub powtórzony teren w presecie.");
+            if (preset.Terrains.Any(t => t.TerrainId == UnpaintedTerrain.Id || t.VariantId == UnpaintedTerrain.Version)) throw new InvalidDataException("Stan niepomalowany należy do mapy, nie do presetu.");
             foreach (var terrain in preset.Terrains) FillRules.ValidatePool(terrain.Variants);
         }
         public static List<TerrainPreset> Load(string directory, out string warning)
@@ -177,6 +178,7 @@ namespace HexMapEditor
     internal static class MapLogic
     {
         static readonly TerrainState neutralState = new TerrainState(new CellData());
+        internal static bool IsUnpainted(CellData cell) { return neutralState.Matches(cell); }
         public static JavaScriptSerializer Serializer() { return new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 128 }; }
         public static string Hash(string value) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? ""))).Replace("-", "").ToLowerInvariant(); }
         public static bool ValidColor(string value)

@@ -7,60 +7,68 @@ namespace HexMapEditor
     internal sealed class TerrainCropDialog : Form
     {
         readonly GraphicDefinition draft;
-        readonly CropSurface pointy, flat;
-        readonly TrackBar rotation = new TrackBar { Minimum = 0, Maximum = 360, TickFrequency = 45, Width = 330 };
+        readonly CropSurface surface;
+        readonly ComboBox orientation = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        readonly TrackBar rotation = new TrackBar { Minimum = 0, Maximum = 360, TickFrequency = 45, Width = 390 };
         readonly Label angle = new Label { AutoSize = true };
-        bool activeFlat, updating;
+        bool activeFlat, updating, initialSync;
         internal GraphicDefinition Result { get; private set; }
-        internal TerrainCropDialog(GraphicDefinition initial)
+        internal TerrainCropDialog(GraphicDefinition initial, bool flat = false, bool newImport = false)
         {
-            draft = initial.Copy(); Text = "Kadrowanie grafiki"; ClientSize = new Size(820, 514);
+            draft = initial.Copy(); initialSync = newImport; draft.Linked = initialSync; activeFlat = flat;
+            Text = "Kadrowanie grafiki"; ClientSize = new Size(640, 590);
             FormBorderStyle = FormBorderStyle.FixedDialog; StartPosition = FormStartPosition.CenterParent;
-            MaximizeBox = MinimizeBox = false; BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI", 9);
-            var hint = new Label { Text = "Przeciągnij obraz pod maską. Kółko zmienia zoom. Kliknięty podgląd wyznacza obrót.", Bounds = new Rectangle(16, 10, 790, 22) };
-            var linked = new CheckBox { Text = "Połącz kadry", Checked = draft.Linked, AutoSize = true, Location = new Point(16, 424) };
+            MaximizeBox = MinimizeBox = false; BackColor = Color.FromArgb(34,38,48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI",9);
+            var hint = new Label { Text = "Przeciągaj obraz pod maską. Kółko: zoom. Suwak: obrót.", Bounds = new Rectangle(16,10,605,24) };
+            orientation.Items.AddRange(new object[] { "Pointy Top", "Flat Top" }); orientation.Bounds = new Rectangle(100,36,170,26); orientation.SelectedIndex = flat ? 1 : 0;
             var image = GraphicSources.Preview(draft.Source, GraphicLimits.CropPreviewSide);
-            pointy = new CropSurface(draft, image, false) { Bounds = new Rectangle(16, 58, 386, 354) };
-            flat = new CropSurface(draft, image, true) { Bounds = new Rectangle(418, 58, 386, 354) };
-            Disposed += (s, e) => image.Dispose();
-            pointy.Edited = isFlat => RefreshViews(isFlat); flat.Edited = isFlat => RefreshViews(isFlat);
-            var reset = new Button { Text = "Obrót 0°", Bounds = new Rectangle(686, 419, 115, 28) };
-            rotation.Location = new Point(275, 417); angle.Location = new Point(616, 425);
-            rotation.ValueChanged += (s, e) =>
-            {
+            surface = new CropSurface(draft,image,flat) { Bounds = new Rectangle(16,70,608,408), Active = true };
+            surface.Edited = ignored => RefreshView();
+            Disposed += (s,e) => image.Dispose();
+            orientation.SelectedIndexChanged += (s,e) => SwitchOrientation(orientation.SelectedIndex == 1);
+            rotation.Location = new Point(16,490); angle.Location = new Point(417,498);
+            rotation.ValueChanged += (s,e) => {
                 if (updating) return;
-                double current = (activeFlat ? draft.Flat : draft.Pointy).Angle;
-                double delta = rotation.Value - current;
-                if (delta > 180) delta -= 360;
-                if (delta < -180) delta += 360;
-                CropMath.Rotate(draft, activeFlat, delta); RefreshViews(activeFlat);
+                double current = (activeFlat ? draft.Flat : draft.Pointy).Angle, delta = rotation.Value-current;
+                if(delta>180)delta-=360; if(delta< -180)delta+=360;
+                CropMath.Rotate(draft,activeFlat,delta); RefreshView();
             };
-            linked.CheckedChanged += (s, e) => { draft.Linked = linked.Checked; RefreshViews(activeFlat); };
-            reset.Click += (s, e) => { CropMath.Rotate(draft, activeFlat, -(activeFlat ? draft.Flat : draft.Pointy).Angle); RefreshViews(activeFlat); };
-            var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(580, 470, 105, 30) };
-            var cancel = new Button { Text = "Anuluj", Bounds = new Rectangle(696, 470, 105, 30), DialogResult = DialogResult.Cancel };
-            accept.Click += (s, e) => { draft.Seal(); Result = draft.Copy(); DialogResult = DialogResult.OK; };
-            Controls.AddRange(new Control[] { hint, pointy, flat, linked, rotation, angle, reset, accept, cancel,
-                new Label { Text = "Pointy Top", Bounds = new Rectangle(16, 35, 200, 22) },
-                new Label { Text = "Flat Top", Bounds = new Rectangle(418, 35, 200, 22) } });
-            AcceptButton = accept; CancelButton = cancel; RefreshViews(false);
+            var reset = new Button { Text = "Obrót 0°", Bounds = new Rectangle(512,488,110,28) };
+            reset.Click += (s,e) => { CropMath.Rotate(draft,activeFlat,-(activeFlat ? draft.Flat : draft.Pointy).Angle); RefreshView(); };
+            var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(400,546,105,30) };
+            var cancel = new Button { Text = "Anuluj", Bounds = new Rectangle(516,546,105,30), DialogResult = DialogResult.Cancel };
+            accept.Click += (s,e) => {
+                // Legacy Linked metadata must not create an invisible recrop/history step on OK.
+                bool unchanged = !newImport && MapLogic.Serializer().Serialize(new[]{draft.Pointy,draft.Flat}) == MapLogic.Serializer().Serialize(new[]{initial.Pointy,initial.Flat});
+                draft.Linked=false; draft.Seal(); Result=unchanged ? initial.Copy() : draft.Copy(); DialogResult=DialogResult.OK;
+            };
+            Controls.AddRange(new Control[] { hint, new Label { Text="Orientacja",Bounds=new Rectangle(16,39,80,22) },orientation,surface,rotation,angle,reset,accept,cancel });
+            var tips = new ToolTip(); tips.SetToolTip(orientation,newImport ? "Nowy import: do pierwszego przełączenia oba kadry otrzymują wspólne zmiany. Potem są niezależne." : "Kadry są niezależne od początku. Przełączenie nie zmienia orientacji mapy.");
+            Disposed += (s,e) => tips.Dispose();
+            AcceptButton=accept; CancelButton=cancel; RefreshView();
         }
-        void RefreshViews(bool isFlat)
+        internal void SwitchOrientation(bool flat)
         {
-            activeFlat = isFlat; pointy.Active = !isFlat; flat.Active = isFlat; pointy.Invalidate(); flat.Invalidate();
-            updating = true; double value = (isFlat ? draft.Flat : draft.Pointy).Angle;
-            rotation.Value = Math.Min(359, (int)Math.Round(value)); angle.Text = value.ToString("0") + "°"; updating = false;
+            if (activeFlat != flat) { initialSync=false; draft.Linked=false; activeFlat=flat; surface.Flat=flat; }
+            RefreshView();
+        }
+        void RefreshView()
+        {
+            surface.Invalidate(); updating=true;
+            double value=(activeFlat ? draft.Flat : draft.Pointy).Angle;
+            rotation.Value=Math.Min(359,(int)System.Math.Round(value)); angle.Text=value.ToString("0")+"°"; updating=false;
         }
     }
     internal sealed class CropSurface : Control
     {
         readonly GraphicDefinition graphic;
         readonly Bitmap image;
-        readonly bool flat;
+        bool flat;
         bool dragging;
         Point previous;
         internal Action<bool> Edited;
         internal bool Active;
+        internal bool Flat { get { return flat; } set { flat=value; AccessibleName=flat ? "Kadr Flat Top" : "Kadr Pointy Top"; Invalidate(); } }
         float Side { get { return Math.Max(1, Math.Min(Width, Height) - 12); } }
         RectangleF Square { get { return new RectangleF((Width - Side) / 2, (Height - Side) / 2, Side, Side); } }
         internal CropSurface(GraphicDefinition graphic, Bitmap image, bool flat)

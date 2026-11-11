@@ -241,13 +241,15 @@ namespace HexMapEditor
                 var source = GraphicSources.Import(file.FileName);
                 var graphic = new GraphicDefinition { Source = source, SourceId = source.Id, Name = name.Substring(0, Math.Min(200, name.Length)) };
                 graphic.Seal();
-                return ShowTerrainCrop(owner, graphic);
+                return OpenTerrainCrop(owner, graphic, true);
             }
         }
 
         GraphicDefinition ShowTerrainCrop(IWin32Window owner, GraphicDefinition graphic)
+        { return OpenTerrainCrop(owner, graphic, false); }
+        GraphicDefinition OpenTerrainCrop(IWin32Window owner, GraphicDefinition graphic, bool newImport)
         {
-            using (var crop = new TerrainCropDialog(graphic))
+            using (var crop = new TerrainCropDialog(graphic, map.Orientation == "FlatTop", newImport))
                 return crop.ShowDialog(owner) == DialogResult.OK ? crop.Result : null;
         }
 

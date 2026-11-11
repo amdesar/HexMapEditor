@@ -45,7 +45,7 @@ namespace HexMapEditor
         void DrawObjects(Graphics g)
         {
             var state=g.Save();g.TranslateTransform(pan.X,pan.Y);g.ScaleTransform(scale,scale);
-            using(var visible=VisibleObjectRegion()){g.SetClip(visible,CombineMode.Intersect);
+            using(var visible=VisibleObjectRegion()){
                 var frames = map.Groups.Where(group => group.FrameEnabled)
                     .SelectMany(group => group.Members.Select(id => new { Id = id, group.FrameColor }))
                     .ToDictionary(entry => entry.Id, entry => entry.FrameColor);
@@ -53,6 +53,7 @@ namespace HexMapEditor
                 {
                     var bounds = ObjectBounds(obj);
                     g.DrawImage(AssetBitmap(map.IconAssets.First(a => a.Id == obj.AssetId), false), bounds);
+                    var decorationState = g.Save(); g.SetClip(visible,CombineMode.Intersect);
                     string color;
                     if (frames.TryGetValue(obj.Id, out color))
                     {
@@ -69,6 +70,7 @@ namespace HexMapEditor
                         using (var pen = new Pen(Color.Gold, 2 / scale))
                             g.DrawRectangle(pen, outline.X, outline.Y, outline.Width, outline.Height);
                     }
+                    g.Restore(decorationState);
                 }
             }g.Restore(state);
             if(objectSelecting&&selectionPath.Count>1)using(var pen=new Pen(Color.CornflowerBlue,1.5f)){var points=selectionPath.Select(Screen).ToArray();if(selectionKind==1){g.DrawLines(pen,points);g.DrawLine(pen,points[points.Length-1],points[0]);}else{var r=SelectionRectangle(selectionPath[0],selectionPath[selectionPath.Count-1]);var a=Screen(r.Location);g.DrawRectangle(pen,a.X,a.Y,r.Width*scale,r.Height*scale);}}

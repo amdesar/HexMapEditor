@@ -184,12 +184,13 @@ namespace HexMapEditor.Tests
                 using (var args = new PaintEventArgs(g, new Rectangle(0, 0, 180, 180)))
                 {
                     Call(window, "PaintMap", null, args);
-                    Check(bitmap.GetPixel(90, 90).ToArgb() == ColorTranslator.FromHtml("#123456").ToArgb(), "Alpha mgły ujawnia teren.");
+                    // 0.5.4 intentionally preserves graphic alpha; logical Fog still masks details/list.
+                    Check(bitmap.GetPixel(90, 90).ToArgb() == ColorTranslator.FromHtml(map.Cells[0].Color).ToArgb() && map.Cells[0].Fog, "Render alpha zmienia logiczny Fog lub dodaje nieprzezroczystą bazę.");
                 }
                 var newPool = new List<FillVariant> { new FillVariant { Id = "pink", Color = "#CC3388" } };
                 Call(window, "ChangeFogAppearance", newPool, false);
                 Check(map.Cells[0].FogFill.GraphicId == graphic.Id, "Zmiana puli zmieniła starą mgłę.");
-                Call(window, "ChangeFogAppearance", newPool, true);
+                Call(window, "ChangeFogAppearance", newPool, true, false); // Explicit reroll; 0.5.3 defaults to preserving IDs.
                 Check(map.Cells[0].FogFill.Color == "#CC3388" && !map.Cells[1].Fog, "Aktualizacja tylko wyglądu.");
                 History(window, false); Check(map.Cells[0].FogFill.GraphicId == graphic.Id, "Undo aktualizacji wyglądu.");
             }

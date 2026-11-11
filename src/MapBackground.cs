@@ -104,6 +104,23 @@ namespace HexMapEditor
             }
             finally { image.UnlockBits(locked); }
         }
+        // Small, coalesced interaction preview. The final preview uses Render at full preview size.
+        internal static Bitmap PreviewEffects(Bitmap covered,int saturation,int blur,float factor)
+        {
+            var result=new Bitmap(covered.Width,covered.Height,PixelFormat.Format32bppArgb);
+            try
+            {
+                using(var g=Graphics.FromImage(result))using(var attributes=new ImageAttributes())
+                {
+                    float s=saturation/100f,r=.2126f*(1-s),green=.7152f*(1-s),b=.0722f*(1-s);
+                    attributes.SetColorMatrix(new ColorMatrix(new[]{new[]{r+s,r,r,0f,0f},new[]{green,green+s,green,0f,0f},new[]{b,b,b+s,0f,0f},new[]{0f,0f,0f,1f,0f},new[]{0f,0f,0f,0f,1f}}));
+                    g.DrawImage(covered,new Rectangle(0,0,result.Width,result.Height),0,0,covered.Width,covered.Height,GraphicsUnit.Pixel,attributes);
+                }
+                if(blur>0)Blur(result,Math.Max(1,(int)Math.Round(blur*factor)));
+                return result;
+            }
+            catch { result.Dispose();throw; }
+        }
     }
     public sealed partial class MainWindow
     {

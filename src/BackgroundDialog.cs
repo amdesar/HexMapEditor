@@ -7,16 +7,16 @@ namespace HexMapEditor
     internal sealed class BackgroundDialog : Form
     {
         MapBackground draft;
-        readonly BackgroundCropSurface crop = new BackgroundCropSurface { Bounds = new Rectangle(12, 48, 450, 320) };
-        readonly PictureBox preview = new PictureBox { Bounds = new Rectangle(477, 58, 290, 310), SizeMode = PictureBoxSizeMode.Zoom };
+        readonly BackgroundCropSurface crop = new BackgroundCropSurface { Bounds = new Rectangle(12, 58, 365, 310) };
+        readonly PictureBox preview = new PictureBox { Bounds = new Rectangle(403, 58, 365, 310), SizeMode = PictureBoxSizeMode.Zoom };
         readonly TrackBar opacity = Slider(0, 100, 100), saturation = Slider(0, 200, 100), blur = Slider(0, 24, 0);
         readonly Label values = new Label { Bounds = new Rectangle(15, 453, 620, 25) };
         readonly Button remove = new Button { Text = "Usuń tło", Bounds = new Rectangle(150, 10, 110, 28) };
         bool updating;
         readonly Size viewport;
-        Bitmap previewSource, filtered;
-        string filteredKey;
-        bool previewQueued;
+        Bitmap previewSource, filtered, covered;
+        string filteredKey, coveredKey;
+        bool previewQueued, adjusting;
         internal Func<bool> CanAccept;
         internal MapBackground Result { get; private set; }
         static TrackBar Slider(int min, int max, int value) { return new TrackBar { Minimum = min, Maximum = max, Value = value, TickStyle = TickStyle.None, Width = 185, Height = 35 }; }
@@ -41,16 +41,24 @@ namespace HexMapEditor
                 draft.Opacity = opacity.Value; draft.Saturation = saturation.Value; draft.Blur = blur.Value;
                 QueuePreview();
             };
+            foreach (var slider in new[] { opacity, saturation, blur })
+            {
+                slider.MouseDown += (s,e) => adjusting=true;
+                slider.MouseUp += (s,e) => FinishPreview();
+                slider.KeyDown += (s,e) => adjusting=true;
+                slider.KeyUp += (s,e) => FinishPreview();
+                slider.MouseCaptureChanged += (s,e) => { if (!slider.Capture && Control.MouseButtons==MouseButtons.None) FinishPreview(); };
+            }
             accept.Click += (s, e) => { if (CanAccept == null || CanAccept()) { Result = draft == null ? null : draft.Copy(); DialogResult = DialogResult.OK; } };
             var reset = new Button { Text = "100%", Bounds = new Rectangle(462,403,58,26), AccessibleName = "Przywróć nasycenie 100%" };
             reset.Click += (s,e) => saturation.Value = 100;
             Controls.AddRange(new Control[] { crop, preview, import, remove, hint, opacity, saturation, blur, accept, cancel, values, reset,
-                new Label { Text = "Podgląd na płótnie", Bounds = new Rectangle(477,35,290,22) },
+                new Label { Text = "Podgląd na płótnie", Bounds = new Rectangle(403,35,365,22) },
                 new Label { Text = "Krycie", Location = new Point(12, 381), AutoSize = true },
                 new Label { Text = "Nasycenie", Location = new Point(272, 381), AutoSize = true },
                 new Label { Text = "Rozmycie", Location = new Point(532, 381), AutoSize = true } });
             AcceptButton = accept; CancelButton = cancel; UpdateSettings();
-            Disposed += (s, e) => { if (preview.Image != null) preview.Image.Dispose(); if (previewSource != null) previewSource.Dispose(); if (filtered != null) filtered.Dispose(); };
+            Disposed += (s, e) => { if (preview.Image != null) preview.Image.Dispose(); if (previewSource != null) previewSource.Dispose(); if (filtered != null) filtered.Dispose(); if (covered != null) covered.Dispose(); };
         }
         void Import()
         {
@@ -74,6 +82,7 @@ namespace HexMapEditor
             if (previewSource != null) previewSource.Dispose();
             previewSource = draft == null ? null : GraphicSources.Preview(draft.Source, GraphicLimits.CropPreviewSide);
             if (filtered != null) filtered.Dispose(); filtered = null; filteredKey = null;
+            if (covered != null) covered.Dispose(); covered = null; coveredKey = null;
             crop.SetContent(draft); updating = false; RefreshPreview();
         }
         void QueuePreview()
@@ -83,15 +92,28 @@ namespace HexMapEditor
             previewQueued = true;
             BeginInvoke((Action)(() => { previewQueued = false; if (!IsDisposed && !Disposing) RefreshPreview(); }));
         }
+        void FinishPreview() { if (!adjusting) return; adjusting=false; QueuePreview(); }
         void RefreshPreview()
         {
             var old = preview.Image;
             if (draft != null)
             {
-                var key = MapLogic.Serializer().Serialize(new { draft.SourceId,draft.Left,draft.Top,draft.Width,draft.Height,draft.Saturation,draft.Blur });
+                var geometry = MapLogic.Serializer().Serialize(new { draft.SourceId,draft.Left,draft.Top,draft.Width,draft.Height });
+                var key = geometry + ":" + draft.Saturation + ":" + draft.Blur + ":" + adjusting;
                 if (key != filteredKey)
                 {
-                    var next = BackgroundRenderer.Render(draft, viewport, previewSource, Math.Min(preview.Width,preview.Height));
+                    Bitmap next;
+                    if (adjusting)
+                    {
+                        if (coveredKey != geometry)
+                        {
+                            var plain=draft.Copy(); plain.Saturation=100; plain.Blur=0;
+                            var cover=BackgroundRenderer.Render(plain,viewport,previewSource,160);
+                            if(covered!=null)covered.Dispose(); covered=cover; coveredKey=geometry;
+                        }
+                        next=BackgroundRenderer.PreviewEffects(covered,draft.Saturation,draft.Blur,Math.Min(1,160f/Math.Max(viewport.Width,viewport.Height)));
+                    }
+                    else next = BackgroundRenderer.Render(draft, viewport, previewSource, Math.Min(preview.Width,preview.Height));
                     if (filtered != null) filtered.Dispose(); filtered = next; filteredKey = key;
                 }
                 preview.Image = (Bitmap)filtered.Clone();

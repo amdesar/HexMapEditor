@@ -14,6 +14,10 @@ namespace HexMapEditor
         readonly FlowLayoutPanel tiles = new FlowLayoutPanel { AutoScroll = true, Dock = DockStyle.Fill, Padding = new Padding(8) };
         readonly bool flat;
         readonly Dictionary<string, Bitmap> thumbnails = new Dictionary<string, Bitmap>();
+        readonly AppearanceHistory history;
+        readonly Button undoLocal = new Button { Image = EditorIcons.Small("undo"), Width = 36, Height = 26, AccessibleName = "Cofnij wariant" };
+        readonly Button redoLocal = new Button { Image = EditorIcons.Small("redo"), Width = 36, Height = 26, AccessibleName = "Ponów wariant" };
+        readonly ToolTip tips = new ToolTip();
         internal Func<IWin32Window, bool, GraphicDefinition> ChooseGraphic;
         internal Func<IWin32Window, GraphicDefinition, GraphicDefinition> EditCrop;
         internal Func<bool> CanAccept;
@@ -25,17 +29,22 @@ namespace HexMapEditor
         internal int ClosingClickTime;
         internal AppearancePoolDialog(string title, string initialName, List<FillVariant> fills, bool existing, bool flat, string applyCaption)
         {
-            Text = title; this.flat = flat; Fills = FillRules.Copy(fills);
+            Text = title; this.flat = flat; history = new AppearanceHistory(fills); Fills = history.Current;
             ClientSize = new Size(470, 350); MinimumSize = new Size(440, 300);
             StartPosition = FormStartPosition.CenterParent; Font = new Font("Segoe UI", 9);
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke;
-            var header = new Panel { Dock = DockStyle.Top, Width = ClientSize.Width, Height = initialName == null ? 30 : 66 };
+            var header = new Panel { Dock = DockStyle.Top, Width = ClientSize.Width, Height = initialName == null ? 64 : 100 };
             if (initialName != null)
             {
                 name.Text = initialName; name.Bounds = new Rectangle(78, 10, 365, 25); name.Anchor |= AnchorStyles.Right;
                 header.Controls.Add(name); header.Controls.Add(new Label { Text = "Nazwa", Location = new Point(12, 13), AutoSize = true });
             }
             header.Controls.Add(new Label { Text = "Warianty wyglądu — kliknij kafelek, aby go edytować.", Location = new Point(12, initialName == null ? 8 : 44), AutoSize = true });
+            undoLocal.Location = new Point(12, initialName == null ? 32 : 68); redoLocal.Location = new Point(54, undoLocal.Top);
+            tips.SetToolTip(undoLocal, "Cofnij wariant (Ctrl+Z). Lokalna historia: 100 operacji; nie cofa plików biblioteki.");
+            tips.SetToolTip(redoLocal, "Ponów wariant (Ctrl+Y / Ctrl+Shift+Z). Historia tylko tego edytora.");
+            undoLocal.Click += (s,e) => LocalHistory(false); redoLocal.Click += (s,e) => LocalHistory(true);
+            header.Controls.AddRange(new Control[] { undoLocal, redoLocal });
             var footer = new Panel { Dock = DockStyle.Bottom, Width = ClientSize.Width, Height = 110 };
             apply.Text = applyCaption; apply.Enabled = existing; apply.Location = new Point(12, 8);
             preserve.Location = new Point(12, 33); apply.CheckedChanged += (s,e) => preserve.Enabled = apply.Checked;
@@ -51,7 +60,7 @@ namespace HexMapEditor
             footer.Controls.AddRange(new Control[] { apply, preserve, accept, cancel });
             Controls.Add(tiles); Controls.Add(header); Controls.Add(footer);
             AcceptButton = accept; CancelButton = cancel; Rebuild();
-            Disposed += (s,e) => { foreach (var image in thumbnails.Values) image.Dispose(); thumbnails.Clear(); };
+            Disposed += (s,e) => { foreach (var image in thumbnails.Values) image.Dispose(); thumbnails.Clear(); tips.Dispose(); };
         }
         void Rebuild()
         {
@@ -64,24 +73,34 @@ namespace HexMapEditor
                 for (int i = 0; i < Fills.Count; i++)
                 {
                     int index = i; var fill = Fills[i];
-                    var tile = new Button { Width = 96, Height = 80, BackColor = ColorTranslator.FromHtml(fill.Color), ForeColor = Color.White,
+                    var tile = new Panel { Width = 88, Height = 88, Margin = new Padding(4) };
+                    var choose = new TerrainChoiceButton { Dock = DockStyle.Fill, BackColor = ColorTranslator.FromHtml(fill.Color), ForeColor = Color.White,
                         Text = fill.Graphic == null ? fill.Color : "", AccessibleName = "Wariant " + (i + 1), FlatStyle = FlatStyle.Flat };
+                    tile.Controls.Add(choose);
                     if (fill.Graphic != null)
                     {
                         Bitmap thumbnail;
                         if (!thumbnails.TryGetValue(fill.GraphicId, out thumbnail)) thumbnails.Add(fill.GraphicId, thumbnail = TerrainTextures.Decode(fill.Graphic, flat));
-                        tile.BackgroundImage = thumbnail; tile.BackgroundImageLayout = ImageLayout.Zoom;
+                        choose.FillImage = thumbnail;
                     }
+                    var close = new VariantRemoveButton { ForeColor = Color.FromArgb(255,90,90), BackColor = Color.FromArgb(25,28,36),
+                        Bounds = new Rectangle(62,2,24,24), FlatStyle = FlatStyle.Flat, AccessibleName = "Usuń wariant " + (i+1), Enabled = Fills.Count > 1 };
+                    close.FlatAppearance.BorderColor = Color.WhiteSmoke;
+                    tips.SetToolTip(close, Fills.Count > 1 ? "Usuń wariant" : "Nie można usunąć ostatniego wariantu");
+                    close.AccessibleDescription = Fills.Count > 1 ? "Usuwa tylko tę pozycję puli" : "Nie można usunąć ostatniego wariantu";
+                    tips.SetToolTip(choose,Fills.Count > 1 ? "Edytuj wariant; czerwony × usuwa pozycję" : "Edytuj wariant. Nie można usunąć ostatniego wariantu.");
+                    close.Click += (s,e) => RemoveVariant(index); tile.Controls.Add(close); close.BringToFront();
                     var menu = new ContextMenuStrip();
                     var remove = menu.Items.Add("Usuń wariant"); remove.Enabled = Fills.Count > 1;
-                    remove.Click += (s, e) => { Fills.RemoveAt(index); Rebuild(); };
-                    tile.ContextMenuStrip = menu;
+                    remove.Click += (s, e) => RemoveVariant(index);
+                    choose.ContextMenuStrip = menu;
                     tile.Disposed += (s, e) => menu.Dispose();
-                    tile.Click += (s, e) => Edit(index);
+                    choose.Click += (s, e) => Edit(index);
                     tiles.Controls.Add(tile);
                 }
-                var add = new Button { Text = "+", Width = 60, Height = 80, Enabled = Fills.Count < GraphicLimits.Pool, AccessibleName = "Dodaj wariant koloru lub grafiki" };
+                var add = new Button { Text = "+", Width = 88, Height = 88, Margin = new Padding(4), Enabled = Fills.Count < GraphicLimits.Pool, AccessibleName = "Dodaj wariant koloru lub grafiki" };
                 add.Click += (s, e) => Edit(-1); tiles.Controls.Add(add);
+                undoLocal.Enabled = history.CanUndo; redoLocal.Enabled = history.CanRedo;
             }
             finally { tiles.ResumeLayout(true); }
         }
@@ -92,8 +111,49 @@ namespace HexMapEditor
                 dialog.ChooseGraphic = ChooseGraphic;
                 dialog.EditCrop = EditCrop;
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                if (index < 0) Fills.Add(dialog.Result); else Fills[index] = dialog.Result;
-                Rebuild();
+                var next = AppearanceHistory.Snapshot(Fills);
+                if (index < 0) next.Add(dialog.Result); else next[index] = dialog.Result;
+                CommitFills(next);
+            }
+        }
+        internal bool CommitFills(List<FillVariant> next)
+        {
+            if (!history.Commit(next)) return false;
+            Fills = history.Current; Rebuild(); return true;
+        }
+        internal bool RemoveVariant(int index)
+        {
+            if (Fills.Count <= 1 || index < 0 || index >= Fills.Count) return false;
+            var next = AppearanceHistory.Snapshot(Fills); next.RemoveAt(index); return CommitFills(next);
+        }
+        internal bool LocalHistory(bool redo)
+        {
+            if (!history.Move(redo)) return false;
+            Fills = history.Current; Rebuild(); return true;
+        }
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            bool undo = keyData == (Keys.Control | Keys.Z);
+            bool redo = keyData == (Keys.Control | Keys.Y) || keyData == (Keys.Control | Keys.Shift | Keys.Z);
+            if (undo || redo)
+            {
+                // Owned modal editors route to themselves. A focused TextBox retains native text undo.
+                if (ContainsFocus && name.Focused) return base.ProcessCmdKey(ref msg, keyData);
+                if (ContainsFocus && Enabled) { LocalHistory(redo); return true; }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+    }
+
+    internal sealed class VariantRemoveButton : Button
+    {
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using(var pen=new Pen(Enabled ? ForeColor : Color.Gray,2.5f))
+            {
+                int x=ClientSize.Width/2,y=ClientSize.Height/2;
+                e.Graphics.DrawLine(pen,x-4,y-4,x+4,y+4); e.Graphics.DrawLine(pen,x+4,y-4,x-4,y+4);
             }
         }
     }

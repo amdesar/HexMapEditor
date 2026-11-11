@@ -37,7 +37,7 @@ namespace HexMapEditor
         internal readonly TerrainChoiceButton Choose = new TerrainChoiceButton();
         internal readonly Button Edit = new Button(), Delete = new Button();
         readonly ToolTip tips = new ToolTip();
-        string thumbnailId, thumbnailColor;
+        string mosaicKey;
         public string TerrainId;
         public TerrainTile(Action<string> choose, Action<string> edit, Action<string> delete)
         {
@@ -57,19 +57,17 @@ namespace HexMapEditor
             Width = width; Choose.SetBounds(0, 0, width - 56, 32);
             Edit.SetBounds(width - 52, 2, 24, 28); Delete.SetBounds(width - 24, 2, 24, 28);
         }
-        public void UpdateTerrain(TerrainDefinition terrain, bool selected)
+        public void UpdateTerrain(TerrainDefinition terrain, bool selected, bool flat = false)
         {
             TerrainId = terrain.TerrainId; Choose.Text = terrain.Name; var color = ColorTranslator.FromHtml(terrain.Color); Choose.BackColor = color;
-            if (thumbnailId != terrain.TextureId || thumbnailColor != terrain.Color)
+            string key = TerrainMosaic.Key(terrain) + ":" + flat + ":" + Choose.ClientSize;
+            if (mosaicKey != key)
             {
                 var old = Choose.FillImage;
                 Choose.FillImage = null;
                 if (old != null) old.Dispose();
-                thumbnailId = terrain.TextureId; thumbnailColor = terrain.Color;
-                if (terrain.Texture != null)
-                {
-                    Choose.FillImage = TerrainTextures.Decode(terrain.Texture);
-                }
+                mosaicKey = key;
+                Choose.FillImage = TerrainMosaic.Render(terrain, Choose.ClientSize, flat);
                 double luminance = color.R * .299 + color.G * .587 + color.B * .114;
                 var image = Choose.FillImage as Bitmap;
                 if (image != null)
