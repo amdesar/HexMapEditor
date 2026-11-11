@@ -1,10 +1,10 @@
-# HexMapEditor 0.5.4
+﻿# HexMapEditor 0.6.0
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.5.4** zapisuje mapy w **formacie 8**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.0** zapisuje mapy w **formacie 9**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,7 +12,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-Ta wersja odczytuje mapy 8 i presety 3. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
+Ta wersja odczytuje mapy 9 i presety 3. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
 
 ## Podmiana ikony programu
 
@@ -22,13 +22,31 @@ Okno odczytuje ICO z katalogu programu. Przy braku lub błędzie odczytu używa 
 
 ## Widok warstw
 
-Menu **Widok** na górnym pasku przełącza kolejno Tło, Tereny, Ikony, Obiekty i Mgłę. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
+Menu **Widok** na górnym pasku przełącza kolejno Tło, Tereny, Ikony, Obiekty, Ciemność, Mgłę i Rysik. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
+
+## Rysik, gumka, ciemność i światło
+
+Rysik: LPM rysuje wektorową kreskę we współrzędnych świata, również poza siatką. Kolor wybiera wspólny picker; grubość 0,5–40 (domyślnie 3) skaluje się razem z mapą. Obrys pod kursorem pokazuje średnicę rysika/gumki przy obecnym zoomie. Punkt daje kropkę. PPM to chwilowy wskaźnik: osobny kolor, kółko 18 logicznych pikseli i smuga do około sekundy. Nie zapisuje się, nie tworzy gwiazdki/historii ani obwiedni. Kółko zmienia zoom, środkowy przycisk przesuwa widok.
+
+Gumka wycina fragmenty kresek; jej średnica 1–160 jednostek świata (domyślnie 28) ma podgląd obrysu. PPM czyści wszystkie rysunki bez pytania. Gest rysika, gumki albo wyczyszczenie to jeden krok głównego Undo/Redo. Wymazane fragmenty nie pozostają jako biała/czarna farba ani niewidoczne obwiednie. Limit dokumentu: 5000 fragmentów, 200000 punktów łącznie, 10000 w jednym fragmencie; historia rysika do 2 mln współdzielonych punktów. Przekroczenie odrzuca gest z informacją w statusie. Ogólny stos nadal ma najwyżej 300 wpisów.
+
+Ciemność i Wiadro ciemności zapisują **bazową** maskę na heksach. Nowa mapa jest jasna. Kształty i tryb nakładania/usuwania działają jak przy mgle: tryb z pierwszego pola, odwiedzone pola nie przełączają się ponownie. Wiadro wymaga spójnego rodzaju/wersji terenu oraz początkowego stanu bazowej ciemności. PPM przycisku narzędzia → Wygląd ciemności: wspólna pula kolor/grafika, lokalne Undo100 i jawna aktualizacja z zachowaniem rozmieszczenia. Domyślna czerń #000000. Wybrany wariant jest utrwalony; grafika zachowuje alpha, co nie ujawnia danych logicznie.
+
+Instancja ma niezależne **Światło** i promień 0–20. Działa dla każdego stanu, niezależnie od odkrywania Fog. Promień0 to heks środka,1 to sześciu sąsiadów; źródło poza mapą może sięgać do istniejących heksów. Wzorzec przechowuje ustawienia początkowe nowych instancji (domyślnie wyłączone); jego checkbox aktualizacji mapy nadal dotyczy grafiki. Grupa ma opcjonalne nadpisania światła i promienia; Indywidualnie zachowuje bazę członków, źródła nadal znajdują się na członkach. Odłączanie pozwala zachować/przywrócić również te dwie właściwości.
+
+Efektywna ciemność to baza bez sumy aktualnych zasięgów światła. Ruch/wyłączenie/usunięcie źródła przywraca wynik **aktualnej bazy**, bez odtwarzania dawnych snapshotów lub losowania. Ręczna zmiana bazy podczas oświetlenia pozostaje. Światło nie odkrywa Fog; ukryte Obiekty nadal emitują światło. Wynik jest obliczany po zmianach i odczycie, nie w pętli co klatkę.
+
+Widok pozwala niezależnie wyłączyć logiczną maskę Fog i Ciemności. Gdy obie są widoczne, maskowanie używa geometrycznej sumy ich heksów bez podwójnego liczenia. Przy najwyżej50% widocznego prostokąta obiektu lista/szczegóły maskują dane. Kolumny Światło i Oświetlenie pokazują efektywne ustawienia oraz procent ciemnej powierzchni; maskowany wpis nie zdradza parametrów źródła. Przezroczystość grafik nie zmienia tej geometrii. Kreski i wskaźnik są nad obiema maskami, wewnątrz płótna. Próba edycji ukrytej warstwy wymaga pokazania jej i ponowienia gestu.
+
+We wszystkich oknach Ctrl+Z cofa, Ctrl+Y ponawia. Ctrl+Shift+Z nie wykonuje operacji. Historie tekstowe i lokalne historie puli zachowują swoje granice.
+
+Przycisk **Biblioteka grafik** obok Dodaj teren otwiera zarządzanie istniejącymi grafikami, także na Domyślnym. Nie przypisuje wybranego zasobu do terenu. Wybór z edytora wariantu pozostaje osobnym kontekstem tego samego okna.
 
 ## Pule wyglądu, źródła i kadrowanie
 
 Nowa mapa i rozszerzane brzegi mają stan **Niepomalowany**, niezależny od neutralnego terenu presetu, choć oba mogą wyglądać identycznie. Aktualizacja neutralnego zmienia tylko faktycznie pomalowane nim pola. Wiadro rozróżnia te regiony. Odczyt nie zgaduje po kolorze, które dawne pola były puste; ich zapisane ID pozostają.
 
-W edycji własnego terenu kliknij kwadratowy kafelek wariantu albo taki sam plus. Pula ma 1–32 kolory, grafiki lub ich mieszankę. Widoczny czerwony × usuwa pozycję bez pytania, poza ostatnią; prawy klik korzysta z tej samej operacji. Lokalne przyciski Cofnij/Ponów oraz Ctrl+Z, Ctrl+Y i Ctrl+Shift+Z obejmują 100 roboczych operacji tego edytora, także kadrowanie i usunięte ID. Pole nazwy zachowuje tekstowe Undo, a aktywny dialog potomny własne skróty. Ta historia nie cofa plików biblioteki. Zatwierdzenie przekazuje jedną zmianę dokumentu; Anuluj odrzuca pulę, ponowne otwarcie ma pustą historię. Ołówek Domyślnego nadal wyjaśnia ochronę wzorca.
+W edycji własnego terenu kliknij kwadratowy kafelek wariantu albo taki sam plus. Pula ma 1–32 kolory, grafiki lub ich mieszankę. Widoczny czerwony × usuwa pozycję bez pytania, poza ostatnią; prawy klik korzysta z tej samej operacji. Lokalne przyciski Cofnij/Ponów oraz Ctrl+Z i Ctrl+Y obejmują 100 roboczych operacji tego edytora, także kadrowanie i usunięte ID. Pole nazwy zachowuje tekstowe Undo, a aktywny dialog potomny własne skróty. Ta historia nie cofa plików biblioteki. Zatwierdzenie przekazuje jedną zmianę dokumentu; Anuluj odrzuca pulę, ponowne otwarcie ma pustą historię. Ołówek Domyślnego nadal wyjaśnia ochronę wzorca.
 
 Zmiany puli dotyczą przyszłego malowania; „Zastosuj do bieżącej mapy” świadomie aktualizuje pola edytowanej wersji. Domyślnie zaznaczone „Zachowaj rozmieszczenie wariantów” przypisuje zmiany po stabilnych ID, również po zmianie typu lub kolejności. Dodany wariant nie zajmuje starych pól; usunięty zachowuje na nich historyczną migawkę i zasoby. Wyłączenie zachowania układu pozwala jawnie przelosować pasujące pola; Redo odtwarza wynik.
 
@@ -36,7 +54,7 @@ Pędzel i Wiadro niezależnie losują pozycję z równym prawdopodobieństwem dl
 
 Import zachowuje pełne, oryginalne bajty nieruchomego PNG/JPEG/BMP/GIF do 32 MiB i 4096 × 4096. Jeden większy podgląd przełączasz między Pointy Top i Flat Top; startuje w orientacji mapy, której ten przełącznik nie zmienia. Przeciągaj obraz, używaj kółka i suwaka 0–360°/resetu. W nowym imporcie zmiany aktualizują oba zestawy parametrów do pierwszego przełączenia orientacji. To przełączenie rozłącza je bez resetu; później pozostają niezależne. Ponowna edycja zapisanej grafiki jest niezależna od początku, także przy dawnym Linked. Nie ma ponownego łączenia ani automatycznego obrotu. „Kadruj…” otwiera pełne osadzone źródło i obie transformacje. Renderuje się wyłącznie wybrany podgląd z bufora do 1024 px; źródło i wynik zapisu zachowują pełne dane. Anulowanie nie zmienia wariantu, a OK bez zmiany parametrów nie tworzy kroku.
 
-Przycisk terenu pokazuje stabilną mozaikę dwóch rzędów regularnych miniheksów, do 12 różnych reprezentantów puli. Małe pule pokazują każdą pozycję; większe stabilny podzbiór. Nazwa, hover, zaznaczenie i repaint nie losują układu ani nie zużywają generatora malowania. Orientacja wybiera właściwy kadr. Tooltip podaje pełną liczbę wariantów.
+Przycisk terenu pokazuje stabilną mozaikę dwóch rzędów regularnych miniheksów, do 12 różnych reprezentantów puli. Małe pule pokazują każdą pozycję możliwie równo (różnica najwyżej jednego miniheksa na pozycję), ze stabilnym przemieszaniem. Większe mają stabilny podzbiór. Obrysów miniheksów nie rysujemy; identyczne grafiki w osobnych pozycjach nadal liczą się oddzielnie. Nazwa, hover, zaznaczenie i repaint nie losują układu ani nie zużywają generatora malowania. Orientacja wybiera właściwy kadr. Tooltip podaje pełną liczbę wariantów.
 
 Biblioteka: `Library/Terrains/Graphics/terrain-Nazwa.json` zawiera logiczne ID, nazwę, kolejność i oba kadry; `Sources/source-SHA256.json` współdzieli pełne źródło. Mapa i preset zawierają własne deduplikowane tabele potrzebnych źródeł/definicji, także dla palet projektu. Cache nie jest zapisywany. Edycja biblioteki nie zmienia historycznie namalowanego wariantu. SHA-256 wskazuje kandydatów, potem sprawdzane są bajty i parametry. Identyczna pozycja daje wybór Użyj istniejącej / Importuj jako nową / Anuluj. Nowa pozycja ma niezależne ID, współdzieląc źródło. Zatwierdzony import pozostaje operacją biblioteczną nawet po późniejszym anulowaniu terenu.
 
@@ -54,12 +72,12 @@ Obie zewnętrzne powierzchnie edytora tła mają równe wymiary. W czasie gestu 
 
 ## Narzędzia, kamera i materiał
 
-- Osobne widoczne przyciski: Zaznaczanie, Prostokąt, Lasso i Rączka w pierwszym rzędzie; Pędzel, Wiadro, Mgła i Wypełnienie mgłą w drugim. Podpowiedzi, nazwy dostępności i aktywne ramki. Prawy przycisk nie jest potrzebny do wyboru lassa.
+- Osobne widoczne przyciski: Zaznaczanie, Prostokąt, Lasso i Rączka w pierwszym rzędzie; Pędzel, Wiadro, Mgła i Wypełnienie mgłą w drugim; Rysik, Gumka, Ciemność i Wiadro ciemności w trzecim. Podpowiedzi, nazwy dostępności i aktywne ramki. Prawy przycisk nie jest potrzebny do wyboru lassa.
 - Rączka nad dostępną instancją przesuwa ją lub jej trwałą grupę, bez otwierania prawego panelu. Nad tłem przesuwa kamerę. Respektuje efektywne blokady i mgłę. Środkowy przycisk nadal przesuwa kamerę. Pusty klik poza mapą odznacza heks/zamyka jego panel, ale rozpoczęcie panowania tego nie robi.
 - Jeden materiał: teren, ikona albo wzorzec obiektu ze złotą ramką lub brak materiału. Wybór terenu/ikony po narzędziu mgły wybiera Pędzel; zwykłe Wiadro pozostaje Wiadrem. Wybór wzorca wybiera Pędzel do pojedynczego umieszczania. Sam wybór nie edytuje mapy.
 - Po udanym OK edycji ikony brak wybranego materiału, także bez zmiany wartości. Narzędzie pozostaje; Pędzel/Wiadro bez materiału nic nie edytują, mgła działa niezależnie. Anuluj zachowuje wybór.
 - Tylko lista terenów ma własne kółko/strzałki o jeden wiersz. Sekcje i szerokość treści panelu zachowane; miniatury ikon/obiektów kompaktowe, pełna biblioteka pod … . Pasek zwijania ma własne miejsce.
-- Prawy panel jest nakładką z uchwytem i resetem szerokości; samo otwarcie nie rusza kamery. Menu Dopasuj ma styl aplikacji i polecenia Dopasuj mapę / Dopasuj wszystko. Oba pomijają prawą nakładkę. Używają tego samego algorytmu i marginesu: jeśli grafiki mieszczą się w obwiedni mapy, zoom/pan są dokładnie takie same. Dopasuj wszystko uwzględnia rzeczywiste, efektywne rozmiary także poza mapą. Otwórz nadal dopasowuje samą mapę.
+- Prawy panel jest nakładką z uchwytem i resetem szerokości; samo otwarcie nie rusza kamery. Menu Dopasuj ma styl aplikacji i polecenia Dopasuj mapę / Dopasuj wszystko. Oba pomijają prawą nakładkę. Używają tego samego algorytmu i marginesu: jeśli grafiki mieszczą się w obwiedni mapy, zoom/pan są dokładnie takie same. Dopasuj wszystko uwzględnia efektywne prostokąty widocznych Obiektów i pozostałe kreski widocznego Rysika, także poza mapą. Ukryte warstwy nie rozszerzają kadru; samo przełączenie flag nie przesuwa kamery. Otwórz nadal dopasowuje samą mapę.
 
 ## Instancje i biblioteki
 
@@ -121,13 +139,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Groups041Tes
 
 Przypadki starszego przyrostu to model, fog i controls. Źródła i skrypty są śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 32 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
-Na później pozostają światło/ciemność, widok gracza, high/low detail, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
+Na później pozostają widok gracza, high/low detail, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 
 Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejności dodania. Starsze wpisy bez kolejności startują według stabilnego ID. Edycja zachowuje pozycję. Kolejność terenów jest kolejnością tablicy w palecie. Lista obiektów na mapie ma odrębny cykl sortowania rosnąco, malejąco i w kolejności dokumentu. Pokazuje grupę i znacznik efektywnego stanu. Sortuje maskowane teksty według widocznego `???` i mgłę liczbowo.
 
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 ## Historia zmian
+
+- **0.6.0** — rysik, chwilowy wskaźnik, częściowa gumka, bazowa Ciemność i dynamiczne Światło instancji/wzorców/grup, łączne maskowanie oraz dopasowanie do widocznych warstw. Poprawki skrótów, mozaiki, podglądu tła i bezpośrednia biblioteka grafik. Mapa9; raport `docs/raport-0.6.0.md`. Celowane próby: `tests/Run-Patch060Tests.ps1 -Case acceptance` (albo ink, pointer, darkness, visibility, gestures, ink-preview); fixture tworzy tylko własną mapę wejściową UI.
 
 - **0.5.4** — niepomalowane pola niezależne od neutralnego presetu; kwadraty/× i lokalne Undo/Redo100 wariantów; deterministyczna mozaika; jeden przełączany podgląd kadru, jednorazowa inicjalizacja nowego importu; symetryczne tło i lżejsze nasycenie; alpha grafiki mgły oddzielona od logicznego Fog. Odchudzono wyłącznie odtwarzalne artefakty _work, zachowując testy i logi. Formaty i limity bez zmian. Celowane scenariusze: `tests/Run-Patch054Tests.ps1 -Case empty` (albo editor, crop, presentation, background-perf). Raport: `docs/raport-0.5.4.md`.
 
