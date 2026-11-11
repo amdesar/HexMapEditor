@@ -74,3 +74,5 @@ Nie dodano wag, high/low detail, światła, widoku gracza, zakładek, eksportu z
 ## Git i artefakty
 
 Wszystkie dane prób i EXE testowe są ignorowane w tests/_work, bez prywatnych plików w commicie. Źródła testów są śledzone. Główny EXE, README, specyfikacja, plan i ten raport obejmują 0.5.1. Końcowy commit implementacyjny wskazuje Git/końcowa odpowiedź (bez samoodwołania hasha w zawartości commita). Nie wykonywano push, tagu ani Release'a. Stan po commicie podano w końcowej odpowiedzi.
+
+Commit implementacji i EXE: `47ed57b6c49232dd3b758a67a54aa02ca32861e0`. Po nim `git status --short` był pusty, master o jeden commit przed lokalną referencją origin/master. Późniejszy commit dokumentacji tylko zapisuje ten wynik; jego hash podano w końcowej odpowiedzi. Nie pobierano nowych zależności i nie wysyłano historii.
