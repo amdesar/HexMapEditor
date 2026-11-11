@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -34,7 +34,7 @@ namespace HexMapEditor
                 foreach (string path in TerrainGraphicLibrary.Files(Path.GetDirectoryName(to.Path)))
                 {
                     if (from != null && String.Equals(path, from.Path, StringComparison.OrdinalIgnoreCase)) continue;
-                    if (TerrainGraphicLibrary.Read(path).Id == to.Id) throw new IOException("Inny plik ma już to samo ID grafiki: " + path);
+                    if (TerrainGraphicLibrary.ReadIdentity(path) == to.Id) throw new IOException("Inny plik ma już to samo ID grafiki: " + path);
                 }
             }
             LibraryFiles.Transition(from == null ? null : from.Path, from == null ? null : from.Bytes,
@@ -45,8 +45,9 @@ namespace HexMapEditor
     internal static class TerrainGraphicLibrary
     {
         internal static string[] Files(string directory) { return Directory.GetFiles(directory, "terrain-*.json"); }
+        internal static string ReadIdentity(string path) { return PresetCatalog.ReadIdentity(path).Id; }
 
-        internal static TerrainGraphic Read(string path)
+        internal static TerrainGraphic Read(string path, Dictionary<string, GraphicSource> sources = null)
         {
             if (new FileInfo(path).Length > 1024 * 1024) throw new InvalidDataException("Za duży plik grafiki terenu.");
             var bytes = File.ReadAllBytes(path);
@@ -59,7 +60,9 @@ namespace HexMapEditor
                 String.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 200 || item.LibraryOrder < 0)
                 throw new InvalidDataException("Nieprawidłowe metadane grafiki terenu.");
             if (item.Asset == null) throw new InvalidDataException("Brak definicji kadrów.");
-            item.Asset.Source = ReadSource(Path.GetDirectoryName(path), item.Asset.SourceId);
+            GraphicSource shared;
+            if (sources != null && sources.TryGetValue(item.Asset.SourceId, out shared)) item.Asset.Source = shared;
+            else { item.Asset.Source = ReadSource(Path.GetDirectoryName(path), item.Asset.SourceId); if (sources != null) sources.Add(item.Asset.SourceId, item.Asset.Source); }
             TerrainTextures.Validate(item.Asset);
             item.Path = Path.GetFullPath(path);
             item.Bytes = bytes;
@@ -74,10 +77,11 @@ namespace HexMapEditor
         static GraphicSource ReadSource(string directory, string id)
         {
             string path = SourcePath(directory, id);
-            if (new FileInfo(path).Length > 23L * 1024 * 1024) throw new InvalidDataException("Za duży plik źródła.");
+            if (new FileInfo(path).Length > GraphicLimits.SourceJsonBytes) throw new InvalidDataException("Za duży plik źródła.");
             var source = MapLogic.Serializer().Deserialize<GraphicSource>(File.ReadAllText(path));
             if (source == null || source.Id != id) throw new InvalidDataException("Sprzeczny identyfikator źródła.");
             using (var bitmap = GraphicSources.Decode(source)) { }
+            source.MakeLibraryReference(path); // Keep metadata in the catalog, pin immutable bytes only when selected.
             return source;
         }
         internal static void StoreSource(string directory, GraphicSource source)
@@ -91,8 +95,8 @@ namespace HexMapEditor
             }
             var stored = new DirectoryInfo(Path.GetDirectoryName(path)).GetFiles("source-*.json");
             if (stored.Length >= GraphicSources.MaxSources || stored.Sum(f => f.Length) +
-                source.Data.Length > GraphicSources.MaxTotalBytes * 4 / 3 + 65536)
-                throw new IOException("Magazyn źródeł biblioteki osiągnął limit 64 obrazów / 64 MiB. Zachowano dotychczasowe wpisy i historię.");
+                source.EncodedLength > GraphicLimits.Encoded(GraphicLimits.LibrarySources) + GraphicLimits.SourceCount * 65536L)
+                throw new IOException("Magazyn źródeł biblioteki osiągnął limit 64 obrazów / 192 MiB. Zachowano dotychczasowe wpisy i historię.");
             // Immutable content store. Undo removes the logical entry, retaining reusable source bytes.
             MapLogic.AtomicWrite(path, MapLogic.Serializer().Serialize(source), false);
         }
@@ -103,13 +107,14 @@ namespace HexMapEditor
             var errors = new List<string>();
             var items = new List<TerrainGraphic>();
             var ids = new HashSet<string>();
+            var sources = new Dictionary<string, GraphicSource>();
             foreach (var path in Files(directory).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
             {
                 try
                 {
-                    var item = Read(path);
-                    if (items.Count >= 128 || !ids.Add(item.Id)) throw new InvalidDataException("Powtórzone ID lub przekroczony limit 128 grafik.");
-                    GraphicSources.Collect(items.Select(e => e.Asset.Source).Concat(new[] { item.Asset.Source }));
+                    var item = Read(path, sources);
+                    if (items.Count >= GraphicLimits.LibraryEntries || !ids.Add(item.Id)) throw new InvalidDataException("Powtórzone ID lub przekroczony limit 128 grafik.");
+                    GraphicSources.Collect(items.Select(e => e.Asset.Source).Concat(new[] { item.Asset.Source }), true);
                     items.Add(item);
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(path) + ": " + ex.Message); }
@@ -120,8 +125,9 @@ namespace HexMapEditor
 
         internal static TerrainGraphic Prepare(string directory, TerrainGraphic before, string name, GraphicDefinition asset, IEnumerable<TerrainGraphic> entries)
         {
+            if (before == null && entries.Count() >= GraphicLimits.LibraryEntries) throw new InvalidDataException("Limit 128 aktywnych grafik biblioteki.");
             TerrainTextures.Validate(asset);
-            GraphicSources.Collect(entries.Where(e => before == null || e.Id != before.Id).Select(e => e.Asset.Source).Concat(new[] { asset.Source }));
+            GraphicSources.Collect(entries.Where(e => before == null || e.Id != before.Id).Select(e => e.Asset.Source).Concat(new[] { asset.Source }), true);
             var path = PresetFiles.Destination(directory, "terrain-" + PresetFiles.Stem(name), before == null ? null : before.Path);
             if (!Path.GetFileName(path).StartsWith("terrain-", StringComparison.Ordinal))
                 throw new IOException("Za długa ścieżka biblioteki grafik terenów.");
@@ -172,7 +178,7 @@ namespace HexMapEditor
                 if (import)
                 {
                     var entry = ImportTerrainGraphic(owner);
-                    return entry == null ? null : entry.Asset;
+                    return entry == null ? null : entry.Asset.DocumentCopy();
                 }
                 using (var picker = new TerrainGraphicPicker(() => terrainGraphics, map.Orientation == "FlatTop"))
                 {
@@ -184,7 +190,7 @@ namespace HexMapEditor
                             "Usuń grafikę terenu", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
                             ChangeTerrainGraphic(item, null);
                     };
-                    return picker.ShowDialog(owner) == DialogResult.OK ? picker.Selected.Asset : null;
+                    return picker.ShowDialog(owner) == DialogResult.OK ? picker.Selected.Asset.DocumentCopy() : null;
                 }
             }
             catch (Exception ex)
@@ -212,7 +218,7 @@ namespace HexMapEditor
                 if (decision == DialogResult.Yes) return duplicate;
                 if (decision != DialogResult.No) return null;
             }
-            if (terrainGraphics.Count >= 128) throw new InvalidOperationException("Biblioteka mieści najwyżej 128 grafik terenów.");
+            if (terrainGraphics.Count >= GraphicLimits.LibraryEntries) throw new InvalidOperationException("Biblioteka mieści najwyżej 128 grafik terenów.");
             string name = asset.Name;
             for (int suffix = 2; terrainGraphics.Any(g => PresetCatalog.SameName(g.Name, name)); suffix++) name = asset.Name + " (" + suffix + ")";
             var item = TerrainGraphicLibrary.Prepare(directory, null, name, asset, terrainGraphics);

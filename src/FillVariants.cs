@@ -25,7 +25,7 @@ namespace HexMapEditor
         }
         internal static void ValidatePool(List<FillVariant> pool)
         {
-            if (pool == null || pool.Count < 1 || pool.Count > 32 || pool.Select(f => f == null ? null : f.Id).Distinct().Count() != pool.Count)
+            if (pool == null || pool.Count < 1 || pool.Count > GraphicLimits.Pool || pool.Select(f => f == null ? null : f.Id).Distinct().Count() != pool.Count)
                 throw new InvalidDataException("Pula wymaga od 1 do 32 różnych wariantów.");
             foreach (var fill in pool) Validate(fill);
         }
@@ -37,6 +37,7 @@ namespace HexMapEditor
         internal static List<FillVariant> Copy(IEnumerable<FillVariant> fills) { return fills.Select(f => f.Copy()).ToList(); }
         internal static FillVariant FogDefault() { return new FillVariant { Id = "fog-gray", Color = "#656B75" }; }
         internal static string Signature(IEnumerable<FillVariant> fills) { return MapLogic.Serializer().Serialize(fills); }
+        internal static string SurfaceSignature(IEnumerable<FillVariant> fills) { return Signature(fills.OrderBy(f => f.Id, StringComparer.Ordinal)); }
         internal static void SetPool(TerrainDefinition terrain, List<FillVariant> fills)
         {
             ValidatePool(fills);

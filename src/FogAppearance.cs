@@ -20,6 +20,8 @@ namespace HexMapEditor
             }
         }
         void EditFogAppearance()
+        { try { EditFogAppearanceCore(); } finally { ArmCanvasInput(); } }
+        void EditFogAppearanceCore()
         {
             using (var dialog = new AppearancePoolDialog("Wygląd mgły", null, map.FogPalette, true,
                 map.Orientation == "FlatTop", "Zastosuj wygląd do obecnie zasłoniętych heksów"))
@@ -32,11 +34,14 @@ namespace HexMapEditor
                     catch (Exception ex) { MessageBox.Show(dialog, ex.Message, "Budżet grafik"); return false; }
                     return !dialog.ApplyToMap || GuardLayer(MapLayer.Fog, dialog);
                 };
-                if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;
-                ChangeFogAppearance(dialog.Fills, dialog.ApplyToMap);
+                var answer = RunModal(() => dialog.ShowDialog(this)); RememberModalClick(dialog);
+                if (answer != DialogResult.OK) return;
+                ChangeFogAppearance(dialog.Fills, dialog.ApplyToMap, dialog.PreserveLayout);
             }
         }
         bool ChangeFogAppearance(List<FillVariant> fills, bool apply)
+        { return ChangeFogAppearance(fills, apply, true); }
+        bool ChangeFogAppearance(List<FillVariant> fills, bool apply, bool preserve)
         {
             FillRules.ValidatePool(fills); CheckTextureBudget(fills.Select(f => f.Graphic)); EndCanvasGesture(true);
             var action = new EditAction { Label = "Wygląd mgły" };
@@ -48,7 +53,8 @@ namespace HexMapEditor
             {
                 foreach (var cell in map.Cells.Where(c => c.Fog))
                 {
-                    var next = NextFill(fills);
+                    var next = preserve ? fills.FirstOrDefault(f => f.Id == cell.FogFill.Id) : NextFill(fills);
+                    if (next == null) continue;
                     if (FillRules.Signature(new[] { next }) == FillRules.Signature(new[] { cell.FogFill })) continue;
                     action.Layers.Add(new LayerChange { CellId = cell.Id, FogAppearance = true,
                         BeforeFill = cell.FogFill.Copy(), AfterFill = next });

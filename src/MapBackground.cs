@@ -35,18 +35,19 @@ namespace HexMapEditor
                 settings.Opacity < 0 || settings.Opacity > 100 || settings.Saturation < 0 || settings.Saturation > 200 || settings.Blur < 0 || settings.Blur > 24)
                 throw new InvalidDataException("Nieprawidłowe ustawienia tła.");
         }
-        internal static Bitmap Render(MapBackground settings, Size viewport)
+        internal static Bitmap Render(MapBackground settings, Size viewport, Bitmap prepared = null, int maxSide = GraphicLimits.BackgroundSide)
         {
             Validate(settings);
-            float factor = Math.Min(1, 2048f / Math.Max(1, Math.Max(viewport.Width, viewport.Height)));
+            float factor = Math.Min(1, (float)maxSide / Math.Max(1, Math.Max(viewport.Width, viewport.Height)));
             var size = new Size(Math.Max(1, (int)(viewport.Width * factor)), Math.Max(1, (int)(viewport.Height * factor)));
             var result = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb);
             try
             {
-                using (var source = GraphicSources.Decode(settings.Source))
+                using (var lease = prepared == null ? GraphicSources.Decode(settings.Source) : null)
                 using (var g = Graphics.FromImage(result))
                 using (var attributes = new ImageAttributes())
                 {
+                    var source = prepared ?? lease;
                     var crop = new RectangleF((float)(settings.Left * source.Width), (float)(settings.Top * source.Height),
                         (float)(settings.Width * source.Width), (float)(settings.Height * source.Height));
                     float cover = Math.Max(size.Width / crop.Width, size.Height / crop.Height);
@@ -143,7 +144,7 @@ namespace HexMapEditor
         }
         void EditBackground()
         {
-            using (var dialog = new BackgroundDialog(map.Background))
+            using (var dialog = new BackgroundDialog(map.Background, canvas.ClientSize))
             {
                 dialog.CanAccept = () => GuardLayer(MapLayer.Background, dialog);
                 if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;

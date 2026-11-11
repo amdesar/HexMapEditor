@@ -19,7 +19,7 @@ namespace HexMapEditor
             MaximizeBox = MinimizeBox = false; BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI", 9);
             var hint = new Label { Text = "Przeciągnij obraz pod maską. Kółko zmienia zoom. Kliknięty podgląd wyznacza obrót.", Bounds = new Rectangle(16, 10, 790, 22) };
             var linked = new CheckBox { Text = "Połącz kadry", Checked = draft.Linked, AutoSize = true, Location = new Point(16, 424) };
-            var image = GraphicSources.Decode(draft.Source);
+            var image = GraphicSources.Preview(draft.Source, GraphicLimits.CropPreviewSide);
             pointy = new CropSurface(draft, image, false) { Bounds = new Rectangle(16, 58, 386, 354) };
             flat = new CropSurface(draft, image, true) { Bounds = new Rectangle(418, 58, 386, 354) };
             Disposed += (s, e) => image.Dispose();
@@ -79,10 +79,10 @@ namespace HexMapEditor
         {
             base.OnMouseMove(e); if (!dragging) return;
             var crop = flat ? graphic.Flat : graphic.Pointy;
-            double factor = Side / Math.Min(image.Width, image.Height) * crop.Zoom;
+            double factor = Side / Math.Min(graphic.Source.Width, graphic.Source.Height) * crop.Zoom;
             double dx = (e.X - previous.X) / factor, dy = (e.Y - previous.Y) / factor, radians = crop.Angle * Math.PI / 180;
-            CropMath.Pan(graphic, flat, -(dx * Math.Cos(radians) + dy * Math.Sin(radians)) / image.Width,
-                -(-dx * Math.Sin(radians) + dy * Math.Cos(radians)) / image.Height);
+            CropMath.Pan(graphic, flat, -(dx * Math.Cos(radians) + dy * Math.Sin(radians)) / graphic.Source.Width,
+                -(-dx * Math.Sin(radians) + dy * Math.Cos(radians)) / graphic.Source.Height);
             previous = e.Location; Edited(flat);
         }
         protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == MouseButtons.Left || e.Button == MouseButtons.Middle) Capture = false; }
@@ -91,7 +91,7 @@ namespace HexMapEditor
         protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); if (CanFocus) Focus(); }
         protected override void OnPaint(PaintEventArgs e)
         {
-            var square = Square; var g = e.Graphics; CropMath.Draw(g, image, flat ? graphic.Flat : graphic.Pointy, square);
+            var square = Square; var g = e.Graphics; CropMath.Draw(g, image, flat ? graphic.Flat : graphic.Pointy, square, true);
             using (var region = new Region(square))
             using (var mask = TerrainTextures.Mask(new PointF(Width / 2f, Height / 2f), Side / 2, flat))
             using (var shade = new SolidBrush(Color.FromArgb(180, BackColor)))

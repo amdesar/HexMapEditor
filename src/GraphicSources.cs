@@ -12,7 +12,23 @@ namespace HexMapEditor
     public sealed class GraphicSource
     {
         public string Id { get; set; }
-        public string Data { get; set; }
+        string data;
+        internal string LibraryFile;
+        internal long LibraryEncodedLength;
+        public string Data
+        {
+            get { return data ?? (LibraryFile == null ? null : MapLogic.Serializer().Deserialize<GraphicSource>(File.ReadAllText(LibraryFile)).Data); }
+            set { data = value; }
+        }
+        internal long EncodedLength { get { return data == null ? LibraryEncodedLength : data.Length; } }
+        internal GraphicSource Pin()
+        {
+            if (data != null) return this;
+            var copy = new GraphicSource { Id = Id, Width = Width, Height = Height, Data = Data };
+            using (var image = GraphicSources.Decode(copy)) { }
+            return copy;
+        }
+        internal void MakeLibraryReference(string path) { LibraryEncodedLength = data.Length; LibraryFile = path; data = null; }
         public int Width { get; set; }
         public int Height { get; set; }
     }
@@ -42,6 +58,7 @@ namespace HexMapEditor
             return new GraphicDefinition { Id = Id, SourceId = SourceId, Source = Source, Name = Name,
                 Pointy = Pointy.Copy(), Flat = Flat.Copy(), Linked = Linked };
         }
+        internal GraphicDefinition DocumentCopy() { var copy = Copy(); copy.Source = Source.Pin(); return copy; }
         internal void Seal()
         {
             SourceId = Source.Id;
@@ -51,9 +68,9 @@ namespace HexMapEditor
 
     internal static class GraphicSources
     {
-        internal const int MaxFileBytes = 16 * 1024 * 1024;
-        internal const long MaxTotalBytes = 64L * 1024 * 1024;
-        internal const int MaxSources = 64;
+        internal const int MaxFileBytes = GraphicLimits.SourceBytes;
+        internal const long MaxTotalBytes = GraphicLimits.DocumentSources;
+        internal const int MaxSources = GraphicLimits.SourceCount;
         internal static string Id(byte[] bytes)
         {
             using (var hash = SHA256.Create())
@@ -62,7 +79,8 @@ namespace HexMapEditor
         internal static bool Finite(double value) { return !Double.IsNaN(value) && !Double.IsInfinity(value); }
         internal static bool Same(GraphicSource a, GraphicSource b)
         {
-            if (a.Id != b.Id || a.Width != b.Width || a.Height != b.Height || a.Data.Length != b.Data.Length) return false;
+            if (Object.ReferenceEquals(a, b)) return true; // Already the same immutable payload, not merely an equal hash.
+            if (a.Id != b.Id || a.Width != b.Width || a.Height != b.Height || a.EncodedLength != b.EncodedLength) return false;
             var x = Convert.FromBase64String(a.Data);
             var y = Convert.FromBase64String(b.Data);
             return x.Length == y.Length && x.SequenceEqual(y);
@@ -71,7 +89,7 @@ namespace HexMapEditor
         {
             using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
-                if (stream.Length < 1 || stream.Length > MaxFileBytes) throw new InvalidDataException("Źródło musi mieć od 1 bajta do 16 MiB.");
+                if (stream.Length < 1 || stream.Length > MaxFileBytes) throw new InvalidDataException("Źródło musi mieć od 1 bajta do 32 MiB.");
                 var bytes = new byte[(int)stream.Length];
                 int read = 0, count;
                 while (read < bytes.Length && (count = stream.Read(bytes, read, bytes.Length - read)) > 0) read += count;
@@ -90,7 +108,7 @@ namespace HexMapEditor
             using (var stream = new MemoryStream(bytes))
             using (var image = Image.FromStream(stream, true, true))
             {
-                if (image is Metafile || image.Width < 1 || image.Height < 1 || image.Width > 4096 || image.Height > 4096 ||
+                if (image is Metafile || image.Width < 1 || image.Height < 1 || image.Width > GraphicLimits.SourceSide || image.Height > GraphicLimits.SourceSide ||
                     !new[] { ImageFormat.Png.Guid, ImageFormat.Jpeg.Guid, ImageFormat.Bmp.Guid, ImageFormat.Gif.Guid }.Contains(image.RawFormat.Guid) ||
                     image.GetFrameCount(new FrameDimension(image.FrameDimensionsList[0])) != 1)
                     throw new InvalidDataException("Wybierz nieruchomy PNG, JPEG, BMP lub GIF do 4096 × 4096.");
@@ -99,17 +117,28 @@ namespace HexMapEditor
         }
         internal static Bitmap Decode(GraphicSource source)
         {
-            if (source == null || source.Data == null || source.Data.Length > MaxFileBytes * 4 / 3 + 8 ||
-                source.Width < 1 || source.Height < 1 || source.Width > 4096 || source.Height > 4096)
+            var encoded = source == null ? null : source.Data;
+            if (source == null || encoded == null || encoded.Length > GraphicLimits.Encoded(MaxFileBytes) ||
+                source.Width < 1 || source.Height < 1 || source.Width > GraphicLimits.SourceSide || source.Height > GraphicLimits.SourceSide)
                 throw new InvalidDataException("Nieprawidłowe źródło grafiki.");
-            byte[] bytes = Convert.FromBase64String(source.Data);
+            byte[] bytes = Convert.FromBase64String(encoded);
             if (bytes.Length > MaxFileBytes || Id(bytes) != source.Id) throw new InvalidDataException("Uszkodzona tożsamość źródła grafiki.");
             var image = ReadImage(bytes);
             if (image.Width == source.Width && image.Height == source.Height) return image;
             image.Dispose();
             throw new InvalidDataException("Sprzeczne wymiary obrazu.");
         }
-        internal static List<GraphicSource> Collect(IEnumerable<GraphicSource> sources)
+        internal static Bitmap Preview(GraphicSource source, int side)
+        {
+            using (var full = Decode(source))
+            {
+                double factor = Math.Min(1, (double)side / Math.Max(full.Width, full.Height));
+                var small = new Bitmap(Math.Max(1, (int)Math.Round(full.Width * factor)), Math.Max(1, (int)Math.Round(full.Height * factor)));
+                using (var g = Graphics.FromImage(small)) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.DrawImage(full, new Rectangle(0, 0, small.Width, small.Height)); }
+                return small;
+            }
+        }
+        internal static List<GraphicSource> Collect(IEnumerable<GraphicSource> sources, bool library = false)
         {
             var result = new Dictionary<string, GraphicSource>();
             foreach (var source in sources.Where(s => s != null))
@@ -122,8 +151,8 @@ namespace HexMapEditor
                 }
                 else result.Add(source.Id, source);
             }
-            if (result.Count > MaxSources || result.Values.Sum(s => (long)s.Data.Length) > MaxTotalBytes * 4 / 3)
-                throw new InvalidDataException("Budżet źródeł to 64 obrazy i 64 MiB pełnych danych.");
+            if (result.Count > MaxSources || result.Values.Sum(s => s.EncodedLength) > GraphicLimits.Encoded(library ? GraphicLimits.LibrarySources : MaxTotalBytes))
+                throw new InvalidDataException("Budżet źródeł to 64 obrazy: 96 MiB w dokumencie, 192 MiB w magazynie biblioteki.");
             return result.Values.ToList();
         }
         internal static Dictionary<string, GraphicSource> ReadTable(List<GraphicSource> sources)
@@ -195,7 +224,7 @@ namespace HexMapEditor
             if (Math.Abs(copy.X - crop.X) > 1e-8 || Math.Abs(copy.Y - crop.Y) > 1e-8 || Math.Abs(copy.Zoom - crop.Zoom) > 1e-8)
                 throw new InvalidDataException("Kadr wykracza poza źródło.");
         }
-        internal static void Draw(Graphics graphics, Bitmap image, CropTransform crop, RectangleF target)
+        internal static void Draw(Graphics graphics, Bitmap image, CropTransform crop, RectangleF target, bool preview = false)
         {
             var state = graphics.Save();
             try
@@ -205,7 +234,7 @@ namespace HexMapEditor
                 graphics.RotateTransform((float)crop.Angle);
                 float factor = (float)(target.Width / Math.Min(image.Width, image.Height) * crop.Zoom);
                 graphics.ScaleTransform(factor, factor);
-                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                graphics.InterpolationMode = preview ? InterpolationMode.Bilinear : InterpolationMode.HighQualityBicubic;
                 graphics.DrawImage(image, new RectangleF((float)(-crop.X * image.Width), (float)(-crop.Y * image.Height), image.Width, image.Height));
             }
             finally { graphics.Restore(state); }

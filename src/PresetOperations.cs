@@ -198,6 +198,8 @@ namespace HexMapEditor
         void EditTerrainById(string id) { EditTerrainDialog(false, id); }
         void EditTerrain(bool add) { EditTerrainDialog(add, null); }
         void EditTerrainDialog(bool add, string id)
+        { try { EditTerrainDialogCore(add, id); } finally { ArmCanvasInput(); } }
+        void EditTerrainDialogCore(bool add, string id)
         {
             if (PresetReadOnly)
             {
@@ -217,17 +219,25 @@ namespace HexMapEditor
                     catch (InvalidDataException ex) { MessageBox.Show(d, ex.Message, "Limit grafik", MessageBoxButtons.OK, MessageBoxIcon.Warning); return false; }
                     return !d.ApplyToMap || !map.Cells.Any(c => c.VariantId == old.VariantId) || GuardLayer(MapLayer.Terrain, d);
                 };
-                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
+                var answer = RunModal(() => d.ShowDialog(this)); RememberModalClick(d);
+                if (answer != DialogResult.OK) return;
                 var next = old.Copy(); next.Name = d.TerrainName; FillRules.SetPool(next, d.Fills);
                 if (add) AddTerrain(next);
-                else if (!SameTerrainAppearance(old, next)) { next.VariantId = Guid.NewGuid().ToString("N"); next.Revision++; UpdateTerrain(old, next, d.ApplyToMap); }
+                else if (!SameTerrainAppearance(old, next)) { VersionTerrain(old, next); UpdateTerrain(old, next, d.ApplyToMap, d.PreserveLayout); }
             }
         }
         static bool SameTerrainAppearance(TerrainDefinition old, TerrainDefinition next)
         { return old.Name == next.Name && FillRules.Signature(old.Variants) == FillRules.Signature(next.Variants); }
+        static void VersionTerrain(TerrainDefinition old, TerrainDefinition next)
+        {
+            if (FillRules.SurfaceSignature(old.Variants) == FillRules.SurfaceSignature(next.Variants)) { next.VariantId = old.VariantId; next.Revision = old.Revision; }
+            else { next.VariantId = Guid.NewGuid().ToString("N"); next.Revision = old.Revision + 1; }
+        }
         void AddTerrain(TerrainDefinition terrain)
         { if (PresetReadOnly) return; ChangePalette("Dodanie terenu", () => { var p = ActivePreset(); p.Terrains.Add(terrain.Copy()); brushIndex = p.Terrains.Count - 1; }); }
         void UpdateTerrain(TerrainDefinition old, TerrainDefinition next, bool apply)
+        { UpdateTerrain(old, next, apply, true); }
+        void UpdateTerrain(TerrainDefinition old, TerrainDefinition next, bool apply, bool preserve)
         {
             if (PresetReadOnly) return;
             var p = ActivePreset(); int at = p.Terrains.FindIndex(t => t.TerrainId == old.TerrainId && t.VariantId == old.VariantId); if (at < 0) throw new InvalidOperationException("Brak wersji terenu.");
@@ -235,7 +245,13 @@ namespace HexMapEditor
             ChangePalette("Edycja terenu" + (apply ? " i mapy" : ""), () => p.Terrains[at] = next.Copy(), action =>
             {
                 if (!apply) return;
-                foreach (var cell in map.Cells.Where(c => c.VariantId == old.VariantId)) { var before = new TerrainState(cell); MapLogic.ApplyTerrain(cell, next, NextFill(next.Variants)); action.Changes.Add(new CellChange { CellId = cell.Id, Before = before, After = new TerrainState(cell) }); }
+                foreach (var cell in map.Cells.Where(c => c.TerrainId == old.TerrainId && c.VariantId == old.VariantId))
+                {
+                    var fill = preserve ? next.Variants.FirstOrDefault(f => f.Id == cell.FillVariantId) : NextFill(next.Variants);
+                    if (fill == null) continue; // Removed positions keep the historical snapshot and resources.
+                    var before = new TerrainState(cell); MapLogic.ApplyTerrain(cell, next, fill);
+                    if (!before.Matches(cell)) action.Changes.Add(new CellChange { CellId = cell.Id, Before = before, After = new TerrainState(cell) });
+                }
             });
         }
         void RemoveTerrainById(string id)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -84,7 +84,7 @@ namespace HexMapEditor
         }
         public static TerrainPreset ReadFile(string file)
         {
-            if (new FileInfo(file).Length > TerrainTextures.MaxPresetBytes) throw new InvalidDataException("Preset przekracza 112 MiB.");
+            if (new FileInfo(file).Length > TerrainTextures.MaxPresetBytes) throw new InvalidDataException("Preset przekracza 160 MiB.");
             byte[] bytes = File.ReadAllBytes(file); string text; using (var stream = new MemoryStream(bytes)) using (var reader = new StreamReader(stream, Encoding.UTF8, true)) text = reader.ReadToEnd();
             var json = MapLogic.Serializer(); var raw = json.DeserializeObject(text) as Dictionary<string, object>;
             string[] fields = { "PresetFormatVersion", "Id", "Name", "Terrains" };
@@ -149,7 +149,7 @@ namespace HexMapEditor
             long order = before == null ? LibrarySequence.Next(records.Select(r => r.Value.Order)) : before.LibraryOrder;
             var assets = TerrainTextures.Collect(preset.Terrains.SelectMany(t => t.Variants).Select(f => f.Graphic));
             var serialized = MapLogic.Serializer().Serialize(new { PresetFormatVersion = 3, preset.Id, preset.Name, preset.Terrains, TerrainAssets = assets, GraphicSources = GraphicSources.Collect(assets.Select(a => a.Source)), LibraryOrder = order });
-            if (Encoding.UTF8.GetByteCount(serialized) > TerrainTextures.MaxPresetBytes) throw new InvalidDataException("Preset przekracza limit zapisu/odczytu 112 MiB.");
+            if (Encoding.UTF8.GetByteCount(serialized) > TerrainTextures.MaxPresetBytes) throw new InvalidDataException("Preset przekracza limit zapisu/odczytu 160 MiB.");
             string destination = PresetFiles.Destination(directory, preset.Name, path);
             if (expected != null && (before == null || !String.Equals(expected.FilePath,before.FilePath,StringComparison.OrdinalIgnoreCase) || !expected.DiskBytes.SequenceEqual(before.DiskBytes))) throw new IOException("Plik presetu zmienił się poza programem. Zachowano plik, projekt i historię. Odśwież presety i sprawdź dane przed ponownym zapisem.");
             var after = preset.Copy(); after.LibraryOrder = order; after.FilePath = destination; after.DiskBytes = new UTF8Encoding(false).GetBytes(serialized);
@@ -237,7 +237,7 @@ namespace HexMapEditor
             while (pending.Count != 0)
             {
                 int current = pending.Dequeue(); result.Add(current);
-                foreach (int next in Neighbors(map, current)) if (!visited[next] && (fog ? original[next].Fog == seed.Fog && original[next].Variant == seed.Variant : original[next].Variant == seed.Variant)) { visited[next] = true; pending.Enqueue(next); }
+                foreach (int next in Neighbors(map, current)) if (!visited[next] && original[next].TerrainId == seed.TerrainId && original[next].Variant == seed.Variant && (!fog || original[next].Fog == seed.Fog)) { visited[next] = true; pending.Enqueue(next); }
             }
             return result;
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -167,7 +167,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.5.2";
+        const string AppVersion = "0.5.3";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -182,6 +182,7 @@ namespace HexMapEditor
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
             LoadProgramIcon();
             InitializeShell();
+            Application.AddMessageFilter(this); Disposed += (s,e) => Application.RemoveMessageFilter(this);
             Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); LoadObjects(); LoadStateLibrary(); };
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
             CaptureSavedState(); UpdateUI();
@@ -349,7 +350,7 @@ namespace HexMapEditor
             error = null; migrated = false;
             try
             {
-                if (new FileInfo(path).Length > 128L * 1024 * 1024) throw new InvalidDataException("Plik przekracza limit odczytu 128 MiB.");
+                if (new FileInfo(path).Length > GraphicLimits.MapBytes) throw new InvalidDataException("Plik przekracza limit odczytu 256 MiB.");
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
                 int format = (int)raw["FormatVersion"];
@@ -439,7 +440,7 @@ namespace HexMapEditor
                 string directory = Path.GetDirectoryName(Path.GetFullPath(path));
                 temp = Path.Combine(directory, ".hexmap-" + Guid.NewGuid().ToString("N") + ".tmp");
                 byte[] bytes = new UTF8Encoding(false).GetBytes(json.Serialize(output));
-                if (bytes.LongLength > 128L * 1024 * 1024) throw new InvalidDataException("Mapa przekracza limit pliku 128 MiB. Zmniejsz zawartość opisów przed zapisem.");
+                if (bytes.LongLength > GraphicLimits.MapBytes) throw new InvalidDataException("Mapa przekracza limit pliku 256 MiB. Zmniejsz zawartość opisów przed zapisem.");
                 using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
                 if (allowOverwrite && File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
                 currentPath = path; CaptureSavedState(); UpdateUI(); return true;
@@ -497,7 +498,8 @@ namespace HexMapEditor
         }
         static void CheckVariant(Dictionary<string, string> variants, string variant, string terrain, int revision, string name, string color, string textureId)
         {
-            string signature = MapLogic.Serializer().Serialize(new[] { terrain, revision.ToString(System.Globalization.CultureInfo.InvariantCulture), name }); string previous;
+            // A name is metadata, not a surface boundary. Appearance positions have their own IDs.
+            string signature = MapLogic.Serializer().Serialize(new[] { terrain, revision.ToString(System.Globalization.CultureInfo.InvariantCulture) }); string previous;
             if (variants.TryGetValue(variant, out previous) && previous != signature) throw new InvalidDataException("Sprzeczne właściwości tej samej wersji terenu: " + variant);
             variants[variant] = signature;
         }
@@ -660,6 +662,7 @@ namespace HexMapEditor
                 EndCanvasGesture(false);
                 waitingForMouseRelease = Control.MouseButtons != MouseButtons.None;
                 requireFreshCanvasDown = true;
+                ArmCanvasInput();
             }
         }
 

@@ -10,14 +10,19 @@ namespace HexMapEditor
     {
         readonly TextBox name = new TextBox { MaxLength = 200 };
         readonly CheckBox apply = new CheckBox { AutoSize = true };
+        readonly CheckBox preserve = new CheckBox { Text = "Zachowaj rozmieszczenie wariantów", AutoSize = true, Checked = true, Enabled = false };
         readonly FlowLayoutPanel tiles = new FlowLayoutPanel { AutoScroll = true, Dock = DockStyle.Fill, Padding = new Padding(8) };
         readonly bool flat;
+        readonly Dictionary<string, Bitmap> thumbnails = new Dictionary<string, Bitmap>();
         internal Func<IWin32Window, bool, GraphicDefinition> ChooseGraphic;
         internal Func<IWin32Window, GraphicDefinition, GraphicDefinition> EditCrop;
         internal Func<bool> CanAccept;
         internal List<FillVariant> Fills { get; private set; }
         internal string TerrainName { get { return name.Text.Trim(); } }
         internal bool ApplyToMap { get { return apply.Checked; } }
+        internal bool PreserveLayout { get { return preserve.Checked; } }
+        internal Point? ClosingClick;
+        internal int ClosingClickTime;
         internal AppearancePoolDialog(string title, string initialName, List<FillVariant> fills, bool existing, bool flat, string applyCaption)
         {
             Text = title; this.flat = flat; Fills = FillRules.Copy(fills);
@@ -31,18 +36,22 @@ namespace HexMapEditor
                 header.Controls.Add(name); header.Controls.Add(new Label { Text = "Nazwa", Location = new Point(12, 13), AutoSize = true });
             }
             header.Controls.Add(new Label { Text = "Warianty wyglądu — kliknij kafelek, aby go edytować.", Location = new Point(12, initialName == null ? 8 : 44), AutoSize = true });
-            var footer = new Panel { Dock = DockStyle.Bottom, Width = ClientSize.Width, Height = 84 };
+            var footer = new Panel { Dock = DockStyle.Bottom, Width = ClientSize.Width, Height = 110 };
             apply.Text = applyCaption; apply.Enabled = existing; apply.Location = new Point(12, 8);
-            var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(240, 46, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
-            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(352, 46, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            preserve.Location = new Point(12, 33); apply.CheckedChanged += (s,e) => preserve.Enabled = apply.Checked;
+            var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(240, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(352, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            foreach (var button in new[] { accept, cancel }) button.MouseDown += (s,e) =>
+            { if (e.Button == MouseButtons.Left) { ClosingClick = ((Control)s).PointToScreen(e.Location); ClosingClickTime = MainWindow.GetMessageTime(); } };
             accept.Click += (s, e) =>
             {
                 if (initialName != null && TerrainName.Length == 0) return;
                 if (CanAccept == null || CanAccept()) DialogResult = DialogResult.OK;
             };
-            footer.Controls.AddRange(new Control[] { apply, accept, cancel });
+            footer.Controls.AddRange(new Control[] { apply, preserve, accept, cancel });
             Controls.Add(tiles); Controls.Add(header); Controls.Add(footer);
             AcceptButton = accept; CancelButton = cancel; Rebuild();
+            Disposed += (s,e) => { foreach (var image in thumbnails.Values) image.Dispose(); thumbnails.Clear(); };
         }
         void Rebuild()
         {
@@ -50,21 +59,28 @@ namespace HexMapEditor
             try
             {
                 foreach (Control child in tiles.Controls.Cast<Control>().ToArray()) child.Dispose();
+                var needed = new HashSet<string>(Fills.Where(f => f.Graphic != null).Select(f => f.GraphicId));
+                foreach (var key in thumbnails.Keys.Where(k => !needed.Contains(k)).ToArray()) { thumbnails[key].Dispose(); thumbnails.Remove(key); }
                 for (int i = 0; i < Fills.Count; i++)
                 {
                     int index = i; var fill = Fills[i];
                     var tile = new Button { Width = 96, Height = 80, BackColor = ColorTranslator.FromHtml(fill.Color), ForeColor = Color.White,
                         Text = fill.Graphic == null ? fill.Color : "", AccessibleName = "Wariant " + (i + 1), FlatStyle = FlatStyle.Flat };
-                    if (fill.Graphic != null) { tile.BackgroundImage = TerrainTextures.Decode(fill.Graphic, flat); tile.BackgroundImageLayout = ImageLayout.Zoom; }
+                    if (fill.Graphic != null)
+                    {
+                        Bitmap thumbnail;
+                        if (!thumbnails.TryGetValue(fill.GraphicId, out thumbnail)) thumbnails.Add(fill.GraphicId, thumbnail = TerrainTextures.Decode(fill.Graphic, flat));
+                        tile.BackgroundImage = thumbnail; tile.BackgroundImageLayout = ImageLayout.Zoom;
+                    }
                     var menu = new ContextMenuStrip();
                     var remove = menu.Items.Add("Usuń wariant"); remove.Enabled = Fills.Count > 1;
                     remove.Click += (s, e) => { Fills.RemoveAt(index); Rebuild(); };
                     tile.ContextMenuStrip = menu;
-                    tile.Disposed += (s, e) => { if (tile.BackgroundImage != null) tile.BackgroundImage.Dispose(); menu.Dispose(); };
+                    tile.Disposed += (s, e) => menu.Dispose();
                     tile.Click += (s, e) => Edit(index);
                     tiles.Controls.Add(tile);
                 }
-                var add = new Button { Text = "+", Width = 60, Height = 80, Enabled = Fills.Count < 32, AccessibleName = "Dodaj wariant koloru lub grafiki" };
+                var add = new Button { Text = "+", Width = 60, Height = 80, Enabled = Fills.Count < GraphicLimits.Pool, AccessibleName = "Dodaj wariant koloru lub grafiki" };
                 add.Click += (s, e) => Edit(-1); tiles.Controls.Add(add);
             }
             finally { tiles.ResumeLayout(true); }

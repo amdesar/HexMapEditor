@@ -20,10 +20,11 @@ namespace HexMapEditor
                     inner.Y + (inner.Height - FillImage.Height * factor) / 2, FillImage.Width * factor, FillImage.Height * factor);
                 e.Graphics.Restore(state);
             }
-            using (var shade = new SolidBrush(Color.FromArgb(150, Color.Black)))
-                e.Graphics.FillRectangle(shade, inner.X, inner.Y + (inner.Height - Font.Height - 2) / 2, inner.Width, Font.Height + 2);
-            TextRenderer.DrawText(e.Graphics, Text, Font, inner, Color.White, TextFormatFlags.HorizontalCenter |
-                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+            var flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
+            var outline = ForeColor == Color.Black ? Color.White : Color.Black;
+            for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) if (x != 0 || y != 0)
+                TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(inner.X+x, inner.Y+y, inner.Width, inner.Height), outline, flags);
+            TextRenderer.DrawText(e.Graphics, Text, Font, inner, ForeColor, flags);
             if (Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(inner, -1, -1));
         }
     }
@@ -58,7 +59,7 @@ namespace HexMapEditor
         }
         public void UpdateTerrain(TerrainDefinition terrain, bool selected)
         {
-            TerrainId = terrain.TerrainId; Choose.Text = terrain.Name; var color = ColorTranslator.FromHtml(terrain.Color); Choose.BackColor = color; Choose.ForeColor = color.R * .299 + color.G * .587 + color.B * .114 > 145 ? Color.Black : Color.White;
+            TerrainId = terrain.TerrainId; Choose.Text = terrain.Name; var color = ColorTranslator.FromHtml(terrain.Color); Choose.BackColor = color;
             if (thumbnailId != terrain.TextureId || thumbnailColor != terrain.Color)
             {
                 var old = Choose.FillImage;
@@ -69,7 +70,22 @@ namespace HexMapEditor
                 {
                     Choose.FillImage = TerrainTextures.Decode(terrain.Texture);
                 }
+                double luminance = color.R * .299 + color.G * .587 + color.B * .114;
+                var image = Choose.FillImage as Bitmap;
+                if (image != null)
+                {
+                    double sum = 0;
+                    for (int y = 0; y < 4; y++) for (int x = 0; x < 8; x++)
+                    {
+                        var pixel = image.GetPixel((x*2+1)*image.Width/16, (int)((.42+y*.04)*image.Height));
+                        double alpha = pixel.A / 255.0;
+                        sum += alpha*(pixel.R*.299+pixel.G*.587+pixel.B*.114)+(1-alpha)*luminance;
+                    }
+                    luminance = sum / 32;
+                }
+                Choose.ForeColor = luminance > 145 ? Color.Black : Color.White;
             }
+            else { /* Preserve the cached single text color for an unchanged graphic. */ }
             Choose.FlatAppearance.BorderColor = selected ? Color.Gold : Color.Gray; Choose.FlatAppearance.BorderSize = selected ? 3 : 1; Choose.AccessibleName = "Teren: " + terrain.Name; Choose.AccessibleDescription = selected ? "Wybrany" : "Niewybrany";
             Edit.AccessibleName = "Edytuj teren " + terrain.Name; Delete.AccessibleName = "Usuń teren " + terrain.Name;
             tips.SetToolTip(Choose, terrain.Name + " · wersja " + terrain.Revision + " · warianty: " + terrain.Variants.Count); tips.SetToolTip(Edit, "Edytuj teren (F2)"); tips.SetToolTip(Delete, "Usuń teren (Delete)");

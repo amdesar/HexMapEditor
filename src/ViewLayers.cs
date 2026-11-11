@@ -74,7 +74,7 @@ namespace HexMapEditor
             var menu = new ContextMenuStrip { BackColor = Color.FromArgb(34, 38, 48), ForeColor = Color.WhiteSmoke,
                 Renderer = new ToolStripProfessionalRenderer(new FitMenuColors()) };
             layerItems = new ToolStripMenuItem[LayerNames.Length];
-            for (int i = 0; i < layerItems.Length; i++)
+            foreach (int i in new[] { (int)MapLayer.Background, (int)MapLayer.Terrain, (int)MapLayer.Icons, (int)MapLayer.Objects, (int)MapLayer.Fog })
             {
                 var layer = (MapLayer)i;
                 var item = new ToolStripMenuItem(LayerNames[i]);

@@ -9,10 +9,11 @@ namespace HexMapEditor
 {
     internal static class TerrainTextures
     {
-        internal const int Resolution = 256;
-        internal const int MaxPresetBytes = 112 * 1024 * 1024;
+        internal const int Resolution = GraphicLimits.TileSide;
+        internal const int MaxPresetBytes = GraphicLimits.PresetBytes;
         internal static bool Same(GraphicDefinition a, GraphicDefinition b)
         {
+            if (Object.ReferenceEquals(a, b)) return true;
             return a.Id == b.Id && a.SourceId == b.SourceId && GraphicSources.Same(a.Source, b.Source) &&
                 MapLogic.Serializer().Serialize(new { a.Pointy, a.Flat, a.Linked }) == MapLogic.Serializer().Serialize(new { b.Pointy, b.Flat, b.Linked });
         }
@@ -29,7 +30,7 @@ namespace HexMapEditor
                 }
                 else result.Add(asset.Id, asset);
             }
-            if (result.Count > 256) throw new InvalidDataException("Limit 256 definicji grafik.");
+            if (result.Count > GraphicLimits.Definitions) throw new InvalidDataException("Limit 256 definicji grafik.");
             GraphicSources.Collect(result.Values.Select(a => a.Source));
             return result.Values.ToList();
         }
@@ -127,7 +128,7 @@ namespace HexMapEditor
             Bitmap bitmap;
             if (!terrainBitmaps.TryGetValue(key, out bitmap))
             {
-                if (terrainBitmaps.Count >= 256)
+                if (terrainBitmaps.Count >= GraphicLimits.TileCacheEntries)
                 {
                     string oldest = terrainBitmapUses.OrderBy(item => item.Value).First().Key;
                     terrainBitmaps[oldest].Dispose(); terrainBitmaps.Remove(oldest); terrainBitmapUses.Remove(oldest);
