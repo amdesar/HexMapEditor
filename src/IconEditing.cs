@@ -17,6 +17,7 @@ namespace HexMapEditor
         HashSet<int> protectedFogCells=new HashSet<int>();
         RegionState[] bucketOrigin;
         PointF? previousStrokePoint;
+        bool strokeDark, strokeDarkValue;
         bool iconMaterial, strokeIcons, strokeFog, strokeRemoveIcon, strokeFogValue, strokeStarted;
         string activeIcon, strokeIcon, strokeEntry, strokeName;
         IconAsset strokeAsset;
@@ -99,23 +100,25 @@ namespace HexMapEditor
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
             var terrainAssets = TerrainTextures.Collect(DocumentGraphics());
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), FogPalette = map.FogPalette, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), FogPalette = map.FogPalette, DarkPalette=map.DarkPalette, Ink=map.Ink, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {
             strokeStarted = true;
             strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear();
-            bucketProcessed.Clear(); bucketOrigin = tool == EditorTool.Bucket || tool == EditorTool.FogBucket ? map.Cells.Select(c => new RegionState(c)).ToArray() : null;
-            strokeFog = tool == EditorTool.FogBrush || tool == EditorTool.FogBucket; strokeIcons = !strokeFog && iconMaterial;
+            bucketProcessed.Clear(); bucketOrigin = tool == EditorTool.Bucket || tool == EditorTool.FogBucket || tool == EditorTool.DarkBucket ? map.Cells.Select(c => new RegionState(c)).ToArray() : null;
+            strokeFog = tool == EditorTool.FogBrush || tool == EditorTool.FogBucket; strokeDark = tool==EditorTool.DarkBrush||tool==EditorTool.DarkBucket; strokeIcons = !strokeFog && !strokeDark && iconMaterial;
             protectedFogCells=strokeFog?EffectiveFogCoverage(map):new HashSet<int>();
             var entry = libraryIcons.FirstOrDefault(a => a.Id == activeIcon); strokeAsset = entry == null ? null : entry.Asset; strokeIcon = strokeAsset == null ? null : strokeAsset.Id; strokeEntry = entry == null ? null : entry.Id; strokeName = entry == null ? null : entry.Name;
-            strokeRemoveIcon = strokeIcons && strokeIcon != null && (map.Cells[start].IconEntryId ?? map.Cells[start].IconId) == strokeEntry; strokeFogValue = !map.Cells[start].Fog;
+            strokeRemoveIcon = strokeIcons && strokeIcon != null && (map.Cells[start].IconEntryId ?? map.Cells[start].IconId) == strokeEntry; strokeFogValue = !map.Cells[start].Fog; strokeDarkValue=!map.Cells[start].Darkness;
         }
         void PaintMaterial(int index)
         {
             if (!strokeVisited.Add(index)) return;
-            if (!strokeFog && !strokeIcons) { PaintCell(index); return; }
-            var cell = map.Cells[index]; string nextIcon = strokeRemoveIcon ? ((cell.IconEntryId ?? cell.IconId) == strokeEntry ? null : cell.IconId) : strokeIcon;
+            if (!strokeFog && !strokeDark && !strokeIcons) { PaintCell(index); return; }
+            var cell = map.Cells[index];
+            if(strokeDark){if(cell.Darkness==strokeDarkValue)return;var dark=new LayerChange{CellId=cell.Id,Dark=true,BeforeDark=cell.Darkness,AfterDark=strokeDarkValue};if(strokeDarkValue){dark.DarkAppearance=true;dark.BeforeDarkFill=cell.DarkFill.Copy();dark.AfterDarkFill=NextFill(map.DarkPalette);}layerBefore.Add(index,dark);dark.Apply(cell,true);if(index==selected){editorCellId=null;UpdateUI();}else canvas.Invalidate();return;}
+            string nextIcon = strokeRemoveIcon ? ((cell.IconEntryId ?? cell.IconId) == strokeEntry ? null : cell.IconId) : strokeIcon;
             bool targetFog=strokeFogValue&&!protectedFogCells.Contains(index);
             if (strokeFog ? cell.Fog == targetFog : strokeIcon == null || (cell.IconId == nextIcon && (strokeRemoveIcon || (cell.IconEntryId == strokeEntry && cell.IconName == strokeName)))) return;
             if (strokeIcons && !strokeRemoveIcon && !map.IconAssets.Any(a => a.Id == strokeIcon))
@@ -136,10 +139,10 @@ namespace HexMapEditor
         void VisitBucketRegion(int start)
         {
             if (bucketOrigin == null || bucketProcessed.Contains(start)) return;
-            var region = MapLogic.Flood(map, start, bucketOrigin, strokeFog);
+            var region = MapLogic.Flood(map, start, bucketOrigin, strokeFog, strokeDark);
             foreach (int index in region) bucketProcessed.Add(index);
             // Passing over opposite fog does not reverse the mode fixed at gesture start.
-            if (strokeFog && bucketOrigin[start].Fog == strokeFogValue) return;
+            if (strokeFog && bucketOrigin[start].Fog == strokeFogValue || strokeDark && bucketOrigin[start].Darkness == strokeDarkValue) return;
             foreach (int index in region) { if (!strokeStarted) break; PaintMaterial(index); }
         }
         void PaintAlong(Point mouse, int hit)
@@ -162,7 +165,7 @@ namespace HexMapEditor
         }
         void DrawBrushPreview(Graphics graphics)
         {
-            if (previewCell < 0 || (currentTool != EditorTool.Brush && currentTool != EditorTool.FogBrush)) return;
+            if (previewCell < 0 || (currentTool != EditorTool.Brush && currentTool != EditorTool.FogBrush && currentTool != EditorTool.DarkBrush)) return;
             using (var pen = new Pen(Color.FromArgb(210, 130, 220, 255), 1.6f)) foreach (int i in BrushGeometry.Stamp(map, previewCell, brushShape, brushSize, brushHeight, brushFilled)) using (var path = HexPath(ScreenCenter(i % map.Columns, i / map.Columns), BaseRadius * scale * .94f)) graphics.DrawPath(pen, path);
         }
     }

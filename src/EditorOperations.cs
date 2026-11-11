@@ -9,12 +9,12 @@ namespace HexMapEditor
     {
         void NameEdited()
         {
-            if (updating || selected < 0 || map.Cells[selected].Fog && !previewWithoutFog) return; var cell = map.Cells[selected];
+            if (updating || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
             var history = textHistory.For(cell.Id, "name", cell.Name); history.Record(cellName.Text, cellName.EditKind); textHistory.Trim(); cell.Name = cellName.Text; MarkCellDirty(cell);
         }
         void DescriptionEdited(string document, string plain, string kind)
         {
-            if (updating || selected < 0 || map.Cells[selected].Fog && !previewWithoutFog) return; var cell = map.Cells[selected];
+            if (updating || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
             if (cell.RichDescription == null && document == NoteCodec.Write(NoteCodec.FromPlain(cell.Description))) return;
             string initial = DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, "description", initial); history.Record("rich:" + document, kind); textHistory.Trim();
@@ -22,7 +22,7 @@ namespace HexMapEditor
         }
         void TextUndo(string field, bool repeat)
         {
-            if (selected < 0 || map.Cells[selected].Fog && !previewWithoutFog) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
+            if (selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
             string initial = field == "name" ? cell.Name : DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, field, initial); int before = history.Cursor;
             string value = repeat ? history.Redo() : history.Undo(); if (before == history.Cursor) return;
@@ -48,6 +48,9 @@ namespace HexMapEditor
             if (action.ObjectLibraryChange != null) ApplyObjectLibrary(action.ObjectLibraryChange, after);
             if (action.StateFileChange != null) ApplyStateFile(action.StateFileChange, after);
             if (action.TerrainGraphicChange != null) ApplyTerrainGraphic(action.TerrainGraphicChange, after);
+            if(action.BeforeInk!=null)map.Ink=new List<InkStroke>(after?action.AfterInk:action.BeforeInk);
+            if(action.BeforeDarkPalette!=null)map.DarkPalette=FillRules.Copy(after?action.AfterDarkPalette:action.BeforeDarkPalette);
+            InvalidateLight();
             if (action.BeforeFogPalette != null) map.FogPalette = FillRules.Copy(after ? action.AfterFogPalette : action.BeforeFogPalette);
             if (action.BackgroundChange)
             {

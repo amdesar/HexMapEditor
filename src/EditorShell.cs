@@ -44,6 +44,9 @@ namespace HexMapEditor
                 else if(key=="lasso"){g.DrawEllipse(p,3,3,16,12);g.DrawBezier(p,new Point(8,14),new Point(2,22),new Point(16,21),new Point(12,15));}
                 else if (key == "hand") { g.DrawEllipse(p, 5, 8, 12, 12); for (int x = 5; x <= 17; x += 4) g.DrawLine(p, x, 10, x, 2 + Math.Abs(x - 11) / 2); }
                 else if (key == "brush") { using (var handle = new Pen(Color.FromArgb(218, 170, 91), 4)) g.DrawLine(handle, 18, 2, 10, 12); g.FillPolygon(Brushes.WhiteSmoke, new[] { new Point(8, 10), new Point(13, 14), new Point(10, 20), new Point(2, 20), new Point(5, 16) }); }
+                else if(key=="stylus"){g.DrawLine(p,4,20,18,4);g.DrawLine(p,3,21,8,19);g.DrawEllipse(p,14,1,7,7);}
+                else if(key=="eraser"){g.FillPolygon(Brushes.Salmon,new[]{new Point(2,15),new Point(13,3),new Point(22,12),new Point(11,23)});g.DrawLine(p,2,15,11,23);g.DrawLine(p,10,7,19,16);}
+                else if(key=="dark"||key=="darkbucket"){g.FillEllipse(Brushes.Black,2,2,20,20);g.DrawEllipse(p,2,2,20,20);if(key=="darkbucket")g.DrawLine(p,2,22,22,22);}
                 else if (key == "fog" || key == "fogbucket") { g.FillEllipse(Brushes.SlateGray, 1, 9, 20, 10); g.FillEllipse(Brushes.LightSlateGray, 4, 4, 10, 12); g.FillEllipse(Brushes.LightSlateGray, 10, 7, 10, 11); if (key == "fogbucket") g.DrawLine(p, 2, 21, 20, 21); }
                 else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 11), new Point(10, 3), new Point(18, 11), new Point(10, 19) }); g.DrawLine(p, 3, 11, 17, 11); g.DrawEllipse(p, 18, 13, 3, 5); }
                 else if (key == "pencil") { g.DrawPolygon(p, new[] { new Point(3, 19), new Point(5, 12), new Point(15, 2), new Point(20, 7), new Point(10, 17) }); g.DrawLine(p, 12, 5, 17, 10); }

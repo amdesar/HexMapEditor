@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,12 +43,14 @@ namespace HexMapEditor
         }
         internal static void Map(Dictionary<string, object> raw)
         {
-            Tables(raw); Fields(raw, "Presets", "Cells", "FogPalette", "Background");
+            Tables(raw); Fields(raw, "Presets", "Cells", "FogPalette", "Background", "Ink", "DarkPalette");
+            foreach(var fill in Array(raw["DarkPalette"]))Fill(fill);
+            foreach(var stroke in Array(raw["Ink"])) {var row=Fields(stroke,"Id","Color","Width","Points");foreach(var point in Array(row["Points"]))Fields(point,"X","Y");}
             foreach (var preset in Array(raw["Presets"])) Preset(preset);
             foreach (var fill in Array(raw["FogPalette"])) Fill(fill);
             foreach (var cell in Array(raw["Cells"]))
             {
-                var row = Fields(cell, "FillVariantId", "TextureId", "FogFill"); Fill(row["FogFill"]);
+                var row = Fields(cell, "FillVariantId", "TextureId", "FogFill", "DarkFill", "Darkness"); Fill(row["FogFill"]); Fill(row["DarkFill"]); if(!(row["Darkness"] is bool))throw new InvalidDataException("Brak bazowej ciemności.");
             }
             if (raw["Background"] != null) Fields(raw["Background"], "SourceId", "Left", "Top", "Width", "Height", "Opacity", "Saturation", "Blur");
         }

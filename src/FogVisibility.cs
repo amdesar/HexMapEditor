@@ -15,6 +15,10 @@ namespace HexMapEditor
 
         public static double VisibleFraction(MapData map, RectangleF bounds)
         {
+            return VisibleFraction(map,bounds,i=>map.Cells[i].Fog);
+        }
+        public static double VisibleFraction(MapData map,RectangleF bounds,Func<int,bool> hidden)
+        {
             double area = (double)bounds.Width * bounds.Height;
             if (area <= 0) return 1;
             bool flat = map.Orientation == "FlatTop";
@@ -28,7 +32,7 @@ namespace HexMapEditor
             for (int row = firstRow; row <= lastRow; row++)
             for (int col = firstCol; col <= lastCol; col++)
             {
-                if (!map.Cells[row * map.Columns + col].Fog) continue;
+                if (!hidden(row * map.Columns + col)) continue;
                 double x = stepX * (col + (flat ? 0 : ((row + map.RowParity) & 1) * .5));
                 double y = stepY * (row + (flat ? ((col + map.ColumnParity) & 1) * .5 : 0));
                 if (x + Radius <= bounds.Left || x - Radius >= bounds.Right ||

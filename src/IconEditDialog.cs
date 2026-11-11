@@ -7,6 +7,11 @@ namespace HexMapEditor
 {
     internal sealed class IconEditDialog : EditorDialog
     {
+        readonly CheckBox light=new CheckBox{Text="Światło nowych instancji",AutoSize=true};
+        readonly NumericUpDown radius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
+        public bool DefaultLight{get{return light.Checked;}}
+        public int DefaultLightRadius{get{return (int)radius.Value;}}
+        public void SetLightDefaults(bool enabled,int value){light.Checked=enabled;radius.Value=value;}
         readonly TextBox name = new TextBox { MaxLength = 200 };
         readonly CheckBox update = new CheckBox { Text = "Zaktualizuj wystąpienia na bieżącej mapie", AutoSize = true, Checked = false };
         readonly PictureBox preview = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom };
@@ -16,6 +21,7 @@ namespace HexMapEditor
         public bool UpdateMap { get { return update.Checked; } }
         public IconEditDialog(LibraryIcon icon, Func<IWin32Window, LibraryIcon> pick, Func<IWin32Window, LibraryIcon> other = null, string title = "Edytuj ikonę") : base(title,other == null ? 335 : 375)
         {
+            if(title!="Edytuj ikonę")ClientSize=new Size(ClientSize.Width,ClientSize.Height+72);
             if(title!="Edytuj ikonę")update.Text="Zaktualizuj grafikę instancji na tej mapie";
             Asset=icon.Asset;name.Text=icon.Name;Row(0,"Nazwa",name,true);
             var file=new Button { Text="Grafika z pliku…" };Row(1,"Podmień",file,true);
@@ -23,6 +29,7 @@ namespace HexMapEditor
             int row=3; Button cross=null;
             if(other!=null){cross=new Button{Text=title=="Edytuj ikonę"?"Z biblioteki obiektów":"Z biblioteki ikon"};Row(row++,"Inna biblioteka",cross,true);}
             Row(row,"Podgląd",preview,true);Layout.RowStyles[row++].Height=90;
+            if(title!="Edytuj ikonę"){Row(row++,"Nowe instancje",light,true);Row(row++,"Promień światła",radius,true);light.CheckedChanged+=(s,e)=>radius.Enabled=light.Checked;radius.Enabled=false;}
             Layout.Controls.Add(update,0,row++);Layout.SetColumnSpan(update,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Buttons(row,()=>{if(IconName.Length>0 && (CanAccept == null || CanAccept()))DialogResult=DialogResult.OK;});
             Action show=()=>{var old=preview.Image;preview.Image=IconAssets.Decode(Asset);if(old!=null)old.Dispose();};show();
             choices.Click+=(s,e)=>{var chosen=pick(this);if(chosen!=null){Asset=chosen.Asset;show();}};

@@ -166,6 +166,9 @@ namespace HexMapEditor
         }
 
         GraphicDefinition ChooseTerrainGraphic(IWin32Window owner, bool import)
+        {return ChooseTerrainGraphicCore(owner,import,false);}
+        void ManageTerrainGraphics(){RunModal(()=>ChooseTerrainGraphicCore(this,false,true));}
+        GraphicDefinition ChooseTerrainGraphicCore(IWin32Window owner, bool import, bool manage)
         {
             try
             {
@@ -180,7 +183,7 @@ namespace HexMapEditor
                     var entry = ImportTerrainGraphic(owner);
                     return entry == null ? null : entry.Asset.DocumentCopy();
                 }
-                using (var picker = new TerrainGraphicPicker(() => terrainGraphics, map.Orientation == "FlatTop"))
+                using (var picker = new TerrainGraphicPicker(() => terrainGraphics, map.Orientation == "FlatTop", manage))
                 {
                     picker.Import = () => ImportTerrainGraphic(picker);
                     picker.Edit = item => EditTerrainGraphic(picker, item);

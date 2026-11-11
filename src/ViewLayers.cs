@@ -4,18 +4,20 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal enum MapLayer { Terrain, Icons, Objects, Fog, Background }
+    internal enum MapLayer { Terrain, Icons, Objects, Fog, Background, Darkness, Ink }
 
     public sealed partial class MainWindow
     {
-        bool hideTerrain, hideIcons, hideObjects;
+        bool hideTerrain, hideIcons, hideObjects, hideDarkness, hideInk;
         ToolStripMenuItem[] layerItems;
-        static readonly string[] LayerNames = { "Tereny", "Ikony", "Obiekty", "Mgła", "Tło" };
+        static readonly string[] LayerNames = { "Tereny", "Ikony", "Obiekty", "Mgła", "Tło", "Ciemność", "Rysik" };
 
         bool LayerVisible(MapLayer layer)
         {
             switch (layer)
             {
+                case MapLayer.Darkness: return !hideDarkness;
+                case MapLayer.Ink: return !hideInk;
                 case MapLayer.Terrain: return !hideTerrain;
                 case MapLayer.Icons: return !hideIcons;
                 case MapLayer.Objects: return !hideObjects;
@@ -29,6 +31,8 @@ namespace HexMapEditor
             EndCanvasGesture(true);
             switch (layer)
             {
+                case MapLayer.Darkness: hideDarkness=!visible; editorCellId=null; break;
+                case MapLayer.Ink: hideInk=!visible; break;
                 case MapLayer.Terrain: hideTerrain = !visible; break;
                 case MapLayer.Icons: hideIcons = !visible; break;
                 case MapLayer.Objects: hideObjects = !visible; break;
@@ -62,6 +66,8 @@ namespace HexMapEditor
 
         bool GuardCanvasLayer()
         {
+            if(currentTool==EditorTool.Stylus||currentTool==EditorTool.Eraser)return GuardLayer(MapLayer.Ink);
+            if(currentTool==EditorTool.DarkBrush||currentTool==EditorTool.DarkBucket)return GuardLayer(MapLayer.Darkness);
             if (currentTool == EditorTool.FogBrush || currentTool == EditorTool.FogBucket) return GuardLayer(MapLayer.Fog);
             if (currentTool == EditorTool.Brush && objectMaterial) return GuardLayer(MapLayer.Objects);
             if ((currentTool == EditorTool.Brush || currentTool == EditorTool.Bucket) && !noMaterial && !objectMaterial)
@@ -74,7 +80,7 @@ namespace HexMapEditor
             var menu = new ContextMenuStrip { BackColor = Color.FromArgb(34, 38, 48), ForeColor = Color.WhiteSmoke,
                 Renderer = new ToolStripProfessionalRenderer(new FitMenuColors()) };
             layerItems = new ToolStripMenuItem[LayerNames.Length];
-            foreach (int i in new[] { (int)MapLayer.Background, (int)MapLayer.Terrain, (int)MapLayer.Icons, (int)MapLayer.Objects, (int)MapLayer.Fog })
+            foreach (int i in new[] { (int)MapLayer.Background, (int)MapLayer.Terrain, (int)MapLayer.Icons, (int)MapLayer.Objects, (int)MapLayer.Darkness, (int)MapLayer.Fog, (int)MapLayer.Ink })
             {
                 var layer = (MapLayer)i;
                 var item = new ToolStripMenuItem(LayerNames[i]);

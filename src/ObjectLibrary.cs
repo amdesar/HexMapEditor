@@ -15,8 +15,10 @@ namespace HexMapEditor
         public string Name {get;set;}
         public IconAsset Asset {get;set;}
         public long LibraryOrder { get; set; }
+        public bool LightEnabled {get;set;}
+        public int LightRadius {get;set;}
         internal string FilePath; internal byte[] DiskBytes;
-        public ObjectTemplate(){ObjectFormatVersion=1;Id=Guid.NewGuid().ToString("N");}
+        public ObjectTemplate(){ObjectFormatVersion=1;LightRadius=1;Id=Guid.NewGuid().ToString("N");}
         internal ObjectTemplate Copy(){return (ObjectTemplate)MemberwiseClone();}
         internal LibraryIcon Graphic(){return new LibraryIcon{Id=Id,Name=Name,Asset=Asset};}
     }
@@ -28,7 +30,7 @@ namespace HexMapEditor
     }
     internal static class ObjectLibrary
     {
-        public static void Validate(ObjectTemplate o){if(o==null||o.ObjectFormatVersion!=1||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200)throw new InvalidDataException("Nieprawidłowy wzorzec obiektu.");using(var image=IconAssets.Decode(o.Asset)){} }
+        public static void Validate(ObjectTemplate o){if(o==null||o.ObjectFormatVersion!=1||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200||o.LightRadius<0||o.LightRadius>20)throw new InvalidDataException("Nieprawidłowy wzorzec obiektu.");using(var image=IconAssets.Decode(o.Asset)){} }
         public static ObjectTemplate Read(string path){if(new FileInfo(path).Length>3*1024*1024)throw new InvalidDataException("Za duży plik obiektu.");var bytes=File.ReadAllBytes(path);var o=MapLogic.Serializer().Deserialize<ObjectTemplate>(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF'));Validate(o);o.FilePath=Path.GetFullPath(path);o.DiskBytes=bytes;return o;}
         public static string Destination(string directory,string name,string current){var path=PresetFiles.Destination(directory,"object-"+PresetFiles.Stem(name),current);if(!Path.GetFileName(path).StartsWith("object-",StringComparison.Ordinal))throw new IOException("Za długa ścieżka obiektu.");return path;}
         public static List<ObjectTemplate> Load(string directory,out string warning)
@@ -70,11 +72,12 @@ namespace HexMapEditor
         }
         void ImportObjectFile(){using(var d=new OpenFileDialog{Title="Dodaj wzorzec obiektu",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)try{var asset=IconAssets.Import(d.FileName);SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false);}catch(Exception ex){ShowEditorMessage(ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
         void EditObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial){ShowEditorMessage("Zaznacz wzorzec obiektu","Edytuj obiekt",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}using(var d=new IconEditDialog(before.Graphic(),PickObjectGraphic,PickLibraryIcon,"Edytuj wzorzec obiektu")){
+                d.SetLightDefaults(before.LightEnabled,before.LightRadius);
                 d.CanAccept = () => !d.UpdateMap || !map.Objects.Any(obj => obj.TemplateId == before.Id) || GuardLayer(MapLayer.Objects, d);
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
                 var next = before.Copy();
                 next.Name = d.IconName;
-                next.Asset = d.Asset;
+                next.Asset = d.Asset; next.LightEnabled=d.DefaultLight; next.LightRadius=d.DefaultLightRadius;
                 SaveObjectTemplate(before, next, d.UpdateMap);
             }}
         void DeleteObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial)return;if(ShowEditorMessage("Usunąć wzorzec „"+before.Name+"”? Instancje na mapie pozostaną.\nBez Kosza: kopia w pamięci Undo, do 300 wpisów. Nowa/Otwórz, wypadnięcie wpisu lub zamknięcie programu usuwa możliwość cofnięcia.","Usuń wzorzec",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)SaveObjectTemplate(before,null,false);}

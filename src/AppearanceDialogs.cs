@@ -42,7 +42,7 @@ namespace HexMapEditor
             header.Controls.Add(new Label { Text = "Warianty wyglądu — kliknij kafelek, aby go edytować.", Location = new Point(12, initialName == null ? 8 : 44), AutoSize = true });
             undoLocal.Location = new Point(12, initialName == null ? 32 : 68); redoLocal.Location = new Point(54, undoLocal.Top);
             tips.SetToolTip(undoLocal, "Cofnij wariant (Ctrl+Z). Lokalna historia: 100 operacji; nie cofa plików biblioteki.");
-            tips.SetToolTip(redoLocal, "Ponów wariant (Ctrl+Y / Ctrl+Shift+Z). Historia tylko tego edytora.");
+            tips.SetToolTip(redoLocal, "Ponów wariant (Ctrl+Y). Historia tylko tego edytora.");
             undoLocal.Click += (s,e) => LocalHistory(false); redoLocal.Click += (s,e) => LocalHistory(true);
             header.Controls.AddRange(new Control[] { undoLocal, redoLocal });
             var footer = new Panel { Dock = DockStyle.Bottom, Width = ClientSize.Width, Height = 110 };
@@ -133,8 +133,9 @@ namespace HexMapEditor
         }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == (Keys.Control | Keys.Shift | Keys.Z)) return true;
             bool undo = keyData == (Keys.Control | Keys.Z);
-            bool redo = keyData == (Keys.Control | Keys.Y) || keyData == (Keys.Control | Keys.Shift | Keys.Z);
+            bool redo = keyData == (Keys.Control | Keys.Y);
             if (undo || redo)
             {
                 // Owned modal editors route to themselves. A focused TextBox retains native text undo.
@@ -152,7 +153,8 @@ namespace HexMapEditor
             base.OnPaint(e);
             using(var pen=new Pen(Enabled ? ForeColor : Color.Gray,2.5f))
             {
-                int x=ClientSize.Width/2,y=ClientSize.Height/2;
+                float x=(ClientSize.Width-1)/2f,y=(ClientSize.Height-1)/2f;
+                e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 e.Graphics.DrawLine(pen,x-4,y-4,x+4,y+4); e.Graphics.DrawLine(pen,x+4,y-4,x-4,y+4);
             }
         }

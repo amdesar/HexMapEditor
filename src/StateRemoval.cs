@@ -56,7 +56,7 @@ namespace HexMapEditor
             foreach (var obj in map.Objects.Where(item => item.Side == id))
             {
                 var group = GroupRules.For(map, obj.Id);
-                string name = !previewWithoutFog && ObjectFogLevel(obj) != 0 ? "???" : obj.Name;
+                string name = ObjectFogLevel(obj) != 0 ? "???" : obj.Name;
                 uses.Add("Baza: " + name + (group != null && group.StateId != null ? " (pod nakładką grupy)" : ""));
             }
             uses.AddRange(map.Groups.Where(group => group.StateId == id).Select(group => "Nakładka grupy: " + group.Name));

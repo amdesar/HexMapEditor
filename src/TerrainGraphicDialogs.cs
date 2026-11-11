@@ -26,7 +26,7 @@ namespace HexMapEditor
             float radius = Math.Max(1, Math.Min(Width, Height) / 2f - 3);
             PaintHex(e.Graphics, center, radius, flat, BackColor, image);
         }
-        internal static void PaintHex(Graphics g, PointF center, float radius, bool flat, Color color, Bitmap image)
+        internal static void PaintHex(Graphics g, PointF center, float radius, bool flat, Color color, Bitmap image, bool outline = true)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var mask = TerrainTextures.Mask(center, radius, flat))
@@ -35,7 +35,7 @@ namespace HexMapEditor
                 g.FillPath(fill, mask);
                 if (image != null)
                     TerrainTextures.Draw(g, mask, image, new RectangleF(center.X - radius, center.Y - radius, radius * 2, radius * 2));
-                g.DrawPath(Pens.Gray, mask);
+                if (outline) g.DrawPath(Pens.Gray, mask);
             }
         }
         protected override void Dispose(bool disposing) { if (disposing && image != null) image.Dispose(); base.Dispose(disposing); }
@@ -53,7 +53,7 @@ namespace HexMapEditor
         internal Action<TerrainGraphic> Delete;
         internal TerrainGraphic Selected { get { return list.SelectedItems.Count == 1 ? (TerrainGraphic)list.SelectedItems[0].Tag : null; } }
 
-        internal TerrainGraphicPicker(Func<List<TerrainGraphic>> items, bool flat)
+        internal TerrainGraphicPicker(Func<List<TerrainGraphic>> items, bool flat, bool manage = false)
         {
             this.items = items; this.flat = flat;
             Text = "Biblioteka grafik terenów";
@@ -61,6 +61,7 @@ namespace HexMapEditor
             MinimumSize = new Size(580, 300);
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9);
+            BackColor=Color.FromArgb(34,38,48); ForeColor=Color.WhiteSmoke; list.BackColor=BackColor;list.ForeColor=ForeColor;
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 47, Padding = new Padding(6) };
             var add = new Button { Text = "Importuj…", Width = 95 };
             var edit = new Button { Text = "Edytuj…", Width = 85 };
@@ -68,6 +69,8 @@ namespace HexMapEditor
             var select = new Button { Text = "Wybierz", Width = 85 };
             var cancel = new Button { Text = "Anuluj", Width = 85, DialogResult = DialogResult.Cancel };
             buttons.Controls.AddRange(new Control[] { add, edit, remove, select, cancel });
+            foreach(Button b in buttons.Controls){b.FlatStyle=FlatStyle.Flat;b.BackColor=Color.FromArgb(49,54,67);b.ForeColor=ForeColor;}
+            select.Visible=!manage; cancel.Text=manage?"Zamknij":"Anuluj";
             Controls.Add(list);
             Controls.Add(buttons);
             list.LargeImageList = images;
@@ -75,9 +78,9 @@ namespace HexMapEditor
             edit.Click += (s, e) => Run(() => { if (Selected != null) RefreshList(Edit(Selected).Id); });
             remove.Click += (s, e) => Run(() => { if (Selected != null) { var item = Selected; Delete(item); RefreshList(item.Id); } });
             select.Click += (s, e) => { if (Selected != null) DialogResult = DialogResult.OK; };
-            list.DoubleClick += (s, e) => select.PerformClick();
+            list.DoubleClick += (s, e) => { if(!manage)select.PerformClick(); };
             list.SelectedIndexChanged += (s, e) => edit.Enabled = remove.Enabled = select.Enabled = Selected != null;
-            AcceptButton = select;
+            if(!manage)AcceptButton = select;
             CancelButton = cancel;
             RefreshList(null);
             edit.Enabled = remove.Enabled = select.Enabled = false;

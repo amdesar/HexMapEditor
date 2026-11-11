@@ -11,7 +11,7 @@ namespace HexMapEditor
     internal sealed class ObjectListRow : ListViewItem
     {
         public int DocumentIndex;
-        public double HiddenFraction;
+        public double HiddenFraction,DarkFraction;
         public Color? StateColor;
         public ObjectListRow(string name) : base(name) { }
     }
@@ -33,7 +33,7 @@ namespace HexMapEditor
             var b = (ObjectListRow)y;
             if (Direction != 0)
             {
-                int comparison = Column == 4
+                int comparison = Column == 6 ? a.DarkFraction.CompareTo(b.DarkFraction) : Column == 4
                     ? a.HiddenFraction.CompareTo(b.HiddenFraction)
                     : StringComparer.CurrentCultureIgnoreCase.Compare(a.SubItems[Column].Text, b.SubItems[Column].Text);
                 if (comparison != 0) return Direction * Math.Sign(comparison);
@@ -47,19 +47,22 @@ namespace HexMapEditor
         ObjectListRow ObjectListItem(MapObject obj)
         {
             double visible = FogVisibility.VisibleFraction(map, ObjectBounds(obj));
-            bool masked = FogVisibility.MasksDetails(visible, previewWithoutFog);
+            bool masked = MaskVisible(ObjectBounds(obj)) <= .5;
+            double darkVisible=FogVisibility.VisibleFraction(map,ObjectBounds(obj),EffectiveDarkness);
             var effective = GroupRules.Effective(map, obj);
             var state = map.ObjectStates.Single(s => s.Id == effective.Side);
             var group = GroupRules.For(map, obj.Id);
             var item = new ObjectListRow(masked ? "???" : obj.Name)
             {
                 Tag = obj.Id, ImageKey = masked ? "hidden" : obj.AssetId,
-                HiddenFraction = 1 - visible, StateColor = masked ? (Color?)null : ColorTranslator.FromHtml(state.Color)
+                HiddenFraction = 1 - visible, DarkFraction=1-darkVisible, StateColor = masked ? (Color?)null : ColorTranslator.FromHtml(state.Color)
             };
             item.SubItems.Add(masked ? "???" : state.Name);
             item.SubItems.Add(masked ? "???" : group == null ? "" : group.Name);
             item.SubItems.Add(masked ? "???" : ObjectGeometry.Hit(map, new PointF(obj.X, obj.Y)) < 0 ? "Poza mapą" : "");
             item.SubItems.Add(FogVisibility.Label(visible));
+            item.SubItems.Add(masked?"???":effective.LightEnabled?"Tak ("+effective.LightRadius+")":"Nie");
+            item.SubItems.Add(darkVisible==1?"Oświetlony":darkVisible==0?"W ciemności":"Częściowo ("+Math.Round((1-darkVisible)*100,MidpointRounding.AwayFromZero)+"% ciemności)");
             return item;
         }
 
@@ -100,7 +103,7 @@ namespace HexMapEditor
             };
             list.SizeChanged += (sender, e) =>
             {
-                int occupied = list.Columns.Cast<ColumnHeader>().Take(4).Sum(h => h.Width);
+                int occupied = list.Columns.Cast<ColumnHeader>().Where((h,i)=>i!=4).Sum(h => h.Width);
                 list.Columns[4].Width = Math.Max(215, list.ClientSize.Width - occupied);
             };
             var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
@@ -161,7 +164,7 @@ namespace HexMapEditor
                 list.Columns.Add("Stan", 150);
                 list.Columns.Add("Grupa", 145);
                 list.Columns.Add("Pozycja", 100);
-                list.Columns.Add("Mgła", 240);
+                list.Columns.Add("Mgła", 220);list.Columns.Add("Światło",100);list.Columns.Add("Oświetlenie",220);
                 foreach (ColumnHeader header in list.Columns) header.Tag = header.Text;
                 StyleInstanceList(list);
                 foreach (var obj in map.Objects)

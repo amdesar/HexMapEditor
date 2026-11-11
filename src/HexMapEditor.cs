@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -12,7 +12,7 @@ namespace HexMapEditor
 {
     public enum HexOrientation { PointyTop, FlatTop }
     public enum LabelMode { Axes, InCells, None }
-    public enum EditorTool { Select, Hand, Brush, Bucket, FogBrush, FogBucket, RectangleSelect, Lasso }
+    public enum EditorTool { Select, Hand, Brush, Bucket, FogBrush, FogBucket, RectangleSelect, Lasso, Stylus, Eraser, DarkBrush, DarkBucket }
 
     internal static class LibraryPaths
     {
@@ -53,7 +53,9 @@ namespace HexMapEditor
         public string IconEntryId { get; set; }
         public string IconName { get; set; }
         public bool Fog { get; set; }
-        public CellData() { Id = Guid.NewGuid().ToString("N"); TerrainId = UnpaintedTerrain.Id; VariantId = UnpaintedTerrain.Version; TerrainRevision = 1; Terrain = "Niepomalowany"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; FillVariantId = UnpaintedTerrain.Fill; FogFill = FillRules.FogDefault(); }
+        public bool Darkness { get; set; }
+        public FillVariant DarkFill { get; set; }
+        public CellData() { Id = Guid.NewGuid().ToString("N"); TerrainId = UnpaintedTerrain.Id; VariantId = UnpaintedTerrain.Version; TerrainRevision = 1; Terrain = "Niepomalowany"; Color = "#777F91"; Name = ""; Description = ""; NotesFormat = "plainText"; FillVariantId = UnpaintedTerrain.Fill; FogFill = FillRules.FogDefault(); DarkFill = FillRules.DarkDefault(); }
     }
 
     public sealed class MapData
@@ -73,12 +75,14 @@ namespace HexMapEditor
         public List<GraphicDefinition> TerrainAssets { get; set; }
         public List<GraphicSource> GraphicSources { get; set; }
         public List<FillVariant> FogPalette { get; set; }
+        public List<InkStroke> Ink { get; set; }
+        public List<FillVariant> DarkPalette { get; set; }
         public MapBackground Background { get; set; }
         public List<MapObject> Objects { get; set; }
         public List<ObjectStateDefinition> ObjectStates { get; set; }
         public List<string> ExcludedStateIds { get; set; }
         public List<ObjectGroup> Groups { get; set; }
-        public MapData() { FormatVersion = 8; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); TerrainAssets = new List<GraphicDefinition>(); GraphicSources = new List<GraphicSource>(); FogPalette = new List<FillVariant> { FillRules.FogDefault() }; Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
+        public MapData() { FormatVersion = 9; Ink = new List<InkStroke>(); DarkPalette = new List<FillVariant>{FillRules.DarkDefault()}; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); TerrainAssets = new List<GraphicDefinition>(); GraphicSources = new List<GraphicSource>(); FogPalette = new List<FillVariant> { FillRules.FogDefault() }; Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
     }
 
     internal sealed class TerrainState
@@ -119,6 +123,8 @@ namespace HexMapEditor
         public List<IconAsset> RequiredAssets = new List<IconAsset>();
         public TerrainGraphicChange TerrainGraphicChange;
         public List<FillVariant> BeforeFogPalette, AfterFogPalette;
+        public List<FillVariant> BeforeDarkPalette, AfterDarkPalette;
+        public List<InkStroke> BeforeInk, AfterInk;
         public bool BackgroundChange;
         public MapBackground BeforeBackground, AfterBackground;
         public string Label;
@@ -167,7 +173,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.5.4";
+        const string AppVersion = "0.6.0";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -178,10 +184,10 @@ namespace HexMapEditor
 
         public MainWindow()
         {
-            Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 720); Size = new Size(1440, 940);
+            Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 748); Size = new Size(1440, 940);
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
             LoadProgramIcon();
-            InitializeShell();
+            InitializeShell(); InitInk();
             Application.AddMessageFilter(this); Disposed += (s,e) => Application.RemoveMessageFilter(this);
             Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); LoadObjects(); LoadStateLibrary(); };
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
@@ -275,11 +281,11 @@ namespace HexMapEditor
                 else if (selected >= 0 && selected < map.Cells.Count)
                 {
                     var cell = map.Cells[selected];
-                    bool hidden=cell.Fog&&!previewWithoutFog;
+                    bool hidden=CellMasked(selected);
                     string key = cell.Id + (hidden ? ":fog" : ":visible");
-                    if (editorCellId != key) { textHistory.BreakGroups(); editorCellId = key; cellName.Text = hidden ? "???" : cell.Name ?? ""; cellDescription.SetContent(hidden ? null : cell.RichDescription, hidden ? "Treść ukryta przez mgłę wojny." : cell.Description); }
+                    if (editorCellId != key) { textHistory.BreakGroups(); editorCellId = key; cellName.Text = hidden ? "???" : cell.Name ?? ""; cellDescription.SetContent(hidden ? null : cell.RichDescription, hidden ? "Treść ukryta przez mgłę lub ciemność." : cell.Description); }
                     cellName.Enabled = cellDescription.Enabled = !hidden;
-                    detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = hidden ? "Mgła wojny — dane ukryte" : "Teren: " + cell.Terrain;
+                    detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = hidden ? "Maska — dane ukryte" : "Teren: " + cell.Terrain;
                     detailIcon.Text = hidden ? "Ikona: ???" : "Ikona: " + (cell.IconId == null ? "brak" : cell.IconName ?? map.IconAssets.First(a=>a.Id==cell.IconId).Name);
                 }
                 else { selected = -1; rightPanelOpen = false; textHistory.BreakGroups(); }
@@ -354,14 +360,14 @@ namespace HexMapEditor
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
                 int format = (int)raw["FormatVersion"];
-                if (format != 8) throw new InvalidDataException("Obsługiwany format mapy: 8. Starszy plik pozostawiono bez zmian.");
+                if (format != 9) throw new InvalidDataException("Obsługiwany format mapy: 9. Starszy plik pozostawiono bez zmian.");
                 GraphicSchema.Map(raw);
                 if (!raw.ContainsKey("TerrainAssets") || !raw.ContainsKey("GraphicSources") || !raw.ContainsKey("FogPalette") ||
                     !raw.ContainsKey("Background")) throw new InvalidDataException("Brak tabeli grafik, źródeł lub ustawień mgły/tła.");
                 {
                     var cells = raw.ContainsKey("Cells") ? raw["Cells"] as object[] : null;
                     var objects=raw.ContainsKey("Objects")?raw["Objects"] as object[]:null;
-                    string[] objectFields={"Id","TemplateId","Name","AssetId","X","Y","Size","Side","Locked","RevealsFog","RevealRadius"};
+                    string[] objectFields={"Id","TemplateId","Name","AssetId","X","Y","Size","Side","Locked","RevealsFog","RevealRadius","LightEnabled","LightRadius"};
                     if(objects==null||objects.Any(o=>!(o is Dictionary<string,object>)||objectFields.Any(key=>!((Dictionary<string,object>)o).ContainsKey(key))))throw new InvalidDataException("Niepełne dane instancji obiektu.");
                     ValidateGroupFields(raw, format);
                     if (cells == null || !raw.ContainsKey("Objects") || !raw.ContainsKey("IconAssets") || cells.Any(c => !(c is Dictionary<string, object>) || new[] { "Id", "TerrainId", "VariantId", "TerrainRevision", "IconId", "Fog", "FillVariantId", "FogFill" }.Any(key => !((Dictionary<string, object>)c).ContainsKey(key)))) throw new InvalidDataException("Brak jawnych danych heksów, zasobów, obiektów, stanów lub grup.");
@@ -457,7 +463,7 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 8) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
+            if (m.FormatVersion != 9) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
             var textures = TerrainTextures.ReadTable(m.TerrainAssets, m.GraphicSources);
             if (m.Background != null)
             {
@@ -467,6 +473,7 @@ namespace HexMapEditor
                 m.Background.Source = source; BackgroundRenderer.Validate(m.Background);
             }
             FillRules.Attach(m.FogPalette, textures); FillRules.ValidatePool(m.FogPalette);
+            FillRules.Attach(m.DarkPalette, textures); FillRules.ValidatePool(m.DarkPalette); InkGeometry.Validate(m.Ink);
             IconAssets.Validate(m.IconAssets); var iconIds = new HashSet<string>(m.IconAssets.Select(a => a.Id));
             ObjectGeometry.Validate(m,iconIds);
             if (m.Columns < 1 || m.Columns > 200 || m.Rows < 1 || m.Rows > 200) throw new InvalidDataException("Wymiary mapy muszą mieścić się w zakresie 1–200.");
@@ -480,7 +487,7 @@ namespace HexMapEditor
                 c.Texture = TerrainTextures.Resolve(textures, c.TextureId);
                 if (String.IsNullOrWhiteSpace(c.FillVariantId)) throw new InvalidDataException("Brak utrwalonego wariantu wyglądu.");
                 if ((c.TerrainId == UnpaintedTerrain.Id || c.VariantId == UnpaintedTerrain.Version) && !MapLogic.IsUnpainted(c)) throw new InvalidDataException("Sprzeczny stan niepomalowanego pola.");
-                FillRules.Attach(new[] { c.FogFill }, textures); FillRules.Validate(c.FogFill);
+                FillRules.Attach(new[] { c.FogFill }, textures); FillRules.Validate(c.FogFill); FillRules.Attach(new[]{c.DarkFill},textures); FillRules.Validate(c.DarkFill);
                 CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color, c.TextureId);
                 if (c.IconId != null && !iconIds.Contains(c.IconId)) throw new InvalidDataException("Brak osadzonego zasobu ikony.");
                 if ((c.IconName != null && (String.IsNullOrWhiteSpace(c.IconName) || c.IconName.Length > 200)) || (c.IconEntryId != null && (String.IsNullOrWhiteSpace(c.IconEntryId) || c.IconEntryId.Length > 200)) || (c.IconId == null && (c.IconName != null || c.IconEntryId != null))) throw new InvalidDataException("Nieprawidłowe metadane wystąpienia ikony.");
@@ -608,7 +615,7 @@ namespace HexMapEditor
                         DrawTerrainTexture(e.Graphics, path, c, BaseRadius * scale, map.Cells[i].Texture);
                     if (!hideIcons) DrawCellIcon(e.Graphics, map.Cells[i], c);
                     if (map.LabelMode == "InCells") CellLabels.Draw(e.Graphics, Coordinate(i), c, BaseRadius * scale, scale, canvas.ClientRectangle);
-                    if (!map.Cells[i].Fog || previewWithoutFog) e.Graphics.DrawPath(pen, path);
+                    if (!CellMasked(i)) e.Graphics.DrawPath(pen, path);
                 }
             }
             if (map.LabelMode == "Axes" && map.Columns * map.Rows <= 1400)
@@ -623,8 +630,9 @@ namespace HexMapEditor
                 }
             }
             if (!hideObjects) DrawObjects(e.Graphics);
+            DrawDarkness(e.Graphics, e.ClipRectangle);
             DrawFog(e.Graphics, e.ClipRectangle);
-            DrawBrushPreview(e.Graphics);
+            DrawBrushPreview(e.Graphics); DrawInk(e.Graphics);
         }
 
         void DrawFog(Graphics graphics, Rectangle clip)
@@ -688,8 +696,8 @@ namespace HexMapEditor
         void EndCanvasGesture(bool commitStroke)
         {
             EndObjectPropertyEdit();
-            FinishObjectGesture(commitStroke);
-            bool brushStroke = gestureButton == MouseButtons.Left && (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket);
+            FinishObjectGesture(commitStroke); FinishInk(commitStroke);
+            bool brushStroke = gestureButton == MouseButtons.Left && (gestureTool == EditorTool.Brush || (gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.DarkBrush) || gestureTool == EditorTool.Bucket || (gestureTool == EditorTool.FogBucket || gestureTool == EditorTool.DarkBucket));
             gestureButton = MouseButtons.None;
             dragging = false; panGesture = false; dragOrigin = Point.Empty; panOrigin = PointF.Empty;
             if (commitStroke && brushStroke) FinishStroke(); else { strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); }
@@ -702,21 +710,22 @@ namespace HexMapEditor
         {
             if (modalDepth > 0 || rightResizing || waitingForMouseRelease || gestureButton != MouseButtons.None) return;
             if (requireFreshCanvasDown && e.Clicks != 1) return;
-            if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle) return;
+            if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle && !(e.Button==MouseButtons.Right&&(currentTool==EditorTool.Stylus||currentTool==EditorTool.Eraser))) return;
             requireFreshCanvasDown = false; EndObjectPropertyEdit();
-            if (e.Button == MouseButtons.Left && !GuardCanvasLayer()) return;
+            if (e.Button != MouseButtons.Middle && !GuardCanvasLayer()) return;
             gestureButton = e.Button; gestureTool = currentTool;
             dragging = false; dragOrigin = e.Location; panOrigin = pan;
             canvas.Focus();
             canvas.Capture = true;
             if (e.Button == MouseButtons.Middle) { panGesture = true; return; }
+            if (BeginInk(e)) return;
             if (ObjectMouseDown(e)) return;
             if (gestureTool==EditorTool.Hand) {panGesture=true;return;}
             if ((gestureTool==EditorTool.Brush || gestureTool==EditorTool.Bucket) && (noMaterial || objectMaterial)) return;
             strokeStarted = false;
             previousStrokePoint = null;
-            if (gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket) { int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); } return; }
-            if (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush)
+            if (gestureTool == EditorTool.Bucket || (gestureTool == EditorTool.FogBucket || gestureTool == EditorTool.DarkBucket)) { int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); } return; }
+            if (gestureTool == EditorTool.Brush || (gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.DarkBrush))
             {
                 strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); PaintAlong(e.Location, hit); } canvas.Capture = true;
             }
@@ -727,10 +736,12 @@ namespace HexMapEditor
             if (modalDepth > 0 || rightResizing) return;
             int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
             if (previewCell != hit) { previewCell = hit; canvas.Invalidate(); }
+            if(currentTool==EditorTool.Eraser){inkCursor=e.Location;canvas.Invalidate();}
             if (e.Button == MouseButtons.None) { waitingForMouseRelease = false; if (gestureButton != MouseButtons.None) EndCanvasGesture(true); return; }
             // A pressed button alone is not an editing gesture: its Down must belong to this canvas.
             if (waitingForMouseRelease || gestureButton == MouseButtons.None || (e.Button & gestureButton) == MouseButtons.None) return;
             if (panGesture) { if(Math.Abs(e.X-dragOrigin.X)+Math.Abs(e.Y-dragOrigin.Y)>3)dragging=true; pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate(); return; }
+            if(gestureTool==EditorTool.Stylus||gestureTool==EditorTool.Eraser){MoveInk(e.Location);return;}
             if (ObjectMouseMove(e)) return;
             if ((gestureTool==EditorTool.Brush || gestureTool==EditorTool.Bucket) && (noMaterial || objectMaterial)) return;
             if (gestureTool == EditorTool.Select && (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3))
@@ -738,8 +749,8 @@ namespace HexMapEditor
                 if (!dragging) { dragging = true; panOrigin = pan; }
                 pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate();
             }
-            if (gestureTool == EditorTool.Brush || gestureTool == EditorTool.FogBrush) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); PaintAlong(e.Location, hit); } else previousStrokePoint = null; }
-            if ((gestureTool == EditorTool.Bucket || gestureTool == EditorTool.FogBucket) && hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); }
+            if (gestureTool == EditorTool.Brush || (gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.DarkBrush)) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); PaintAlong(e.Location, hit); } else previousStrokePoint = null; }
+            if ((gestureTool == EditorTool.Bucket || (gestureTool == EditorTool.FogBucket || gestureTool == EditorTool.DarkBucket)) && hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); }
         }
 
         void CanvasMouseUp(object sender, MouseEventArgs e)

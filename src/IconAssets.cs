@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -80,6 +80,8 @@ namespace HexMapEditor
         public bool BeforeFog, AfterFog, Icons, Fog;
         public FillVariant BeforeFill, AfterFill;
         public bool FogAppearance;
-        public void Apply(CellData cell, bool after) { if (Icons) { cell.IconId = after ? AfterIcon : BeforeIcon; cell.IconEntryId = after ? AfterEntry : BeforeEntry; cell.IconName = after ? AfterName : BeforeName; } if (Fog) cell.Fog = after ? AfterFog : BeforeFog; if (FogAppearance) cell.FogFill = (after ? AfterFill : BeforeFill).Copy(); }
+        public bool Dark, BeforeDark, AfterDark, DarkAppearance;
+        public FillVariant BeforeDarkFill, AfterDarkFill;
+        public void Apply(CellData cell, bool after) { if (Icons) { cell.IconId = after ? AfterIcon : BeforeIcon; cell.IconEntryId = after ? AfterEntry : BeforeEntry; cell.IconName = after ? AfterName : BeforeName; } if(Dark)cell.Darkness=after?AfterDark:BeforeDark;if(DarkAppearance)cell.DarkFill=(after?AfterDarkFill:BeforeDarkFill).Copy(); if (Fog) cell.Fog = after ? AfterFog : BeforeFog; if (FogAppearance) cell.FogFill = (after ? AfterFill : BeforeFill).Copy(); }
     }
 }

@@ -50,8 +50,9 @@ namespace HexMapEditor
                     var source = prepared ?? lease;
                     var crop = new RectangleF((float)(settings.Left * source.Width), (float)(settings.Top * source.Height),
                         (float)(settings.Width * source.Width), (float)(settings.Height * source.Height));
-                    float cover = Math.Max(size.Width / crop.Width, size.Height / crop.Height);
-                    float width = size.Width / cover, height = size.Height / cover;
+                    // Geometry follows the viewport, never the rounded working bitmap dimensions.
+                    float cover = Math.Max(viewport.Width / crop.Width, viewport.Height / crop.Height);
+                    float width = viewport.Width / cover, height = viewport.Height / cover;
                     crop = new RectangleF(crop.X + (crop.Width - width) / 2, crop.Y + (crop.Height - height) / 2, width, height);
                     float s = settings.Saturation / 100f, r = .2126f * (1 - s), green = .7152f * (1 - s), b = .0722f * (1 - s);
                     attributes.SetColorMatrix(new ColorMatrix(new[] {

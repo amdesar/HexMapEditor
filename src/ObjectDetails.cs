@@ -15,6 +15,8 @@ namespace HexMapEditor
         readonly TextBox objectName=new TextBox{MaxLength=200};
         readonly NumericUpDown objectSize=new NumericUpDown{Minimum=8,Maximum=1024,Value=30},objectRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
         readonly CheckBox objectLocked=new CheckBox{Text="Blokada ruchu",AutoSize=true},objectReveal=new CheckBox{Text="Odkrywa mgłę",AutoSize=true};
+        readonly CheckBox objectLight=new CheckBox{Text="Światło",AutoSize=true};
+        readonly NumericUpDown objectLightRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
         Label objectCount,memberGroupLabel,effectiveLabel;
         FlowLayoutPanel stateTiles;
         Button addStateTile;
@@ -29,7 +31,7 @@ namespace HexMapEditor
         void EndObjectPropertyEdit(){propertyEditKey=null;propertyEditAction=null;}
         void LiveNumber(NumericUpDown number){number.TextChanged+=(s,e)=>{decimal value;if(!updating&&Decimal.TryParse(number.Text,System.Globalization.NumberStyles.Integer,System.Globalization.CultureInfo.CurrentCulture,out value)&&value>=number.Minimum&&value<=number.Maximum)number.Value=value;};}
         void ClearIconMaterial(){activeIcon=null;iconMaterial=false;objectMaterial=false;noMaterial=true;UpdateMaterialIndicator();canvas.Invalidate();}
-        void UpdateBrushAvailability(){if(shapePicker==null)return;bool applicable=currentTool==EditorTool.FogBrush||currentTool==EditorTool.Brush&&!objectMaterial&&!noMaterial;shapePicker.Enabled=applicable;sizePicker.Enabled=applicable&&brushShape!=BrushShape.Point;heightPicker.Enabled=applicable;fillPicker.Enabled=applicable&&brushShape!=BrushShape.Point&&brushShape!=BrushShape.Horizontal&&brushShape!=BrushShape.Vertical;}
+        void UpdateBrushAvailability(){if(shapePicker==null)return;bool applicable=currentTool==EditorTool.FogBrush||currentTool==EditorTool.DarkBrush||currentTool==EditorTool.Brush&&!objectMaterial&&!noMaterial;shapePicker.Enabled=applicable;sizePicker.Enabled=applicable&&brushShape!=BrushShape.Point;heightPicker.Enabled=applicable;fillPicker.Enabled=applicable&&brushShape!=BrushShape.Point&&brushShape!=BrushShape.Horizontal&&brushShape!=BrushShape.Vertical;UpdateInkSettings();}
         TableLayoutPanel PropertyTable(Control parent){var t=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(4)};t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));parent.Controls.Add(t);return t;}
         void PropertyRow(TableLayoutPanel t,int row,string label,Control input){t.RowStyles.Add(new RowStyle(SizeType.AutoSize));t.Controls.Add(new Label{Text=label,AutoSize=true,Padding=new Padding(0,9,0,0)},0,row);input.Dock=DockStyle.Fill;input.Margin=new Padding(4,5,4,5);input.MinimumSize=new Size(0,26);input.AccessibleName="Obiekt/grupa: "+label;t.Controls.Add(input,1,row);}
         void SpanRow(TableLayoutPanel t,int row,Control input){input.Dock=DockStyle.Fill;input.Margin=new Padding(4,5,4,5);t.Controls.Add(input,0,row);t.SetColumnSpan(input,2);t.RowStyles.Add(new RowStyle(SizeType.AutoSize));}
@@ -59,13 +61,16 @@ namespace HexMapEditor
             objectName.TextChanged+=(s,e)=>{if(!String.IsNullOrWhiteSpace(objectName.Text))EditInstance("name",o=>o.Name=objectName.Text.Trim(),true);};objectSize.ValueChanged+=(s,e)=>EditInstance("size",o=>o.Size=(float)objectSize.Value,true);objectRadius.ValueChanged+=(s,e)=>EditInstance("radius",o=>o.RevealRadius=(int)objectRadius.Value,true);objectLocked.CheckedChanged+=(s,e)=>EditInstance("lock",o=>o.Locked=objectLocked.Checked,false);objectReveal.CheckedChanged+=(s,e)=>EditInstance("reveal",o=>o.RevealsFog=objectReveal.Checked,false);
             LiveNumber(objectSize);LiveNumber(objectRadius);
             foreach(Control c in new Control[]{objectName,objectSize,objectRadius})c.LostFocus+=(s,e)=>{if(!updating){EndObjectPropertyEdit();UpdateUI();}};
+            PropertyRow(instanceLayout,11,"Światło",objectLight);PropertyRow(instanceLayout,12,"Promień światła",objectLightRadius);
+            objectLight.CheckedChanged+=(s,e)=>EditInstance("light",o=>o.LightEnabled=objectLight.Checked,false);objectLightRadius.ValueChanged+=(s,e)=>EditInstance("light-radius",o=>o.LightRadius=(int)objectLightRadius.Value,true);LiveNumber(objectLightRadius);objectLightRadius.LostFocus+=(s,e)=>EndObjectPropertyEdit();
+            tips.SetToolTip(objectLight,"Niezależne od stanu i odkrywania Fog. Światło usuwa tylko efektywną ciemność; baza pozostaje. Promień 0–20.");
             BuildGroupDetails(container);
             objectDetailPanel.Layout+=(s,e)=>{int width=Math.Max(200,objectDetailPanel.ClientSize.Width-40-(objectDetailPanel.VerticalScroll.Visible?SystemInformation.VerticalScrollBarWidth:0));container.Width=width;stateTiles.MaximumSize=new Size(width-12,0);};
         }
         MapObject SingleSelectedObject(){return selectedGroupId==null&&selectedObjects.Count==1?map.Objects.FirstOrDefault(o=>selectedObjects.Contains(o.Id)):null;}
         void EditInstance(string field,Action<MapObject> edit,bool merge)
         {
-            if(updating)return;var obj=SingleSelectedObject();if(obj==null||!previewWithoutFog&&ObjectFogLevel(obj)>0)return;if (!GuardLayer(MapLayer.Objects)) { UpdateUI(); return; } if(!merge)EndObjectPropertyEdit();var next=obj.Copy();edit(next);try{LiveChangeObject(next,merge?obj.Id+":"+field:null);}catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
+            if(updating)return;var obj=SingleSelectedObject();if(obj==null||ObjectFogLevel(obj)>0)return;if (!GuardLayer(MapLayer.Objects)) { UpdateUI(); return; } if(!merge)EndObjectPropertyEdit();var next=obj.Copy();edit(next);try{LiveChangeObject(next,merge?obj.Id+":"+field:null);}catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
         }
         void RefreshStateTiles()
         {
@@ -159,10 +164,11 @@ namespace HexMapEditor
         {
             groupSelectionButton.Text = groups > 1 ? "Połącz grupy" : groups == 1 ? "Dodaj do grupy" : "Grupuj wybrane";
             groupSelectionButton.Visible=!group&&selectedObjects.Count>=2;objectCount.Text=group?"Trwała grupa: "+map.Groups.Single(g=>g.Id==selectedGroupId).Members.Count+" obiektów":selectedObjects.Count==1?"Instancja obiektu":"Wybrane obiekty: "+selectedObjects.Count;
-            if(group){UpdateGroupDetails();return;}var obj=SingleSelectedObject();if(obj==null)return;RefreshStateTiles();bool masked=!previewWithoutFog&&ObjectFogLevel(obj)>0;
+            if(group){UpdateGroupDetails();return;}var obj=SingleSelectedObject();if(obj==null)return;RefreshStateTiles();bool masked=ObjectFogLevel(obj)>0;
             if(propertyEditKey==null||!objectName.ContainsFocus)objectName.Text=masked?"???":obj.Name;objectSize.Value=masked?8:(decimal)obj.Size;objectLocked.Checked=!masked&&obj.Locked;objectReveal.Checked=!masked&&obj.RevealsFog;objectRadius.Value=masked?0:obj.RevealRadius;
             foreach(Control c in new Control[]{objectName,objectSize,objectLocked,instanceDelete})c.Enabled=!masked;
             foreach(Button b in stateTiles.Controls){bool chosen=!masked&&(string)b.Tag==obj.Side;b.FlatAppearance.BorderSize=chosen?3:1;b.FlatAppearance.BorderColor=chosen?Color.Gold:Color.Gray;b.Enabled=b.Tag==null||!masked;}
+            objectLight.Checked=!masked&&obj.LightEnabled;objectLight.Enabled=!masked;objectLightRadius.Value=masked?0:obj.LightRadius;objectLightRadius.Enabled=!masked&&obj.LightEnabled;
             objectReveal.Enabled=!masked&&GroupRules.Allows(map,obj.Side);objectRadius.Enabled=objectReveal.Enabled&&obj.RevealsFog;
             var membership=GroupRules.For(map,obj.Id);memberGroupLabel.Text=membership==null?"Bez grupy":masked?"Członek grupy (dane ukryte)":"Grupa: "+membership.Name;memberToGroup.Visible=memberDetach.Visible=membership!=null;
             if(masked){objectCount.Text="Obiekt ukryty przez mgłę";effectiveLabel.Text="Włącz Podgląd bez mgły, aby zobaczyć i edytować właściwości.";}

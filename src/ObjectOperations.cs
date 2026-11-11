@@ -24,7 +24,7 @@ namespace HexMapEditor
         {
             var template=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(!objectMaterial||template==null)return null;
             if(map.Objects.Count>=5000)throw new IOException("Limit 5000 instancji na mapie.");
-            var obj=new MapObject{TemplateId=template.Id,Name=template.Name,AssetId=template.Asset.Id,X=point.X,Y=point.Y};
+            var obj=new MapObject{TemplateId=template.Id,Name=template.Name,AssetId=template.Asset.Id,X=point.X,Y=point.Y,LightEnabled=template.LightEnabled,LightRadius=template.LightRadius};
             ObjectGeometry.Validate(new MapData{Objects=new List<MapObject>{obj}},new HashSet<string>{template.Asset.Id});
             var action=new EditAction{Label="Umieszczenie obiektu"};RequireObjectAsset(action,template.Asset);action.Objects.Add(new ObjectChange{After=obj,Index=map.Objects.Count});AddReveal(action,obj,null);
             CommitObjectTransaction(action);return map.Objects.First(o=>o.Id==obj.Id);
@@ -52,7 +52,7 @@ namespace HexMapEditor
         {
             var objects = map.Objects.Where(obj => selectedObjects.Contains(obj.Id)).ToList();
             if (objects.Count == 0 || !GuardLayer(MapLayer.Objects)) return false;
-            string what = objects.Count == 1 ? "instancję „" + (!previewWithoutFog && ObjectFogLevel(objects[0]) > 0 ? "???" : objects[0].Name) + "”" : objects.Count + " instancje";
+            string what = objects.Count == 1 ? "instancję „" + (ObjectFogLevel(objects[0]) > 0 ? "???" : objects[0].Name) + "”" : objects.Count + " instancje";
             if (!confirm("Usunąć z mapy " + what + "? Wzorce w bibliotece pozostaną. Operację można cofnąć.")) return false;
             DeleteSelectedObjects();
             canvas.Focus();
@@ -72,10 +72,10 @@ namespace HexMapEditor
         {
             var changes=new List<ObjectChange>();for(int i=0;i<map.Objects.Count;i++){var o=map.Objects[i];var p=ObjectGeometry.Transform(map,geometry,new PointF(o.X,o.Y),dc,dr);var next=o.Copy();next.X=p.X;next.Y=p.Y;changes.Add(new ObjectChange{Before=o.Copy(),After=next,Index=i});}return changes;
         }
-        void ResetObjectDocument(){selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;previewWithoutFog=hideTerrain=hideIcons=hideObjects=hideBackground=false;UpdateLayerChecks();objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
+        void ResetObjectDocument(){pointerTrail.Clear();pointerActive=false;pointerTimer.Stop();inkCursor=null;InvalidateLight();selectedObjects.Clear();groupSelectionOrder.Clear();selectedGroupId=null;previewWithoutFog=hideTerrain=hideIcons=hideObjects=hideBackground=hideDarkness=hideInk=false;UpdateLayerChecks();objectMaterial=false;noMaterial=false;activeObject=null;objectGesture=null;objectDragBefore=null;selectionPath.Clear();}
         void FitEverything()
         {
-            EndCanvasGesture(true);RectangleF bounds=MapBounds();foreach(var o in map.Objects)bounds=RectangleF.Union(bounds,ObjectBounds(o));FitBounds(bounds);UpdateUI();
+            EndCanvasGesture(true);RectangleF bounds=MapBounds();if(!hideObjects)foreach(var o in map.Objects)bounds=RectangleF.Union(bounds,ObjectBounds(o));if(!hideInk)foreach(var stroke in map.Ink)bounds=RectangleF.Union(bounds,InkGeometry.Bounds(stroke));FitBounds(bounds);UpdateUI();
         }
         RectangleF ObjectBounds(MapObject o){return ObjectGeometry.Bounds(GroupRules.Effective(map,o),map.IconAssets.First(a=>a.Id==o.AssetId));}
         void FitWorldBounds(RectangleF bounds,bool accountRight)

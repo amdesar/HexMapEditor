@@ -51,13 +51,13 @@ namespace HexMapEditor
     {
         readonly ComboBox mode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};
         readonly CheckBox[] categories;
-        public bool[] Keep {get{return mode.SelectedIndex==0?Enumerable.Repeat(true,5).ToArray():mode.SelectedIndex==1?new bool[5]:categories.Select(c=>c.Checked).ToArray();}}
-        public UngroupDialog(bool dissolve):base(dissolve?"Rozwiąż grupę":"Odłącz od grupy",365)
+        public bool[] Keep {get{return mode.SelectedIndex==0?Enumerable.Repeat(true,7).ToArray():mode.SelectedIndex==1?new bool[7]:categories.Select(c=>c.Checked).ToArray();}}
+        public UngroupDialog(bool dissolve):base(dissolve?"Rozwiąż grupę":"Odłącz od grupy",440)
         {
-            ClientSize=new Size(480,365);mode.Items.AddRange(new object[]{"Zachowaj wynikowe ustawienia","Przywróć indywidualne ustawienia","Wybierz dla każdej właściwości"});mode.SelectedIndex=1;Row(0,"Po odłączeniu",mode,true);
-            categories=new[]{"Stan","Rozmiar","Blokada ruchu","Odkrywanie","Promień"}.Select(n=>new CheckBox{Text="Zachowaj wynikowe: "+n,AutoSize=true,Enabled=false}).ToArray();
+            ClientSize=new Size(480,440);mode.Items.AddRange(new object[]{"Zachowaj wynikowe ustawienia","Przywróć indywidualne ustawienia","Wybierz dla każdej właściwości"});mode.SelectedIndex=1;Row(0,"Po odłączeniu",mode,true);
+            categories=new[]{"Stan","Rozmiar","Blokada ruchu","Odkrywanie","Promień mgły","Światło","Promień światła"}.Select(n=>new CheckBox{Text="Zachowaj wynikowe: "+n,AutoSize=true,Enabled=false}).ToArray();
             for(int i=0;i<categories.Length;i++){Layout.Controls.Add(categories[i],0,i+1);Layout.SetColumnSpan(categories[i],3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,34));}
-            mode.SelectedIndexChanged+=(s,e)=>{foreach(var c in categories)c.Enabled=mode.SelectedIndex==2;};var note=new Label{Text="Pozycje i nazwy pozostaną. Odkryta wcześniej mgła nie zostanie zasłonięta. Całość można cofnąć.",Dock=DockStyle.Fill};Layout.Controls.Add(note,0,6);Layout.SetColumnSpan(note,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,70));Buttons(7,()=>DialogResult=DialogResult.OK);
+            mode.SelectedIndexChanged+=(s,e)=>{foreach(var c in categories)c.Enabled=mode.SelectedIndex==2;};var note=new Label{Text="Pozycje i nazwy pozostaną. Odkryta wcześniej mgła nie zostanie zasłonięta. Całość można cofnąć.",Dock=DockStyle.Fill};Layout.Controls.Add(note,0,8);Layout.SetColumnSpan(note,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,70));Buttons(9,()=>DialogResult=DialogResult.OK);
         }
     }
 }

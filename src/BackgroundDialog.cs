@@ -8,7 +8,7 @@ namespace HexMapEditor
     {
         MapBackground draft;
         readonly BackgroundCropSurface crop = new BackgroundCropSurface { Bounds = new Rectangle(12, 58, 365, 310) };
-        readonly PictureBox preview = new PictureBox { Bounds = new Rectangle(403, 58, 365, 310), SizeMode = PictureBoxSizeMode.Zoom };
+        readonly CanvasAspectPreview preview = new CanvasAspectPreview { Bounds = new Rectangle(403, 58, 365, 310) };
         readonly TrackBar opacity = Slider(0, 100, 100), saturation = Slider(0, 200, 100), blur = Slider(0, 24, 0);
         readonly Label values = new Label { Bounds = new Rectangle(15, 453, 620, 25) };
         readonly Button remove = new Button { Text = "Usuń tło", Bounds = new Rectangle(150, 10, 110, 28) };
@@ -23,6 +23,7 @@ namespace HexMapEditor
         internal BackgroundDialog(MapBackground initial, Size viewport)
         {
             this.viewport = new Size(Math.Max(1,viewport.Width),Math.Max(1,viewport.Height));
+            preview.Aspect = this.viewport;
             draft = initial == null ? null : initial.Copy();
             Text = "Tło mapy"; ClientSize = new Size(780, 526); FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent; MaximizeBox = MinimizeBox = false;
@@ -137,6 +138,18 @@ namespace HexMapEditor
             }
             values.Text = draft == null ? "Brak tła." : String.Format("Krycie {0}%     Nasycenie {1}%     Rozmycie {2} px", draft.Opacity, draft.Saturation, draft.Blur);
         }
+    }
+
+    internal sealed class CanvasAspectPreview : PictureBox
+    {
+        internal Size Aspect;
+        internal Rectangle Destination
+        {
+            get { double factor=Math.Min((double)ClientSize.Width/Math.Max(1,Aspect.Width),(double)ClientSize.Height/Math.Max(1,Aspect.Height));
+                var size=new Size((int)Math.Round(Aspect.Width*factor),(int)Math.Round(Aspect.Height*factor));
+                return new Rectangle((ClientSize.Width-size.Width)/2,(ClientSize.Height-size.Height)/2,size.Width,size.Height); }
+        }
+        protected override void OnPaint(PaintEventArgs e) { if(Image!=null)e.Graphics.DrawImage(Image,Destination); }
     }
 
     internal sealed class BackgroundCropSurface : Control

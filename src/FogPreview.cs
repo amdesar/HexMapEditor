@@ -15,12 +15,12 @@ namespace HexMapEditor
         // 0 visible, 1 partial, 2 hidden. Rectangular geometry only, no per-pixel scan.
         int ObjectFogLevel(MapObject obj)
         {
-            double fraction = FogVisibility.VisibleFraction(map, ObjectBounds(obj));
-            return fraction == 1 ? 0 : fraction == 0 ? 2 : 1;
+            double fraction = MaskVisible(ObjectBounds(obj));
+            return fraction > .5 ? 0 : fraction == 0 ? 2 : 1;
         }
         static void ValidateGroupFields(Dictionary<string,object> raw, int format)
         {
-            string[][] required={new[]{"ObjectStates","Id","Name","Color","CanReveal"},new[]{"Groups","Id","Name","Members","StateId","Locked","RevealsFog","RevealRadius","SizeMode","SizeValue"}};
+            string[][] required={new[]{"ObjectStates","Id","Name","Color","CanReveal"},new[]{"Groups","Id","Name","Members","StateId","Locked","RevealsFog","RevealRadius","SizeMode","SizeValue","LightEnabled","LightRadius"}};
             foreach(var fields in required){var items=raw.ContainsKey(fields[0])?raw[fields[0]] as object[]:null;if(items==null||items.Any(o=>!(o is Dictionary<string,object>)||fields.Skip(1).Any(k=>!((Dictionary<string,object>)o).ContainsKey(k))))throw new InvalidDataException("Brak jawnych danych stanów lub grup.");}
             if (format >= 6 && ((object[])raw["Groups"]).Cast<Dictionary<string, object>>().Any(g =>
                 !g.ContainsKey("FrameEnabled") || !(g["FrameEnabled"] is bool) ||

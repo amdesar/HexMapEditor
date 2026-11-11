@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -35,6 +35,7 @@ namespace HexMapEditor
             foreach (var fill in pool) { if (fill == null) throw new InvalidDataException("Brak wariantu."); fill.Graphic = TerrainTextures.Resolve(graphics, fill.GraphicId); }
         }
         internal static List<FillVariant> Copy(IEnumerable<FillVariant> fills) { return fills.Select(f => f.Copy()).ToList(); }
+        internal static FillVariant DarkDefault() { return new FillVariant { Id="dark-black",Color="#000000" }; }
         internal static FillVariant FogDefault() { return new FillVariant { Id = "fog-gray", Color = "#656B75" }; }
         internal static string Signature(IEnumerable<FillVariant> fills) { return MapLogic.Serializer().Serialize(fills); }
         internal static string SurfaceSignature(IEnumerable<FillVariant> fills) { return Signature(fills.OrderBy(f => f.Id, StringComparer.Ordinal)); }
@@ -54,7 +55,7 @@ namespace HexMapEditor
         IEnumerable<GraphicDefinition> DocumentGraphics()
         {
             return map.Cells.Select(c => c.Texture).Concat(map.Presets.SelectMany(p => p.Terrains).SelectMany(t => t.Variants).Select(f => f.Graphic))
-                .Concat(map.Cells.Select(c => c.FogFill == null ? null : c.FogFill.Graphic)).Concat(map.FogPalette.Select(f => f.Graphic));
+                .Concat(map.Cells.Select(c => c.FogFill == null ? null : c.FogFill.Graphic)).Concat(map.FogPalette.Select(f => f.Graphic)).Concat(map.DarkPalette.Select(f=>f.Graphic)).Concat(map.Cells.Select(c=>c.DarkFill==null?null:c.DarkFill.Graphic));
         }
     }
 }

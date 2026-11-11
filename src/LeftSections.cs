@@ -28,14 +28,14 @@ namespace HexMapEditor
         void BuildSections()
         {
             leftSections = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty, Padding = Padding.Empty };
-            foreach (var style in new[] { new RowStyle(SizeType.Absolute, 166), new RowStyle(SizeType.Absolute, 100), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, 90), new RowStyle(SizeType.Absolute, 90) }) leftSections.RowStyles.Add(style);
+            foreach (var style in new[] { new RowStyle(SizeType.Absolute, 194), new RowStyle(SizeType.Absolute, 100), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, 90), new RowStyle(SizeType.Absolute, 90) }) leftSections.RowStyles.Add(style);
             left.Controls.Add(leftSections);
             var toolbox = Section("Przybornik", 0);
-            paletteTools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 56, WrapContents = true }; toolbox.Controls.Add(paletteTools);
-            string[] names={"Zaznaczanie","Prostokąt","Lasso","Rączka","Pędzel","Wiadro","Mgła wojny","Wypełnienie mgłą"},icons={"select","rectangle","lasso","hand","brush","bucket","fog","fogbucket"};
-            var tools=new[]{EditorTool.Select,EditorTool.RectangleSelect,EditorTool.Lasso,EditorTool.Hand,EditorTool.Brush,EditorTool.Bucket,EditorTool.FogBrush,EditorTool.FogBucket};
+            paletteTools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 84, WrapContents = true }; toolbox.Controls.Add(paletteTools);
+            string[] names={"Zaznaczanie","Prostokąt","Lasso","Rączka","Pędzel","Wiadro","Mgła wojny","Wypełnienie mgłą","Rysik","Gumka","Ciemność","Wiadro ciemności"},icons={"select","rectangle","lasso","hand","brush","bucket","fog","fogbucket","stylus","eraser","dark","darkbucket"};
+            var tools=new[]{EditorTool.Select,EditorTool.RectangleSelect,EditorTool.Lasso,EditorTool.Hand,EditorTool.Brush,EditorTool.Bucket,EditorTool.FogBrush,EditorTool.FogBucket,EditorTool.Stylus,EditorTool.Eraser,EditorTool.DarkBrush,EditorTool.DarkBucket};
             for(int i=0;i<tools.Length;i++){var tool=tools[i];var b=ShellButton(paletteTools,"",icons[i],names[i],()=>SelectTool(tool),48);b.Height=26;toolButtons.Add(tool,b);}
-            AttachFogAppearanceMenu();
+            AttachFogAppearanceMenu(); AttachDarkAppearanceMenu();
             var shapeLabel = new Label { Text = "Kształt", Width = 52, Height = 22 }; toolbox.Controls.Add(shapeLabel);
             shapePicker = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Kształt pędzla" }; shapePicker.Items.AddRange(new object[] { "Punkt", "Kwadrat", "Prostokąt", "Koło", "Heksagon", "Pięciokąt foremny", "Linia pozioma", "Linia pionowa" }); shapePicker.SelectedIndex = 0; toolbox.Controls.Add(shapePicker);
             var sizeLabel = new Label { Text = "Rozmiar", Width = 52, Height = 22 }; toolbox.Controls.Add(sizeLabel);
@@ -44,7 +44,8 @@ namespace HexMapEditor
             tips.SetToolTip(sizePicker, "1–15. Heksagon: promień w pierścieniach + pole środkowe. Pozostałe: wymiar figury w odstępach siatki. Punkt zawsze 1 heks."); tips.SetToolTip(heightPicker, "Drugi wymiar prostokąta: wysokość 1–15");
             Action settings = () => { EndCanvasGesture(true); brushShape = (BrushShape)shapePicker.SelectedIndex; brushSize = (int)sizePicker.Value; brushHeight = (int)heightPicker.Value; brushFilled = fillPicker.Checked; heightPicker.Visible = brushShape == BrushShape.Rectangle; UpdateBrushAvailability(); tips.SetToolTip(sizeLabel, brushShape == BrushShape.Point ? "Punkt obejmuje zawsze jeden heks; rozmiar i wypełnienie nie mają zastosowania." : "Wymiar figury w jednostkach siatki: 1–15."); canvas.Invalidate(); };
             shapePicker.SelectedIndexChanged += (s, e) => settings(); sizePicker.ValueChanged += (s, e) => settings(); heightPicker.ValueChanged += (s, e) => settings(); fillPicker.CheckedChanged += (s, e) => settings(); settings();
-            toolbox.Layout+=(s,e)=>{int w=toolbox.ClientSize.Width;foreach(Control b in paletteTools.Controls){b.Width=(w-8)/4;b.Height=26;}shapeLabel.Location=new Point(0,59);shapePicker.SetBounds(52,57,Math.Max(80,w-52),22);sizeLabel.Location=new Point(0,82);sizePicker.Location=new Point(52,80);heightPicker.Location=new Point(w-60,80);fillPicker.Location=new Point(0,103);};
+            toolbox.Layout+=(s,e)=>{int w=toolbox.ClientSize.Width;foreach(Control b in paletteTools.Controls){b.Width=(w-8)/4;b.Height=26;}shapeLabel.Location=new Point(0,87);shapePicker.SetBounds(52,85,Math.Max(80,w-52),22);sizeLabel.Location=new Point(0,110);sizePicker.Location=new Point(52,108);heightPicker.Location=new Point(w-60,108);fillPicker.Location=new Point(0,131);};
+            BuildInkSettings(toolbox);
             var presets = Section("Presety", 1);
             presetPickerRow = new Panel { Dock = DockStyle.Top, Height = 28 }; presets.Controls.Add(presetPickerRow);
             terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name"; terrainPicker.AccessibleName = "Presety"; presetPickerRow.Controls.Add(terrainPicker);
@@ -55,7 +56,12 @@ namespace HexMapEditor
             presetStateLabel.AutoEllipsis = true; presets.Controls.Add(presetStateLabel);
             presets.Layout += (s, e) => { int w = presets.ClientSize.Width; terrainPicker.SetBounds(0, 1, Math.Max(80, w - 32), 24); refreshPresetsButton.SetBounds(w - 28, 0, 28, 26); presetActions.SetBounds(0, 25, w, 28); foreach (Control b in presetActions.Controls) b.Width = (w - 16) / 4; presetStateLabel.SetBounds(0, 54, w, 20); };
 
-            var terrains = Section("Tereny", 2); addTerrainButton = SmallButton(terrains, "Dodaj teren", () => EditTerrain(true), 208); addTerrainButton.Dock = DockStyle.Top; addTerrainButton.Height = 26;
+            var terrains = Section("Tereny", 2);
+            var terrainActions=new Panel{Dock=DockStyle.Top,Height=28};terrains.Controls.Add(terrainActions);
+            addTerrainButton=SmallButton(terrainActions,"Dodaj teren",()=>EditTerrain(true),96);
+            var graphicsLibrary=SmallButton(terrainActions,"Biblioteka grafik",ManageTerrainGraphics,112);
+            graphicsLibrary.AccessibleName="Biblioteka grafik terenów — zarządzanie bez przypisywania";tips.SetToolTip(graphicsLibrary,graphicsLibrary.AccessibleName);
+            terrainActions.Layout+=(s,e)=>{int half=terrainActions.ClientSize.Width/2;addTerrainButton.SetBounds(0,0,half-2,26);graphicsLibrary.SetBounds(half+2,0,terrainActions.ClientSize.Width-half-2,26);};
             var terrainList = new Panel { Dock = DockStyle.Fill }; terrains.Controls.Add(terrainList); terrainList.BringToFront();
             terrainUp = TerrainScrollButton(terrainList, true);
             terrainDown = TerrainScrollButton(terrainList, false);
@@ -69,7 +75,7 @@ namespace HexMapEditor
             IconAction(objectActions,"new","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);deleteObjectButton=IconAction(objectActions,"trash","Usuń wzorzec obiektu",DeleteObjectTemplate);SmallButton(objectActions,"…",OpenObjectLibrary,32);IconAction(objectActions,"labels","Lista obiektów na mapie",OpenObjectInstances);
             objectPreview=new BufferedFlowPanel{Dock=DockStyle.Fill,AutoScroll=false,WrapContents=true};objects.Controls.Add(objectPreview);objectPreview.BringToFront();
             SelectTool(EditorTool.Select); LayoutPalette(); RefreshPresetPicker(); UpdateMaterialIndicator();
-            canvas.MouseLeave += (s, e) => { previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
+            canvas.MouseLeave += (s, e) => { inkCursor=null;inkPrevious=null;activeStroke=null;previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
             Disposed += (s, e) => { foreach (var b in documentBitmaps.Values) b.Dispose(); foreach (var b in libraryBitmaps.Values) b.Dispose(); };
         }
         bool layingOutPalette;

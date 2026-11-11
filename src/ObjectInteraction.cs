@@ -20,10 +20,10 @@ namespace HexMapEditor
         static bool SelectionTool(EditorTool tool){return tool==EditorTool.Select||tool==EditorTool.RectangleSelect||tool==EditorTool.Lasso;}
         PointF World(Point p){return new PointF((p.X-pan.X)/scale,(p.Y-pan.Y)/scale);}
         PointF Screen(PointF p){return new PointF(pan.X+p.X*scale,pan.Y+p.Y*scale);}
-        bool HiddenPoint(PointF world){int at=ObjectGeometry.Hit(map,world);return !previewWithoutFog&&at>=0&&map.Cells[at].Fog;}
+        bool HiddenPoint(PointF world){int at=ObjectGeometry.Hit(map,world);return CellMasked(at);}
         Region VisibleObjectRegion(bool real=false)
         {
-            var region=new Region();if(previewWithoutFog&&!real)return region;for(int i=0;i<map.Cells.Count;i++)if(map.Cells[i].Fog)using(var path=ObjectGeometry.Hex(map,BrushGeometry.Center(map,i%map.Columns,i/map.Columns),28.03f))region.Exclude(path);return region;
+            var region=new Region();for(int i=0;i<map.Cells.Count;i++)if(real?(map.Cells[i].Fog||EffectiveDarkness(i)):CellMasked(i))using(var path=ObjectGeometry.Hex(map,BrushGeometry.Center(map,i%map.Columns,i/map.Columns),28.03f))region.Exclude(path);return region;
         }
         bool ObjectVisible(MapObject o)
         {if(hideObjects)return false;using(var region=VisibleObjectRegion()){region.Intersect(ObjectBounds(o));using(var matrix=new Matrix())return region.GetRegionScans(matrix).Any(r=>r.Width>.001f&&r.Height>.001f);}}
@@ -106,7 +106,7 @@ namespace HexMapEditor
                     AddReveal(objectGesture,obj,from);
                 }
                 foreach(var layer in objectGesture.Layers)layer.Apply(map.Cells.First(c=>c.Id==layer.CellId),true);
-                objectPreviousCursor=p;canvas.Invalidate();return true;
+                objectPreviousCursor=p;InvalidateLight();canvas.Invalidate();return true;
             }
             if(objectSelecting){if(Math.Abs(e.X-dragOrigin.X)+Math.Abs(e.Y-dragOrigin.Y)>3)dragging=true;if(selectionKind==1){if(selectionPath.Count==1||Distance(selectionPath.Last(),p)>3/scale)selectionPath.Add(p);}else{if(selectionPath.Count==1)selectionPath.Add(p);else selectionPath[1]=p;}canvas.Invalidate();return true;}
             if(Math.Abs(e.X-dragOrigin.X)+Math.Abs(e.Y-dragOrigin.Y)>3)dragging=true;return true;
@@ -135,7 +135,7 @@ namespace HexMapEditor
                 if(commit&&(objectGesture.Objects.Count>0||objectGesture.Layers.Count>0)){ReconcileFog(objectGesture,map,true);PushAction(objectGesture);MarkDirty();if(skippedLocked>0)statusLabel.Text="Pominięto zablokowane obiekty: "+skippedLocked;}
                 else if(!commit){foreach(var before in objectDragBefore.Values){var index=map.Objects.FindIndex(o=>o.Id==before.Id);if(index>=0)map.Objects[index]=before.Copy();}foreach(var layer in objectGesture.Layers)layer.Apply(map.Cells.First(c=>c.Id==layer.CellId),false);}
             }
-            objectGesture=null;objectDragBefore=null;objectMoving=false;objectSelecting=false;objectClick=false;objectClickToClear=null;objectPreviousCursor=null;selectionPath.Clear();canvas.Invalidate();
+            InvalidateLight();objectGesture=null;objectDragBefore=null;objectMoving=false;objectSelecting=false;objectClick=false;objectClickToClear=null;objectPreviousCursor=null;selectionPath.Clear();canvas.Invalidate();
         }
     }
 }

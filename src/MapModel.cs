@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -232,14 +232,14 @@ namespace HexMapEditor
         }
         public static List<int> Flood(MapData map, int start, bool byColor = false)
         { return Flood(map, start, map.Cells.Select(c => new RegionState(c)).ToArray(), byColor); }
-        public static List<int> Flood(MapData map, int start, RegionState[] original, bool fog)
+        public static List<int> Flood(MapData map, int start, RegionState[] original, bool fog, bool dark = false)
         {
             var result = new List<int>(); if (start < 0 || start >= map.Cells.Count) return result;
             var seed = original[start]; var visited = new bool[map.Cells.Count]; var pending = new Queue<int>(); pending.Enqueue(start); visited[start] = true;
             while (pending.Count != 0)
             {
                 int current = pending.Dequeue(); result.Add(current);
-                foreach (int next in Neighbors(map, current)) if (!visited[next] && original[next].TerrainId == seed.TerrainId && original[next].Variant == seed.Variant && (!fog || original[next].Fog == seed.Fog)) { visited[next] = true; pending.Enqueue(next); }
+                foreach (int next in Neighbors(map, current)) if (!visited[next] && original[next].TerrainId == seed.TerrainId && original[next].Variant == seed.Variant && (!fog || original[next].Fog == seed.Fog) && (!dark || original[next].Darkness == seed.Darkness)) { visited[next] = true; pending.Enqueue(next); }
             }
             return result;
         }
@@ -252,7 +252,7 @@ namespace HexMapEditor
             var kind = CellContentKind.None;
             if (!neutralState.Matches(cell)) kind |= CellContentKind.Terrain;
             if (cell.IconId != null) kind |= CellContentKind.Icon;
-            if (cell.Fog) kind |= CellContentKind.Fog;
+            if (cell.Fog) kind |= CellContentKind.Fog; if(cell.Darkness)kind|=CellContentKind.Darkness;
             if (!String.IsNullOrEmpty(cell.Name) || !String.IsNullOrEmpty(cell.Description) || !String.IsNullOrEmpty(cell.RichDescription)) kind |= CellContentKind.Text;
             return kind;
         }
@@ -312,7 +312,7 @@ namespace HexMapEditor
         static string CellKey(CellData cell) { return MapLogic.Hash(MapLogic.Serializer().Serialize(cell)); }
         static string Header(MapData map)
         {
-            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, ObjectStates = StateLibrary.ForSave(map), map.ExcludedStateIds, map.FogPalette, map.Background });
+            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, ObjectStates = StateLibrary.ForSave(map), map.ExcludedStateIds, map.FogPalette, map.DarkPalette, map.Ink, map.Background });
         }
         public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); changed.Clear(); headerChanged = false; }
         public bool CheckCell(CellData cell) { string value; if (saved.TryGetValue(cell.Id, out value) && value == CellKey(cell)) changed.Remove(cell.Id); else changed.Add(cell.Id); return Dirty; }
