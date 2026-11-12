@@ -1,6 +1,6 @@
 ﻿# Specyfikacja użytkowa — HexMapEditor
-Wersja 2.5. Stan decyzji 11 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.5.4. Pierwszeństwo mają ustalenia sekcji 34, pozostałe wcześniejsze sekcje opisują historię uzgodnień.
+Wersja 2.6. Stan decyzji 12 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.6.1. Pierwszeństwo mają ustalenia sekcji 36, pozostałe wcześniejsze sekcje opisują historię uzgodnień.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -655,3 +655,42 @@ Dopasuj mapę bez zmian. Dopasuj wszystko sumuje obwiednię siatki z efektywnymi
 Mapa9 wymagana dla Ink, DarkPalette/Darkness/DarkFill oraz ustawień świateł instancji/grup. Jawne pola, skończone wartości, limity i referencje walidowane przed podmianą dokumentu. Osadzone źródła ciemności deduplikowane z terenem/mgłą/tłem; tylko potrzebne zasoby i istniejące palety. Nie zapisujemy wskaźnika ani autorytatywnego cache światła/flag widoku. Bez konwerterów lub kasowania map8. Presety3, grafiki2, ikony2 i wzorce obiektów1 bez zmiany numerów; brakujące nowe ustawienia starego wzorca mają wyłączone światło i promień1, bez masowego przepisywania plików.
 
 Testy wyłącznie celowane, jawny pojedynczy Case Run-Patch060Tests; wyniki i niewykonane próby opisuje raport. Bez Run-AllTests, DPI, audytu WPF, pełnej przenośności lub wydajności dużych map. Zachowane źródła dawnych prób. Zakładki, światło kierunkowe/ściany/ponowne Fog, inne warstwy i reszta backlogu nie są implementowane w0.6.0.
+
+
+## 36. Przyrost 0.6.1 — pole widzenia, narzędzia i biblioteka teł
+
+Ta sekcja zastępuje sprzeczne reguły0.6.0. Nazwy użytkowe: Ograniczenie widoczności / Wiadro ograniczenia widoczności, Pole widzenia, Promień widzenia i kolumna Widoczność (Widoczny / Częściowo widoczny / Poza polem widzenia). Wewnętrzne Light/Darkness i geometria masek bez kosmetycznego przemianowywania schematu. Fog pozostaje trwałą, niezależną mgłą wojny.
+
+Widok Obiekty wyłączony pomija źródła pola widzenia, oprócz rysowania/hit-testu obiektów. Wraca aktualna baza maski; ponowne włączenie używa bieżących efektywnych ustawień członków/grup. Flaga nie zmienia masek, danych, dirty ani historii. Nie zasłania odkrytego Fog. Wyłączenie Ograniczenia widoczności pomija jego renderowanie/maskowanie danych; Fog nadal działa niezależnie. Geometryczna suma masek i próg50% bez zmian. Alpha nie ujawnia danych logicznie. Ręczne usunięcie/przemalowanie bazy w odsłoniętym obszarze pozostaje po odejściu źródła, bez przywracania starego snapshotu.
+
+Grupy: nullable LightEnabled/LightRadius zachowują ustawienia indywidualne. Źródło jest na każdym efektywnie uprawnionym członku, nie na środku grupy; dowolny stan może mieć pole widzenia. Cache unieważniany po zakończeniu transakcji i przy ruchu/odczycie/historii. Zgłoszenia zaniku zasięgów po grupowaniu poza mapą nie odtworzono w celowanej próbie; użytkownik zgodził się odłożyć dalszą diagnozę po próbie15×10PointyTop z mieszaną maską. Nie nazywać tego naprawą o udowodnionej przyczynie.
+
+### Rozmiar, uchwyty i wskaźnik
+
+Rysik/Gumka współdzielą ustawienie0,5–200 logicznych px, domyślnie5. Na początku gestu światowa grubość/średnica = wartość × DPI/96 ÷ zoom. Gest utrwala grubość świata; stare kreski później skalują się normalnie, nowy gest odzyskuje ustawiony rozmiar ekranowy. Zoom/MMB/Fit kończą bieżący fragment przed zmianą kamery. Obrys odpowiada rozmiarowi narzędzia. Walidacja dodatnich skończonych grubości świata do2 mld uwzględnia zoom min0,000001 i DPI do960;200 ogranicza ustawienie ekranowe, nie zapis świata. Współrzędne/punkty/fragmenty i budżet historii nie są zwiększane.
+
+Małe poziome uchwyty: wspólny rozmiar pędzla/mgły/ograniczenia —8px na1; rozmiar rysika/gumki —4px na0,5. MouseDown bez ruchu nic nie zmienia; pozycja względem początku gestu, bez czasu/przyspieszania. Zachowane wpisywanie, limity i bezpieczne zakończenie capture.
+
+PPM Rysika: jednokolorowy dysk bez obwódki, średnica18×DPI/96+2px (20 przy DPI96, dotychczasowa zewnętrzna obwiednia). Kometa zwęża się i wygasa przez750ms, do128 próbek. Żywe kliknięcia mogą łączyć się; wygaśnięcie, wyjście z narzędzia/płótna, ukrycie warstwy i utrata capture/fokusu czyszczą kontekst. Kursor ukryty jedynie w oknie płótna podczas PPM, bez globalnego licznika Cursor.Hide/Show; wszystkie zakończenia przywracają go. Timer33ms tylko przy aktywności. Brak dokumentu/dirty/historii/zapisu/Fit.
+
+### Biblioteka teł i kadr
+
+Tło ma dostęp Z pliku / Z biblioteki / Usuń tło. Nowy/zmieniony wynik po Zatwierdź daje decyzję: nowe tło z nazwą, jawne nadpisanie wybranego celu, tylko mapa, powrót. Nowy import domyślnie proponuje nowe; niezmieniona akceptacja nie mnoży wpisów. Sam wybór/suwaki niczego nie zapisują. Błąd pliku nie stosuje połowicznie mapy i pozwala ponowić albo świadomie wybrać tylko mapę. Usunięcie tła z mapy nie usuwa biblioteki.
+
+`Library/Backgrounds/background-Nazwa.json` format1: stabilne ID, nazwa, kolejność, SourceId i wszystkie parametry Left/Top/Width/Height/Opacity/Saturation/Blur. Źródła współdzielone w Sources/source-SHA256.json istniejącym mechanizmem niezmiennej treści. Brak bitmapy konkretnego okna i ścieżki oryginału. Wybór odtwarza WSZYSTKIE suwaki/kadr, pełne źródło nadal pozwala przekadrować. Cover używa aktualnego płótna. MMB przesuwa cały prostokąt bez zmiany wymiarów, ogranicza do obrazu i kończy po utracie capture; LPM nadal tworzy prostokąt i obsługuje uchwyty.
+
+Ciemny selektor: wybór, rename, edytuj/zastąp i potwierdzane usuwanie. LibraryFiles ze wspólną historią300, bajtami, ścieżkami i konfliktami; bez Kosza. Operacja biblioteczna bez zmiany mapy nie dodaje dirty. Zapis połączony z mapą to jeden krok, bez live-powiązania; mapa ma migawkę źródła/parametrów. Niezmienne źródła pozostają dostępne dla sesyjnej historii, bez automatycznego sprzątania.
+
+Budżety biblioteki teł:128 aktywnych definicji, metadane do1MiB,64 źródła i192MiB skompresowanej treści całego magazynu (także nieaktywnej). Źródło32MiB/4096×4096; JSON źródła uwzględnia base64 i narzut. Katalog zachowuje lekkie referencje; wybór przypina potrzebne bajty, bez rozkodowania całej biblioteki naraz w RAM. Mapa nadal96MiB źródeł/256MiB pliku,64 źródła; cache/pozostałe limity bez zwiększania. Tła deduplikują źródła między wpisami i w dokumencie z innymi użyciami. Brak skanowania folderów wejściowych.
+
+### UI, zapis i granice
+
+Przybornik3×4: Kursor | Rączka | Rysik | Gumka; Pędzel | Wiadro | Zaznaczenie prostokątne | Lasso; Mgła | Wiadro mgły | Ograniczenie widoczności | Wiadro ograniczenia widoczności. Dwie odróżnialne ikony ograniczenia. Biblioteka grafik domyślnie4kolumny w granicach ekranu. Lista obiektów szersza, kolumny o rozsądnych minimach, ellipsis/bezpieczny tooltip nazw i awaryjny scrollbar.
+
+Usuwanie instancji jest ostatnią akcją; grupa ma u dołu ramkę/kolor, potem usuwanie. Jawne AutoSize dla właściwych indeksów wierszy i GrowAndShrink zapobiegają zachowaniu rozciągniętego przycisku. Pomiar natywnego pokazania panelu ujawnił koszt~140–150ms; nie obiecujemy usunięcia pauzy ani płynności ze zrzutów. Zachowana izolacja kompozycji WinForms od WPF, bez nowego globalnego WS_EX_COMPOSITED lub timera maskującego.
+
+Mozaika rysuje siatkę z zapasem poza krawędzie przycisku, bez pustych ząbków/obrysów. Rozmiar miniheksów i limit12 reprezentantów zachowane. Stabilne możliwie równe przypisania niezależnych pozycji, bez zużywania Random mapy; częściowe heksy przy krawędzi nie są nowymi danymi dokumentu.
+
+Mapa9, preset3, grafika2, ikona2 i wzorzec obiektu1 pozostają. Istniejące pola grubości świata/światła/parametrów tła wystarczają; biblioteka teł ma odrębny format1. Brak migracji/konwerterów i kasowania dawnych plików. Przenośność do czystej kopii nadal świadomie odłożona.
+
+[Kolejka importu z folderów](backlog-import-z-folderow.md) jest WYŁĄCZNIE szczegółowym backlogiem z otwartymi decyzjami: lokalizacja wejść, pomijanie, duplikaty, resume, usuwanie i granice historii. Nie implementujemy jej w0.6.1. Pozostałe granice1.0.0/backlogu bez rozszerzenia.
