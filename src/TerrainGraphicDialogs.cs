@@ -120,8 +120,7 @@ namespace HexMapEditor
                     var thumbnail = new Bitmap(88, 72);
                     thumbnails.Add(thumbnail);
                     using (var g = Graphics.FromImage(thumbnail))
-                    using (var asset = TerrainTextures.Decode(entry.Asset))
-                        TerrainPreview.PaintHex(g, new PointF(44, 36), 33, flat, Color.SlateGray, asset);
+                        g.DrawImageUnscaled(TerrainGraphicThumbnails.Get(entry.Asset,flat),0,0);
                     images.Images.Add(thumbnail);
                     var row = list.Items.Add(entry.Name, images.Images.Count - 1);
                     row.Tag = entry;

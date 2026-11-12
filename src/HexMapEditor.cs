@@ -177,7 +177,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.6.3";
+        const string AppVersion = "0.6.4";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -724,9 +724,10 @@ namespace HexMapEditor
             if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle && !(e.Button==MouseButtons.Right&&(currentTool==EditorTool.Stylus||currentTool==EditorTool.Eraser))) return;
             requireFreshCanvasDown = false; EndObjectPropertyEdit();
             if (e.Button != MouseButtons.Middle && !GuardCanvasLayer()) return;
+            // Numeric editors can commit on focus loss and end an old gesture. Finish that first.
+            canvas.Focus();
             gestureButton = e.Button; gestureTool = currentTool;
             dragging = false; dragOrigin = e.Location; panOrigin = pan;
-            canvas.Focus();
             canvas.Capture = true;
             if (e.Button == MouseButtons.Middle) { panGesture = true; return; }
             if (BeginInk(e)) return;

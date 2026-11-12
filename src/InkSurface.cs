@@ -33,7 +33,7 @@ namespace HexMapEditor
             {context.BeginFigure(new WPoint(stroke.Points[0].X,stroke.Points[0].Y),false,false);context.PolyLineTo(stroke.Points.Skip(1).Select(p=>new WPoint(p.X,p.Y)).ToList(),true,true);}
             return path.GetWidenedPathGeometry(Pen(stroke.Width),Tolerance(stroke.Width),Media.ToleranceType.Absolute);
         }
-        internal static InkStroke Subtract(InkStroke stroke,Media.PathGeometry cut,float diameter)
+        internal static InkStroke Subtract(InkStroke stroke,Media.Geometry cut,float diameter)
         {
             var geometry=Geometry(stroke);double tolerance=Tolerance(Math.Min(stroke.Width,diameter));
             if(geometry.FillContainsWithDetail(cut,tolerance,Media.ToleranceType.Absolute)==Media.IntersectionDetail.Empty)return stroke;

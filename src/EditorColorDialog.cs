@@ -28,7 +28,7 @@ namespace HexMapEditor
         internal EditorColorDialog(Color initial)
         {
             Text = "Wybierz kolor";
-            ClientSize = new Size(414, 398);
+            ClientSize = new Size(414, 450);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
@@ -43,11 +43,12 @@ namespace HexMapEditor
             var old = new Panel { BackColor = initial, Bounds = new Rectangle(193, 224, 93, 29), BorderStyle = BorderStyle.FixedSingle };
             next.SetBounds(303, 224, 95, 29);
             next.BorderStyle = BorderStyle.FixedSingle;
-            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(302, 354, 96, 29) };
-            accept.SetBounds(196, 354, 96, 29);
+            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(302, 410, 96, 29) };
+            accept.SetBounds(196, 410, 96, 29);
             foreach (var button in new[] { accept, cancel }) { button.FlatStyle = FlatStyle.Flat; button.BackColor = hex.BackColor; }
-            error.Location = new Point(16, 328);
-            for(int i=0;i<3;i++){var n=rgb[i];n.Minimum=0;n.Maximum=255;n.DecimalPlaces=0;n.SetBounds(38+i*127,291,74,26);n.AccessibleName="RGB "+"RGB"[i];Controls.Add(n);Controls.Add(LabelAt("RGB"[i].ToString(),16+i*127,295));n.ValueChanged+=(a,b)=>{if(updating)return;ReadColor(Color.FromArgb((int)rgb[0].Value,(int)rgb[1].Value,(int)rgb[2].Value));RefreshColor(true);};}
+            error.Location = new Point(16, 382);
+            for(int i=0;i<3;i++){var n=rgb[i];n.Minimum=0;n.Maximum=255;n.DecimalPlaces=0;n.SetBounds(40,282+i*30,74,26);n.TabIndex=3+i;n.AccessibleName="RGB "+"RGB"[i];Controls.Add(n);Controls.Add(LabelAt("RGB"[i]+":",16,286+i*30));n.ValueChanged+=(a,b)=>{if(updating)return;ReadColor(Color.FromArgb((int)rgb[0].Value,(int)rgb[1].Value,(int)rgb[2].Value));RefreshColor(true);};}
+            hex.TabIndex=2;accept.TabIndex=6;cancel.TabIndex=7;
             Controls.AddRange(new Control[] { saturation, hue, hex, old, next, error, accept, cancel,
                 LabelAt("HEX", 16, 228), LabelAt("Poprzedni", 193, 257), LabelAt("Nowy", 303, 257) });
             AcceptButton = accept;
