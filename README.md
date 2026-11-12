@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.6.3
+﻿# HexMapEditor 0.6.4
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.3** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.4** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -155,11 +155,13 @@ Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejn
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 
-Bieżące próby 0.6.3 wybiera jawny pojedynczy Case `ink-profile`, `gradient`, `ink-gradient`, `fills` albo `ui` w `tests/Run-Patch063Tests.ps1`; `fixture` tworzy własną mapę i bibliotekę. Brak Case kończy się błędem. Wyniki i ograniczenia: [raport 0.6.3](docs/raport-0.6.3.md). Nie uruchamiać pełnej kampanii bez osobnej zgody.
+Bieżące próby 0.6.4 wybiera jawny pojedynczy Case `profile`, `comparison`, `image`, `picker`, `input` albo `library` w `tests/Run-Patch064Tests.ps1`; `fixture` tworzy tylko własne dane. `comparison` odtwarza bazowy renderer z lokalnego commita 0cf9c24 w tests/_work, bez zależności od pozostałości starych prób. Brak Case kończy się błędem. [Raport i checklista 0.6.4](docs/raport-0.6.4.md). Bez pełnego zestawu bez osobnego polecenia.
 
 Kolejka importu z folderów to wyłącznie [szczegółowy backlog](docs/backlog-import-z-folderow.md). Nie ma skanowania wejść, okien startowych ani usuwania oryginałów.
 
 ## Historia zmian
+
+- **0.6.4** — renderer gradientów ograniczony do widoku, cache ukończonej warstwy i późniejszy fragment kreski na wierzchu; jedno dokładne odejmowanie całego gestu gumki; pionowe RGB, dwa przełączniki i Losuj; małe buforowane miniatury biblioteki. Mapa 11 / preset 4 bez zmiany.
 
 - **0.6.3** — cache geometrii/walidacji usuwa koszt nowych kresek po długiej gumce; wspólne HEX/RGB/HSV i gradienty rysika, wskaźnika oraz wariantów heksów; stały spacing responsywnej biblioteki, ciemny nagłówek listy i disabled ramka usuwania tła. Mapa11/preset4.
 - **0.6.2** — dokładna gumka powierzchniowa, ciągła kometa bez sumowania alpha próbek, całkowity rozmiar 1–200, odroczone otwarcie szczegółów przy pierwszym drag, lżejsze tło podczas zmiany rozmiaru okna i lokalne UI. Mapa10 zapisuje kontury wymazania; preset3 bez zmiany. Wizualna płynność komety/panelu pozostaje do odbioru.
@@ -231,3 +233,14 @@ Mapa11 i preset4 zapisują gradienty oraz przebieg kolorów kreski. Brak migracj
 Biblioteka grafik ma stały kafelek/odstęp120px, domyślnie4kolumny, więcej po poszerzeniu i mniej po zwężeniu. Lista obiektów startuje od sumy szerokości kolumn, a resztkowy nagłówek jest ciemny. Nie ma czerwonej aktywnej ramki Usuń tło, gdy brak tła. Odroczenie panelu i zaakceptowany resize0.6.2 pozostają; nie dodano ryzykownego Show w MouseDown.
 
 Dawne zgłoszenie źródeł pola widzenia grup jest **zamknięte po ponownym potwierdzeniu użytkownika**; nie jest aktywnym zadaniem ani odbiorem. Nie ustalono historycznej przyczyny, wracamy dopiero po nowym zgłoszeniu. [Merge heksów](docs/backlog-merge-heksow.md) to osobny pomysł bez zatwierdzonego zakresu, nie funkcja0.6.3. Lokalne ustawienia/góra, panele, kolejka importu, zakładki i UX presetów nadal backlog.
+
+
+## Poprawki odbiorcze 0.6.4
+
+Gradient kreski zachowuje cykl 300 logicznych px (80% paleta, 20% powrót), fazę od drogi i Tęczę. Na samoprzecięciu wygrywa później narysowany fragment tej samej kreski. Kolor nie jest już wybierany według najbliższej osi. Gumka nie odsłania starszego fragmentu w otworze i nie zmienia fazy pozostałości. Heksy i półprzezroczysta kometa zachowują swoje zaakceptowane reguły.
+
+Renderer używa natywnych liniowych przejść RGB w pełnej skali ekranu, jednego roboczego kafla 256×256 i cache ukończonej warstwy tylko dla bieżącego widoku (do 5,8 mln pikseli, razem poniżej dawnego budżetu 24 MiB). Aktywną kreskę rysuje osobno. Nie ma bitmapy świata ani cyklu budowania i wyrzucania kafli per kreska. Przy większym viewportcie działa rendering bez cache. Dokładne odejmowanie gumki wykonywane jest raz na przeciętą kreskę na zakończenie gestu; podgląd już podczas ruchu wyklucza wszystkie kapsuły gestu. Krawędź podglądu może różnić się antyaliasingiem około jednego piksela, końcowy wynik jest dokładny. Do 10000 próbek gestu, bez zmiany budżetów zapisu i historii.
+
+Picker: R/G/B w pionie; Jednolity i Gradient wybierane bezpośrednio. Losuj zmienia wyłącznie RGB istniejących punktów roboczego gradientu, zachowuje pozycje/liczbę/kąt i nie korzysta z generatora malowania mapy. Anuluj odrzuca te zmiany. Stany i ramki nadal mają tylko jednolity kolor. Poprawiono też pierwszy gest po wpisaniu rozmiaru, który wcześniej mógł kończyć się kropką przy zatwierdzaniu pola na utracie fokusu.
+
+Biblioteka grafik zachowuje responsywny układ. Małe miniatury tworzone są bez pośredniego obrazu 1024×1024, z cache do 32 podglądów (około 0,78 MiB), bez zachowywania pełnych źródeł w tym cache. Czasy zależą od danych; lokalne wyniki, narzut cache jednolitej warstwy oraz ograniczenia prób są w raporcie. Nie deklarujemy pełnej płynności ani pełnej regresji. Format mapy 11 i presetu 4 bez zmiany; bez migracji lub sprzątania bibliotek.

@@ -770,3 +770,34 @@ Mapa11 i preset4 wymagają jawnych pól Gradient (również null), a kreska tak�
 Grafiki terenów: stały spacing120×114px z obecnym kafelkiem88×72, domyślny viewport4kolumny + marginesy/scrollbar; resize daje zmienną liczbę kolumn bez rozciągania odstępów. Lista obiektów startuje od sumy kolumn i obramowania/scrollbarów, ograniczona ekranem. Mgła nie jest wypełniaczem. Natywny resztkowy nagłówek ma ciemne tło także po poszerzeniu. Usuń tło: disabled tekst i ramka szare, aktywne czerwone; znaczenie bez zmiany. Oczy, akcje grupy i geometria mozaiki zachowane.
 
 [Merge heksów](backlog-merge-heksow.md) to pomysł bez zatwierdzonego zakresu; przy jego omawianiu można rozważyć wspólny gradient połączonego obszaru. Nie implementowane teraz. Lokalne ustawienia/góra, panele, folderowa kolejka importu, zakładki i UX presetów pozostają osobnymi backlogami.
+
+
+## 39. Poprawki odbiorcze 0.6.4
+
+Ta sekcja zastępuje w sekcji 38 wybór koloru kreski według najbliższego odcinka i dawny raster kafli per kreska. Cykl, Tęcza, faza od drogi, kąty heksów, logiczne maski i alpha grafik pozostają bez zmian.
+
+### Rysik: wydajność i kolejność
+
+Późniejszy fragment jednego gestu przykrywa wcześniejszy. Kolejność wynika wyłącznie z zapisanej listy Points/Distance; nie wymaga nowego stanu pliku. Natywny liniowy brush RGB powtarza zapisany cykl 80/20. Kolorowe korpusy malowane są kolejno, z okrągłymi zewnętrznymi łączeniami i końcami, bez stemplowania pełnych kolorowych dysków każdej próbki. Końcowa geometria/surface dostarcza jedną krawędź AA. Po gumce oryginalna droga kolorów pozostaje, a odejmowany jest cały otwór, łącznie z ukrytymi wcześniejszymi częściami tej samej kreski.
+
+Render kolorów odrzuca segmenty poza widocznym kaflem przed utworzeniem brush/pen. Pracuje w dokładnej skali urządzenia, bez zaniżania rozdzielczości po zoomie. Jeden scratch 256×256 jest ponownie używany; brak LRU kafli per kreska i per-pixel arbitrażu odległości. Cache ukończonej warstwy dotyczy bieżącego viewportu/kamery i niezmiennych instancji kresek; aktywna kreska osobno. Limit 5,8 mln pikseli, z buforem roboczym poniżej dawnego 24 MiB rastra. Większy widok rysowany bez tego cache; nie obniżamy jakości. Pusta warstwa nie alokuje cache. Wyparcie, zmiana dokumentu/Clear/Dispose zwalniają obrazy. Częściowa invalidacja i podgląd gumki nie przebudowują ukończonych rysunków.
+
+Walidacja całej warstwy na początku/końcu gestu i odczycie; podczas dopisywania sprawdzana aktywna kreska oraz łączny limit. Niezmienne stare drogi nie są ponownie walidowane przy każdej próbce. Wskaźnik zachowuje max pokrycia, 750 ms i niezależną fazę barw; po zgaśnięciu smugi stojąca głowa nie wymaga dalszego timera, następny ruch wznowi wygaszanie. Nie składa się półprzezroczystej komety jak nieprzezroczystego rysika.
+
+### Dokładna gumka
+
+Gest przechowuje wszystkie kapsuły koła/pasa z próbek (maksymalnie 10000). Nie pomija zakrętów. Podgląd wyklucza ich niezerową sumę geometryczną z rysowania warstwy; nie maluje tłem i nie zmienia innych warstw. Na koniec jeden boolean Exclude na każdą przeciętą kreskę, jedna serializacja/pełna walidacja wyniku i jedna główna operacja Undo/Redo. Nie zapisuje się pośrednich konturów po każdej próbce. Ograniczenia punktów/konturów/historii pozostają; błąd odrzuca całość. Różnica podglądowego klipu i dokładnego wyniku ograniczona do antyaliasingu około jednego piksela. Fit i zapis używają końcowej rzeczywistej pozostałości.
+
+### Obserwacje i lokalne UI
+
+Porównane gęste i rzadkie okręgi zachowują tę samą sylwetkę dla jednolitego/gradientu. Usunięto przycięcie piksela AA na obwiedni gradientu (floor/ceil i margines urządzenia). Rzadki wielokątny przebieg nie staje się automatycznie krzywą. Brak globalnego wygładzania narożników.
+
+RGB to zwarta pionowa grupa R/G/B, zsynchronizowana z HEX/HSV. W pickerze narzędzia dwa wzajemnie wykluczające przełączniki Jednolity/Gradient. W edytorze wariantu pozostaje Kolor/Gradient/Grafika. Losuj między Tęcza i Usuń punkt losuje RGB istniejących punktów, zachowuje liczbę/pozycje/kąt. Generator lokalny pickera, niezależny od losowania heksów. Wynik jest roboczy, nie losuje przy Paint/OK/odczycie; Anuluj/no-op i historia nadal działają. Bez alpha zwykłych kolorów i bez nowych presetów/bibliotek gradientów.
+
+Pole rozmiaru zatwierdza się przed utworzeniem nowego gestu: canvas.Focus poprzedza ustawienie gestureButton. Zatwierdzenie liczby przy utracie fokusu nie kończy świeżego drag.
+
+Biblioteka grafik nie tworzy ponownie pełnych wyników 1024×1024 dla małych miniatur. Podgląd 88×72 pochodzi bezpośrednio ze źródła/kadru, LRU 32 małych bitmap (około 0,78 MiB), bez pełnych źródeł. Identyfikator zawiera źródło i oba kadry; zmiana grafiki wybiera nową miniaturę, rename zachowuje wynik. Zwalnianie przy wyparciu/Dispose aplikacji. Cold/warm i wpływ rysunków opisuje raport; bez nowego indeksowania, workerów lub przebudowy układu.
+
+### Formaty i zamknięte zakresy
+
+Map 11 / preset 4 pozostają. Nie zmieniają się autorytatywne Gradient/Points/Distance/CycleWorld/Surface; zmiana składania wynika z istniejącej kolejności. Cache i robocze kapsuły nie są zapisem. Bez migracji, kasowania lub regenerowania starych bibliotek. Wszystkie dotychczasowe budżety źródeł, geometrii i 300 historii pozostają. Zachowane odroczenie panelu, resize tła, zamknięte zgłoszenie grup i wszystkie backlogi; żaden nie został zaimplementowany.
