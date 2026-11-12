@@ -11,14 +11,16 @@ namespace HexMapEditor
         public string Id { get; set; }
         public string Color { get; set; }
         public string GraphicId { get; set; }
+        public GradientDefinition Gradient {get;set;}
         internal GraphicDefinition Graphic;
         public FillVariant() { Id = Guid.NewGuid().ToString("N"); Color = "#777F91"; }
-        internal FillVariant Copy() { return (FillVariant)MemberwiseClone(); }
+        internal FillVariant Copy() { var copy=(FillVariant)MemberwiseClone();copy.Gradient=Gradient==null?null:Gradient.Copy();return copy; }
     }
     internal static class FillRules
     {
         internal static void Validate(FillVariant fill)
         {
+            if(fill!=null){GradientRules.Validate(fill.Gradient);if(fill.Gradient!=null&&fill.GraphicId!=null)throw new InvalidDataException("Wariant nie może być równocześnie grafiką i gradientem.");}
             if (fill == null || String.IsNullOrWhiteSpace(fill.Id) || fill.Id.Length > 200 || !MapLogic.ValidColor(fill.Color) ||
                 (fill.GraphicId == null ? fill.Graphic != null : fill.Graphic == null || fill.Graphic.Id != fill.GraphicId))
                 throw new InvalidDataException("Nieprawidłowy wariant wyglądu.");
@@ -45,7 +47,7 @@ namespace HexMapEditor
             terrain.Variants = Copy(fills);
             var first = fills[0];
             terrain.Color = first.Color; terrain.TextureId = first.GraphicId; terrain.Texture = first.Graphic;
-            terrain.FillKind = first.Graphic == null ? "color" : "graphic";
+            terrain.FillKind = first.Graphic != null ? "graphic" : first.Gradient!=null?"gradient":"color";
         }
     }
     public sealed partial class MainWindow

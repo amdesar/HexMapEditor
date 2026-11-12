@@ -153,7 +153,7 @@ namespace HexMapEditor
                     DrawQuestionMarker(g, new Rectangle(0, 0, 36, 36));
                 }
                 images.Images.Add("hidden", hidden);
-                var list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false,
+                var list = new DarkObjectList { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false,
                     SmallImageList = images, HideSelection = false, ShowItemToolTips = true };
                 list.Columns.Add("Nazwa", 185);
                 list.Columns.Add("Stan", 110);
@@ -161,6 +161,8 @@ namespace HexMapEditor
                 list.Columns.Add("Pozycja", 90);
                 list.Columns.Add("Mgła", 185);list.Columns.Add("Pole widzenia",100);list.Columns.Add("Widoczność",205);
                 foreach (ColumnHeader header in list.Columns) header.Tag = header.Text;
+                int desired=list.Columns.Cast<ColumnHeader>().Sum(h=>h.Width)+SystemInformation.VerticalScrollBarWidth+4;
+                dialog.ClientSize=new Size(Math.Min(desired,System.Windows.Forms.Screen.FromControl(this).WorkingArea.Width-40-(dialog.Width-dialog.ClientSize.Width)),dialog.ClientSize.Height);
                 StyleInstanceList(list);
                 foreach (var obj in map.Objects)
                 {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -12,6 +12,12 @@ namespace HexMapEditor
         readonly Button accept = new Button { Text = "Zatwierdź" };
         readonly HsvSurface saturation;
         readonly HsvSurface hue;
+        readonly NumericUpDown[] rgb={new NumericUpDown(),new NumericUpDown(),new NumericUpDown()};
+        internal Action<Color> Changed;
+        internal Action<bool> ValidityChanged;
+        internal bool ColorValid {get{return MapLogic.ValidColor(hex.Text);}}
+        internal void SetColor(Color color){ReadColor(color);RefreshColor(true);}
+        internal void Embed(){TopLevel=false;FormBorderStyle=FormBorderStyle.None;foreach(Control c in Controls)if(c is Button)c.Visible=false;}
         double h, s, v;
         bool updating;
 
@@ -22,7 +28,7 @@ namespace HexMapEditor
         internal EditorColorDialog(Color initial)
         {
             Text = "Wybierz kolor";
-            ClientSize = new Size(414, 348);
+            ClientSize = new Size(414, 398);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
@@ -37,10 +43,11 @@ namespace HexMapEditor
             var old = new Panel { BackColor = initial, Bounds = new Rectangle(193, 224, 93, 29), BorderStyle = BorderStyle.FixedSingle };
             next.SetBounds(303, 224, 95, 29);
             next.BorderStyle = BorderStyle.FixedSingle;
-            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(302, 302, 96, 29) };
-            accept.SetBounds(196, 302, 96, 29);
+            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(302, 354, 96, 29) };
+            accept.SetBounds(196, 354, 96, 29);
             foreach (var button in new[] { accept, cancel }) { button.FlatStyle = FlatStyle.Flat; button.BackColor = hex.BackColor; }
-            error.Location = new Point(16, 276);
+            error.Location = new Point(16, 328);
+            for(int i=0;i<3;i++){var n=rgb[i];n.Minimum=0;n.Maximum=255;n.DecimalPlaces=0;n.SetBounds(38+i*127,291,74,26);n.AccessibleName="RGB "+"RGB"[i];Controls.Add(n);Controls.Add(LabelAt("RGB"[i].ToString(),16+i*127,295));n.ValueChanged+=(a,b)=>{if(updating)return;ReadColor(Color.FromArgb((int)rgb[0].Value,(int)rgb[1].Value,(int)rgb[2].Value));RefreshColor(true);};}
             Controls.AddRange(new Control[] { saturation, hue, hex, old, next, error, accept, cancel,
                 LabelAt("HEX", 16, 228), LabelAt("Poprzedni", 193, 257), LabelAt("Nowy", 303, 257) });
             AcceptButton = accept;
@@ -51,6 +58,7 @@ namespace HexMapEditor
                 if (updating) return;
                 accept.Enabled = MapLogic.ValidColor(hex.Text);
                 error.Visible = !accept.Enabled;
+                if(ValidityChanged!=null)ValidityChanged(accept.Enabled);
                 if (accept.Enabled) { ReadColor(ColorTranslator.FromHtml(hex.Text)); RefreshColor(false); }
             };
             ReadColor(initial);
@@ -81,6 +89,9 @@ namespace HexMapEditor
                 hex.Text = Hex;
                 updating = false;
             }
+            updating=true;rgb[0].Value=SelectedColor.R;rgb[1].Value=SelectedColor.G;rgb[2].Value=SelectedColor.B;updating=false;
+            if(Changed!=null)Changed(SelectedColor);
+            if(ValidityChanged!=null)ValidityChanged(true);
             accept.Enabled = true;
             error.Visible = false;
         }

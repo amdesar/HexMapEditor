@@ -38,7 +38,7 @@ namespace HexMapEditor
         internal string FilePath;
         internal byte[] DiskBytes;
         internal long LibraryOrder;
-        public TerrainPreset() { PresetFormatVersion = 3; Id = Guid.NewGuid().ToString("N"); Name = "Nowy preset"; Terrains = new List<TerrainDefinition>(); }
+        public TerrainPreset() { PresetFormatVersion = 4; Id = Guid.NewGuid().ToString("N"); Name = "Nowy preset"; Terrains = new List<TerrainDefinition>(); }
         public TerrainPreset Copy() { return new TerrainPreset { PresetFormatVersion = PresetFormatVersion, Id = Id, Name = Name, Terrains = Terrains.Select(t => t.Copy()).ToList(), FilePath = FilePath, DiskBytes = DiskBytes, LibraryOrder = LibraryOrder }; }
     }
 
@@ -59,12 +59,13 @@ namespace HexMapEditor
         public static TerrainDefinition Neutral() { return Default().Terrains[0]; }
         public static void Validate(TerrainPreset preset)
         {
-            if (preset == null || preset.PresetFormatVersion != 3 || String.IsNullOrWhiteSpace(preset.Id) || String.IsNullOrWhiteSpace(preset.Name) || preset.Terrains == null || preset.Terrains.Count > 1000) throw new InvalidDataException("Nieprawidłowy preset terenów. Obsługiwany format: 3.");
+            if (preset == null || preset.PresetFormatVersion != 4 || String.IsNullOrWhiteSpace(preset.Id) || String.IsNullOrWhiteSpace(preset.Name) || preset.Terrains == null || preset.Terrains.Count > 1000) throw new InvalidDataException("Nieprawidłowy preset terenów. Obsługiwany format: 4.");
             var ids = new HashSet<string>(); var variants = new HashSet<string>();
             foreach (var t in preset.Terrains)
                 if (t == null || String.IsNullOrWhiteSpace(t.TerrainId) || String.IsNullOrWhiteSpace(t.VariantId) || t.Revision < 1 || String.IsNullOrWhiteSpace(t.Name) || !MapLogic.ValidColor(t.Color) || !TerrainTextures.ValidFill(t) || !ids.Add(t.TerrainId) || !variants.Add(t.VariantId)) throw new InvalidDataException("Nieprawidłowy lub powtórzony teren w presecie.");
             if (preset.Terrains.Any(t => t.TerrainId == UnpaintedTerrain.Id || t.VariantId == UnpaintedTerrain.Version)) throw new InvalidDataException("Stan niepomalowany należy do mapy, nie do presetu.");
             foreach (var terrain in preset.Terrains) FillRules.ValidatePool(terrain.Variants);
+            GradientRules.Budget(preset.Terrains.SelectMany(t=>t.Variants).Select(f=>f.Gradient),50000,"presetu");
         }
         public static List<TerrainPreset> Load(string directory, out string warning)
         {
@@ -94,7 +95,7 @@ namespace HexMapEditor
             if (terrains == null || terrains.Any(t => !(t is Dictionary<string, object>) || !((Dictionary<string, object>)t).ContainsKey("Variants") || terrainFields.Any(k => !((Dictionary<string, object>)t).ContainsKey(k)) || ((Dictionary<string, object>)t).Keys.Any(k => k != "TextureId" && k != "Variants" && !terrainFields.Contains(k)))) throw new InvalidDataException("Niepełna lub nieobsługiwana definicja terenu; plik pozostawiono bez zmian.");
             var preset = json.ConvertToType<TerrainPreset>(raw);
             GraphicSchema.Tables(raw); GraphicSchema.Preset(raw);
-            if (preset.PresetFormatVersion != 3 || !raw.ContainsKey("TerrainAssets") || !raw.ContainsKey("GraphicSources")) throw new InvalidDataException("Nieprawidłowy format tabeli grafik presetu. Wymagany format 3.");
+            if (preset.PresetFormatVersion != 4 || !raw.ContainsKey("TerrainAssets") || !raw.ContainsKey("GraphicSources")) throw new InvalidDataException("Nieprawidłowy format tabeli grafik presetu. Wymagany format 4.");
             TerrainTextures.Attach(preset, TerrainTextures.ReadTable(json.ConvertToType<List<GraphicDefinition>>(raw["TerrainAssets"]), json.ConvertToType<List<GraphicSource>>(raw["GraphicSources"])));
             Validate(preset); preset.LibraryOrder = LibrarySequence.Read(raw); preset.FilePath = Path.GetFullPath(file); preset.DiskBytes = bytes; return preset;
         }
@@ -149,7 +150,7 @@ namespace HexMapEditor
             var before = path == null ? null : ReadFile(path);
             long order = before == null ? LibrarySequence.Next(records.Select(r => r.Value.Order)) : before.LibraryOrder;
             var assets = TerrainTextures.Collect(preset.Terrains.SelectMany(t => t.Variants).Select(f => f.Graphic));
-            var serialized = MapLogic.Serializer().Serialize(new { PresetFormatVersion = 3, preset.Id, preset.Name, preset.Terrains, TerrainAssets = assets, GraphicSources = GraphicSources.Collect(assets.Select(a => a.Source)), LibraryOrder = order });
+            var serialized = MapLogic.Serializer().Serialize(new { PresetFormatVersion = 4, preset.Id, preset.Name, preset.Terrains, TerrainAssets = assets, GraphicSources = GraphicSources.Collect(assets.Select(a => a.Source)), LibraryOrder = order });
             if (Encoding.UTF8.GetByteCount(serialized) > TerrainTextures.MaxPresetBytes) throw new InvalidDataException("Preset przekracza limit zapisu/odczytu 160 MiB.");
             string destination = PresetFiles.Destination(directory, preset.Name, path);
             if (expected != null && (before == null || !String.Equals(expected.FilePath,before.FilePath,StringComparison.OrdinalIgnoreCase) || !expected.DiskBytes.SequenceEqual(before.DiskBytes))) throw new IOException("Plik presetu zmienił się poza programem. Zachowano plik, projekt i historię. Odśwież presety i sprawdź dane przed ponownym zapisem.");
@@ -190,7 +191,7 @@ namespace HexMapEditor
         public static void ApplyTerrain(CellData cell, TerrainDefinition terrain, FillVariant appearance)
         {
             cell.Terrain = terrain.Name; cell.Color = terrain.Color; cell.TerrainId = terrain.TerrainId; cell.VariantId = terrain.VariantId; cell.TerrainRevision = terrain.Revision;
-            cell.Color = appearance.Color; cell.TextureId = appearance.GraphicId; cell.Texture = appearance.Graphic; cell.FillVariantId = appearance.Id;
+            cell.Color = appearance.Color; cell.TextureId = appearance.GraphicId; cell.Texture = appearance.Graphic; cell.FillVariantId = appearance.Id;cell.Gradient=appearance.Gradient==null?null:appearance.Gradient.Copy();
         }
         public static MapData Migrate(MapData map)
         {

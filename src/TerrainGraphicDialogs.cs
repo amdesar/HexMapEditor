@@ -12,6 +12,7 @@ namespace HexMapEditor
     {
         readonly bool flat;
         Bitmap image;
+        internal GradientDefinition Gradient;
         internal TerrainPreview(bool flat) { this.flat = flat; DoubleBuffered = true; }
         internal void ShowFill(Color color, GraphicDefinition asset)
         {
@@ -25,15 +26,16 @@ namespace HexMapEditor
         {
             var center = new PointF(Width / 2f, Height / 2f);
             float radius = Math.Max(1, Math.Min(Width, Height) / 2f - 3);
-            PaintHex(e.Graphics, center, radius, flat, BackColor, image);
+            PaintHex(e.Graphics, center, radius, flat, BackColor, image,true,Gradient);
         }
-        internal static void PaintHex(Graphics g, PointF center, float radius, bool flat, Color color, Bitmap image, bool outline = true)
+        internal static void PaintHex(Graphics g, PointF center, float radius, bool flat, Color color, Bitmap image, bool outline = true, GradientDefinition gradient=null)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var mask = TerrainTextures.Mask(center, radius, flat))
             using (var fill = new SolidBrush(color))
             {
                 g.FillPath(fill, mask);
+                if(gradient!=null)GradientRules.Fill(g,mask,gradient);
                 if (image != null)
                     TerrainTextures.Draw(g, mask, image, new RectangleF(center.X - radius, center.Y - radius, radius * 2, radius * 2));
                 if (outline) g.DrawPath(Pens.Gray, mask);
@@ -60,7 +62,7 @@ namespace HexMapEditor
             this.items = items; this.flat = flat;
             Text = "Biblioteka grafik terenów";
             var area=Screen.FromControl(this).WorkingArea;
-            ClientSize = new Size(Math.Min(4*120+SystemInformation.VerticalScrollBarWidth+4,Math.Max(320,area.Width-50)),Math.Min(450,Math.Max(220,area.Height-80)));
+            ClientSize = new Size(Math.Min(4*120+SystemInformation.VerticalScrollBarWidth+8,Math.Max(320,area.Width-50)),Math.Min(450,Math.Max(220,area.Height-80)));
             MinimumSize = new Size(Math.Min(480,Width),Math.Min(300,Height));
             Shown+=(s,e)=>UpdateIconSpacing();list.Resize+=(s,e)=>UpdateIconSpacing();
             StartPosition = FormStartPosition.CenterParent;
@@ -93,7 +95,7 @@ namespace HexMapEditor
         void UpdateIconSpacing()
         {
             if(!list.IsHandleCreated)return;
-            int spacing=Math.Max(100,(list.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-8)/4);
+            int spacing=120;
             SendMessage(list.Handle,0x1035,IntPtr.Zero,new IntPtr(spacing|(114<<16)));
             list.ArrangeIcons(ListViewAlignment.Top);
         }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -68,7 +68,7 @@ namespace HexMapEditor
             try
             {
                 foreach (Control child in tiles.Controls.Cast<Control>().ToArray()) child.Dispose();
-                var needed = new HashSet<string>(Fills.Where(f => f.Graphic != null).Select(f => f.GraphicId));
+                var needed = new HashSet<string>(Fills.Where(f => f.Graphic != null||f.Gradient!=null).Select(f => f.Graphic!=null?f.GraphicId:"gradient:"+MapLogic.Serializer().Serialize(f.Gradient)));
                 foreach (var key in thumbnails.Keys.Where(k => !needed.Contains(k)).ToArray()) { thumbnails[key].Dispose(); thumbnails.Remove(key); }
                 for (int i = 0; i < Fills.Count; i++)
                 {
@@ -77,7 +77,11 @@ namespace HexMapEditor
                     var choose = new TerrainChoiceButton { Dock = DockStyle.Fill, BackColor = ColorTranslator.FromHtml(fill.Color), ForeColor = Color.White,
                         Text = fill.Graphic == null ? fill.Color : "", AccessibleName = "Wariant " + (i + 1), FlatStyle = FlatStyle.Flat };
                     tile.Controls.Add(choose);
-                    if (fill.Graphic != null)
+                    if (fill.Gradient != null)
+                    {
+                        string key="gradient:"+MapLogic.Serializer().Serialize(fill.Gradient);Bitmap image;if(!thumbnails.TryGetValue(key,out image))thumbnails.Add(key,image=GradientRules.Thumbnail(fill.Gradient,new Size(88,88)));choose.FillImage=image;choose.Text="";
+                    }
+                    else if (fill.Graphic != null)
                     {
                         Bitmap thumbnail;
                         if (!thumbnails.TryGetValue(fill.GraphicId, out thumbnail)) thumbnails.Add(fill.GraphicId, thumbnail = TerrainTextures.Decode(fill.Graphic, flat));
@@ -175,7 +179,7 @@ namespace HexMapEditor
         {
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke;
             draft = initial.Copy();
-            kind.Items.AddRange(new object[] { "Kolor", "Grafika" }); kind.SelectedIndex = draft.Graphic == null ? 0 : 1;
+            kind.Items.AddRange(new object[] { "Kolor", "Gradient", "Grafika" }); kind.SelectedIndex = draft.Graphic != null ? 2 : draft.Gradient!=null?1:0;
             var library = new Button { Text = "Biblioteka…", Width = 88 };
             var import = new Button { Text = "Importuj…", Width = 80 };
             graphicButtons.Controls.AddRange(new Control[] { library, import, crop });
@@ -184,14 +188,15 @@ namespace HexMapEditor
             Layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); Layout.Controls.Add(preview, 0, 3); Layout.SetColumnSpan(preview, 3);
             Buttons(4, () =>
             {
-                if (kind.SelectedIndex == 1 && draft.Graphic == null) return;
-                if (kind.SelectedIndex == 0) { draft.Graphic = null; draft.GraphicId = null; }
+                if (kind.SelectedIndex == 2 && draft.Graphic == null) return;
+                if (kind.SelectedIndex != 2) { draft.Graphic = null; draft.GraphicId = null; }
+                if(kind.SelectedIndex!=1)draft.Gradient=null;
                 Result = draft.Copy(); DialogResult = DialogResult.OK;
             });
             color.Click += (s, e) =>
             {
-                using (var picker = new EditorColorDialog(ColorTranslator.FromHtml(draft.Color)))
-                    if (picker.ShowDialog(this) == DialogResult.OK) { draft.Color = picker.Hex; RefreshPreview(); }
+                using (var picker = new PaintPickerDialog(ColorTranslator.FromHtml(draft.Color),draft.Gradient,false,flat,kind.SelectedIndex==1))
+                    if (picker.ShowDialog(this) == DialogResult.OK) { draft.Color = picker.Hex;draft.Gradient=picker.Gradient;kind.SelectedIndex=picker.Gradient==null?0:1; RefreshPreview(); }
             };
             library.Click += (s, e) => Pick(false); import.Click += (s, e) => Pick(true);
             crop.Click += (s, e) =>
@@ -211,10 +216,13 @@ namespace HexMapEditor
         void RefreshPreview()
         {
             color.Text = draft.Color; color.BackColor = ColorTranslator.FromHtml(draft.Color);
-            color.Enabled = kind.SelectedIndex == 0; graphicButtons.Enabled = kind.SelectedIndex == 1;
+            if(kind.SelectedIndex==1&&draft.Gradient==null)draft.Gradient=GradientRules.Two(draft.Color);
+            color.Text=kind.SelectedIndex==1?"Edytuj gradient…":draft.Color;
+            color.Enabled = kind.SelectedIndex != 2; graphicButtons.Enabled = kind.SelectedIndex == 2;
             crop.Enabled = draft.Graphic != null;
-            preview.ShowFill(ColorTranslator.FromHtml(draft.Color), kind.SelectedIndex == 1 ? draft.Graphic : null);
-            Ok.Enabled = kind.SelectedIndex == 0 || draft.Graphic != null;
+            preview.ShowFill(ColorTranslator.FromHtml(draft.Color), kind.SelectedIndex == 2 ? draft.Graphic : null);
+            preview.Gradient=kind.SelectedIndex==1?draft.Gradient:null;preview.Invalidate();
+            Ok.Enabled = kind.SelectedIndex != 2 || draft.Graphic != null;
         }
     }
 }

@@ -29,7 +29,7 @@ namespace HexMapEditor
         }
         void ChooseInkColor(bool pointer)
         {
-            using(var d=new EditorColorDialog(ColorTranslator.FromHtml(pointer?pointerColor:inkColor)))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK){if(pointer)pointerColor=d.Hex;else inkColor=d.Hex;}
+            using(var d=new PaintPickerDialog(ColorTranslator.FromHtml(pointer?pointerColor:inkColor),pointer?pointerGradient:inkGradient,true))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK){if(pointer){ClearPointerContext();pointerColor=d.Hex;pointerGradient=d.Gradient;pointerPalette=pointerGradient==null?null:new GradientSampler(pointerGradient);}else{inkColor=d.Hex;inkGradient=d.Gradient;}}
         }
     }
 }

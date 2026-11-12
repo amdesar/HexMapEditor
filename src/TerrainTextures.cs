@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -92,7 +92,8 @@ namespace HexMapEditor
         }
         internal static bool ValidFill(TerrainDefinition terrain)
         {
-            if (terrain.FillKind == "color") return terrain.Texture == null && terrain.TextureId == null;
+            if(terrain.FillKind=="gradient")return terrain.Texture==null&&terrain.TextureId==null&&terrain.Variants.Count>0&&terrain.Variants[0].Gradient!=null;
+            if (terrain.FillKind == "color") return terrain.Texture == null && terrain.TextureId == null && terrain.Variants.Count>0 && terrain.Variants[0].Gradient==null;
             return terrain.FillKind == "graphic" && terrain.Texture != null && terrain.Texture.Id == terrain.TextureId;
         }
         internal static GraphicsPath Mask(PointF center, float radius, bool flat)

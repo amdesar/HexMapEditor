@@ -19,7 +19,8 @@ namespace HexMapEditor
             if (!(definition["Linked"] is bool)) throw new InvalidDataException("Brak jawnego połączenia kadrów.");
             foreach (string key in new[] { "Pointy", "Flat" }) Fields(definition[key], "X", "Y", "Zoom", "Angle");
         }
-        static void Fill(object value) { Fields(value, "Id", "Color", "GraphicId"); }
+        static void Gradient(object value){if(value==null)return;var row=Fields(value,"Angle","Stops");foreach(var stop in Array(row["Stops"]))Fields(stop,"Position","Color");}
+        static void Fill(object value) {var row=Fields(value, "Id", "Color", "GraphicId","Gradient");Gradient(row["Gradient"]); }
         static IEnumerable<object> Array(object value)
         {
             var array = value as object[];
@@ -45,12 +46,12 @@ namespace HexMapEditor
         {
             Tables(raw); Fields(raw, "Presets", "Cells", "FogPalette", "Background", "Ink", "DarkPalette");
             foreach(var fill in Array(raw["DarkPalette"]))Fill(fill);
-            foreach(var stroke in Array(raw["Ink"])) {var row=Fields(stroke,"Id","Color","Width","Points","Surface");foreach(var point in Array(row["Points"]))Fields(point,"X","Y");}
+            foreach(var stroke in Array(raw["Ink"])) {var row=Fields(stroke,"Id","Color","Width","Points","Surface","Gradient","CycleWorld");Gradient(row["Gradient"]);foreach(var point in Array(row["Points"]))Fields(point,"X","Y","Distance");}
             foreach (var preset in Array(raw["Presets"])) Preset(preset);
             foreach (var fill in Array(raw["FogPalette"])) Fill(fill);
             foreach (var cell in Array(raw["Cells"]))
             {
-                var row = Fields(cell, "FillVariantId", "TextureId", "FogFill", "DarkFill", "Darkness"); Fill(row["FogFill"]); Fill(row["DarkFill"]); if(!(row["Darkness"] is bool))throw new InvalidDataException("Brak bazowego ograniczenia widoczności.");
+                var row = Fields(cell, "FillVariantId", "TextureId", "FogFill", "DarkFill", "Darkness","Gradient"); Gradient(row["Gradient"]); Fill(row["FogFill"]); Fill(row["DarkFill"]); if(!(row["Darkness"] is bool))throw new InvalidDataException("Brak bazowego ograniczenia widoczności.");
             }
             if (raw["Background"] != null) Fields(raw["Background"], "SourceId", "Left", "Top", "Width", "Height", "Opacity", "Saturation", "Blur");
         }

@@ -43,6 +43,7 @@ namespace HexMapEditor
         public string Terrain { get; set; }
         public string TextureId { get; set; }
         public string FillVariantId { get; set; }
+        public GradientDefinition Gradient {get;set;}
         public FillVariant FogFill { get; set; }
         internal GraphicDefinition Texture;
         public string Color { get; set; }
@@ -83,7 +84,7 @@ namespace HexMapEditor
         public List<ObjectStateDefinition> ObjectStates { get; set; }
         public List<string> ExcludedStateIds { get; set; }
         public List<ObjectGroup> Groups { get; set; }
-        public MapData() { FormatVersion = 10; Ink = new List<InkStroke>(); DarkPalette = new List<FillVariant>{FillRules.DarkDefault()}; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); TerrainAssets = new List<GraphicDefinition>(); GraphicSources = new List<GraphicSource>(); FogPalette = new List<FillVariant> { FillRules.FogDefault() }; Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
+        public MapData() { FormatVersion = 11; Ink = new List<InkStroke>(); DarkPalette = new List<FillVariant>{FillRules.DarkDefault()}; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); TerrainAssets = new List<GraphicDefinition>(); GraphicSources = new List<GraphicSource>(); FogPalette = new List<FillVariant> { FillRules.FogDefault() }; Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
     }
 
     internal sealed class TerrainState
@@ -94,10 +95,11 @@ namespace HexMapEditor
         readonly GraphicDefinition texture;
         readonly string textureId;
         readonly string fillVariantId;
+        readonly GradientDefinition gradient;
         public readonly int Revision;
-        public TerrainState(CellData cell) { Terrain = cell.Terrain; Color = cell.Color; TerrainId = cell.TerrainId; VariantId = cell.VariantId; Revision = cell.TerrainRevision; texture = cell.Texture; textureId = cell.TextureId; fillVariantId = cell.FillVariantId; }
-        public bool Matches(CellData cell) { return VariantId == cell.VariantId && TerrainId == cell.TerrainId && Revision == cell.TerrainRevision && textureId == cell.TextureId && fillVariantId == cell.FillVariantId && String.Equals(Terrain, cell.Terrain, StringComparison.Ordinal) && String.Equals(Color, cell.Color, StringComparison.OrdinalIgnoreCase); }
-        public void ApplyTo(CellData cell) { cell.Terrain = Terrain; cell.Color = Color; cell.TerrainId = TerrainId; cell.VariantId = VariantId; cell.TerrainRevision = Revision; cell.Texture = texture; cell.TextureId = textureId; cell.FillVariantId = fillVariantId; }
+        public TerrainState(CellData cell) { Terrain = cell.Terrain; Color = cell.Color; TerrainId = cell.TerrainId; VariantId = cell.VariantId; Revision = cell.TerrainRevision; texture = cell.Texture; textureId = cell.TextureId; fillVariantId = cell.FillVariantId; gradient=cell.Gradient==null?null:cell.Gradient.Copy(); }
+        public bool Matches(CellData cell) { return GradientRules.Same(gradient,cell.Gradient) && VariantId == cell.VariantId && TerrainId == cell.TerrainId && Revision == cell.TerrainRevision && textureId == cell.TextureId && fillVariantId == cell.FillVariantId && String.Equals(Terrain, cell.Terrain, StringComparison.Ordinal) && String.Equals(Color, cell.Color, StringComparison.OrdinalIgnoreCase); }
+        public void ApplyTo(CellData cell) { cell.Terrain = Terrain; cell.Color = Color; cell.TerrainId = TerrainId; cell.VariantId = VariantId; cell.TerrainRevision = Revision; cell.Texture = texture; cell.TextureId = textureId; cell.FillVariantId = fillVariantId;cell.Gradient=gradient==null?null:gradient.Copy(); }
     }
 
     internal sealed class CellChange
@@ -175,7 +177,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.6.2";
+        const string AppVersion = "0.6.3";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -362,7 +364,7 @@ namespace HexMapEditor
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
                 int format = (int)raw["FormatVersion"];
-                if (format != 10) throw new InvalidDataException("Obsługiwany format mapy: 10. Starszy plik pozostawiono bez zmian.");
+                if (format != 11) throw new InvalidDataException("Obsługiwany format mapy: 11. Starszy plik pozostawiono bez zmian.");
                 GraphicSchema.Map(raw);
                 if (!raw.ContainsKey("TerrainAssets") || !raw.ContainsKey("GraphicSources") || !raw.ContainsKey("FogPalette") ||
                     !raw.ContainsKey("Background")) throw new InvalidDataException("Brak tabeli grafik, źródeł lub ustawień mgły/tła.");
@@ -465,7 +467,7 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 10) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
+            if (m.FormatVersion != 11) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
             var textures = TerrainTextures.ReadTable(m.TerrainAssets, m.GraphicSources);
             if (m.Background != null)
             {
@@ -489,6 +491,7 @@ namespace HexMapEditor
                 c.Texture = TerrainTextures.Resolve(textures, c.TextureId);
                 if (String.IsNullOrWhiteSpace(c.FillVariantId)) throw new InvalidDataException("Brak utrwalonego wariantu wyglądu.");
                 if ((c.TerrainId == UnpaintedTerrain.Id || c.VariantId == UnpaintedTerrain.Version) && !MapLogic.IsUnpainted(c)) throw new InvalidDataException("Sprzeczny stan niepomalowanego pola.");
+                GradientRules.Validate(c.Gradient);if(c.Gradient!=null&&c.TextureId!=null)throw new InvalidDataException("Heks ma równocześnie grafikę i gradient.");
                 FillRules.Attach(new[] { c.FogFill }, textures); FillRules.Validate(c.FogFill); FillRules.Attach(new[]{c.DarkFill},textures); FillRules.Validate(c.DarkFill);
                 CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color, c.TextureId);
                 if (c.IconId != null && !iconIds.Contains(c.IconId)) throw new InvalidDataException("Brak osadzonego zasobu ikony.");
@@ -505,6 +508,7 @@ namespace HexMapEditor
                 if (!presets.Add(p.Id)) throw new InvalidDataException("Powtórzony identyfikator presetu.");
                 foreach (var t in p.Terrains) CheckVariant(variants, t.VariantId, t.TerrainId, t.Revision, t.Name, t.Color, t.TextureId);
             }
+            GradientRules.Budget(m.Presets.SelectMany(p=>p.Terrains).SelectMany(t=>t.Variants).Select(f=>f.Gradient).Concat(m.Cells.SelectMany(c=>new[]{c.Gradient,c.FogFill==null?null:c.FogFill.Gradient,c.DarkFill==null?null:c.DarkFill.Gradient})).Concat(m.FogPalette.Select(f=>f.Gradient)).Concat(m.DarkPalette.Select(f=>f.Gradient)).Concat(m.Ink.Select(s=>s.Gradient)),100000,"dokumentu");
         }
         static void CheckVariant(Dictionary<string, string> variants, string variant, string terrain, int revision, string name, string color, string textureId)
         {
@@ -615,6 +619,7 @@ namespace HexMapEditor
                 using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
                 {
                     e.Graphics.FillPath(brush, path);
+                    if(!hideTerrain&&map.Cells[i].Gradient!=null)GradientRules.Fill(e.Graphics,path,map.Cells[i].Gradient);
                     if (!hideTerrain && map.Cells[i].Texture != null)
                         DrawTerrainTexture(e.Graphics, path, c, BaseRadius * scale, map.Cells[i].Texture);
                     if (!hideIcons) DrawCellIcon(e.Graphics, map.Cells[i], c);
@@ -651,6 +656,7 @@ namespace HexMapEditor
                 {
                     var fill = map.Cells[i].FogFill;
                     if (fill.Graphic != null) DrawTerrainTexture(graphics, path, center, radius, fill.Graphic);
+                    else if(fill.Gradient!=null)GradientRules.Fill(graphics,path,fill.Gradient);
                     else using (var brush = new SolidBrush(ColorTranslator.FromHtml(fill.Color))) graphics.FillPath(brush, path);
                     using (var pen = new Pen(i == selected ? Color.FromArgb(255,239,190,89) : Color.FromArgb(135,19,23,30), i == selected ? 2.4f : 1.2f)) graphics.DrawPath(pen,path);
                 }

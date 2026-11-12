@@ -25,7 +25,7 @@ namespace HexMapEditor
         int brushSize = 1, brushHeight = 1, previewCell = -1;
         bool brushFilled = true;
 
-        void ClearDocumentIcons() { ClearBackgroundCache(); ClearTerrainBitmaps(); foreach (var image in documentBitmaps.Values) image.Dispose(); documentBitmaps.Clear(); layerBefore.Clear(); strokeVisited.Clear(); previewCell = -1; iconMaterial = false; activeIcon = null; UpdateMaterialIndicator(); }
+        void ClearDocumentIcons() { InkPathCache.Clear();InkGradientRenderer.Clear(); ClearBackgroundCache(); ClearTerrainBitmaps(); foreach (var image in documentBitmaps.Values) image.Dispose(); documentBitmaps.Clear(); layerBefore.Clear(); strokeVisited.Clear(); previewCell = -1; iconMaterial = false; activeIcon = null; UpdateMaterialIndicator(); }
         Bitmap AssetBitmap(IconAsset asset, bool library)
         { var cache = library ? libraryBitmaps : documentBitmaps; Bitmap image; if (!cache.TryGetValue(asset.Id, out image)) { image = IconAssets.Decode(asset); cache.Add(asset.Id, image); } return image; }
         void LoadIcons()

@@ -36,7 +36,7 @@ namespace HexMapEditor
                         var center = new PointF(col*dx+(flat ? 0 : row*dx/2), flat ? dy/2+row*dy+(col%2)*dy/2 : radius+row*dy);
                         Bitmap image = null;
                         if (fill.Graphic != null && !decoded.TryGetValue(fill.GraphicId,out image)) decoded.Add(fill.GraphicId,image=TerrainTextures.Decode(fill.Graphic,flat));
-                        TerrainPreview.PaintHex(g,center,radius,flat,ColorTranslator.FromHtml(fill.Color),image,false);
+                        TerrainPreview.PaintHex(g,center,radius,flat,ColorTranslator.FromHtml(fill.Color),image,false,fill.Gradient);
                     }
                 }
                 return result;

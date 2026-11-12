@@ -40,7 +40,8 @@ namespace HexMapEditor
             var remaining=Media.Geometry.Combine(geometry,cut,Media.GeometryCombineMode.Exclude,null,tolerance,Media.ToleranceType.Absolute);
             if(remaining.IsEmpty()||remaining.Bounds.IsEmpty)return null;
             remaining.Freeze();
-            var next=new InkStroke{Id=stroke.Id,Color=stroke.Color,Width=stroke.Width,Surface=remaining.ToString(CultureInfo.InvariantCulture)};
+            var next=new InkStroke{Id=stroke.Id,Color=stroke.Color,Width=stroke.Width,Surface=remaining.ToString(CultureInfo.InvariantCulture),Gradient=stroke.Gradient,CycleWorld=stroke.CycleWorld,ColorTrace=stroke.ColorTrace};
+            if(stroke.Gradient!=null)next.Points=stroke.Points;
             next.CachedSurface=remaining;next.CachedSurfaceText=next.Surface;return next;
         }
         internal static int PointCount(Media.PathGeometry path)
@@ -58,12 +59,14 @@ namespace HexMapEditor
         {var r=Geometry(stroke).Bounds;return r.IsEmpty?RectangleF.Empty:new RectangleF((float)r.X,(float)r.Y,(float)r.Width,(float)r.Height);}
         internal static void Validate(InkStroke stroke)
         {
+            if(stroke.ValidatedSurfaceText==stroke.Surface&&stroke.ValidatedWidth==stroke.Width)return;
             var geometry=Geometry(stroke);var b=geometry.Bounds;double edge=10000000.0+stroke.Width/2.0+1;
             if(geometry.IsEmpty()||b.IsEmpty||!new[]{b.Left,b.Top,b.Right,b.Bottom}.All(v=>GraphicSources.Finite(v)&&Math.Abs(v)<=edge))throw new InvalidDataException("Nieprawidłowa obwiednia powierzchni rysunku.");
             foreach(var f in geometry.Figures)
             {if(!f.IsClosed||!f.IsFilled)throw new InvalidDataException("Powierzchnia musi mieć zamknięte kontury.");}
-            PointCount(geometry);
+            int count=PointCount(geometry);
             using(var path=DrawingPath(geometry))foreach(var p in path.PathPoints)if(!ObjectGeometry.Finite(p.X)||!ObjectGeometry.Finite(p.Y)||Math.Abs(p.X)>edge||Math.Abs(p.Y)>edge)throw new InvalidDataException("Nieprawidłowe punkty powierzchni.");
+            stroke.CachedSurfacePointCount=count;stroke.ValidatedWidth=stroke.Width;stroke.ValidatedSurfaceText=stroke.Surface;
         }
         static PointF Point(WPoint p){return new PointF((float)p.X,(float)p.Y);}
         internal static GraphicsPath DrawingPath(Media.PathGeometry geometry)

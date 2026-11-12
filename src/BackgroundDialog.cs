@@ -36,6 +36,7 @@ namespace HexMapEditor
             var import = new Button { Text = "Z pliku…", Bounds = new Rectangle(149, 10, 125, 28) };
             var library = new Button { Text = "Z biblioteki…", Bounds = new Rectangle(12,10,125,28) };
             remove.FlatStyle=FlatStyle.Flat;remove.ForeColor=Color.FromArgb(244,113,113);remove.FlatAppearance.BorderColor=remove.ForeColor;
+            remove.EnabledChanged+=(s,e)=>{remove.ForeColor=remove.Enabled?Color.FromArgb(244,113,113):Color.Gray;remove.FlatAppearance.BorderColor=remove.ForeColor;};
             remove.FlatAppearance.MouseOverBackColor=Color.FromArgb(80,42,48);remove.FlatAppearance.MouseDownBackColor=Color.FromArgb(100,44,52);
             library.Click+=(s,e)=>{if(ChooseLibrary==null)return;var chosen=ChooseLibrary();if(chosen==null)return;draft=chosen.Settings.Copy();draft.Source=draft.Source.Pin();draft.LibraryId=chosen.Id;UpdateSettings();};
             var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(407,15,365,22) };

@@ -44,6 +44,7 @@ namespace HexMapEditor
                 {
                     var fill=map.Cells[i].DarkFill;
                     if(fill.Graphic!=null)DrawTerrainTexture(g,path,center,radius,fill.Graphic);
+                    else if(fill.Gradient!=null)GradientRules.Fill(g,path,fill.Gradient);
                     else using(var b=new SolidBrush(ColorTranslator.FromHtml(fill.Color)))g.FillPath(b,path);
                     using(var p=new Pen(Color.FromArgb(135,19,23,30),1.2f))g.DrawPath(p,path);
                 }
