@@ -19,6 +19,7 @@ namespace HexMapEditor
         public static string Root { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Library"); } }
         public static string Hexmaps { get { return Path.Combine(Root, "Hexmaps"); } }
         public static string Presets { get { return Path.Combine(Root, "Terrains", "Presets"); } }
+        public static string Backgrounds { get { return Path.Combine(Root, "Backgrounds"); } }
         public static string TerrainGraphics { get { return Path.Combine(Root, "Terrains", "Graphics"); } }
         public static void EnsureDirectories(string applicationDirectory)
         {
@@ -122,6 +123,7 @@ namespace HexMapEditor
         public List<string> BeforeExcludedStates, AfterExcludedStates;
         public List<IconAsset> RequiredAssets = new List<IconAsset>();
         public TerrainGraphicChange TerrainGraphicChange;
+        public BackgroundFileChange BackgroundFileChange;
         public List<FillVariant> BeforeFogPalette, AfterFogPalette;
         public List<FillVariant> BeforeDarkPalette, AfterDarkPalette;
         public List<InkStroke> BeforeInk, AfterInk;
@@ -137,7 +139,7 @@ namespace HexMapEditor
         static readonly string[] TerrainNames = { "Teren neutralny", "Woda", "Równina", "Góry", "Pustynia", "Czerń / Pustka" };
         static readonly string[] TerrainColors = { "#777F91", "#287DB3", "#72A65B", "#8D8174", "#D1A94E", "#252735" };
         readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 64 };
-        readonly Panel canvas = new BufferedPanel();
+        readonly Panel canvas = new InkCanvas();
         readonly Panel left = new Panel();
         readonly BufferedPanel right = new BufferedPanel();
         readonly Button leftToggle = new Button();
@@ -173,7 +175,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.6.0";
+        const string AppVersion = "0.6.1";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -283,7 +285,7 @@ namespace HexMapEditor
                     var cell = map.Cells[selected];
                     bool hidden=CellMasked(selected);
                     string key = cell.Id + (hidden ? ":fog" : ":visible");
-                    if (editorCellId != key) { textHistory.BreakGroups(); editorCellId = key; cellName.Text = hidden ? "???" : cell.Name ?? ""; cellDescription.SetContent(hidden ? null : cell.RichDescription, hidden ? "Treść ukryta przez mgłę lub ciemność." : cell.Description); }
+                    if (editorCellId != key) { textHistory.BreakGroups(); editorCellId = key; cellName.Text = hidden ? "???" : cell.Name ?? ""; cellDescription.SetContent(hidden ? null : cell.RichDescription, hidden ? "Treść ukryta przez mgłę lub ograniczenie widoczności." : cell.Description); }
                     cellName.Enabled = cellDescription.Enabled = !hidden;
                     detailCoordinate.Text = "Współrzędne: " + Coordinate(selected); detailTerrain.Text = hidden ? "Maska — dane ukryte" : "Teren: " + cell.Terrain;
                     detailIcon.Text = hidden ? "Ikona: ???" : "Ikona: " + (cell.IconId == null ? "brak" : cell.IconName ?? map.IconAssets.First(a=>a.Id==cell.IconId).Name);
@@ -570,6 +572,7 @@ namespace HexMapEditor
         }
         bool FitBounds(RectangleF bounds)
         {
+            if(inkBefore!=null)EndCanvasGesture(true);
             bool axes = map.LabelMode == "Axes" && map.Cells.Count <= 1400;
             var viewport = RectangleF.FromLTRB(32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), canvas.ClientSize.Width - 32, canvas.ClientSize.Height - 32);
             scale = Math.Max(.000001f, Math.Min(Math.Max(1, viewport.Width) / Math.Max(bounds.Width, 1), Math.Max(1, viewport.Height) / Math.Max(bounds.Height, 1)));
@@ -588,6 +591,7 @@ namespace HexMapEditor
 
         void SetZoom100()
         {
+            if(inkBefore!=null)EndCanvasGesture(true);
             var center = new PointF(canvas.ClientSize.Width / 2f, canvas.ClientSize.Height / 2f);
             float factor = 1f / scale; pan = new PointF(center.X - (center.X - pan.X) * factor, center.Y - (center.Y - pan.Y) * factor); scale = 1f; UpdateUI();
         }
@@ -708,6 +712,7 @@ namespace HexMapEditor
 
         void CanvasMouseDown(object sender, MouseEventArgs e)
         {
+            if(e.Button==MouseButtons.Middle&&inkBefore!=null)EndCanvasGesture(true);
             if (modalDepth > 0 || rightResizing || waitingForMouseRelease || gestureButton != MouseButtons.None) return;
             if (requireFreshCanvasDown && e.Clicks != 1) return;
             if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle && !(e.Button==MouseButtons.Right&&(currentTool==EditorTool.Stylus||currentTool==EditorTool.Eraser))) return;
@@ -774,6 +779,7 @@ namespace HexMapEditor
         void CanvasMouseWheel(object sender, MouseEventArgs e)
         {
             if (rightResizing || modalDepth > 0) return;
+            if(inkBefore!=null)EndCanvasGesture(true);
             float old = scale, next = Math.Max(Math.Min(old, .01f), Math.Min(Math.Max(old, 128f), old * (e.Delta > 0 ? 1.12f : 1f / 1.12f)));
             float factor = next / old; pan = new PointF(e.X - (e.X - pan.X) * factor, e.Y - (e.Y - pan.Y) * factor); scale = next; UpdateUI();
         }

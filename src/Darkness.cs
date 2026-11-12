@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -26,9 +26,9 @@ namespace HexMapEditor
     }
     public sealed partial class MainWindow
     {
-        MapData lightMap;HashSet<int> lightCells;
+        MapData lightMap;HashSet<int> lightCells;readonly HashSet<int> noLightCells=new HashSet<int>();
         void InvalidateLight(){lightCells=null;}
-        HashSet<int> LitCells(){if(lightCells==null||!Object.ReferenceEquals(map,lightMap)){lightMap=map;lightCells=LightGeometry.Coverage(map);}return lightCells;}
+        HashSet<int> LitCells(){if(hideObjects)return noLightCells;if(lightCells==null||!Object.ReferenceEquals(map,lightMap)){lightMap=map;lightCells=LightGeometry.Coverage(map);}return lightCells;}
         bool EffectiveDarkness(int index){return map.Cells[index].Darkness&&!LitCells().Contains(index);}
         bool CellMasked(int index){return index>=0&&((!previewWithoutFog&&map.Cells[index].Fog)||(!hideDarkness&&EffectiveDarkness(index)));}
         double MaskVisible(RectangleF bounds){return FogVisibility.VisibleFraction(map,bounds,CellMasked);}
@@ -52,13 +52,13 @@ namespace HexMapEditor
         void AttachDarkAppearanceMenu()
         {
             foreach(var tool in new[]{EditorTool.DarkBrush,EditorTool.DarkBucket})
-            {var menu=new ContextMenuStrip{BackColor=BackColor,ForeColor=ForeColor};menu.Items.Add("Wygląd ciemności…",null,(s,e)=>EditDarkAppearance());var button=toolButtons[tool];button.ContextMenuStrip=menu;button.Disposed+=(s,e)=>menu.Dispose();tips.SetToolTip(button,button.AccessibleName+". Klik/przeciągnięcie: nakłada lub usuwa bazową ciemność, tryb z pierwszego pola. PPM przycisku: wygląd.");}
+            {var menu=new ContextMenuStrip{BackColor=BackColor,ForeColor=ForeColor};menu.Items.Add("Wygląd ograniczenia widoczności…",null,(s,e)=>EditDarkAppearance());var button=toolButtons[tool];button.ContextMenuStrip=menu;button.Disposed+=(s,e)=>menu.Dispose();tips.SetToolTip(button,button.AccessibleName+". Klik/przeciągnięcie: nakłada lub usuwa bazowe ograniczenie widoczności, tryb z pierwszego pola. PPM przycisku: wygląd.");}
         }
         void EditDarkAppearance()
         {
             try
             {
-                using(var d=new AppearancePoolDialog("Wygląd ciemności",null,map.DarkPalette,true,map.Orientation=="FlatTop","Zastosuj wygląd do obecnie przyciemnionych heksów"))
+                using(var d=new AppearancePoolDialog("Wygląd ograniczenia widoczności",null,map.DarkPalette,true,map.Orientation=="FlatTop","Zastosuj wygląd do obecnie przyciemnionych heksów"))
                 {
                     d.ChooseGraphic=ChooseTerrainGraphic;d.EditCrop=ShowTerrainCrop;
                     d.CanAccept=()=>{try{CheckTextureBudget(d.Fills.Select(f=>f.Graphic));}catch(Exception ex){MessageBox.Show(d,ex.Message,"Budżet grafik");return false;}return !d.ApplyToMap||GuardLayer(MapLayer.Darkness,d);};
@@ -69,7 +69,7 @@ namespace HexMapEditor
         bool ChangeDarkAppearance(List<FillVariant> fills,bool apply,bool preserve)
         {
             FillRules.ValidatePool(fills);CheckTextureBudget(fills.Select(f=>f.Graphic));EndCanvasGesture(true);
-            var action=new EditAction{Label="Wygląd ciemności"};
+            var action=new EditAction{Label="Wygląd ograniczenia widoczności"};
             if(FillRules.Signature(map.DarkPalette)!=FillRules.Signature(fills)){action.BeforeDarkPalette=FillRules.Copy(map.DarkPalette);action.AfterDarkPalette=FillRules.Copy(fills);}
             if(apply)foreach(var cell in map.Cells.Where(c=>c.Darkness))
             {var next=preserve?fills.FirstOrDefault(f=>f.Id==cell.DarkFill.Id):NextFill(fills);if(next==null||FillRules.Signature(new[]{next})==FillRules.Signature(new[]{cell.DarkFill}))continue;action.Layers.Add(new LayerChange{CellId=cell.Id,DarkAppearance=true,BeforeDarkFill=cell.DarkFill.Copy(),AfterDarkFill=next.Copy()});}

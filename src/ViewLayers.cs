@@ -10,7 +10,7 @@ namespace HexMapEditor
     {
         bool hideTerrain, hideIcons, hideObjects, hideDarkness, hideInk;
         ToolStripMenuItem[] layerItems;
-        static readonly string[] LayerNames = { "Tereny", "Ikony", "Obiekty", "Mgła", "Tło", "Ciemność", "Rysik" };
+        static readonly string[] LayerNames = { "Tereny", "Ikony", "Obiekty", "Mgła", "Tło", "Ograniczenie widoczności", "Rysik" };
 
         bool LayerVisible(MapLayer layer)
         {
@@ -32,10 +32,10 @@ namespace HexMapEditor
             switch (layer)
             {
                 case MapLayer.Darkness: hideDarkness=!visible; editorCellId=null; break;
-                case MapLayer.Ink: hideInk=!visible; break;
+                case MapLayer.Ink: hideInk=!visible;if(hideInk)ClearPointerContext(); break;
                 case MapLayer.Terrain: hideTerrain = !visible; break;
                 case MapLayer.Icons: hideIcons = !visible; break;
-                case MapLayer.Objects: hideObjects = !visible; break;
+                case MapLayer.Objects: hideObjects = !visible;InvalidateLight();editorCellId=null; break;
                 case MapLayer.Background: hideBackground = !visible; break;
                 default: previewWithoutFog = !visible; editorCellId = null; break;
             }

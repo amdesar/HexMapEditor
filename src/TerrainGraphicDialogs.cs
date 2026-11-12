@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace HexMapEditor
@@ -48,6 +49,7 @@ namespace HexMapEditor
         readonly List<Bitmap> thumbnails = new List<Bitmap>();
         readonly Func<List<TerrainGraphic>> items;
         readonly bool flat;
+        [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam);
         internal Func<TerrainGraphic> Import;
         internal Func<TerrainGraphic, TerrainGraphic> Edit;
         internal Action<TerrainGraphic> Delete;
@@ -57,8 +59,10 @@ namespace HexMapEditor
         {
             this.items = items; this.flat = flat;
             Text = "Biblioteka grafik terenów";
-            ClientSize = new Size(650, 450);
-            MinimumSize = new Size(580, 300);
+            var area=Screen.FromControl(this).WorkingArea;
+            ClientSize = new Size(Math.Min(650,Math.Max(320,area.Width-50)),Math.Min(450,Math.Max(220,area.Height-80)));
+            MinimumSize = new Size(Math.Min(580,Width),Math.Min(300,Height));
+            Shown+=(s,e)=>{int spacing=Math.Max(100,(list.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-4)/4);SendMessage(list.Handle,0x1035,IntPtr.Zero,new IntPtr(spacing|(114<<16)));};
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9);
             BackColor=Color.FromArgb(34,38,48); ForeColor=Color.WhiteSmoke; list.BackColor=BackColor;list.ForeColor=ForeColor;

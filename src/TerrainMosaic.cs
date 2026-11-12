@@ -29,8 +29,8 @@ namespace HexMapEditor
                     float dx = flat ? 1.5f*radius : (float)Math.Sqrt(3)*radius;
                     float dy = flat ? (float)Math.Sqrt(3)*radius : 1.5f*radius;
                     int columns=(int)Math.Ceiling((size.Width+radius)/dx);
-                    var order=Assignments(terrain,columns*2);
-                    for (int row=0;row<2;row++) for (int col=0;col*dx<size.Width+radius;col++)
+                    var order=Assignments(terrain,(columns+2)*4);
+                    for (int row=-1;row<3;row++) for (int col=-1;col<columns+1;col++)
                     {
                         var fill = fills[order[slot++]];
                         var center = new PointF(col*dx+(flat ? 0 : row*dx/2), flat ? dy/2+row*dy+(col%2)*dy/2 : radius+row*dy);

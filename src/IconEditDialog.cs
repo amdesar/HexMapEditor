@@ -7,7 +7,7 @@ namespace HexMapEditor
 {
     internal sealed class IconEditDialog : EditorDialog
     {
-        readonly CheckBox light=new CheckBox{Text="Światło nowych instancji",AutoSize=true};
+        readonly CheckBox light=new CheckBox{Text="Pole widzenia nowych instancji",AutoSize=true};
         readonly NumericUpDown radius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
         public bool DefaultLight{get{return light.Checked;}}
         public int DefaultLightRadius{get{return (int)radius.Value;}}
@@ -29,7 +29,7 @@ namespace HexMapEditor
             int row=3; Button cross=null;
             if(other!=null){cross=new Button{Text=title=="Edytuj ikonę"?"Z biblioteki obiektów":"Z biblioteki ikon"};Row(row++,"Inna biblioteka",cross,true);}
             Row(row,"Podgląd",preview,true);Layout.RowStyles[row++].Height=90;
-            if(title!="Edytuj ikonę"){Row(row++,"Nowe instancje",light,true);Row(row++,"Promień światła",radius,true);light.CheckedChanged+=(s,e)=>radius.Enabled=light.Checked;radius.Enabled=false;}
+            if(title!="Edytuj ikonę"){Row(row++,"Nowe instancje",light,true);Row(row++,"Promień widzenia",radius,true);light.CheckedChanged+=(s,e)=>radius.Enabled=light.Checked;radius.Enabled=false;}
             Layout.Controls.Add(update,0,row++);Layout.SetColumnSpan(update,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Buttons(row,()=>{if(IconName.Length>0 && (CanAccept == null || CanAccept()))DialogResult=DialogResult.OK;});
             Action show=()=>{var old=preview.Image;preview.Image=IconAssets.Decode(Asset);if(old!=null)old.Dispose();};show();
             choices.Click+=(s,e)=>{var chosen=pick(this);if(chosen!=null){Asset=chosen.Asset;show();}};

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -19,6 +19,7 @@ namespace HexMapEditor
         public int Saturation { get; set; }
         public int Blur { get; set; }
         internal GraphicSource Source;
+        internal string LibraryId;
         public MapBackground() { Width = Height = 1; Opacity = Saturation = 100; }
         internal MapBackground Copy() { return (MapBackground)MemberwiseClone(); }
     }
@@ -165,9 +166,9 @@ namespace HexMapEditor
             using (var dialog = new BackgroundDialog(map.Background, canvas.ClientSize))
             {
                 dialog.CanAccept = () => GuardLayer(MapLayer.Background, dialog);
-                if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;
-                try { ChangeBackground(dialog.Result); }
-                catch (Exception ex) { ShowEditorMessage(ex.Message, "Tło mapy", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                dialog.ChooseLibrary = () => ChooseBackground(dialog);
+                dialog.SaveAndApply = (settings,id) => AcceptBackground(dialog,settings,id,true);
+                RunModal(() => dialog.ShowDialog(this));
             }
         }
     }

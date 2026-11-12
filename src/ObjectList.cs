@@ -62,7 +62,7 @@ namespace HexMapEditor
             item.SubItems.Add(masked ? "???" : ObjectGeometry.Hit(map, new PointF(obj.X, obj.Y)) < 0 ? "Poza mapą" : "");
             item.SubItems.Add(FogVisibility.Label(visible));
             item.SubItems.Add(masked?"???":effective.LightEnabled?"Tak ("+effective.LightRadius+")":"Nie");
-            item.SubItems.Add(darkVisible==1?"Oświetlony":darkVisible==0?"W ciemności":"Częściowo ("+Math.Round((1-darkVisible)*100,MidpointRounding.AwayFromZero)+"% ciemności)");
+            item.SubItems.Add(darkVisible==1?"Widoczny":darkVisible==0?"Poza polem widzenia":"Częściowo widoczny ("+Math.Round((1-darkVisible)*100,MidpointRounding.AwayFromZero)+"% poza polem widzenia)");
             return item;
         }
 
@@ -104,7 +104,7 @@ namespace HexMapEditor
             list.SizeChanged += (sender, e) =>
             {
                 int occupied = list.Columns.Cast<ColumnHeader>().Where((h,i)=>i!=4).Sum(h => h.Width);
-                list.Columns[4].Width = Math.Max(215, list.ClientSize.Width - occupied);
+                list.Columns[4].Width = Math.Max(160, list.ClientSize.Width - occupied);
             };
             var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
             list.DrawColumnHeader += (sender, e) =>
@@ -144,7 +144,7 @@ namespace HexMapEditor
         {
             EndCanvasGesture(true);
             using (var dialog = new Form { Text = "Lista obiektów na mapie" + (previewWithoutFog ? " — podgląd bez mgły" : ""),
-                Size = new Size(875, 440), MinimumSize = new Size(460, 260), StartPosition = FormStartPosition.CenterParent,
+                Size = new Size(Math.Min(1200,System.Windows.Forms.Screen.FromControl(this).WorkingArea.Width-40), Math.Min(480,System.Windows.Forms.Screen.FromControl(this).WorkingArea.Height-60)), MinimumSize = new Size(460, 260), StartPosition = FormStartPosition.CenterParent,
                 BackColor = BackColor, ForeColor = ForeColor })
             using (var images = new ImageList { ImageSize = new Size(36, 36), ColorDepth = ColorDepth.Depth32Bit })
             {
@@ -159,18 +159,19 @@ namespace HexMapEditor
                 }
                 images.Images.Add("hidden", hidden);
                 var list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false,
-                    SmallImageList = images, HideSelection = false, ShowItemToolTips = false };
-                list.Columns.Add("Nazwa", 205);
-                list.Columns.Add("Stan", 150);
-                list.Columns.Add("Grupa", 145);
-                list.Columns.Add("Pozycja", 100);
-                list.Columns.Add("Mgła", 220);list.Columns.Add("Światło",100);list.Columns.Add("Oświetlenie",220);
+                    SmallImageList = images, HideSelection = false, ShowItemToolTips = true };
+                list.Columns.Add("Nazwa", 185);
+                list.Columns.Add("Stan", 110);
+                list.Columns.Add("Grupa", 115);
+                list.Columns.Add("Pozycja", 90);
+                list.Columns.Add("Mgła", 220);list.Columns.Add("Pole widzenia",100);list.Columns.Add("Widoczność",205);
                 foreach (ColumnHeader header in list.Columns) header.Tag = header.Text;
                 StyleInstanceList(list);
                 foreach (var obj in map.Objects)
                 {
                     var row = ObjectListItem(obj);
                     row.DocumentIndex = list.Items.Count;
+                    row.ToolTipText=row.ImageKey=="hidden"?"":obj.Name;
                     if (row.ImageKey != "hidden" && !images.Images.ContainsKey(obj.AssetId))
                     {
                         var asset = map.IconAssets.First(a => a.Id == obj.AssetId);

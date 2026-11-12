@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -74,7 +74,7 @@ namespace HexMapEditor
                 throw new InvalidDataException("Nieprawidłowy identyfikator źródła.");
             return Path.Combine(directory, "Sources", id + ".json");
         }
-        static GraphicSource ReadSource(string directory, string id)
+        internal static GraphicSource ReadSource(string directory, string id)
         {
             string path = SourcePath(directory, id);
             if (new FileInfo(path).Length > GraphicLimits.SourceJsonBytes) throw new InvalidDataException("Za duży plik źródła.");

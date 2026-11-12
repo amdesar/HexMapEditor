@@ -36,11 +36,11 @@ namespace HexMapEditor
             SpanRow(groupLayout,10,new Label{Text="Nakładka nie zmienia wartości indywidualnych. Przesunięcie jest liczone od ich rozmiaru i ograniczane do 8–1024. Stan bez uprawnienia zawsze blokuje skuteczne odkrywanie.",AutoSize=true,MaximumSize=new Size(340,0)});
             SpanRow(groupLayout,11,PropertyButton("Rozwiąż grupę",()=>{var g=CurrentGroup();if(g!=null)UnlinkWithDialog(g,g.Members.ToArray());}));
             groupFrame = new CheckBox { Text = "Ramka członków", AutoSize = true };
-            SpanRow(groupLayout, 12, groupFrame);
+            SpanRow(groupLayout, 15, groupFrame);
             groupFrameColor = PropertyButton("Wybierz kolor", ChooseFrameColor);
-            PropertyRow(groupLayout, 13, "Kolor ramki", groupFrameColor);
-            SpanRow(groupLayout,14,PropertyButton("Usuń instancje grupy",ConfirmDeleteSelectedObjects,true));
-            groupLight=OverrideChoice();PropertyRow(groupLayout,15,"Światło",groupLight);groupLightRadiusOverride=new CheckBox{Text="Nadpisz promień światła",AutoSize=true};SpanRow(groupLayout,16,groupLightRadiusOverride);groupLightRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,17,"Światło: promień",groupLightRadius);
+            PropertyRow(groupLayout, 16, "Kolor ramki", groupFrameColor);
+            SpanRow(groupLayout,17,PropertyButton("Usuń instancje grupy",ConfirmDeleteSelectedObjects,true));
+            groupLight=OverrideChoice();PropertyRow(groupLayout,12,"Pole widzenia",groupLight);groupLightRadiusOverride=new CheckBox{Text="Nadpisz promień widzenia",AutoSize=true};SpanRow(groupLayout,13,groupLightRadiusOverride);groupLightRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,14,"Promień widzenia",groupLightRadius);
             groupLight.SelectedIndexChanged+=(s,e)=>EditGroup("light",g=>g.LightEnabled=ReadOverride(groupLight),false);groupLightRadiusOverride.CheckedChanged+=(s,e)=>EditGroup("light-radius-mode",g=>g.LightRadius=groupLightRadiusOverride.Checked?(int?)groupLightRadius.Value:null,false);groupLightRadius.ValueChanged+=(s,e)=>{if(groupLightRadiusOverride.Checked)EditGroup("light-radius",g=>g.LightRadius=(int)groupLightRadius.Value,true);};LiveNumber(groupLightRadius);groupLightRadius.LostFocus+=(s,e)=>EndObjectPropertyEdit();
             groupFrame.CheckedChanged += (s, e) => EditGroup("frame", g => g.FrameEnabled = groupFrame.Checked, false);
             groupName.TextChanged+=(s,e)=>{if(!String.IsNullOrWhiteSpace(groupName.Text))EditGroup("name",g=>g.Name=groupName.Text.Trim(),true);};

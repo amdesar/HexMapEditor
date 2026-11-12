@@ -43,6 +43,7 @@ namespace HexMapEditor
         void ApplyAction(EditAction action, bool after)
         {
             // Nothing in memory or on either stack changes before the checked disk transition.
+            if(action.BackgroundFileChange!=null)ApplyBackgroundFile(action.BackgroundFileChange,after);
             if (action.LibraryChange != null) ApplyIconLibrary(action.LibraryChange, after);
             if (action.PresetChange != null) ApplyPresetLibrary(action.PresetChange, after);
             if (action.ObjectLibraryChange != null) ApplyObjectLibrary(action.ObjectLibraryChange, after);
@@ -50,7 +51,6 @@ namespace HexMapEditor
             if (action.TerrainGraphicChange != null) ApplyTerrainGraphic(action.TerrainGraphicChange, after);
             if(action.BeforeInk!=null)map.Ink=new List<InkStroke>(after?action.AfterInk:action.BeforeInk);
             if(action.BeforeDarkPalette!=null)map.DarkPalette=FillRules.Copy(after?action.AfterDarkPalette:action.BeforeDarkPalette);
-            InvalidateLight();
             if (action.BeforeFogPalette != null) map.FogPalette = FillRules.Copy(after ? action.AfterFogPalette : action.BeforeFogPalette);
             if (action.BackgroundChange)
             {
@@ -74,6 +74,7 @@ namespace HexMapEditor
                 foreach (var change in action.Changes) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) (after ? change.After : change.Before).ApplyTo(cell); }
                 foreach (var change in action.Layers) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) change.Apply(cell, after); }
             }
+            InvalidateLight();
             selected = selectedId == null ? -1 : map.Cells.FindIndex(c => c.Id == selectedId); editorCellId = null;
             if (action.BeforePalette != null || action.PresetChange != null) RefreshPresetPicker();
         }

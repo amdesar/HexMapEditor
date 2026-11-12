@@ -98,7 +98,7 @@ namespace HexMapEditor.Tests
                 Stroke(w,EditorTool.DarkBrush,16);Check(!m.Cells[16].Darkness,"Remove lit base");var move=b.Copy();var center=BrushGeometry.Center(m,5,3);move.X=center.X;move.Y=center.Y;Call(w,"ChangeObject",move);Check(!m.Cells[16].Darkness&&Json(m.Cells[16].DarkFill)==look,"Light overwrote newer base");
                 Stroke(w,EditorTool.DarkBrush,16);string result=Json(m.Cells);var group=new ObjectGroup{Name="Lampy",Members=m.Objects.Select(o=>o.Id).ToList(),LightEnabled=true,LightRadius=1};m.Groups.Add(group);Call(w,"InvalidateLight");Check(GroupRules.Effective(m,m.Objects[0]).LightEnabled&&!m.Objects[0].LightEnabled,"Group destroys base light");
                 var g2=group.Copy();g2.LightEnabled=false;Call(w,"ChangeObjectGroup",g2,null);Check(((HashSet<int>)Call(w,"LitCells")).Count==0,"Group off");History(w,false);Check(((HashSet<int>)Call(w,"LitCells")).Count>=7,"Group light undo");Check(Json(m.Cells)==result,"Light/group changed fog/base appearances");
-                Call(w,"SetLayerVisible",MapLayer.Objects,false);Check(((HashSet<int>)Call(w,"LitCells")).Count>=7,"Hidden objects remove light");
+                Call(w,"SetLayerVisible",MapLayer.Objects,false);Check(((HashSet<int>)Call(w,"LitCells")).Count==0,"0.6.1: hidden objects must not participate in field of view");
                 foreach(string orientation in new[]{"PointyTop","FlatTop"}){m.Orientation=orientation;var p=BrushGeometry.Center(m,-1,2);m.Objects.Clear();m.Groups.Clear();m.Objects.Add(new MapObject{X=p.X,Y=p.Y,LightEnabled=true,LightRadius=1});Check(LightGeometry.Coverage(m).Count>0,"Outside source doesn't reach map "+orientation);}
             }
             Console.WriteLine("darkness PASS: base/bucket/history; stable appearance, light0/1/union, base edit while lit, group overrides, outside source both orientations.");
@@ -139,7 +139,7 @@ namespace HexMapEditor.Tests
                 m.Cells.ForEach(c=>c.Fog=false);InkGesture(w,EditorTool.Stylus,new Point(100,100),new Point(250,100));var stroke=m.Ink.Single();Check(InkGeometry.Bounds(stroke).Width>149,"Cached ink bounds stale");string drawn=Json(m.Ink);InkGesture(w,EditorTool.Eraser,new Point(175,90),new Point(175,110));History(w,false);Check(Json(m.Ink)==drawn,"Ink cache changes snapshot");
                 Set(w,"gestureTool",EditorTool.Stylus);Set(w,"gestureButton",MouseButtons.Right);Call(w,"BeginInk",new MouseEventArgs(MouseButtons.Right,1,30,30,0));Call(w,"EndCanvasGesture",true);Thread.Sleep(1050);Call(w,"AgePointer");Check(!((System.Windows.Forms.Timer)Get(w,"pointerTimer")).Enabled,"Pointer timer survives release");
                 // Validate new field limits without giant allocations / campaign.
-                var invalid=Line(0,0,1,1);invalid.Width=41;bool rejected=false;try{InkGeometry.Validate(new List<InkStroke>{invalid});}catch(InvalidDataException){rejected=true;}Check(rejected,"Ink width limit");var bad=group.Copy();bad.LightRadius=21;m.Groups=new List<ObjectGroup>{bad};rejected=false;try{GroupRules.Validate(m);}catch(InvalidDataException){rejected=true;}Check(rejected,"Light radius limit");
+                var invalid=Line(0,0,1,1);invalid.Width=Single.PositiveInfinity;bool rejected=false;try{InkGeometry.Validate(new List<InkStroke>{invalid});}catch(InvalidDataException){rejected=true;}Check(rejected,"Ink width limit");var bad=group.Copy();bad.LightRadius=21;m.Groups=new List<ObjectGroup>{bad};rejected=false;try{GroupRules.Validate(m);}catch(InvalidDataException){rejected=true;}Check(rejected,"Light radius limit");
             }
             Console.WriteLine("gestures PASS: light movement one Undo/Redo, preserved darkness, visited appearance RNG, fog protection, masked group, ink bounds/history, pointer idle, limits.");
         }
@@ -147,14 +147,14 @@ namespace HexMapEditor.Tests
         {
             using(var w=new MainWindow())
             {
-                Start(w);Set(w,"currentTool",EditorTool.Stylus);Set(w,"inkWidth",20f);Set(w,"scale",2f);
+                Start(w);Set(w,"currentTool",EditorTool.Stylus);Set(w,"inkToolSize",20f);Set(w,"scale",2f);
                 string before=Json(Model(w));int history=UndoCount(w);
                 Call(w,"CanvasMouseMove",null,new MouseEventArgs(MouseButtons.None,0,100,100,0));
                 Check((Point?)Get(w,"inkCursor")==new Point(100,100),"Stylus hover position missing");
                 using(var image=new Bitmap(240,240))using(var g=Graphics.FromImage(image))
-                {Call(w,"DrawInk",g);Check(image.GetPixel(120,100).A>0&&image.GetPixel(100,100).A==0,"World thickness preview radius / center");}
+                {Call(w,"DrawInk",g);Check(image.GetPixel(110,100).A>0&&image.GetPixel(100,100).A==0,"World thickness preview radius / center");}
                 Check(before==Json(Model(w))&&history==UndoCount(w),"Hover edited model/history");
-                Set(w,"hideInk",true);using(var image=new Bitmap(240,240))using(var g=Graphics.FromImage(image)){Call(w,"DrawInk",g);Check(image.GetPixel(120,100).A==0,"Hidden ink preview still drawn");}
+                Set(w,"hideInk",true);using(var image=new Bitmap(240,240))using(var g=Graphics.FromImage(image)){Call(w,"DrawInk",g);Check(image.GetPixel(110,100).A==0,"Hidden ink preview still drawn");}
             }
             Console.WriteLine("ink-preview PASS: hover, world thickness scaled to screen, no data/history, hidden layer.");
         }

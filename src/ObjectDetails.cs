@@ -15,7 +15,7 @@ namespace HexMapEditor
         readonly TextBox objectName=new TextBox{MaxLength=200};
         readonly NumericUpDown objectSize=new NumericUpDown{Minimum=8,Maximum=1024,Value=30},objectRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
         readonly CheckBox objectLocked=new CheckBox{Text="Blokada ruchu",AutoSize=true},objectReveal=new CheckBox{Text="Odkrywa mgłę",AutoSize=true};
-        readonly CheckBox objectLight=new CheckBox{Text="Światło",AutoSize=true};
+        readonly CheckBox objectLight=new CheckBox{Text="Pole widzenia",AutoSize=true};
         readonly NumericUpDown objectLightRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
         Label objectCount,memberGroupLabel,effectiveLabel;
         FlowLayoutPanel stateTiles;
@@ -32,10 +32,11 @@ namespace HexMapEditor
         void LiveNumber(NumericUpDown number){number.TextChanged+=(s,e)=>{decimal value;if(!updating&&Decimal.TryParse(number.Text,System.Globalization.NumberStyles.Integer,System.Globalization.CultureInfo.CurrentCulture,out value)&&value>=number.Minimum&&value<=number.Maximum)number.Value=value;};}
         void ClearIconMaterial(){activeIcon=null;iconMaterial=false;objectMaterial=false;noMaterial=true;UpdateMaterialIndicator();canvas.Invalidate();}
         void UpdateBrushAvailability(){if(shapePicker==null)return;bool applicable=currentTool==EditorTool.FogBrush||currentTool==EditorTool.DarkBrush||currentTool==EditorTool.Brush&&!objectMaterial&&!noMaterial;shapePicker.Enabled=applicable;sizePicker.Enabled=applicable&&brushShape!=BrushShape.Point;heightPicker.Enabled=applicable;fillPicker.Enabled=applicable&&brushShape!=BrushShape.Point&&brushShape!=BrushShape.Horizontal&&brushShape!=BrushShape.Vertical;UpdateInkSettings();}
-        TableLayoutPanel PropertyTable(Control parent){var t=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(4)};t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));parent.Controls.Add(t);return t;}
-        void PropertyRow(TableLayoutPanel t,int row,string label,Control input){t.RowStyles.Add(new RowStyle(SizeType.AutoSize));t.Controls.Add(new Label{Text=label,AutoSize=true,Padding=new Padding(0,9,0,0)},0,row);input.Dock=DockStyle.Fill;input.Margin=new Padding(4,5,4,5);input.MinimumSize=new Size(0,26);input.AccessibleName="Obiekt/grupa: "+label;t.Controls.Add(input,1,row);}
-        void SpanRow(TableLayoutPanel t,int row,Control input){input.Dock=DockStyle.Fill;input.Margin=new Padding(4,5,4,5);t.Controls.Add(input,0,row);t.SetColumnSpan(input,2);t.RowStyles.Add(new RowStyle(SizeType.AutoSize));}
-        Button PropertyButton(string text,Action action,bool red=false){var b=new Button{Text=text,Height=30,FlatStyle=FlatStyle.Flat,AutoSize=true};StyleButton(b);if(red){b.BackColor=Color.FromArgb(140,44,44);b.TextAlign=ContentAlignment.MiddleCenter;}b.Click+=(s,e)=>action();return b;}
+        TableLayoutPanel PropertyTable(Control parent){var t=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=2,Padding=new Padding(4)};t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));parent.Controls.Add(t);return t;}
+        static void EnsurePropertyRows(TableLayoutPanel table,int row){while(table.RowStyles.Count<=row)table.RowStyles.Add(new RowStyle(SizeType.AutoSize));}
+        void PropertyRow(TableLayoutPanel t,int row,string label,Control input){EnsurePropertyRows(t,row);t.Controls.Add(new Label{Text=label,AutoSize=true,Padding=new Padding(0,9,0,0)},0,row);input.Dock=DockStyle.Fill;input.Margin=new Padding(4,5,4,5);input.MinimumSize=new Size(0,26);input.AccessibleName="Obiekt/grupa: "+label;t.Controls.Add(input,1,row);}
+        void SpanRow(TableLayoutPanel t,int row,Control input){EnsurePropertyRows(t,row);input.Dock=DockStyle.Fill;input.Margin=new Padding(4,5,4,5);t.Controls.Add(input,0,row);t.SetColumnSpan(input,2);}
+        Button PropertyButton(string text,Action action,bool red=false){var b=new Button{Text=text,Height=30,MinimumSize=new Size(0,30),FlatStyle=FlatStyle.Flat,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink};StyleButton(b);if(red){b.BackColor=Color.FromArgb(140,44,44);b.TextAlign=ContentAlignment.MiddleCenter;}b.Click+=(s,e)=>action();return b;}
         void BuildObjectDetails()
         {
             objectDetailPanel=new DetailsOverlay{Dock=DockStyle.Fill,Padding=new Padding(16),AutoScroll=true,Visible=false};right.Controls.Add(objectDetailPanel);objectDetailPanel.BringToFront();
@@ -56,14 +57,14 @@ namespace HexMapEditor
             effectiveLabel=new Label{AutoSize=true,MaximumSize=new Size(350,0)};SpanRow(instanceLayout,6,effectiveLabel);
             memberGroupLabel=new Label{AutoSize=true};SpanRow(instanceLayout,7,memberGroupLabel);
             var membership=new FlowLayoutPanel{AutoSize=true};memberToGroup=PropertyButton("Przejdź do grupy",()=>{var o=SingleSelectedObject();var g=o==null?null:GroupRules.For(map,o.Id);if(g!=null)SelectGroup(g);});memberDetach=PropertyButton("Odłącz od grupy",()=>{var o=SingleSelectedObject();var g=o==null?null:GroupRules.For(map,o.Id);if(g!=null)UnlinkWithDialog(g,new[]{o.Id});});membership.Controls.Add(memberToGroup);membership.Controls.Add(memberDetach);SpanRow(instanceLayout,8,membership);
-            instanceDelete=PropertyButton("Usuń instancję",ConfirmDeleteSelectedObjects,true);SpanRow(instanceLayout,9,instanceDelete);
+            instanceDelete=PropertyButton("Usuń instancję",ConfirmDeleteSelectedObjects,true);SpanRow(instanceLayout,13,instanceDelete);
             SpanRow(instanceLayout,10,new Label{Text="Zmiany działają na bieżąco. Rozmiar 8–1024 jednostek świata; promień 0–20 pierścieni (0 = heks centralny).",AutoSize=true,MaximumSize=new Size(340,0)});
             objectName.TextChanged+=(s,e)=>{if(!String.IsNullOrWhiteSpace(objectName.Text))EditInstance("name",o=>o.Name=objectName.Text.Trim(),true);};objectSize.ValueChanged+=(s,e)=>EditInstance("size",o=>o.Size=(float)objectSize.Value,true);objectRadius.ValueChanged+=(s,e)=>EditInstance("radius",o=>o.RevealRadius=(int)objectRadius.Value,true);objectLocked.CheckedChanged+=(s,e)=>EditInstance("lock",o=>o.Locked=objectLocked.Checked,false);objectReveal.CheckedChanged+=(s,e)=>EditInstance("reveal",o=>o.RevealsFog=objectReveal.Checked,false);
             LiveNumber(objectSize);LiveNumber(objectRadius);
             foreach(Control c in new Control[]{objectName,objectSize,objectRadius})c.LostFocus+=(s,e)=>{if(!updating){EndObjectPropertyEdit();UpdateUI();}};
-            PropertyRow(instanceLayout,11,"Światło",objectLight);PropertyRow(instanceLayout,12,"Promień światła",objectLightRadius);
+            PropertyRow(instanceLayout,11,"Pole widzenia",objectLight);PropertyRow(instanceLayout,12,"Promień widzenia",objectLightRadius);
             objectLight.CheckedChanged+=(s,e)=>EditInstance("light",o=>o.LightEnabled=objectLight.Checked,false);objectLightRadius.ValueChanged+=(s,e)=>EditInstance("light-radius",o=>o.LightRadius=(int)objectLightRadius.Value,true);LiveNumber(objectLightRadius);objectLightRadius.LostFocus+=(s,e)=>EndObjectPropertyEdit();
-            tips.SetToolTip(objectLight,"Niezależne od stanu i odkrywania Fog. Światło usuwa tylko efektywną ciemność; baza pozostaje. Promień 0–20.");
+            tips.SetToolTip(objectLight,"Niezależne od stanu i odkrywania Fog. Pole widzenia usuwa tylko efektywne ograniczenie widoczności; baza pozostaje. Promień 0–20.");
             BuildGroupDetails(container);
             objectDetailPanel.Layout+=(s,e)=>{int width=Math.Max(200,objectDetailPanel.ClientSize.Width-40-(objectDetailPanel.VerticalScroll.Visible?SystemInformation.VerticalScrollBarWidth:0));container.Width=width;stateTiles.MaximumSize=new Size(width-12,0);};
         }

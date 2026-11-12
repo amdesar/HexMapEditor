@@ -50,7 +50,7 @@ namespace HexMapEditor
             foreach (var fill in Array(raw["FogPalette"])) Fill(fill);
             foreach (var cell in Array(raw["Cells"]))
             {
-                var row = Fields(cell, "FillVariantId", "TextureId", "FogFill", "DarkFill", "Darkness"); Fill(row["FogFill"]); Fill(row["DarkFill"]); if(!(row["Darkness"] is bool))throw new InvalidDataException("Brak bazowej ciemności.");
+                var row = Fields(cell, "FillVariantId", "TextureId", "FogFill", "DarkFill", "Darkness"); Fill(row["FogFill"]); Fill(row["DarkFill"]); if(!(row["Darkness"] is bool))throw new InvalidDataException("Brak bazowego ograniczenia widoczności.");
             }
             if (raw["Background"] != null) Fields(raw["Background"], "SourceId", "Left", "Top", "Width", "Height", "Opacity", "Saturation", "Blur");
         }

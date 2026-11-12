@@ -9,7 +9,7 @@ namespace HexMapEditor
     {
         public CellContentKind Kind;
         public string[] Coordinates;
-        public string Title { get { var parts = new List<string>(); if ((Kind & CellContentKind.Terrain) != 0) parts.Add("Teren"); if ((Kind & CellContentKind.Text) != 0) parts.Add("Tekst"); if ((Kind & CellContentKind.Icon) != 0) parts.Add("Ikona"); if ((Kind & CellContentKind.Fog) != 0) parts.Add("Mgła"); if ((Kind & CellContentKind.Darkness) != 0) parts.Add("Ciemność"); return String.Join(" + ", parts); } }
+        public string Title { get { var parts = new List<string>(); if ((Kind & CellContentKind.Terrain) != 0) parts.Add("Teren"); if ((Kind & CellContentKind.Text) != 0) parts.Add("Tekst"); if ((Kind & CellContentKind.Icon) != 0) parts.Add("Ikona"); if ((Kind & CellContentKind.Fog) != 0) parts.Add("Mgła"); if ((Kind & CellContentKind.Darkness) != 0) parts.Add("Ograniczenie widoczności"); return String.Join(" + ", parts); } }
         public static List<RemovalGroup> For(MapData before, IEnumerable<int> indices)
         {
             return indices.Distinct().Select(i => new { Index = i, Kind = MapLogic.ContentKind(before.Cells[i]) }).Where(p => p.Kind != CellContentKind.None)

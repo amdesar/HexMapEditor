@@ -14,24 +14,27 @@ namespace HexMapEditor
         PointF? inkPrevious;
         string inkError;
         string inkColor="#FFD04A",pointerColor="#FF496C";
-        float inkWidth=3,eraserSize=28;
+        float inkToolSize=5,inkGestureSize;
+        float InkWorldSize(){using(var g=canvas.CreateGraphics())return InkSizeMath.World(inkToolSize,scale,g.DpiX);}
+        void ClearPointerContext(){pointerActive=false;pointerTrail.Clear();pointerTimer.Stop();((InkCanvas)canvas).PointerHidden=false;canvas.Invalidate();}
         Point? inkCursor;
         sealed class PointerSample { internal Point Point;internal long Time; }
         readonly List<PointerSample> pointerTrail=new List<PointerSample>();
         readonly Timer pointerTimer=new Timer{Interval=33};
-        bool pointerActive; Point pointerPosition;
+        bool pointerActive; Point pointerPosition;float pointerDiameter=20;
         static long PointerTime {get{return System.Diagnostics.Stopwatch.GetTimestamp()*1000/System.Diagnostics.Stopwatch.Frequency;}}
         void InitInk()
         {
             pointerTimer.Tick+=(s,e)=>AgePointer();Disposed+=(s,e)=>pointerTimer.Dispose();
-            Deactivate+=(s,e)=>EndCanvasGesture(true);
+            Deactivate+=(s,e)=>{EndCanvasGesture(true);ClearPointerContext();};
+            canvas.LostFocus+=(s,e)=>{if(pointerActive){EndCanvasGesture(true);ClearPointerContext();}};
         }
         bool BeginInk(MouseEventArgs e)
         {
             if(gestureTool!=EditorTool.Stylus&&gestureTool!=EditorTool.Eraser)return false;
-            if(e.Button==MouseButtons.Right){if(gestureTool==EditorTool.Stylus){pointerActive=true;PointerAt(e.Location);}else ClearInk();return true;}
+            if(e.Button==MouseButtons.Right){if(gestureTool==EditorTool.Stylus){using(var g=canvas.CreateGraphics())pointerDiameter=18*g.DpiX/96f+2;pointerActive=true;((InkCanvas)canvas).PointerHidden=true;PointerAt(e.Location);}else ClearInk();return true;}
             if(e.Button!=MouseButtons.Left)return true;
-            inkBefore=new List<InkStroke>(map.Ink);map.Ink=new List<InkStroke>(map.Ink);inkError=null;inkPrevious=null;MoveInk(e.Location);return true;
+            inkGestureSize=InkWorldSize();inkBefore=new List<InkStroke>(map.Ink);map.Ink=new List<InkStroke>(map.Ink);inkError=null;inkPrevious=null;MoveInk(e.Location);return true;
         }
         void MoveInk(Point point)
         {
@@ -42,10 +45,10 @@ namespace HexMapEditor
             var p=World(point);
             try
             {
-                if(gestureTool==EditorTool.Eraser)map.Ink=InkGeometry.Erase(map.Ink,inkPrevious??p,p,eraserSize);
+                if(gestureTool==EditorTool.Eraser)map.Ink=InkGeometry.Erase(map.Ink,inkPrevious??p,p,inkGestureSize);
                 else
                 {
-                    if(activeStroke==null){activeStroke=new InkStroke{Color=inkColor,Width=inkWidth};map.Ink.Add(activeStroke);}
+                    if(activeStroke==null){activeStroke=new InkStroke{Color=inkColor,Width=inkGestureSize};map.Ink.Add(activeStroke);}
                     if(activeStroke.Points.Count==0||Math.Abs(activeStroke.Points.Last().X-p.X)+Math.Abs(activeStroke.Points.Last().Y-p.Y)>.05)activeStroke.Points.Add(new InkPoint(p));
                     activeStroke.CachedBounds=null;InkGeometry.Validate(map.Ink);
                 }
@@ -55,7 +58,7 @@ namespace HexMapEditor
         }
         void FinishInk(bool commit)
         {
-            pointerActive=false;AgePointer();
+            pointerActive=false;((InkCanvas)canvas).PointerHidden=false;AgePointer();
             if(inkBefore==null)return;
             var before=inkBefore;inkBefore=null;activeStroke=null;inkPrevious=null;
             if(!commit||inkError!=null){map.Ink=new List<InkStroke>(before);if(inkError!=null)statusLabel.Text=inkError;return;}
@@ -74,13 +77,13 @@ namespace HexMapEditor
         void PointerAt(Point point)
         {
             if(hideInk)return;
-            pointerPosition=point;pointerTrail.Add(new PointerSample{Point=point,Time=PointerTime});if(pointerTrail.Count>128)pointerTrail.RemoveAt(0);
+            AgePointer();pointerPosition=point;pointerTrail.Add(new PointerSample{Point=point,Time=PointerTime});if(pointerTrail.Count>128)pointerTrail.RemoveAt(0);
             pointerTimer.Start();AgePointer();
         }
         void AgePointer()
         {
-            var all=pointerTrail.Select(p=>p.Point).ToList();if(pointerActive)all.Add(pointerPosition);pointerTrail.RemoveAll(p=>PointerTime-p.Time>=1000);
-            if(all.Count>0){var box=Rectangle.FromLTRB(all.Min(p=>p.X)-24,all.Min(p=>p.Y)-24,all.Max(p=>p.X)+24,all.Max(p=>p.Y)+24);canvas.Invalidate(box);}
+            var all=pointerTrail.Select(p=>p.Point).ToList();if(pointerActive)all.Add(pointerPosition);pointerTrail.RemoveAll(p=>PointerTime-p.Time>=750);
+            if(all.Count>0){int margin=(int)Math.Ceiling(pointerDiameter/2)+3;var box=Rectangle.FromLTRB(all.Min(p=>p.X)-margin,all.Min(p=>p.Y)-margin,all.Max(p=>p.X)+margin,all.Max(p=>p.Y)+margin);canvas.Invalidate(box);}
             if(!pointerActive&&pointerTrail.Count==0)pointerTimer.Stop();
         }
         void DrawInk(Graphics graphics)
@@ -92,16 +95,27 @@ namespace HexMapEditor
             graphics.Restore(state);
             if((currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus)&&inkCursor.HasValue&&!pointerActive)
             {
-                float r=(currentTool==EditorTool.Eraser?eraserSize:inkWidth)*scale/2;
+                float r=inkToolSize*graphics.DpiX/96f/2;
                 var p=inkCursor.Value;
                 using(var edge=new Pen(Color.Black,3))graphics.DrawEllipse(edge,p.X-r,p.Y-r,2*r,2*r);
                 using(var pen=new Pen(Color.White,1.3f)){if(currentTool==EditorTool.Eraser)pen.DashStyle=DashStyle.Dash;graphics.DrawEllipse(pen,p.X-r,p.Y-r,2*r,2*r);}
             }
             if(pointerTrail.Count==0&&!pointerActive)return;
-            var color=ColorTranslator.FromHtml(pointerColor);
-            for(int i=1;i<pointerTrail.Count;i++){int alpha=(int)(220*Math.Max(0,1-(PointerTime-pointerTrail[i].Time)/1000.0));using(var pen=new Pen(Color.FromArgb(alpha,color),4))graphics.DrawLine(pen,pointerTrail[i-1].Point,pointerTrail[i].Point);}
-            if(!pointerActive&&pointerTrail.Count>0){var last=pointerTrail.Last();int alpha=(int)(220*Math.Max(0,1-(PointerTime-last.Time)/1000.0));using(var b=new SolidBrush(Color.FromArgb(alpha,color)))graphics.FillEllipse(b,last.Point.X-2,last.Point.Y-2,4,4);}
-            if(pointerActive){var p=pointerPosition;float diameter=18*graphics.DpiX/96f;using(var b=new SolidBrush(color))graphics.FillEllipse(b,p.X-diameter/2,p.Y-diameter/2,diameter,diameter);using(var pen=new Pen(Color.Black,2))graphics.DrawEllipse(pen,p.X-diameter/2,p.Y-diameter/2,diameter,diameter);}
+            var color=ColorTranslator.FromHtml(pointerColor);float diameter=pointerDiameter;
+            for(int i=1;i<pointerTrail.Count;i++)
+            {
+                var a=pointerTrail[i-1];var b=pointerTrail[i];
+                float lifeA=(float)Math.Max(0,1-(PointerTime-a.Time)/750.0),lifeB=(float)Math.Max(0,1-(PointerTime-b.Time)/750.0);
+                float ra=Math.Max(.35f,diameter*lifeA/2),rb=Math.Max(.35f,diameter*lifeB/2);
+                float dx=b.Point.X-a.Point.X,dy=b.Point.Y-a.Point.Y,length=(float)Math.Sqrt(dx*dx+dy*dy);
+                using(var brush=new SolidBrush(Color.FromArgb((int)(210*lifeB),color)))
+                {
+                    if(length>.01f){float nx=-dy/length,ny=dx/length;graphics.FillPolygon(brush,new[]{new PointF(a.Point.X+nx*ra,a.Point.Y+ny*ra),new PointF(b.Point.X+nx*rb,b.Point.Y+ny*rb),new PointF(b.Point.X-nx*rb,b.Point.Y-ny*rb),new PointF(a.Point.X-nx*ra,a.Point.Y-ny*ra)});}
+                    graphics.FillEllipse(brush,b.Point.X-rb,b.Point.Y-rb,2*rb,2*rb);
+                }
+            }
+            if(!pointerActive&&pointerTrail.Count==1){var last=pointerTrail.Last();float life=(float)Math.Max(0,1-(PointerTime-last.Time)/750.0);float r=diameter*life/2;using(var brush=new SolidBrush(Color.FromArgb((int)(210*life),color)))graphics.FillEllipse(brush,last.Point.X-r,last.Point.Y-r,2*r,2*r);}
+            if(pointerActive){var p=pointerPosition;using(var brush=new SolidBrush(color))graphics.FillEllipse(brush,p.X-diameter/2,p.Y-diameter/2,diameter,diameter);}
         }
     }
 }

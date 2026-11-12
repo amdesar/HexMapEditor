@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -17,11 +17,16 @@ namespace HexMapEditor
         Bitmap previewSource, filtered, covered;
         string filteredKey, coveredKey;
         bool previewQueued, adjusting;
+        internal bool LibraryOnly {set{remove.Visible=!value;}}
         internal Func<bool> CanAccept;
+        internal Func<BackgroundEntry> ChooseLibrary;
+        internal Func<MapBackground,string,bool> SaveAndApply;
+        internal MapBackground Initial {get;private set;}
         internal MapBackground Result { get; private set; }
         static TrackBar Slider(int min, int max, int value) { return new TrackBar { Minimum = min, Maximum = max, Value = value, TickStyle = TickStyle.None, Width = 185, Height = 35 }; }
         internal BackgroundDialog(MapBackground initial, Size viewport)
         {
+            Initial=initial==null?null:initial.Copy();
             this.viewport = new Size(Math.Max(1,viewport.Width),Math.Max(1,viewport.Height));
             preview.Aspect = this.viewport;
             draft = initial == null ? null : initial.Copy();
@@ -29,7 +34,9 @@ namespace HexMapEditor
             StartPosition = FormStartPosition.CenterParent; MaximizeBox = MinimizeBox = false;
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI", 9);
             var import = new Button { Text = "Z pliku…", Bounds = new Rectangle(12, 10, 125, 28) };
-            var hint = new Label { Text = "Przeciągaj uchwyty kadru lub zaznacz nowy prostokąt.", Bounds = new Rectangle(280, 15, 490, 22) };
+            var library = new Button { Text = "Z biblioteki…", Bounds = new Rectangle(273,10,125,28) };
+            library.Click+=(s,e)=>{if(ChooseLibrary==null)return;var chosen=ChooseLibrary();if(chosen==null)return;draft=chosen.Settings.Copy();draft.Source=draft.Source.Pin();draft.LibraryId=chosen.Id;UpdateSettings();};
+            var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(407,15,365,22) };
             opacity.Location = new Point(12, 403); saturation.Location = new Point(272, 403); blur.Location = new Point(532, 403);
             var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(546, 484, 106, 29) };
             var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(660, 484, 106, 29) };
@@ -50,10 +57,10 @@ namespace HexMapEditor
                 slider.KeyUp += (s,e) => FinishPreview();
                 slider.MouseCaptureChanged += (s,e) => { if (!slider.Capture && Control.MouseButtons==MouseButtons.None) FinishPreview(); };
             }
-            accept.Click += (s, e) => { if (CanAccept == null || CanAccept()) { Result = draft == null ? null : draft.Copy(); DialogResult = DialogResult.OK; } };
+            accept.Click += (s, e) => { if (CanAccept != null && !CanAccept())return;var result=draft==null?null:draft.Copy();if(SaveAndApply!=null&&!SaveAndApply(result,draft==null?null:draft.LibraryId))return;Result=result;DialogResult=DialogResult.OK; };
             var reset = new Button { Text = "100%", Bounds = new Rectangle(462,403,58,26), AccessibleName = "Przywróć nasycenie 100%" };
             reset.Click += (s,e) => saturation.Value = 100;
-            Controls.AddRange(new Control[] { crop, preview, import, remove, hint, opacity, saturation, blur, accept, cancel, values, reset,
+            Controls.AddRange(new Control[] { crop, preview, import, remove, library, hint, opacity, saturation, blur, accept, cancel, values, reset,
                 new Label { Text = "Podgląd na płótnie", Bounds = new Rectangle(403,35,365,22) },
                 new Label { Text = "Krycie", Location = new Point(12, 381), AutoSize = true },
                 new Label { Text = "Nasycenie", Location = new Point(272, 381), AutoSize = true },
@@ -157,7 +164,7 @@ namespace HexMapEditor
         MapBackground settings;
         Bitmap image;
         PointF anchor;
-        int handle;
+        int handle;bool moving;
         MapBackground original;
         internal Action Changed;
         internal BackgroundCropSurface() { DoubleBuffered = true; BackColor = Color.FromArgb(23, 27, 34); }
@@ -183,11 +190,12 @@ namespace HexMapEditor
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            if (image == null || e.Button != MouseButtons.Left || !RectangleF.Inflate(ImageBounds,10,10).Contains(e.Location)) return;
-            handle = HitHandle(e.Location);
+            if (image == null || (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle) || !RectangleF.Inflate(ImageBounds,10,10).Contains(e.Location)) return;
+            moving=e.Button==MouseButtons.Middle;handle = moving?-1:HitHandle(e.Location);
             original = settings.Copy();
             var corners = Handles();
             anchor = handle < 0 ? Relative(e.Location) : corners[(handle + 2) % 4];
+            if(moving)Cursor=Cursors.SizeAll;
             Capture = true;
         }
         protected override void OnMouseMove(MouseEventArgs e)
@@ -195,6 +203,12 @@ namespace HexMapEditor
             base.OnMouseMove(e);
             if (!Capture || settings == null) { int hit = image == null ? -1 : HitHandle(e.Location); Cursor = hit==0 || hit==2 ? Cursors.SizeNWSE : hit==1 || hit==3 ? Cursors.SizeNESW : hit==4 || hit==6 ? Cursors.SizeNS : hit==5 || hit==7 ? Cursors.SizeWE : Cursors.Cross; return; }
             var point = Relative(e.Location);
+            if(moving)
+            {
+                settings.Left=Math.Max(0,Math.Min(1-original.Width,original.Left+point.X-anchor.X));
+                settings.Top=Math.Max(0,Math.Min(1-original.Height,original.Top+point.Y-anchor.Y));
+                Invalidate();return;
+            }
             double left = Math.Min(anchor.X, point.X), top = Math.Min(anchor.Y, point.Y);
             double width = Math.Abs((double)point.X - anchor.X), height = Math.Abs((double)point.Y - anchor.Y);
             if (handle >= 4)
@@ -212,8 +226,9 @@ namespace HexMapEditor
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
-            if (e.Button == MouseButtons.Left && Capture) { Capture = false; if (Changed != null) Changed(); }
+            if ((e.Button == MouseButtons.Left || e.Button==MouseButtons.Middle) && Capture) { Capture = false; }
         }
+        protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture){moving=false;Cursor=Cursors.Cross;if(Changed!=null)Changed();}}
         PointF[] Handles()
         {
             float l=(float)settings.Left,t=(float)settings.Top,r=(float)(settings.Left+settings.Width),b=(float)(settings.Top+settings.Height);

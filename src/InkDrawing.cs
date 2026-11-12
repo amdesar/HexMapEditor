@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -30,7 +30,7 @@ namespace HexMapEditor
         {
             if(strokes==null||strokes.Count>MaxStrokes||strokes.Sum(s=>(long)(s==null||s.Points==null?0:s.Points.Count))>MaxPoints)throw new InvalidDataException("Limit rysunków: 5000 fragmentów / 200000 punktów.");
             var ids=new HashSet<string>();foreach(var s in strokes)
-                if(s==null||String.IsNullOrWhiteSpace(s.Id)||s.Id.Length>200||!ids.Add(s.Id)||!MapLogic.ValidColor(s.Color)||!ObjectGeometry.Finite(s.Width)||s.Width<.5||s.Width>40||s.Points==null||s.Points.Count<1||s.Points.Count>MaxStrokePoints||s.Points.Any(p=>p==null||!ObjectGeometry.Finite(p.X)||!ObjectGeometry.Finite(p.Y)||Math.Abs(p.X)>10000000||Math.Abs(p.Y)>10000000))throw new InvalidDataException("Nieprawidłowa kreska (grubość 0,5–40; do 10000 punktów)." );
+                if(s==null||String.IsNullOrWhiteSpace(s.Id)||s.Id.Length>200||!ids.Add(s.Id)||!MapLogic.ValidColor(s.Color)||!ObjectGeometry.Finite(s.Width)||s.Width<=0||s.Width>InkSizeMath.MaxWorldWidth||s.Points==null||s.Points.Count<1||s.Points.Count>MaxStrokePoints||s.Points.Any(p=>p==null||!ObjectGeometry.Finite(p.X)||!ObjectGeometry.Finite(p.Y)||Math.Abs(p.X)>10000000||Math.Abs(p.Y)>10000000))throw new InvalidDataException("Nieprawidłowa kreska (grubość świata >0, do 2 mld; do 10000 punktów)." );
         }
         internal static RectangleF Bounds(InkStroke s)
         {if(!s.CachedBounds.HasValue)s.CachedBounds=RectangleF.FromLTRB(s.Points.Min(p=>p.X)-s.Width/2,s.Points.Min(p=>p.Y)-s.Width/2,s.Points.Max(p=>p.X)+s.Width/2,s.Points.Max(p=>p.Y)+s.Width/2);return s.CachedBounds.Value;}
