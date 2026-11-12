@@ -83,7 +83,7 @@ namespace HexMapEditor
         public List<ObjectStateDefinition> ObjectStates { get; set; }
         public List<string> ExcludedStateIds { get; set; }
         public List<ObjectGroup> Groups { get; set; }
-        public MapData() { FormatVersion = 9; Ink = new List<InkStroke>(); DarkPalette = new List<FillVariant>{FillRules.DarkDefault()}; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); TerrainAssets = new List<GraphicDefinition>(); GraphicSources = new List<GraphicSource>(); FogPalette = new List<FillVariant> { FillRules.FogDefault() }; Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
+        public MapData() { FormatVersion = 10; Ink = new List<InkStroke>(); DarkPalette = new List<FillVariant>{FillRules.DarkDefault()}; Name = "Nowa mapa"; Columns = 15; Rows = 10; Orientation = "PointyTop"; LabelMode = "Axes"; Cells = new List<CellData>(); ActivePresetId = PresetCatalog.DefaultId; Presets = new List<TerrainPreset> { PresetCatalog.Default() }; IconAssets = new List<IconAsset>(); TerrainAssets = new List<GraphicDefinition>(); GraphicSources = new List<GraphicSource>(); FogPalette = new List<FillVariant> { FillRules.FogDefault() }; Objects = new List<MapObject>(); ObjectStates=ObjectStateDefinition.Defaults(); ExcludedStateIds = new List<string>(); Groups=new List<ObjectGroup>(); }
     }
 
     internal sealed class TerrainState
@@ -175,7 +175,7 @@ namespace HexMapEditor
         PointF pan = new PointF(500, 340);
         float scale = 1f;
         const float BaseRadius = 28f;
-        const string AppVersion = "0.6.1";
+        const string AppVersion = "0.6.2";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -189,7 +189,7 @@ namespace HexMapEditor
             Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 748); Size = new Size(1440, 940);
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
             LoadProgramIcon();
-            InitializeShell(); InitInk();
+            InitializeShell(); InitInk(); InitBackgroundResize();
             Application.AddMessageFilter(this); Disposed += (s,e) => Application.RemoveMessageFilter(this);
             Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); LoadLibraryPresets(true); LoadIcons(); LoadObjects(); LoadStateLibrary(); };
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
@@ -362,7 +362,7 @@ namespace HexMapEditor
                 var raw = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
                 int format = (int)raw["FormatVersion"];
-                if (format != 9) throw new InvalidDataException("Obsługiwany format mapy: 9. Starszy plik pozostawiono bez zmian.");
+                if (format != 10) throw new InvalidDataException("Obsługiwany format mapy: 10. Starszy plik pozostawiono bez zmian.");
                 GraphicSchema.Map(raw);
                 if (!raw.ContainsKey("TerrainAssets") || !raw.ContainsKey("GraphicSources") || !raw.ContainsKey("FogPalette") ||
                     !raw.ContainsKey("Background")) throw new InvalidDataException("Brak tabeli grafik, źródeł lub ustawień mgły/tła.");
@@ -465,7 +465,7 @@ namespace HexMapEditor
         static void ValidateMap(MapData m)
         {
             if (m == null) throw new InvalidDataException("Brak danych mapy.");
-            if (m.FormatVersion != 9) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
+            if (m.FormatVersion != 10) throw new InvalidDataException("Nieobsługiwana wersja formatu: " + m.FormatVersion);
             var textures = TerrainTextures.ReadTable(m.TerrainAssets, m.GraphicSources);
             if (m.Background != null)
             {

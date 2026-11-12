@@ -45,7 +45,7 @@ namespace HexMapEditor
         {
             Tables(raw); Fields(raw, "Presets", "Cells", "FogPalette", "Background", "Ink", "DarkPalette");
             foreach(var fill in Array(raw["DarkPalette"]))Fill(fill);
-            foreach(var stroke in Array(raw["Ink"])) {var row=Fields(stroke,"Id","Color","Width","Points");foreach(var point in Array(row["Points"]))Fields(point,"X","Y");}
+            foreach(var stroke in Array(raw["Ink"])) {var row=Fields(stroke,"Id","Color","Width","Points","Surface");foreach(var point in Array(row["Points"]))Fields(point,"X","Y");}
             foreach (var preset in Array(raw["Presets"])) Preset(preset);
             foreach (var fill in Array(raw["FogPalette"])) Fill(fill);
             foreach (var cell in Array(raw["Cells"]))

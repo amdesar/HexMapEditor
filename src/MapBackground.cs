@@ -127,21 +127,39 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         Bitmap backgroundBitmap;
-        string backgroundKey;
-        bool hideBackground;
+        string backgroundKey, backgroundSourceKey;
+        Bitmap backgroundSource;
+        bool hideBackground, backgroundResizing;
+        void InitBackgroundResize()
+        {
+            Disposed+=(s,e)=>ClearBackgroundCache();
+            ResizeBegin+=(s,e)=>{backgroundResizing=true;canvas.Invalidate();};
+            ResizeEnd+=(s,e)=>{backgroundResizing=false;ClearBackgroundRendered();canvas.Invalidate();};
+        }
+        void ClearBackgroundRendered()
+        {
+            if(backgroundBitmap!=null)backgroundBitmap.Dispose();
+            backgroundBitmap=null;backgroundKey=null;
+        }
         void ClearBackgroundCache()
         {
-            if (backgroundBitmap != null) backgroundBitmap.Dispose();
-            backgroundBitmap = null; backgroundKey = null;
+            ClearBackgroundRendered();
+            if(backgroundSource!=null)backgroundSource.Dispose();
+            backgroundSource=null;backgroundSourceKey=null;
         }
         void DrawBackground(Graphics g)
         {
             if (hideBackground || map.Background == null) return;
-            string key = json.Serialize(map.Background) + ":" + canvas.ClientSize;
+            if(backgroundSourceKey!=map.Background.SourceId)
+            {
+                var source=GraphicSources.Decode(map.Background.Source);
+                ClearBackgroundCache();backgroundSource=source;backgroundSourceKey=map.Background.SourceId;
+            }
+            string key = json.Serialize(map.Background) + ":" + canvas.ClientSize + ":" + backgroundResizing;
             if (key != backgroundKey)
             {
-                var rendered = BackgroundRenderer.Render(map.Background, canvas.ClientSize);
-                ClearBackgroundCache(); backgroundBitmap = rendered; backgroundKey = key;
+                var rendered = BackgroundRenderer.Render(map.Background, canvas.ClientSize, backgroundSource, backgroundResizing?320:GraphicLimits.BackgroundSide);
+                ClearBackgroundRendered(); backgroundBitmap = rendered; backgroundKey = key;
             }
             using (var attributes = new ImageAttributes())
             {

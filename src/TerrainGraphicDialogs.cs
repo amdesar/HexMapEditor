@@ -60,9 +60,9 @@ namespace HexMapEditor
             this.items = items; this.flat = flat;
             Text = "Biblioteka grafik terenów";
             var area=Screen.FromControl(this).WorkingArea;
-            ClientSize = new Size(Math.Min(650,Math.Max(320,area.Width-50)),Math.Min(450,Math.Max(220,area.Height-80)));
-            MinimumSize = new Size(Math.Min(580,Width),Math.Min(300,Height));
-            Shown+=(s,e)=>{int spacing=Math.Max(100,(list.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-4)/4);SendMessage(list.Handle,0x1035,IntPtr.Zero,new IntPtr(spacing|(114<<16)));};
+            ClientSize = new Size(Math.Min(4*120+SystemInformation.VerticalScrollBarWidth+4,Math.Max(320,area.Width-50)),Math.Min(450,Math.Max(220,area.Height-80)));
+            MinimumSize = new Size(Math.Min(480,Width),Math.Min(300,Height));
+            Shown+=(s,e)=>UpdateIconSpacing();list.Resize+=(s,e)=>UpdateIconSpacing();
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9);
             BackColor=Color.FromArgb(34,38,48); ForeColor=Color.WhiteSmoke; list.BackColor=BackColor;list.ForeColor=ForeColor;
@@ -88,6 +88,14 @@ namespace HexMapEditor
             CancelButton = cancel;
             RefreshList(null);
             edit.Enabled = remove.Enabled = select.Enabled = false;
+        }
+
+        void UpdateIconSpacing()
+        {
+            if(!list.IsHandleCreated)return;
+            int spacing=Math.Max(100,(list.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-8)/4);
+            SendMessage(list.Handle,0x1035,IntPtr.Zero,new IntPtr(spacing|(114<<16)));
+            list.ArrangeIcons(ListViewAlignment.Top);
         }
 
         void Run(Action action)

@@ -101,11 +101,6 @@ namespace HexMapEditor
                     header.Text = (string)header.Tag + (i != order.Column || order.Direction == 0 ? "" : order.Direction > 0 ? " ▲" : " ▼");
                 }
             };
-            list.SizeChanged += (sender, e) =>
-            {
-                int occupied = list.Columns.Cast<ColumnHeader>().Where((h,i)=>i!=4).Sum(h => h.Width);
-                list.Columns[4].Width = Math.Max(160, list.ClientSize.Width - occupied);
-            };
             var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
             list.DrawColumnHeader += (sender, e) =>
             {
@@ -164,7 +159,7 @@ namespace HexMapEditor
                 list.Columns.Add("Stan", 110);
                 list.Columns.Add("Grupa", 115);
                 list.Columns.Add("Pozycja", 90);
-                list.Columns.Add("Mgła", 220);list.Columns.Add("Pole widzenia",100);list.Columns.Add("Widoczność",205);
+                list.Columns.Add("Mgła", 185);list.Columns.Add("Pole widzenia",100);list.Columns.Add("Widoczność",205);
                 foreach (ColumnHeader header in list.Columns) header.Tag = header.Text;
                 StyleInstanceList(list);
                 foreach (var obj in map.Objects)

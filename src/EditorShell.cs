@@ -48,10 +48,9 @@ namespace HexMapEditor
                 else if(key=="eraser"){g.FillPolygon(Brushes.Salmon,new[]{new Point(2,15),new Point(13,3),new Point(22,12),new Point(11,23)});g.DrawLine(p,2,15,11,23);g.DrawLine(p,10,7,19,16);}
                 else if(key=="dark"||key=="darkbucket")
                 {
-                    using(var shade=new SolidBrush(Color.FromArgb(90,100,120)))g.FillPolygon(shade,new[]{new Point(3,3),new Point(18,3),new Point(17,13),new Point(10,19),new Point(4,13)});
-                    g.DrawLines(p,new[]{new Point(3,3),new Point(18,3),new Point(17,13),new Point(10,19),new Point(4,13),new Point(3,3)});
-                    g.DrawLine(p,6,12,14,6);g.DrawLine(p,6,7,13,7);
-                    if(key=="darkbucket"){using(var badge=new SolidBrush(Color.FromArgb(49,54,67)))g.FillRectangle(badge,12,12,10,10);g.DrawLine(p,13,17,21,17);g.DrawLine(p,17,13,17,21);}
+                    using(var eye=new GraphicsPath()){eye.AddBezier(2,10,7,2,15,2,20,10);eye.AddBezier(20,10,15,18,7,18,2,10);g.DrawPath(p,eye);}
+                    g.DrawEllipse(p,8,7,6,6);
+                    if(key=="darkbucket"){g.DrawLine(p,3,20,19,20);g.DrawLine(p,16,16,16,21);}
                 }
                 else if (key == "fog" || key == "fogbucket") { g.FillEllipse(Brushes.SlateGray, 1, 9, 20, 10); g.FillEllipse(Brushes.LightSlateGray, 4, 4, 10, 12); g.FillEllipse(Brushes.LightSlateGray, 10, 7, 10, 11); if (key == "fogbucket") g.DrawLine(p, 2, 21, 20, 21); }
                 else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 11), new Point(10, 3), new Point(18, 11), new Point(10, 19) }); g.DrawLine(p, 3, 11, 17, 11); g.DrawEllipse(p, 18, 13, 3, 5); }
@@ -96,7 +95,7 @@ namespace HexMapEditor
             ShellButton(file, "Zapisz jako", "saveas", "Zapisz jako (Ctrl+Shift+S)", () => SaveAsProject(), 100);
             ConfigureButton(undoButton, "", "undo", "Cofnij operację mapy", Undo, 32); file.Controls.Add(undoButton);
             ConfigureButton(redoButton, "", "redo", "Ponów operację mapy", Redo, 32); file.Controls.Add(redoButton);
-            ShellButton(file, "Biblioteka", "library", "Pokaż lokalizację biblioteki", () => ShowEditorMessage("Lokalna biblioteka:\n" + LibraryPaths.Root + "\n\nPresety terenów można zapisywać w panelu po lewej. Stany obiektów są dostępne w menu kafelków w szczegółach instancji.", "Biblioteka", MessageBoxButtons.OK, MessageBoxIcon.Information), 98);
+            ShellButton(file, "Biblioteka", "library", "Otwórz folder Library w Eksploratorze", OpenLibraryFolder, 98);
             ShellButton(file, "Tło", "open", "Tło mapy", EditBackground, 65);
             ConfigureButton(orientationToggle, "Pointy Top", "pointy", "Zmień orientację", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop"), 128); view.Controls.Add(orientationToggle);
             ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);

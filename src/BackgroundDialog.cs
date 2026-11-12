@@ -11,7 +11,7 @@ namespace HexMapEditor
         readonly CanvasAspectPreview preview = new CanvasAspectPreview { Bounds = new Rectangle(403, 58, 365, 310) };
         readonly TrackBar opacity = Slider(0, 100, 100), saturation = Slider(0, 200, 100), blur = Slider(0, 24, 0);
         readonly Label values = new Label { Bounds = new Rectangle(15, 453, 620, 25) };
-        readonly Button remove = new Button { Text = "Usuń tło", Bounds = new Rectangle(150, 10, 110, 28) };
+        readonly Button remove = new Button { Text = "Usuń tło", Bounds = new Rectangle(286, 10, 110, 28) };
         bool updating;
         readonly Size viewport;
         Bitmap previewSource, filtered, covered;
@@ -33,8 +33,10 @@ namespace HexMapEditor
             Text = "Tło mapy"; ClientSize = new Size(780, 526); FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent; MaximizeBox = MinimizeBox = false;
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI", 9);
-            var import = new Button { Text = "Z pliku…", Bounds = new Rectangle(12, 10, 125, 28) };
-            var library = new Button { Text = "Z biblioteki…", Bounds = new Rectangle(273,10,125,28) };
+            var import = new Button { Text = "Z pliku…", Bounds = new Rectangle(149, 10, 125, 28) };
+            var library = new Button { Text = "Z biblioteki…", Bounds = new Rectangle(12,10,125,28) };
+            remove.FlatStyle=FlatStyle.Flat;remove.ForeColor=Color.FromArgb(244,113,113);remove.FlatAppearance.BorderColor=remove.ForeColor;
+            remove.FlatAppearance.MouseOverBackColor=Color.FromArgb(80,42,48);remove.FlatAppearance.MouseDownBackColor=Color.FromArgb(100,44,52);
             library.Click+=(s,e)=>{if(ChooseLibrary==null)return;var chosen=ChooseLibrary();if(chosen==null)return;draft=chosen.Settings.Copy();draft.Source=draft.Source.Pin();draft.LibraryId=chosen.Id;UpdateSettings();};
             var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(407,15,365,22) };
             opacity.Location = new Point(12, 403); saturation.Location = new Point(272, 403); blur.Location = new Point(532, 403);

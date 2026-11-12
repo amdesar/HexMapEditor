@@ -16,6 +16,7 @@ namespace HexMapEditor
         readonly List<PointF> selectionPath=new List<PointF>();
         bool objectSelecting,objectMoving,objectClick,selectionControl;
         string objectClickToClear;
+        bool deferredObjectDetails;
         int selectionKind,skippedLocked;
         static bool SelectionTool(EditorTool tool){return tool==EditorTool.Select||tool==EditorTool.RectangleSelect||tool==EditorTool.Lasso;}
         PointF World(Point p){return new PointF((p.X-pan.X)/scale,(p.Y-pan.Y)/scale);}
@@ -32,10 +33,12 @@ namespace HexMapEditor
         void ChooseObject(MapObject hit,bool control)
         {ChooseObjectMember(hit,control,(ModifierKeys&Keys.Alt)!=0);}
         void ChooseObjectMember(MapObject hit,bool control,bool single)
+        {ChooseObjectMemberCore(hit,control,single,true);}
+        void ChooseObjectMemberCore(MapObject hit,bool control,bool single,bool refresh)
         {
             EndObjectPropertyEdit();textHistory.BreakGroups();var unit=single?new HashSet<string>{hit.Id}:ExpandedObjects(new[]{hit.Id});
             if(control){if(unit.IsSubsetOf(selectedObjects))selectedObjects.ExceptWith(unit);else selectedObjects.UnionWith(unit);}else if(single||!unit.IsSubsetOf(selectedObjects)){selectedObjects.Clear();groupSelectionOrder.Clear();selectedObjects.UnionWith(unit);}
-            if(single){selectedGroupId=null;SelectedWholeGroups();}else ResolveSelectedGroup();selected=-1;rightPanelOpen=selectedObjects.Count>0;UpdateUI();
+            if(single){selectedGroupId=null;SelectedWholeGroups();}else ResolveSelectedGroup();selected=-1;if(refresh){rightPanelOpen=selectedObjects.Count>0;UpdateUI();}else canvas.Invalidate();
         }
         void BeginObjectMove(IEnumerable<string> ids,PointF point)
         {
@@ -86,7 +89,8 @@ namespace HexMapEditor
             if(hit!=null){
                 if (!selectionControl && (ModifierKeys & Keys.Alt) == 0 && selectedObjects.SetEquals(ExpandedObjects(new[]{hit.Id})))
                     objectClickToClear = hit.Id;
-                ChooseObject(hit,selectionControl);
+                deferredObjectDetails=!rightPanelOpen;
+                ChooseObjectMemberCore(hit,selectionControl,(ModifierKeys&Keys.Alt)!=0,!deferredObjectDetails);
                 if(selectedObjects.Contains(hit.Id)){
                     BeginObjectMove(selectedObjects,point);
                 }return true;
@@ -130,12 +134,18 @@ namespace HexMapEditor
         }
         void FinishObjectGesture(bool commit)
         {
+            bool changed=false,show=commit&&deferredObjectDetails;
+            deferredObjectDetails=false;
             if(objectGesture!=null&&objectDragBefore!=null){
                 foreach(var before in objectDragBefore.Values){var now=map.Objects.FirstOrDefault(o=>o.Id==before.Id);if(now!=null&&(now.X!=before.X||now.Y!=before.Y))objectGesture.Objects.Add(new ObjectChange{Before=before,After=now.Copy(),Index=map.Objects.IndexOf(now)});}
-                if(commit&&(objectGesture.Objects.Count>0||objectGesture.Layers.Count>0)){ReconcileFog(objectGesture,map,true);PushAction(objectGesture);MarkDirty();if(skippedLocked>0)statusLabel.Text="Pominięto zablokowane obiekty: "+skippedLocked;}
+                if(commit&&(objectGesture.Objects.Count>0||objectGesture.Layers.Count>0)){ReconcileFog(objectGesture,map,true);PushAction(objectGesture);changed=true;}
                 else if(!commit){foreach(var before in objectDragBefore.Values){var index=map.Objects.FindIndex(o=>o.Id==before.Id);if(index>=0)map.Objects[index]=before.Copy();}foreach(var layer in objectGesture.Layers)layer.Apply(map.Cells.First(c=>c.Id==layer.CellId),false);}
             }
-            InvalidateLight();objectGesture=null;objectDragBefore=null;objectMoving=false;objectSelecting=false;objectClick=false;objectClickToClear=null;objectPreviousCursor=null;selectionPath.Clear();canvas.Invalidate();
+            InvalidateLight();objectGesture=null;objectDragBefore=null;objectMoving=false;objectSelecting=false;objectClick=false;objectClickToClear=null;objectPreviousCursor=null;selectionPath.Clear();
+            if(show)rightPanelOpen=selectedObjects.Count>0;
+            if(changed)MarkDirty();else if(show)UpdateUI();
+            if(changed&&skippedLocked>0)statusLabel.Text="Pominięto zablokowane obiekty: "+skippedLocked;
+            canvas.Invalidate();
         }
     }
 }

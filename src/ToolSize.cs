@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -9,7 +9,7 @@ namespace HexMapEditor
         internal const float MaxWorldWidth=2000000000f;
         internal static float World(float logical,float zoom,float dpi)
         {
-            if(!ObjectGeometry.Finite(logical)||logical<.5f||logical>200||!ObjectGeometry.Finite(zoom)||zoom<.000001f||!ObjectGeometry.Finite(dpi)||dpi<=0||dpi>960)throw new ArgumentOutOfRangeException("Rozmiar/zoom/DPI rysika poza zakresem.");
+            if(!ObjectGeometry.Finite(logical)||logical<1||logical!=Math.Truncate(logical)||logical>200||!ObjectGeometry.Finite(zoom)||zoom<.000001f||!ObjectGeometry.Finite(dpi)||dpi<=0||dpi>960)throw new ArgumentOutOfRangeException("Rozmiar/zoom/DPI rysika poza zakresem.");
             return logical*(dpi/96f)/zoom;
         }
     }
