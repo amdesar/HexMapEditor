@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.6.1
+﻿# HexMapEditor 0.6.2
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.1** zapisuje mapy w **formacie 9**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.2** zapisuje mapy w **formacie 10**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,7 +12,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-Ta wersja odczytuje mapy 9 i presety 3. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
+Ta wersja odczytuje mapy 10 i presety 3. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
 
 ## Podmiana ikony programu
 
@@ -26,11 +26,11 @@ Menu **Widok** na górnym pasku przełącza kolejno Tło, Tereny, Ikony, Obiekty
 
 ## Rysik, gumka, ograniczenie widoczności i pole widzenia
 
-Rysik i Gumka mają **jeden wspólny rozmiar ekranowy 0,5–200 logicznych pikseli**, domyślnie **5**. Nowy gest przelicza wartość przez zoom i DPI na geometrię świata. Gotowa kreska skaluje się potem z mapą; kolejny gest przy innym zoomie znów ma ustawioną szerokość ekranową. Obrys odpowiada narzędziu. Zmiana kamery kończy rozpoczęty fragment. Mały uchwyt przy liczbie zmienia wartość poziomym przeciąganiem, bez samoczynnego przyspieszania: 4 px = 0,5; przy wspólnym rozmiarze pędzla/mgły/ograniczenia widoczności 8 px = 1.
+Rysik i Gumka mają **jeden wspólny rozmiar ekranowy 1–200 logicznych pikseli (wartości całkowite)**, domyślnie **5**. Nowy gest przelicza wartość przez zoom i DPI na geometrię świata. Gotowa kreska skaluje się potem z mapą; kolejny gest przy innym zoomie znów ma ustawioną szerokość ekranową. Obrys odpowiada narzędziu. Zmiana kamery kończy rozpoczęty fragment. Mały uchwyt przy liczbie zmienia wartość poziomym przeciąganiem, bez samoczynnego przyspieszania: 8 px = 1; przy wspólnym rozmiarze pędzla/mgły/ograniczenia widoczności 8 px = 1.
 
 Rysik LPM rysuje kreskę świata również poza siatką. Kolor wybiera wspólny picker. PPM to osobny chwilowy wskaźnik: pełne kolorowe koło bez obwódki (20 px przy DPI96), zwężająca się kometa do **750 ms** i najwyżej128 próbek. Kursor ukrywa się tylko na płótnie podczas PPM i wraca po zakończeniu/utracie kontekstu. Żywe kliknięcia mogą się łączyć, wygasła smuga nie daje starego łącznika. Brak zapisu, dirty, historii i wpływu na Dopasuj. Timer działa tylko przy aktywnym wskaźniku lub smudze. Kółko zoomuje, MMB przesuwa widok.
 
-Gumka usuwa geometryczne części kresek, bez zmiany innych warstw. PPM czyści wszystkie rysunki z jednym Undo; pusta warstwa niczego nie dopisuje. Jeden lewy gest rysika/gumki to jeden wpis. Limity nadal5000 fragmentów,200000 punktów dokumentu,10000 punktów fragmentu i2 mln współdzielonych punktów historii; stos300. Grubość zapisanej kreski to dodatnia skończona wartość świata, może przekraczać200 po przeliczeniu oddalenia; walidacja dopuszcza do2 mld jednostek (200 px przy minimalnym zoomie i DPI do960), bez zwiększania liczby punktów.
+Gumka odejmuje faktyczną powierzchnię koła (klik) lub ciągłego pasa kół (drag) od wszystkich przecinanych rysunków. Nie usuwa osi ani całych warstw kreski poza tym obszarem. Powstają wektorowe kontury z otworami, przez które widać rzeczywiste warstwy. Położenie, zapis i dokładne Undo/Redo zachowują powierzchnię; Dopasuj uwzględnia pozostały rysunek. PPM czyści wszystkie rysunki z jednym Undo; pusta warstwa niczego nie dopisuje. Jeden lewy gest rysika/gumki to jeden wpis. Limity nadal5000 fragmentów,200000 punktów dokumentu,10000 punktów fragmentu i2 mln współdzielonych punktów historii; stos300. Grubość zapisanej kreski to dodatnia skończona wartość świata, może przekraczać200 po przeliczeniu oddalenia; walidacja dopuszcza do2 mld jednostek (200 px przy minimalnym zoomie i DPI do960), bez zwiększania liczby punktów.
 
 
 Ograniczenie widoczności i Wiadro ograniczenia widoczności zapisują **bazową** maskę na heksach. Nowa mapa jest jasna. Kształty i tryb nakładania/usuwania działają jak przy mgle: tryb z pierwszego pola, odwiedzone pola nie przełączają się ponownie. Wiadro wymaga spójnego rodzaju/wersji terenu oraz początkowego stanu bazowego ograniczenia widoczności. PPM przycisku narzędzia → Wygląd ograniczenia widoczności: wspólna pula kolor/grafika, lokalne Undo100 i jawna aktualizacja z zachowaniem rozmieszczenia. Domyślna czerń #000000. Wybrany wariant jest utrwalony; grafika zachowuje alpha, co nie ujawnia danych logicznie.
@@ -155,12 +155,13 @@ Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejn
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 
-Bieżące próby0.6.1 wybiera jawny pojedynczy Case w `tests/Run-Patch061Tests.ps1`; brak Case kończy się błędem. Wyniki i ograniczenia: [raport0.6.1](docs/raport-0.6.1.md). Nie uruchamiać pełnej kampanii bez osobnej zgody.
+Bieżące próby 0.6.2 wybiera jawny pojedynczy Case `eraser`, `comet`, `panel` albo `background-ui` w `tests/Run-Patch062Tests.ps1`; `fixture` jedynie tworzy własną mapę. Brak Case kończy się błędem. Wyniki i ograniczenia: [raport 0.6.2](docs/raport-0.6.2.md). Nie uruchamiać pełnej kampanii bez osobnej zgody.
 
 Kolejka importu z folderów to wyłącznie [szczegółowy backlog](docs/backlog-import-z-folderow.md). Nie ma skanowania wejść, okien startowych ani usuwania oryginałów.
 
 ## Historia zmian
 
+- **0.6.2** — dokładna gumka powierzchniowa, ciągła kometa bez sumowania alpha próbek, całkowity rozmiar 1–200, odroczone otwarcie szczegółów przy pierwszym drag, lżejsze tło podczas zmiany rozmiaru okna i lokalne UI. Mapa10 zapisuje kontury wymazania; preset3 bez zmiany. Wizualna płynność komety/panelu pozostaje do odbioru.
 - **0.6.1** — ekranowy wspólny rozmiar rysika/gumki, kometa750ms, biblioteka teł z parametrami, Widok Obiektów wyłącza udział źródeł, nazwy Ograniczenie widoczności/Pole widzenia i lokalne poprawki UI. Format mapy9 bez zmiany. Nieodtworzony błąd grup został odłożony za zgodą użytkownika; raport nie obiecuje jego naprawy.
 - **0.6.0** — rysik, chwilowy wskaźnik, częściowa gumka, bazowa Ciemność i dynamiczne Światło instancji/wzorców/grup, łączne maskowanie oraz dopasowanie do widocznych warstw. Poprawki skrótów, mozaiki, podglądu tła i bezpośrednia biblioteka grafik. Mapa9; raport `docs/raport-0.6.0.md`. Celowane próby: `tests/Run-Patch060Tests.ps1 -Case acceptance` (albo ink, pointer, darkness, visibility, gestures, ink-preview); fixture tworzy tylko własną mapę wejściową UI.
 
@@ -201,3 +202,14 @@ Kolejka importu z folderów to wyłącznie [szczegółowy backlog](docs/backlog-
 - **0.1.2** — historia malowania przywraca wyłącznie teren i kolor, zachowując późniejsze nazwy, opisy i `NotesFormat`; Ctrl+Z/Ctrl+Y w polach tekstowych nie uruchamiają historii mapy; puste pociągnięcia nie zmieniają historii ani stanu zapisu. Format projektu pozostaje w wersji **1**.
 - **0.1.1** — poprawiona prostokątna geometria obu orientacji, wybór i dopasowanie heksów, przyciski orientacji i etykiet, zapamiętywanie etykiet, przełączanie panelu szczegółów, skróty zapisu, rozszerzenie `.hexmap` oraz uczciwy licznik łącznej liczby heksów.
 - **0.1.0** — pierwszy prototyp edytora.
+
+
+## Zmiany użytkowe 0.6.2
+
+Górna **Biblioteka** otwiera folder Library w Eksploratorze, bez informacyjnego okienka. Biblioteka grafik nadal ma cztery kolumny w bardziej zwartym oknie; można zmienić jego rozmiar. Ograniczenie widoczności ma konturowe oczy. W grupie na dole: ramka/kolor, Rozwiąż grupę, Usuń instancje grupy. Kolumna Mgła ma stałą domyślną szerokość, bez automatycznego wypełniania nadmiaru. W tle: Z biblioteki → Z pliku → czerwone Usuń tło.
+
+Przy zamkniętych szczegółach Kursor rozpoczyna ruch przed pokazaniem panelu; panel otwiera się po kliknięciu/końcu gestu. To lokalna poprawka pierwszego drag; pozostałe etapowe natywne pokazanie separatora nie ma deklaracji pełnej naprawy. Bez zmian kompozycji WPF. Podczas systemowej zmiany rozmiaru tło ma bufor do320px, po zakończeniu wraca dokładny wynik do2048px i dotychczasowy cover. Jedno źródło jest dekodowane i przechowywane do zmiany dokumentu/tła lub zamknięcia; brak kolejki rozmiarów i zmian danych.
+
+Kontury gumki mają dodatkowe limity: 2 Mi znaków pojedynczej powierzchni, 16 Mi znaków dokumentu i64 Mi znaków zachowanych wersji w historii. Napisy są UTF-16 w pamięci (do dwukrotności liczby znaków w bajtach); nadal obowiązują mniejsze limity punktów kontrolnych. Przekroczenie odrzuca cały gest. Nie ma bitmapy całego świata. Nowa mapa10 wymaga jawnego pola Surface, dlatego nie odczytujemy map9 ani nie zgadujemy ich danych; stare pliki pozostają bez zmian.
+
+[Lokalne ustawienia układu i przyszła przebudowa górnego paska](docs/backlog-ustawienia-lokalne.md) są backlogiem, podobnie jak wygląd uchwytów i drugi wymiar lewego panelu. [Kolejka importu z folderów](docs/backlog-import-z-folderow.md) pozostaje niewdrożona. Zgłoszony dawniej zanik pola widzenia grup jest obecnie nieodtwarzalny także według użytkownika; w0.6.2 nie prowadzono jego diagnozy.

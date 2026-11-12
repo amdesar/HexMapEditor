@@ -694,3 +694,34 @@ Mozaika rysuje siatkę z zapasem poza krawędzie przycisku, bez pustych ząbków
 Mapa9, preset3, grafika2, ikona2 i wzorzec obiektu1 pozostają. Istniejące pola grubości świata/światła/parametrów tła wystarczają; biblioteka teł ma odrębny format1. Brak migracji/konwerterów i kasowania dawnych plików. Przenośność do czystej kopii nadal świadomie odłożona.
 
 [Kolejka importu z folderów](backlog-import-z-folderow.md) jest WYŁĄCZNIE szczegółowym backlogiem z otwartymi decyzjami: lokalizacja wejść, pomijanie, duplikaty, resume, usuwanie i granice historii. Nie implementujemy jej w0.6.1. Pozostałe granice1.0.0/backlogu bez rozszerzenia.
+
+
+## 37. Przyrost 0.6.2 — powierzchnia gumki, kometa i lokalne UI
+
+Poniższe reguły zastępują cięcie osi rysunku i ułamkowe ustawienie ekranowe z0.6.1. Nie zmieniamy świata zapisanych szerokości ani semantyki masek/grup. Dawny błąd źródeł grup jest obecnie nieodtwarzalny, bez ustalonej przyczyny i bez dalszej diagnozy w tej wersji.
+
+### Gumka i zapis
+
+Klik odejmuje koło o średnicy ustawienia; drag odejmuje sumę kół po ciągłych odcinkach między próbkami. Dotyczy wszystkich nakładających się rysunków i tylko ich powierzchni w tym obszarze, bez powiększania promienia o pół grubości kreski. Pełna kreska/dot ma początkowo środek i grubość; dopiero wymazywanie tworzy zamkniętą powierzchnię wektorową z otworami i ewentualnie rozłącznymi wyspami. Boolean WPF Geometry.Combine wykorzystuje istniejącą zależność aplikacji, nie tworzy ani nie odtwarza edytora opisu. Kontury są rysowane GDI+ z antyaliasingiem; nie ma bitmapy świata ani malowania kolorem tła. Dokładność geometryczna ograniczona tolerancją co najmniej0,0005 jednostki, zależną od grubości /65536; piksele krawędzi podlegają antyaliasingowi.
+
+Mapa ma format10: InkStroke.Surface to kanoniczny opis zamkniętych konturów, autorytatywny gdy nie-null; Points pozostają dla nienaruszonej kreski. Pusty wynik usuwa powierzchnię. ID/kolor/grubość pozostają, wynik ma rzeczywistą obwiednię. Jeden gest zapisuje niezmienne wersje w jednym wpisie historii; Undo/Redo i odczyt nie powtarzają odejmowania. PPM Wyczyść wszystko nadal jeden krok/no-op na pustej warstwie. Preset3 i pozostałe formaty bez zmiany. Brak migracji dawnych map9 i kasowania plików.
+
+Limity: nadal5000 powierzchni,10000 punktów kontrolnych jednej,200000 dokumentu,2mln współdzielonych punktów historii,300 wpisów. Dodatkowo2Mi znaków opisu pojedynczej powierzchni,16Mi dokumentu,64Mi zachowanych powierzchni historii (UTF-16, do2bajty/znak, poza kosztem geometrii). Walidacja zamkniętych konturów, obsługiwanych segmentów, skończonych liczb i granic; przekroczenie odrzuca cały gest. Nie zwiększa się limitów źródeł/obrazów/map.
+
+Wspólne ustawienie Rysik/Gumka: całkowite1–200, domyślnie5, krok1 i uchwyt8logicznych px/1. Rozmiar na ekranie przelicza się na świat z zoomu/DPI raz na gest; zapis float pozostaje ułamkowy i dopuszcza dotychczasowy bezpieczny zakres świata. Obrys odpowiada średnicy. Stare rysunki skalują się z mapą.
+
+### Kometa
+
+750ms i128próbek pozostają. Kolejne próbki wyznaczają ciągłe segmenty o interpolowanej szerokości/alpha; szerokość spada według potęgi2,3 pozostałego życia. Pokrycie łączymy maksimum, bez wielokrotnego SourceOver na łączeniach i bez osobnych dysków próbek. Kafelkowy bufor256×256ARGB i tablica pokrycia zajmują około512KiB łącznie, używane ponownie i zwalniane przy zamknięciu. Głowa20px przy DPI96 bez obwódki, osobny kolor, lokalnie ukrywany/przywracany kursor, łączenie żywych kliknięć i brak starego łącznika. Timer33ms tylko podczas aktywności/wygasania, bez historii/dirty/zapisu/Fit. Syntetyczne obrazy potwierdzają ciągłość i brak pików alpha; nie zastępują wizualnej próby ciągłego PPM.
+
+### Ograniczona poprawka panelu i resize
+
+W zamkniętym panelu wybór i rozpoczęcie ruchu nie wywołują synchronicznie pełnego UpdateUI/Show. Szczegóły są ujawniane po kliknięciu/końcu gestu; panel już otwarty i Rączka zachowują dotychczasową semantykę. Nie gubimy przemieszczenia, jeden ruch to jeden wpis, powtórny klik nadal odznacza. Izolacja ElementHost/WPF i kompozycja bez zmian. Pozostała atomowość natywnego Show/separatora wymaga odbioru, ewentualnie przyszłej przebudowy panelu; nie ma deklaracji naprawy na podstawie końcowego zrzutu. Header jitter nadal backlog.
+
+Tło: jeden zdekodowany obraz źródła, cache wyniku dla najnowszego viewportu i parametrów. ResizeBegin używa bufora do320px; ResizeEnd odrzuca lekki wynik i przelicza dokładny do2048px. Ten sam renderer cover/centrowania, bez kolejki, zmiany źródła/ustawień/dirty i bez stałego pogorszenia jakości. Wymiana/dokument/Dispose zwalniają oba bufory. Filtry/mniejsze renderowanie nie zmieniają zaakceptowanej geometrii podglądu tła.
+
+### UI i granice
+
+Górna Biblioteka inicjalizuje standardowe brakujące katalogi i otwiera folder przez ProcessStartInfo UseShellExecute, bez cmd/konkatenacji argumentów, z komunikatem tylko przy błędzie. Ikony ograniczenia widoczności: konturowe oczy, wiadro z dodatkowym podkreśleniem/znakiem. Biblioteka grafik: kompaktowa szerokość czterech kafelków z marginesami/scrollbarem, ręczny resize i obszar roboczy ekranu. Mgła na liście domyślnie185px, bez elastycznego wypełniania; ellipsis/maskowanie pozostają. Dół grupy: ramka/kolor → Rozwiąż → Usuń. Tło: Z biblioteki → Z pliku → czerwone Usuń tło, bez zmiany znaczenia lub historii biblioteki.
+
+[Przyszła przebudowa góry i lokalne ustawienia układu](backlog-ustawienia-lokalne.md): zapamiętywanie lokalnych okien/paneli/kolumn niezależnie od map, reset domyślnych i bezpieczny fallback monitora/DPI. Lewy panel: wygląd uchwytów, X/Y lub szerokość/wysokość i uchwyt drugiego wymiaru. Wszystko wyłącznie backlog; istniejąca [kolejka importu z folderów](backlog-import-z-folderow.md) zachowana, bez implementacji.

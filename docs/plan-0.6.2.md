@@ -1,0 +1,43 @@
+﻿# Plan 0.6.2
+
+Baza: czysty master a00807e, ukończona0.6.1. Bez push/tagu/Release, resetu, sprzątania i prywatnych danych. Artefakty wyłącznie tests/_work. Grupy ze źródłami: obecnie nieodtwarzalne, potwierdzone przez użytkownika; bez dalszej diagnozy.
+
+## Etapy
+
+1. Gumka: zastąpić cięcie osi powiększonym promieniem odejmowaniem faktycznej powierzchni. Pełne okrągłe kreski zamieniane dopiero przy wymazywaniu na wektorową powierzchnię z otworami. Wykorzystać istniejący WPF Geometry.Combine (bez nowych zależności i bez odtwarzania edytora), przechowywać kanoniczną geometrię, renderować ją GDI+ z antyaliasingiem. Jeden gest i niezmienne migawki; obwiednia rzeczywistej pozostałości. Format mapy10 uzasadniony nową autorytatywną powierzchnią, bez migracji. Budżety punktów/fragmentów nie rosną; dodać ograniczenie danych geometrii i historii. UI rozmiaru1–200, krok1, uchwyt8px/1; światowe grubości nadal ułamkowe.
+2. Kometa: zamiast osobnych alpha-dysków rasteryzować ciągłe zwężane segmenty do małego bufora kafelkowego i łączyć pokrycie przez max, nie sumę alpha. Jedno złożenie na płótno; interpolacja profilu i antyaliasing, szybszy spadek szerokości,750ms i obecna głowa. Bez nieograniczonej bitmapy/queue, timer tylko gdy potrzeba.
+3. Jedna ograniczona próba panelu: wykorzystać koszt Show~140ms z0.6.1. Rozdzielić wybór/rozpoczęcie ruchu od pokazania zamkniętego panelu; nie wykonywać synchronicznego Show w MouseDown przed pierwszym drag. Pokazać po rozstrzygnięciu klik/końcu gestu; bez zmian WPF/kompozycji. Jeśli sam efekt separatora wymaga przebudowy, odłożyć jawnie.
+4. Tło live resize: jednokrotnie dekodowane źródło, lekki render podczas ResizeBegin/End, najnowszy rozmiar bez kolejki, dokładny wynik po końcu i ta sama geometria cover. Lokalny pomiar na reprezentatywnym źródle.
+5. UI: Biblioteka otwiera folder bez cmd, konturowe oczy, kompaktowe4kolumny, dolne akcje grupy, stała rozsądna Mgła, kolejność/styl tła. Backlog lokalnych ustawień i lewego panelu wyłącznie dokumentacyjny; wcześniejsza kolejka folderów zachowana.
+6. Kilka jawnych Case (model/render/kontrolki oddzielnie), round-trip i krótki zwykły finalny EXE z identycznymi bajtami. Nie Run-AllTests. Wersja0.6.2 dopiero po ukończeniu kodu; raport/README/spec/plan i lokalne commity.
+
+## Punkt wznowienia
+
+Odczytano Git i odpowiednie źródła/raport0.6.1. Odtworzona przyczyna gumki w kodzie: radius=(diameter+stroke.Width)/2 i usuwanie osi/całych kropek; to nie odejmowanie powierzchni. Kometa rysuje osobne wielokąty oraz dysk każdej próbki SourceOver, powodując nadmiar alpha/koraliki. Plan zapisany przed edycją. Nie uruchomiono testów0.6.2. Własnych procesów/dialogów brak ustalonych, przed UI sprawdzić rzeczywistą listę. Ostatnia niepewna operacja: brak. Główny EXE nadal0.6.1.
+
+## Etap 1 — zakończony
+
+Gumka odejmuje powierzchnię WPF Geometry.Combine, wynik z otworami renderowany GDI+ i zapisywany jako Surface. Format mapy10; punkty/fragmenty bez zwiększania, 2MiB pojedynczy opis /16MiB dokument /64MiB zachowanej historii powierzchni. Rozmiar UI1–200 całkowity, uchwyt8px/1; zapis światowy nadal float. Test `eraser` PASS w `tests/_work/patch-062-eraser-dd2f83a9449d4aab959366bb6691236b`: piksele dwóch zoomów, otwór i niezmieniony obszar poza nim, sparse sweep, obwiednia, główne Undo/Redo/clear, round-trip formatu10. Pierwsza próba miała błąd fixture (nazwany kolor zamiast #HEX), poprawiona. Nie powtarzać po zmianach niezależnych.
+
+W toku etap2: dodano kafelkowy renderer komety, jeszcze bez kompilacji/prób. Pozostałe etapy3–6 niewykonane. Ostatnia niepewna operacja: brak; zapis kodu etapu2, wynik ustalić przez build przypadku comet. Własnych zwykłych okien brak; proces testu eraser zakończony. Główny EXE nadal0.6.1.
+
+## Etapy 2–5 — kod i celowane próby
+
+Kometa: bufor256×256, max pokrycia/alpha zamiast sumowania, ciągłe segmenty z interpolacją szerokości, profil potęgowy2,3;750ms,128 próbek i dotychczasowa głowa. `comet` PASS `patch-062-comet-801287de60cb4c23bd6aab8991af6807`: rzadkie próbki/piksele bez dziur i pików alpha, taper, wygaśnięcie, timer/kursor/brak historii. Pierwszy build ujawnił brak średnika w nowym handlerze Dispose, poprawiono. PPM wizualnie nadal niezaliczony.
+
+Panel: zamknięte szczegóły odroczone do zakończenia click/drag, bez synchronicznego Show w MouseDown. `panel` PASS `patch-062-panel-f9ecd7cf776349e2b216606e36fc3084`: single/group closed/open, pozycje, jeden wpis i Undo/Redo, zwykły i powtórny klik. MouseDown 6,06/0,30/0,19/0,26ms (pierwsze JIT wliczone), bez obietnicy czasu natywnego Show po gestach. Pierwsza próba miała nakładające się obiekty fixture i trafiała górny inny obiekt; rozstawiono fixture. Sam separator: istniejący UpdateUI przygotowuje wartości/layout przed Visible, natywna gałąź Show nadal może malować etapami; nie wprowadzono kolejnej kompozycji. Ocenę wizualną pozostawić próbie EXE, ewentualny efekt jawnie odłożyć.
+
+Tło: cache jednego dekodowanego źródła, bufor do320px podczas ResizeBegin/End, finalnie do2048, bez kolejki. Zwolnienie obu buforów przy zmianie/dokumentu/Dispose. UI: otwieranie Library przez ProcessStartInfo UseShellExecute, konturowe oczy, stała Mgła185px, kompaktowe4kolumny z ArrangeIcons po resize, grupa ramka→Rozwiąż→Usuń, tło Biblioteka→Plik→Usuń (czerwony). `background-ui` PASS `patch-062-background-ui-502bef8993ad434d82094e64c68f6830`: końcowe próbki pikseli zgodne z dokładnym rendererem, cache/brak dirty, layout. Cztery viewporty1300–1339×800: dawna ścieżka267,33ms, lekki renderer116,75ms; pełna próba4zmian rozmiaru okna z layoutem317,82ms. Nie utożsamiać pomiaru renderera z płynnością okna. Pierwsza próba biblioteki dała2kolumny przed ułożeniem natywnego widoku; poprawiono stosowanie spacing/ArrangeIcons. Dawnych runnerów nie uruchamiano; ich konkretnie nieaktualne asercje powierzchni/minimum/formatu dostosowano.
+
+Pozostałe: backlog/dokumentacja, fixture i finalny build0.6.2, zwykły EXE identyczny bajtowo (gumka wymaga nowej zgody w chwili akcji), stan Git/commit. Ostatnia niepewna operacja: brak; wszystkie4Case zakończyły się kodem0. Własne zwykłe procesy: jeszcze nie uruchamiano; kontrolki testów zamknięte. Główny EXE nadal0.6.1.
+
+## Etap 6 — kandydat EXE i UI
+Kod ukończony, główny EXE zbudowany0.6.2.0, SHA256 700360F96794009C1B73BC0C1D577DE3484AF75EA3CF309475F0CDFF9238BA56. Identyczna kopia i własny fixture w tests/_work/patch-062-fixture-c4aa4569b48040449c7898eb3c1520f9 (Próba 0.6.2.hexmap): plama/kropka/cienka kreska, pojedynczy obiekt, grupa i filtrowane tło. Pierwszy build wersji miał błędny BOM AssemblyInfo, poprawiono; poprzedni EXE był zachowany. Pierwszy fixture nie miał wymaganego TemplateId, naprawiono wyłącznie testowe dane, ponowny zapis udany. Inventory Sky nie pokazał żadnego HexMapEditor. Następna operacja: uruchomienie tej kopii i obserwacja. Zwykły EXE jeszcze niezaliczony; nie ma oczekującej zgody usuwania gumką. Raport/backlog/README/spec i końcowy Git do ukończenia.
+
+## Koniec — 0.6.2
+
+Kod/testy/EXE w lokalnym commicie025ee1b. Zwykły finalny EXE (identyczny hash700360F96794009C1B73BC0C1D577DE3484AF75EA3CF309475F0CDFF9238BA56) sprawdzony na własnym fixture. Pierwszy drag został raz wstrzymany przez wykryty input użytkownika; po ponownym odczycie następny gest prawidłowo przesunął obiekt i otworzył szczegóły. Po nowej zgodzie użytkownika wykonano klik i drag gumki na plamie, Ctrl+Z/Y z właściwym obrazem. Biblioteka otworzyła dokładnie własny folder tests/_work/.../Library, bez starego okna. Natywna zmiana rozmiaru przez systemowe Rozmiar i drag aktywnej krawędzi dała szerokość1415→1243px z poprawnym końcowym tłem. Próba zwykłego trafienia ramki wcześniej nie rozpoczęła resize, nie zaliczono jej. Mapę zapisano (brak gwiazdki), własne EXE i własne okno Eksploratora zamknięte; inventory potwierdziło brak obu okien. Plik UI ma format10,12rysunków/8powierzchni, przesunięty obiekt. Nie odczytywano go ponownie w UI. Brak oczekujących zgód/procesów/dialogów i niepewnych operacji.
+
+README/specyfikacja/raport/backlog gotowe. Pełna atomowość natywnego separatora pozostaje jawnie odłożona po jednej lokalnej poprawce pierwszego drag; nie ruszano kompozycji/WPF. Ciągłe PPM komety niewykonane (API drag=LPM); ciągła płynność resize/panelu niezaliczona ze zrzutów. Przenośność do czystej kopii nadal świadomie odłożona. Brak pozostałej implementacji w uzgodnionym zakresie, poza tymi jawnymi ograniczeniami odbioru.
+
+Ostatnia operacja: zapis raportu i planu; następnie lokalny commit wyłącznie dokumentacji i sprawdzenie Git. Nie powtarzać zaliczonych4Case, fixture/build/UI bez wpływającej zmiany. Nie sprzątać artefaktów ani prywatnych danych. Bez push/tagu/Release'a.
