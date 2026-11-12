@@ -725,3 +725,48 @@ Tło: jeden zdekodowany obraz źródła, cache wyniku dla najnowszego viewportu 
 Górna Biblioteka inicjalizuje standardowe brakujące katalogi i otwiera folder przez ProcessStartInfo UseShellExecute, bez cmd/konkatenacji argumentów, z komunikatem tylko przy błędzie. Ikony ograniczenia widoczności: konturowe oczy, wiadro z dodatkowym podkreśleniem/znakiem. Biblioteka grafik: kompaktowa szerokość czterech kafelków z marginesami/scrollbarem, ręczny resize i obszar roboczy ekranu. Mgła na liście domyślnie185px, bez elastycznego wypełniania; ellipsis/maskowanie pozostają. Dół grupy: ramka/kolor → Rozwiąż → Usuń. Tło: Z biblioteki → Z pliku → czerwone Usuń tło, bez zmiany znaczenia lub historii biblioteki.
 
 [Przyszła przebudowa góry i lokalne ustawienia układu](backlog-ustawienia-lokalne.md): zapamiętywanie lokalnych okien/paneli/kolumn niezależnie od map, reset domyślnych i bezpieczny fallback monitora/DPI. Lewy panel: wygląd uchwytów, X/Y lub szerokość/wysokość i uchwyt drugiego wymiaru. Wszystko wyłącznie backlog; istniejąca [kolejka importu z folderów](backlog-import-z-folderow.md) zachowana, bez implementacji.
+
+
+## 38. Przyrost0.6.3 — wydajność i gradienty
+
+### Zamknięte zgłoszenia i małe próby
+
+Źródła pola widzenia grup: użytkownik ponownie potwierdził działanie; zgłoszenie zamknięte i zdjęte z aktywnego odbioru. Nie ustalono historycznej przyczyny, nie powtarzamy diagnozy, wracamy dopiero po nowym zgłoszeniu. Indywidualne/grupowe źródła, reguła Obiekty OFF, trwały Fog i ręczna baza zachowane.
+
+Panel: ocena odroczenia przez BeginInvoke wykazała, że nadal wykonałoby natywne Show na tym samym wątku UI przed kolejnym Move. Nie dodajemy tej blokady. Zachowujemy odroczenie0.6.2 do końca click/drag; atomowość separatora/nagłówka pozostaje przyszłą przebudową. Resize z tłem zaakceptowany, istniejący cache źródła i lekki/dokładny bufor pozostają bez przebudowy. Bez WPF/globalnej kompozycji/DoEvents/timerów maskujących.
+
+### Gumka
+
+Powierzchnie boolean nadal dokładnie odejmują koło/kapsułę. Geometria WPF była już cache'owana; regresję nowych kresek powodowały powtórne pełne walidacje i konwersje niezmiennych konturów GDI+ przy próbkach/Paint. Walidacja zapamiętuje zgodność tekstu powierzchni/szerokości i liczbę punktów. Native path ma LRU256wpisów/200000punktów, zwalniany przy wyparciu/dokumencie/Clear/Dispose. Pozostaje broadphase po obwiedniach. Brak destrukcyjnego uproszczenia, zmiany tolerancji, limitów lub bitmapy świata. Długi boolean wciąż ma własny koszt; nie obiecujemy stałego FPS. Pomiary i identyczność obrazu są w raporcie.
+
+### Wspólny model i edytor
+
+GradientDefinition: uporządkowane GradientStop(Position,Color), Angle0–360.2–16punktów, skrajne dokładnie0/1, minimalny odstęp0,01 (tolerancja numeryczna1e-9), skończone wartości i HEX#RRGGBB. Interpolacja liniowa RGB bez alpha/gamma-korekcji. Wszystkie zastosowania korzystają z tego samego modelu; migawki głęboko kopiowane przy edycji puli/pickera. Definicje stosowane w kresce i śladzie są traktowane jako niezmienne; nie mają live-powiązania z ustawieniami narzędzia.
+
+Jednolity picker: zsynchronizowane HEX/RGB0–255/HSV i poprzedni/nowy kolor, niepełny HEX nie staje się poprawnym wynikiem. PaintPicker w dozwolonych kontekstach ma Jednolity/Gradient, pasek klik/dodaj, zaznacz/drag, usuwanie wnętrza, Tęcza i podgląd poprzedni/nowy. Kierunek tylko dla heksa. Brak timera statycznego gradientu. Stany obiektów i kolory ramek pozostają wyłącznie jednolite. Alpha grafik PNG jest niezależna, bez zmian.
+
+### Cykl rysika i wskaźnika
+
+Długość cyklu300logicznych pikseli drogi, nie czasu.80% cyklu to pełna paleta od0do1,20% to jawny liniowy powrót z ostatniego do pierwszego koloru; ostatni stop nie jest zmieniany. Tęcza ma zgodne końce, więc ten odcinek jest kolorem wspólnym. Postój nie animuje koloru.
+
+Nowa kreska: utrwalona definicja gradientu, CycleWorld=300×DPI/96/zoom z początku gestu, punkty świata wraz z utrwaloną odległością Distance od początku. Faza jest odległość/CycleWorld. Nowe punkty nie przeskalowują wcześniejszego przebiegu; po zoomie kolory pozostają związane ze światem. Rzadkie próbki interpolują drogę i kolor, kropka ma początek palety. Przy wymazywaniu zachowujemy oryginalną drogę i tylko odejmujemy Surface; nie odcinamy punktów potrzebnych do koloru. Pozostałe boki nie dostają nowej fazy, Undo/Redo/odczyt nie losują i nie przesuwają przebiegu. W miejscu nakładania części tej samej kreski kolor wyznacza najbliższy odcinek oryginalnej drogi; jest to deterministyczny wynik, nie edycja węzłów.
+
+Renderer kolorów używa32kafli256×256 z buforem ARGB i odległościami (~24MiB), LRU i skalą rastra dobraną do zoomu. Aktywny trace dopisuje tylko nowe segmenty do obecnych kafli; po gumce współdzieli ten sam trace. Kontur nadal rysuje GDI+; kolor jest pochodnym cache. Mirroring brzegów kafli zapobiega szwom przy niecałkowitym zoomie. Cache nie jest serializowany i nie zajmuje bitmapy świata.
+
+Wskaźnik: próbka zachowuje fazę i niezmienny sampler palety. Szerokość/alpha i max pokrycia komety jak0.6.2; kolor interpolowany po drodze między próbkami, bez nakładania dysków.750ms wygasza alpha, nie hue. Faza głowy niezależna od wygasłej listy próbek: trzymanie stojącej głowy nie resetuje barwy zegarem. Żywe kolejne kliknięcia zachowują fazę; całkowite wygaśnięcie/zmiana kontekstu resetują. Bez historii/dirty/zapisu/Fit, ten sam rozmiar i przywracanie kursora.
+
+### Gradient heksa i historia
+
+Gradient jest jednym FillVariant obok koloru/grafiki, z własnym stabilnym ID. Każdy heks otrzymuje pełny przebieg. Kąt w przestrzeni płótna:0° lewo→prawo,90° góra→dół; przełączenie Pointy/Flat nie obraca palety. Projekcja faktycznych wierzchołków wyznacza pełny zakres gradientu, maska przycina go do heksa. Mozaika, miniatury i buforowany kontrast nazwy korzystają z wyniku. Nie ma gradientu regionu lub mapy.
+
+CellData ma własną migawkę Gradient. Historyczna wersja terenu nadal wyznacza region, losowanie wybiera pozycję puli, nie pojedynczy stop. Jawna aktualizacja z zachowaniem rozmieszczenia mapuje stabilne ID; brak checkboxa nie zmienia dawnych pól. Usunięte warianty zachowują historyczne zastosowane dane. Lokalna historia100operacji kopiuje gradienty; jedna zaakceptowana edycja staje się jedną główną transakcją. Mgła/ograniczenie używają tego samego edytora i wypełnienia, a ich logiczne maskowanie nie zależy od koloru/jasności. Grafik alpha nie zmieniono.
+
+### Format i budżety
+
+Mapa11 i preset4 wymagają jawnych pól Gradient (również null), a kreska także CycleWorld i Distance punktów. Oryginalne punkty gradientowej kreski pozostają po gumce, aby odtworzyć kolory. Walidacja palety, porządku, stopów, kąta, odległości zgodnej z geometrią i skończonej długości cyklu odbywa się przed podmianą dokumentu. Grubości świata nadal do2mld, CycleWorld do3mld, zapisana droga do300mld jednostek, przy istniejących limitach punktów. Gradientowych stopów do100000 dokumentu i zachowanych kresek historii,50000 presetów,16 jednej definicji. Dotychczasowe limity źródeł, mapy/presetu, konturów i historii nie podniesione; nowe cache ograniczone jak wyżej. Brak migracji, zgadywania dawnych danych lub kasowania plików. Biblioteczne grafiki2 i pozostałe formaty bez zmiany.
+
+### Lokalne UI i backlog
+
+Grafiki terenów: stały spacing120×114px z obecnym kafelkiem88×72, domyślny viewport4kolumny + marginesy/scrollbar; resize daje zmienną liczbę kolumn bez rozciągania odstępów. Lista obiektów startuje od sumy kolumn i obramowania/scrollbarów, ograniczona ekranem. Mgła nie jest wypełniaczem. Natywny resztkowy nagłówek ma ciemne tło także po poszerzeniu. Usuń tło: disabled tekst i ramka szare, aktywne czerwone; znaczenie bez zmiany. Oczy, akcje grupy i geometria mozaiki zachowane.
+
+[Merge heksów](backlog-merge-heksow.md) to pomysł bez zatwierdzonego zakresu; przy jego omawianiu można rozważyć wspólny gradient połączonego obszaru. Nie implementowane teraz. Lokalne ustawienia/góra, panele, folderowa kolejka importu, zakładki i UX presetów pozostają osobnymi backlogami.

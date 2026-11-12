@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.6.2
+﻿# HexMapEditor 0.6.3
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.2** zapisuje mapy w **formacie 10**, presety w formacie **3**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.3** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,7 +12,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-Ta wersja odczytuje mapy 10 i presety 3. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
+Ta wersja odczytuje mapy 11 i presety 4. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
 
 ## Podmiana ikony programu
 
@@ -155,12 +155,13 @@ Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejn
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 
-Bieżące próby 0.6.2 wybiera jawny pojedynczy Case `eraser`, `comet`, `panel` albo `background-ui` w `tests/Run-Patch062Tests.ps1`; `fixture` jedynie tworzy własną mapę. Brak Case kończy się błędem. Wyniki i ograniczenia: [raport 0.6.2](docs/raport-0.6.2.md). Nie uruchamiać pełnej kampanii bez osobnej zgody.
+Bieżące próby 0.6.3 wybiera jawny pojedynczy Case `ink-profile`, `gradient`, `ink-gradient`, `fills` albo `ui` w `tests/Run-Patch063Tests.ps1`; `fixture` tworzy własną mapę i bibliotekę. Brak Case kończy się błędem. Wyniki i ograniczenia: [raport 0.6.3](docs/raport-0.6.3.md). Nie uruchamiać pełnej kampanii bez osobnej zgody.
 
 Kolejka importu z folderów to wyłącznie [szczegółowy backlog](docs/backlog-import-z-folderow.md). Nie ma skanowania wejść, okien startowych ani usuwania oryginałów.
 
 ## Historia zmian
 
+- **0.6.3** — cache geometrii/walidacji usuwa koszt nowych kresek po długiej gumce; wspólne HEX/RGB/HSV i gradienty rysika, wskaźnika oraz wariantów heksów; stały spacing responsywnej biblioteki, ciemny nagłówek listy i disabled ramka usuwania tła. Mapa11/preset4.
 - **0.6.2** — dokładna gumka powierzchniowa, ciągła kometa bez sumowania alpha próbek, całkowity rozmiar 1–200, odroczone otwarcie szczegółów przy pierwszym drag, lżejsze tło podczas zmiany rozmiaru okna i lokalne UI. Mapa10 zapisuje kontury wymazania; preset3 bez zmiany. Wizualna płynność komety/panelu pozostaje do odbioru.
 - **0.6.1** — ekranowy wspólny rozmiar rysika/gumki, kometa750ms, biblioteka teł z parametrami, Widok Obiektów wyłącza udział źródeł, nazwy Ograniczenie widoczności/Pole widzenia i lokalne poprawki UI. Format mapy9 bez zmiany. Nieodtworzony błąd grup został odłożony za zgodą użytkownika; raport nie obiecuje jego naprawy.
 - **0.6.0** — rysik, chwilowy wskaźnik, częściowa gumka, bazowa Ciemność i dynamiczne Światło instancji/wzorców/grup, łączne maskowanie oraz dopasowanie do widocznych warstw. Poprawki skrótów, mozaiki, podglądu tła i bezpośrednia biblioteka grafik. Mapa9; raport `docs/raport-0.6.0.md`. Celowane próby: `tests/Run-Patch060Tests.ps1 -Case acceptance` (albo ink, pointer, darkness, visibility, gestures, ink-preview); fixture tworzy tylko własną mapę wejściową UI.
@@ -213,3 +214,20 @@ Przy zamkniętych szczegółach Kursor rozpoczyna ruch przed pokazaniem panelu; 
 Kontury gumki mają dodatkowe limity: 2 Mi znaków pojedynczej powierzchni, 16 Mi znaków dokumentu i64 Mi znaków zachowanych wersji w historii. Napisy są UTF-16 w pamięci (do dwukrotności liczby znaków w bajtach); nadal obowiązują mniejsze limity punktów kontrolnych. Przekroczenie odrzuca cały gest. Nie ma bitmapy całego świata. Nowa mapa10 wymaga jawnego pola Surface, dlatego nie odczytujemy map9 ani nie zgadujemy ich danych; stare pliki pozostają bez zmian.
 
 [Lokalne ustawienia układu i przyszła przebudowa górnego paska](docs/backlog-ustawienia-lokalne.md) są backlogiem, podobnie jak wygląd uchwytów i drugi wymiar lewego panelu. [Kolejka importu z folderów](docs/backlog-import-z-folderow.md) pozostaje niewdrożona. Zgłoszony dawniej zanik pola widzenia grup jest obecnie nieodtwarzalny także według użytkownika; w0.6.2 nie prowadzono jego diagnozy.
+
+
+## Gradienty i poprawki 0.6.3
+
+Wspólny picker jednolitego koloru ma HEX#RRGGBB, RGB0–255 i HSV. Tylko dla Rysika, Wskaźnika oraz wariantów terenu/mgły/ograniczenia widoczności dostępny jest także Gradient:2–16 punktów, klik paska dodaje, przeciąganie przesuwa, Usuń punkt dotyczy wewnętrznych. Końce0/1 pozostają, odstęp minimum0,01. Tęcza daje gotową paletę. Poprzedni/nowy podgląd i Anuluj nie zmieniają danych. Stany obiektów i ramki grup są wyłącznie jednolite.
+
+W heksie każdy gradient zajmuje własny pełny heks; kąt0° oznacza lewo→prawo,90° góra→dół. Orientacja mapy nie obraca kolorów. Gradient jest jednym wariantem puli; losowanie, historyczne wersje i Zachowaj rozmieszczenie pozostają. Zmiana palety bez jawnej aktualizacji nie zmienia namalowanych pól. Logiczne maskowanie nie zależy od jasności gradientu ani od alpha grafiki.
+
+Rysik/Wskaźnik mają cykl300logicznych px drogi:80% przebieg palety,20% płynny powrót z ostatniego do pierwszego koloru. Ostatni stop nie jest nadpisywany. Postój nie zmienia koloru. Nowa kreska zaczyna od początku; istniejąca kreska nie rozciąga gradientu po wydłużeniu ani zoomie. Gumka zachowuje oryginalny zapis drogi i kolory pozostałości. Żywe kliknięcia wskaźnika zachowują fazę, wygasły/kontekst zakończony zaczyna od nowa. Timer750ms wygasza alpha smugi, nie animuje barw.
+
+Optymalizacja gumki buforuje walidację niezmiennych konturów i ścieżki GDI+, zamiast odtwarzać je przy każdym Paint/nowej próbce. Dokładna powierzchnia i limity0.6.2 pozostają. Wyniki pomiarów nie są gwarancją FPS. Nowy cache gradientowych kolorów jest kafelkowy, ograniczony do32kafli256×256 (~24MiB z danymi roboczymi), bez bitmapy świata. Dodatkowe limity:16stopów/gradient,100000stopów/dokument i historia kresek,50000/preset; poprzednich limitów nie zwiększano.
+
+Mapa11 i preset4 zapisują gradienty oraz przebieg kolorów kreski. Brak migracji dawnych map/presetów, stare pliki pozostają nietknięte. Biblioteki grafik nadal format2; formatów źródeł/obiektów/teł nie zmieniono. Nie dołączamy nieużytej biblioteki do mapy.
+
+Biblioteka grafik ma stały kafelek/odstęp120px, domyślnie4kolumny, więcej po poszerzeniu i mniej po zwężeniu. Lista obiektów startuje od sumy szerokości kolumn, a resztkowy nagłówek jest ciemny. Nie ma czerwonej aktywnej ramki Usuń tło, gdy brak tła. Odroczenie panelu i zaakceptowany resize0.6.2 pozostają; nie dodano ryzykownego Show w MouseDown.
+
+Dawne zgłoszenie źródeł pola widzenia grup jest **zamknięte po ponownym potwierdzeniu użytkownika**; nie jest aktywnym zadaniem ani odbiorem. Nie ustalono historycznej przyczyny, wracamy dopiero po nowym zgłoszeniu. [Merge heksów](docs/backlog-merge-heksow.md) to osobny pomysł bez zatwierdzonego zakresu, nie funkcja0.6.3. Lokalne ustawienia/góra, panele, kolejka importu, zakładki i UX presetów nadal backlog.
