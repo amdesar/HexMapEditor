@@ -101,6 +101,7 @@ namespace HexMapEditor
             ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
             ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
             BuildViewMenu(view);
+            qualityButton=ShellButton(view,"Wysoka jakość","labels","Wysoka / Niska jakość — tylko podgląd tej sesji",()=>SetLowQuality(!lowQuality),124);
             var fitMenu=new ContextMenuStrip();fitMenu.Items.Add("Dopasuj mapę",null,(s,e)=>FitMap());fitMenu.Items.Add("Dopasuj wszystko",null,(s,e)=>FitEverything());
             fitMenu.BackColor=Color.FromArgb(34,38,48);fitMenu.ForeColor=Color.WhiteSmoke;fitMenu.Renderer=new ToolStripProfessionalRenderer(new FitMenuColors());
             fitMenu.Opening+=(s,e)=>EndCanvasGesture(true);fitMenu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};
@@ -130,9 +131,10 @@ namespace HexMapEditor
         {
             fileGroup.Width = fileGroup.Controls.Cast<Control>().Sum(c => c.Width + c.Margin.Horizontal);
             viewGroup.Width = viewGroup.Controls.Cast<Control>().Sum(c => c.Width + c.Margin.Horizontal);
-            fileGroup.Location = new Point(4, 4); viewGroup.Location = new Point(shellToolbar.ClientSize.Width - viewGroup.Width - 4, 4);
+            bool wrap=fileGroup.Width+viewGroup.Width+16>shellToolbar.ClientSize.Width;
+            shellToolbar.Height=wrap?78:42;fileGroup.Location = new Point(4, 4); viewGroup.Location = new Point(Math.Max(4,shellToolbar.ClientSize.Width - viewGroup.Width - 4), wrap?40:4);
             int titleHeight = mapName.Font.Height + 2;
-            mapName.Bounds = new Rectangle(fileGroup.Right + 8, 4 + (34 - titleHeight) / 2, Math.Max(0, viewGroup.Left - fileGroup.Right - 16), titleHeight);
+            mapName.Bounds = new Rectangle(fileGroup.Right + 8, 4 + (34 - titleHeight) / 2, Math.Max(0, (wrap?shellToolbar.ClientSize.Width-4:viewGroup.Left) - fileGroup.Right - 16), titleHeight);
         }
         void BuildPalettePanel() { BuildSections(); }
         Button SmallButton(Control parent, string text, Action action, int width)

@@ -67,11 +67,11 @@ namespace HexMapEditor
             }
             Validate(result);return result;
         }
-        internal static void Draw(System.Drawing.Graphics graphics,InkStroke stroke)
+        internal static void Draw(System.Drawing.Graphics graphics,InkStroke stroke,bool low=false)
         {
-            if(stroke.Gradient!=null){InkGradientRenderer.Draw(graphics,stroke);return;}
-            if(stroke.Surface!=null){using(var brush=new SolidBrush(ColorTranslator.FromHtml(stroke.Color)))graphics.FillPath(brush,InkPathCache.Get(stroke));return;}
-            using(var pen=new Pen(ColorTranslator.FromHtml(stroke.Color),stroke.Width){StartCap=System.Drawing.Drawing2D.LineCap.Round,EndCap=System.Drawing.Drawing2D.LineCap.Round,LineJoin=System.Drawing.Drawing2D.LineJoin.Round})
+            if(stroke.Gradient!=null&&!low){InkGradientRenderer.Draw(graphics,stroke);return;}
+            if(stroke.Surface!=null){using(var brush=new SolidBrush(ColorTranslator.FromHtml(low&&stroke.Gradient!=null?stroke.Gradient.Stops[0].Color:stroke.Color)))graphics.FillPath(brush,InkPathCache.Get(stroke));return;}
+            using(var pen=new Pen(ColorTranslator.FromHtml(low&&stroke.Gradient!=null?stroke.Gradient.Stops[0].Color:stroke.Color),stroke.Width){StartCap=System.Drawing.Drawing2D.LineCap.Round,EndCap=System.Drawing.Drawing2D.LineCap.Round,LineJoin=System.Drawing.Drawing2D.LineJoin.Round})
             {
                 if(stroke.Points.Count==1){var p=stroke.Points[0];using(var b=new SolidBrush(pen.Color))graphics.FillEllipse(b,p.X-stroke.Width/2,p.Y-stroke.Width/2,stroke.Width,stroke.Width);}
                 else graphics.DrawLines(pen,stroke.Points.Select(p=>p.Point).ToArray());

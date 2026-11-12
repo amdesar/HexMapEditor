@@ -308,23 +308,24 @@ namespace HexMapEditor
     {
         readonly Dictionary<string, string> saved = new Dictionary<string, string>();
         readonly HashSet<string> changed = new HashSet<string>();
-        string header;
-        bool headerChanged;
+        string header,savedInk;
+        bool headerChanged,inkChanged;
         static string CellKey(CellData cell) { return MapLogic.Hash(MapLogic.Serializer().Serialize(cell)); }
         static string Header(MapData map)
         {
-            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, ObjectStates = StateLibrary.ForSave(map), map.ExcludedStateIds, map.FogPalette, map.DarkPalette, map.Ink, map.Background });
+            return MapLogic.Serializer().Serialize(new { map.Name, map.Columns, map.Rows, map.Orientation, map.LabelMode, map.RowParity, map.ColumnParity, map.ActivePresetId, map.Presets, map.Objects, map.Groups, ObjectStates = StateLibrary.ForSave(map), map.ExcludedStateIds, map.FogPalette, map.DarkPalette, map.Background });
         }
-        public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); changed.Clear(); headerChanged = false; }
+        public void Capture(MapData map) { saved.Clear(); foreach (var cell in map.Cells) saved.Add(cell.Id, CellKey(cell)); header = Header(map); savedInk=MapLogic.Serializer().Serialize(map.Ink); changed.Clear(); headerChanged = inkChanged = false; }
         public bool CheckCell(CellData cell) { string value; if (saved.TryGetValue(cell.Id, out value) && value == CellKey(cell)) changed.Remove(cell.Id); else changed.Add(cell.Id); return Dirty; }
         public bool CheckHeader(MapData map){headerChanged=header!=Header(map);return Dirty;}
         public bool CheckAll(MapData map)
         {
             changed.Clear(); var ids = new HashSet<string>(); foreach (var cell in map.Cells) { ids.Add(cell.Id); CheckCell(cell); }
             foreach (string id in saved.Keys) if (!ids.Contains(id)) changed.Add(id);
-            headerChanged = header != Header(map); return Dirty;
+            headerChanged = header != Header(map); inkChanged=savedInk!=MapLogic.Serializer().Serialize(map.Ink); return Dirty;
         }
-        public bool Dirty { get { return headerChanged || changed.Count != 0; } }
+        public bool CheckInkSerialized(string value){inkChanged=savedInk!=value;return Dirty;}
+        public bool Dirty { get { return headerChanged || inkChanged || changed.Count != 0; } }
     }
 
     internal sealed class TextHistory

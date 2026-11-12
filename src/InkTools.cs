@@ -33,7 +33,7 @@ namespace HexMapEditor
         static long PointerTime {get{return System.Diagnostics.Stopwatch.GetTimestamp()*1000/System.Diagnostics.Stopwatch.Frequency;}}
         void InitInk()
         {
-            pointerTimer.Tick+=(s,e)=>AgePointer();Disposed+=(s,e)=>{pointerTimer.Dispose();comet.Dispose();InkPathCache.Clear();InkGradientRenderer.Clear();TerrainGraphicThumbnails.Clear();if(eraseGesture!=null)eraseGesture.Dispose();};
+            pointerTimer.Tick+=(s,e)=>AgePointer();Disposed+=(s,e)=>{pointerTimer.Dispose();comet.Dispose();InkPathCache.Clear();InkGradientRenderer.Clear();TerrainGraphicThumbnails.Clear();if(eraseGesture!=null)eraseGesture.Dispose();if(pendingInk!=null){pendingInk.Cancellation.Cancel();pendingInk.Preview.Dispose();}};
             Deactivate+=(s,e)=>{EndCanvasGesture(true);ClearPointerContext();};
             canvas.LostFocus+=(s,e)=>{if(pointerActive){EndCanvasGesture(true);ClearPointerContext();}};
         }
@@ -72,9 +72,11 @@ namespace HexMapEditor
             if(inkBefore==null)return;
             if(eraseGesture!=null)
             {
-                try{if(commit&&inkError==null)map.Ink=eraseGesture.Apply(inkBefore);}
-                catch(Exception ex){inkError=ex.Message;}
-                finally{eraseGesture.Dispose();eraseGesture=null;canvas.Invalidate();}
+                var source=inkBefore;var gesture=eraseGesture;inkBefore=null;eraseGesture=null;activeStroke=null;inkPrevious=null;
+                if(!commit||inkError!=null){gesture.Dispose();map.Ink=new List<InkStroke>(source);canvas.Invalidate();return;}
+                try{StartInkCommit(source,gesture);}
+                catch(Exception ex){if(pendingInk!=null)CompleteInkCommit(pendingInk,null,ex);else gesture.Dispose();map.Ink=new List<InkStroke>(source);statusLabel.Text="Nie można przygotować gumki: "+ex.Message;canvas.Invalidate();}
+                return;
             }
             var before=inkBefore;inkBefore=null;activeStroke=null;inkPrevious=null;
             if(!commit||inkError!=null){map.Ink=new List<InkStroke>(before);if(inkError!=null)statusLabel.Text=inkError;return;}
@@ -110,8 +112,8 @@ namespace HexMapEditor
         void DrawInk(Graphics graphics)
         {
             if(hideInk)return;var state=graphics.Save();graphics.TranslateTransform(pan.X,pan.Y);graphics.ScaleTransform(scale,scale);
-            if(eraseGesture!=null)graphics.SetClip(eraseGesture.Preview,CombineMode.Exclude);
-            InkLayerRenderer.Draw(graphics,map.Ink,activeStroke,canvas.ClientRectangle);
+            var preview=eraseGesture??(pendingInk==null?null:pendingInk.Preview);if(preview!=null)graphics.SetClip(preview.Preview,CombineMode.Exclude);
+            InkLayerRenderer.Draw(graphics,map.Ink,activeStroke,canvas.ClientRectangle,cameraInteraction,lowQuality);
             graphics.Restore(state);
             if((currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus)&&inkCursor.HasValue&&!pointerActive)
             {
@@ -122,8 +124,8 @@ namespace HexMapEditor
             }
             if(pointerTrail.Count==0&&!pointerActive)return;
             long now=PointerTime;
-            var points=pointerTrail.Select(p=>new CometPoint(p.Point,now-p.Time,p.Phase,p.Palette,p.Color)).ToList();
-            CometPoint? head=pointerActive?(CometPoint?)new CometPoint(pointerPosition,0,pointerPhase,pointerPalette,ColorTranslator.FromHtml(pointerColor)):null;
+            var points=pointerTrail.Select(p=>new CometPoint(p.Point,now-p.Time,p.Phase,lowQuality?null:p.Palette,lowQuality&&p.Palette!=null?p.Palette.At(0):p.Color)).ToList();
+            CometPoint? head=pointerActive?(CometPoint?)new CometPoint(pointerPosition,0,pointerPhase,lowQuality?null:pointerPalette,lowQuality&&pointerPalette!=null?pointerPalette.At(0):ColorTranslator.FromHtml(pointerColor)):null;
             comet.DrawColored(graphics,canvas.ClientRectangle,points,head,pointerDiameter);
         }
     }

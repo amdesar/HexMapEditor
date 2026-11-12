@@ -40,7 +40,8 @@ namespace HexMapEditor
             using(var matrix=new Matrix((float)ux,(float)uy,(float)-uy,(float)ux,(float)(ax-ux*(phase-Math.Floor(phase))*cycle),(float)(ay-uy*(phase-Math.Floor(phase))*cycle)))
             {
                 brush.InterpolationColors=trace.Blend;brush.WrapMode=WrapMode.Tile;brush.Transform=matrix;
-                using(var pen=new Pen(brush,(float)(2*r)){StartCap=LineCap.Flat,EndCap=LineCap.Flat})g.DrawLine(pen,(float)ax,(float)ay,(float)bx,(float)by);
+                // Tiny color-field overlap prevents aliased flat-cap pinholes. The vector mask is unchanged.
+                using(var pen=new Pen(brush,(float)(2*r)){StartCap=LineCap.Flat,EndCap=LineCap.Flat})g.DrawLine(pen,(float)(ax-ux*1.5),(float)(ay-uy*1.5),(float)(bx+ux*1.5),(float)(by+uy*1.5));
             }
         }
         static void Segment(Graphics g,InkGradientTrace trace,int index,double zoom,double ox,double oy,RectangleF area)
@@ -54,12 +55,14 @@ namespace HexMapEditor
             double ux=dx/len,uy=dy/len;
             if(index>1)
             {
-                // Round only the join's uncovered sector. Restore the preceding body inside the disc,
-                // then paint the current body last; full colored sample-discs must not make beads.
-                using(var disc=new GraphicsPath())using(var fill=new SolidBrush(trace.Palette.Cycle(a.Distance/trace.Cycle)))
+                // Only the exposed round join sector, never a full flat-color sample disc.
+                var previous=trace.Points[index-2];double px=a.X-previous.X,py=a.Y-previous.Y;
+                double turn=Math.Atan2(px*dy-py*dx,px*dx+py*dy)*180/Math.PI;
+                if(Math.Abs(turn)>.0001)
+                using(var join=new GraphicsPath())using(var fill=new SolidBrush(trace.Palette.Cycle(a.Distance/trace.Cycle)))
                 {
-                    disc.AddEllipse((float)(ax-r),(float)(ay-r),(float)(2*r),(float)(2*r));g.FillPath(fill,disc);
-                    var state=g.Save();g.SetClip(disc,CombineMode.Intersect);Body(g,trace,trace.Points[index-2],a,zoom,ox,oy,r);g.Restore(state);
+                    double start=Math.Atan2(py,px)*180/Math.PI+(turn>0?-90:90);
+                    join.AddPie((float)(ax-r),(float)(ay-r),(float)(2*r),(float)(2*r),(float)start,(float)turn);g.FillPath(fill,join);
                 }
             }
             else Cap(g,trace.Palette.Cycle(a.Distance/trace.Cycle),ax,ay,ux,uy,r,false);

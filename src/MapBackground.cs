@@ -149,7 +149,7 @@ namespace HexMapEditor
         }
         void DrawBackground(Graphics g)
         {
-            if (hideBackground || map.Background == null) return;
+            if (lowQuality || hideBackground || map.Background == null) return;
             if(backgroundSourceKey!=map.Background.SourceId)
             {
                 var source=GraphicSources.Decode(map.Background.Source);

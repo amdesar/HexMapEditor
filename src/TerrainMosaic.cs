@@ -14,7 +14,7 @@ namespace HexMapEditor
         {
             return terrain.Variants.OrderBy(f => MapLogic.Hash(terrain.TerrainId + ":" + f.Id), StringComparer.Ordinal).Take(Capacity).ToList();
         }
-        internal static Bitmap Render(TerrainDefinition terrain, Size size, bool flat)
+        internal static Bitmap Render(TerrainDefinition terrain, Size size, bool flat,bool low=false)
         {
             var result = new Bitmap(Math.Max(1,size.Width),Math.Max(1,size.Height));
             var decoded = new Dictionary<string,Bitmap>();
@@ -35,8 +35,9 @@ namespace HexMapEditor
                         var fill = fills[order[slot++]];
                         var center = new PointF(col*dx+(flat ? 0 : row*dx/2), flat ? dy/2+row*dy+(col%2)*dy/2 : radius+row*dy);
                         Bitmap image = null;
-                        if (fill.Graphic != null && !decoded.TryGetValue(fill.GraphicId,out image)) decoded.Add(fill.GraphicId,image=TerrainTextures.Decode(fill.Graphic,flat));
-                        TerrainPreview.PaintHex(g,center,radius,flat,ColorTranslator.FromHtml(fill.Color),image,false,fill.Gradient);
+                        if (!low && fill.Graphic != null && !decoded.TryGetValue(fill.GraphicId,out image)) decoded.Add(fill.GraphicId,image=TerrainTextures.Decode(fill.Graphic,flat));
+                        if(low){using(var path=TerrainTextures.Mask(center,radius,flat)){using(var basis=new SolidBrush(ColorTranslator.FromHtml(fill.Color)))g.FillPath(basis,path);using(var brush=new SolidBrush(RepresentativeColors.Get(fill.Color,fill.Graphic,fill.Gradient,flat)))g.FillPath(brush,path);}}
+                        else TerrainPreview.PaintHex(g,center,radius,flat,ColorTranslator.FromHtml(fill.Color),image,false,fill.Gradient);
                     }
                 }
                 return result;

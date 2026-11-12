@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace HexMapEditor
@@ -9,6 +10,8 @@ namespace HexMapEditor
         readonly TextBox hex = new TextBox { MaxLength = 32, AccessibleName = "Kolor HEX" };
         readonly Label error = new Label { Text = "Wpisz # i dokładnie sześć cyfr szesnastkowych.", AutoSize = true, ForeColor = Color.Salmon };
         readonly Panel next = new Panel();
+        readonly Button[] recent=new Button[12];
+        readonly ToolTip recentTips=new ToolTip();
         readonly Button accept = new Button { Text = "Zatwierdź" };
         readonly HsvSurface saturation;
         readonly HsvSurface hue;
@@ -17,7 +20,7 @@ namespace HexMapEditor
         internal Action<bool> ValidityChanged;
         internal bool ColorValid {get{return MapLogic.ValidColor(hex.Text);}}
         internal void SetColor(Color color){ReadColor(color);RefreshColor(true);}
-        internal void Embed(){TopLevel=false;FormBorderStyle=FormBorderStyle.None;foreach(Control c in Controls)if(c is Button)c.Visible=false;}
+        internal void Embed(){TopLevel=false;FormBorderStyle=FormBorderStyle.None;foreach(Control c in Controls)if(c is Button && !recent.Contains((Button)c))c.Visible=false;}
         double h, s, v;
         bool updating;
 
@@ -51,9 +54,12 @@ namespace HexMapEditor
             hex.TabIndex=2;accept.TabIndex=6;cancel.TabIndex=7;
             Controls.AddRange(new Control[] { saturation, hue, hex, old, next, error, accept, cancel,
                 LabelAt("HEX", 16, 228), LabelAt("Poprzedni", 193, 257), LabelAt("Nowy", 303, 257) });
+            for(int i=0;i<12;i++){int at=i;var b=recent[i]=new Button{Bounds=new Rectangle(146+(i%6)*42,289+(i/6)*38,36,30),FlatStyle=FlatStyle.Flat,TabIndex=8+i};b.Click+=(s,e)=>{var colors=RecentColors.Values;if(at<colors.Length)SetColor(colors[at]);};Controls.Add(b);}
+            RecentColors.Changed+=RefreshRecent;Disposed+=(s,e)=>{RecentColors.Changed-=RefreshRecent;recentTips.Dispose();};RefreshRecent();
+            Controls.Add(LabelAt("Kolory sesji (ostatnie 12)",146,272));
             AcceptButton = accept;
             CancelButton = cancel;
-            accept.Click += (sender, e) => { if (MapLogic.ValidColor(hex.Text)) DialogResult = DialogResult.OK; };
+            accept.Click += (sender, e) => { if (MapLogic.ValidColor(hex.Text)){RecentColors.Add(SelectedColor);DialogResult = DialogResult.OK;} };
             hex.TextChanged += (sender, e) =>
             {
                 if (updating) return;
@@ -66,6 +72,8 @@ namespace HexMapEditor
             RefreshColor(true);
             ActiveControl = hex;
         }
+
+        void RefreshRecent(){var colors=RecentColors.Values;for(int i=0;i<12;i++){var b=recent[i];if(b==null)continue;b.Enabled=i<colors.Length;b.BackColor=b.Enabled?colors[i]:Color.FromArgb(48,53,65);b.AccessibleName=b.Enabled?Format(colors[i]):"Puste miejsce historii kolorów";recentTips.SetToolTip(b,b.Enabled?Format(colors[i]):"Brak koloru w tej sesji");}}
 
         static Label LabelAt(string text, int x, int y) { return new Label { Text = text, Location = new Point(x, y), AutoSize = true }; }
 

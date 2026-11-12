@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Linq;
 using Media=System.Windows.Media;
 namespace HexMapEditor
 {
@@ -12,6 +13,7 @@ namespace HexMapEditor
     {
         internal readonly GraphicsPath Preview=new GraphicsPath(FillMode.Winding);
         readonly Media.GeometryGroup cuts=new Media.GeometryGroup{FillRule=Media.FillRule.Nonzero};
+        readonly List<RectangleF> cutBounds=new List<RectangleF>();
         readonly float diameter;
         RectangleF bounds;
         int count;
@@ -22,6 +24,7 @@ namespace HexMapEditor
             var cut=InkSurface.Capsule(from,to,diameter);cuts.Children.Add(cut);
             using(var path=InkSurface.DrawingPath(cut))Preview.AddPath(path,false);
             var area=RectangleF.FromLTRB(Math.Min(from.X,to.X)-diameter/2,Math.Min(from.Y,to.Y)-diameter/2,Math.Max(from.X,to.X)+diameter/2,Math.Max(from.Y,to.Y)+diameter/2);
+            cutBounds.Add(area);
             bounds=count==1?area:RectangleF.Union(bounds,area);
         }
         internal List<InkStroke> Apply(IList<InkStroke> source)
@@ -32,8 +35,12 @@ namespace HexMapEditor
                 if(!bounds.IntersectsWith(InkGeometry.Bounds(stroke))){result.Add(stroke);continue;}
                 var next=InkSurface.Subtract(stroke,cuts,diameter);if(next!=null)result.Add(next);
             }
-            InkGeometry.Validate(result);return result;
+            InkTiming.Measure(()=>{InkGeometry.Validate(result);return true;},(m,t)=>m.Validate+=t);return result;
         }
         public void Dispose(){Preview.Dispose();}
+        internal InkEraseWork Capture(IList<InkStroke> source)
+        {
+            cuts.Freeze();return new InkEraseWork(source,cuts.Children.ToArray(),cutBounds.ToArray(),diameter);
+        }
     }
 }

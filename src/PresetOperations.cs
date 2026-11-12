@@ -45,7 +45,7 @@ namespace HexMapEditor
                         {
                             var terrain = palette.Terrains[i]; TerrainTile tile;
                             if (!existing.TryGetValue(terrain.TerrainId, out tile)) { tile = new TerrainTile(SelectTerrain, EditTerrainById, RemoveTerrainById); tile.TerrainId = terrain.TerrainId; paletteTiles.Controls.Add(tile); }
-                            tile.UpdateTerrain(terrain, i == brushIndex, map.Orientation == "FlatTop"); paletteTiles.Controls.SetChildIndex(tile, i);
+                            tile.UpdateTerrain(terrain, i == brushIndex, map.Orientation == "FlatTop",lowQuality); paletteTiles.Controls.SetChildIndex(tile, i);
                         }
                         paletteSignature = signature;
                     }
@@ -57,7 +57,7 @@ namespace HexMapEditor
         }
         void UpdateTerrainSelection()
         {
-            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex, map.Orientation == "FlatTop"); tile.Delete.Enabled = !PresetReadOnly; }
+            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex, map.Orientation == "FlatTop",lowQuality); tile.Delete.Enabled = !PresetReadOnly; }
         }
         void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; objectMaterial=false;noMaterial=false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); } }
         void MaterialChosen() { if (!updating && (currentTool == EditorTool.FogBrush || currentTool == EditorTool.FogBucket)) SelectTool(EditorTool.Brush); }

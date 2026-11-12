@@ -36,11 +36,11 @@ namespace HexMapEditor
         internal static InkStroke Subtract(InkStroke stroke,Media.Geometry cut,float diameter)
         {
             var geometry=Geometry(stroke);double tolerance=Tolerance(Math.Min(stroke.Width,diameter));
-            if(geometry.FillContainsWithDetail(cut,tolerance,Media.ToleranceType.Absolute)==Media.IntersectionDetail.Empty)return stroke;
-            var remaining=Media.Geometry.Combine(geometry,cut,Media.GeometryCombineMode.Exclude,null,tolerance,Media.ToleranceType.Absolute);
+            if(InkTiming.Measure(()=>geometry.FillContainsWithDetail(cut,tolerance,Media.ToleranceType.Absolute),(m,t)=>m.Contains+=t)==Media.IntersectionDetail.Empty)return stroke;
+            var remaining=InkTiming.Measure(()=>Media.Geometry.Combine(geometry,cut,Media.GeometryCombineMode.Exclude,null,tolerance,Media.ToleranceType.Absolute),(m,t)=>m.Exclude+=t);
             if(remaining.IsEmpty()||remaining.Bounds.IsEmpty)return null;
             remaining.Freeze();
-            var next=new InkStroke{Id=stroke.Id,Color=stroke.Color,Width=stroke.Width,Surface=remaining.ToString(CultureInfo.InvariantCulture),Gradient=stroke.Gradient,CycleWorld=stroke.CycleWorld,ColorTrace=stroke.ColorTrace};
+            var next=new InkStroke{Id=stroke.Id,Color=stroke.Color,Width=stroke.Width,Surface=InkTiming.Measure(()=>remaining.ToString(CultureInfo.InvariantCulture),(m,t)=>m.Serialize+=t),Gradient=stroke.Gradient,CycleWorld=stroke.CycleWorld,ColorTrace=stroke.ColorTrace};
             if(stroke.Gradient!=null)next.Points=stroke.Points;
             next.CachedSurface=remaining;next.CachedSurfaceText=next.Surface;return next;
         }

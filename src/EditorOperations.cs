@@ -38,7 +38,7 @@ namespace HexMapEditor
         static string DescriptionHistoryState(CellData cell) { return cell.RichDescription == null ? "plain:" + (cell.Description ?? "") : "rich:" + cell.RichDescription; }
         void PushAction(EditAction action)
         {
-            undo.Push(action); if (undo.Count > 300) { var keep = undo.Reverse().Skip(1).ToArray(); undo.Clear(); foreach (var item in keep) undo.Push(item); } redo.Clear();
+            documentRevision++; undo.Push(action); if (undo.Count > 300) { var keep = undo.Reverse().Skip(1).ToArray(); undo.Clear(); foreach (var item in keep) undo.Push(item); } redo.Clear();
         }
         void ApplyAction(EditAction action, bool after)
         {

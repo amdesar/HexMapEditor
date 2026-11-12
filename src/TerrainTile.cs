@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -57,17 +57,17 @@ namespace HexMapEditor
             Width = width; Choose.SetBounds(0, 0, width - 56, 32);
             Edit.SetBounds(width - 52, 2, 24, 28); Delete.SetBounds(width - 24, 2, 24, 28);
         }
-        public void UpdateTerrain(TerrainDefinition terrain, bool selected, bool flat = false)
+        public void UpdateTerrain(TerrainDefinition terrain, bool selected, bool flat = false,bool low=false)
         {
             TerrainId = terrain.TerrainId; Choose.Text = terrain.Name; var color = ColorTranslator.FromHtml(terrain.Color); Choose.BackColor = color;
-            string key = TerrainMosaic.Key(terrain) + ":" + flat + ":" + Choose.ClientSize;
+            string key = TerrainMosaic.Key(terrain) + ":" + flat + ":" + Choose.ClientSize + ":" + low;
             if (mosaicKey != key)
             {
                 var old = Choose.FillImage;
                 Choose.FillImage = null;
                 if (old != null) old.Dispose();
                 mosaicKey = key;
-                Choose.FillImage = TerrainMosaic.Render(terrain, Choose.ClientSize, flat);
+                Choose.FillImage = TerrainMosaic.Render(terrain, Choose.ClientSize, flat,low);
                 double luminance = color.R * .299 + color.G * .587 + color.B * .114;
                 var image = Choose.FillImage as Bitmap;
                 if (image != null)
