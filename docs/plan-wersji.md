@@ -6,9 +6,10 @@
 | 0.7.1 | Poprawki startu/Nowy z plikiem, no-op i przekazanie wyniku gumki, stan cache naprzemiennego zoomu |
 | 0.7.2 | Rozdzielone Nowa start/edytor, autozapis istniejącej mapy co5min, autor i jawna data wydania |
 | 0.8.0 | Menu i szybkie polecenia, wspólne pola liczbowe, ciemny motyw własnych kontrolek, rename pliku |
-| 0.9.0 | Lewy panel, presety i ikony |
+| 0.8.1 | Poprawki odbiorcze pól/historii, switchy, stempla i góry; hybryda wycofana po regresji RestoreBounds |
+| 0.9.0 | Lewy panel, presety i ikony; niebieska ramka aktywnego narzędzia |
 | 0.10.0 | Prawy panel i opisy z obrazami |
-| 0.11.0 | Niezależne mapy w zakładkach **na dole** |
+| 0.11.0 | Niezależne mapy w zakładkach; lokalizacja do ponownej oceny na tym etapie |
 | 0.12.0 | Lokalne ustawienia i [kolejka importu](backlog-import-z-folderow.md) |
 | 0.13.0 | Aktualizator |
 | 0.13.x | Końcowa stabilizacja i uzgodnione testy |
@@ -34,4 +35,4 @@ Do zaprojektowania w 0.13.0 po wykryciu dostępnej aktualizacji: A — link do k
 
 ## Po 1.0 — szersze preferencje użytkownika
 
-Oddzielny panel: interwał/włączenie autozapisu, preferowane wartości i kolory, użytkowy domyślny preset, ewentualne skróty oraz preferencja uruchamiania w maksymalizacji. To inny zakres niż zapis układu/kolumn/paneli z resetem i fallback w 0.12.0. Przy reworku góry0.8 można przewidzieć przyszłe wejście; teraz bez aktywnego pustego okna i bez zmiany chronionego Domyślnego. Szczegóły: [backlog ustawień](backlog-ustawienia-lokalne.md). High/Low nadal wyłącznie sesyjny.
+Oddzielny panel: interwał/włączenie autozapisu, preferowane wartości i kolory, użytkowy domyślny preset, konfigurowalne skróty z alternatywnymi kombinacjami i kontrolą konfliktów oraz preferencja uruchamiania w maksymalizacji. To inny zakres niż zapis układu/kolumn/paneli z resetem i fallback w 0.12.0. Przy reworku góry0.8 można przewidzieć przyszłe wejście; teraz bez aktywnego pustego okna i bez zmiany chronionego Domyślnego. Szczegóły: [backlog ustawień](backlog-ustawienia-lokalne.md). High/Low nadal wyłącznie sesyjny.

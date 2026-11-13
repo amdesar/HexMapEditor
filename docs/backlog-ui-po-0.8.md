@@ -17,3 +17,12 @@ Docelowo widoczne źródłowe PNG/JPG/GIF i inne obsługiwane obrazy w folderach
 ## Zakładki 0.11.0
 
 Na dole, niezależne mapy; obok krzyżyków do rozważenia menu zamykania wybranej karty. Bez placeholderów menu lub przycisków przed wdrożeniem zakładek.
+
+## Uzupełnienie po odbiorze0.8.1
+
+- 0.9.0: niebieska ramka aktywnego narzędzia w lewym przyborniku, spójna z rzeczywistym ChoiceStyle Jednolity/Gradient. Obecnego wyboru narzędzia nie zmieniamy w0.8.1.
+- 0.11.0: niezależne mapy w zakładkach; lokalizacja zakładek do ponownej oceny na tym etapie (wcześniejszy dół jest wcześniejszą propozycją, nie wymuszeniem implementacji).
+- 0.12.0: foldery rzeczywistych źródeł i kolejka importu; dopiero wtedy porządkowanie menu Biblioteka według zatwierdzonych folderów użytkowych z grafikami. Teraz nie usuwać kategorii na podstawie domysłów.
+- Po1.0: konfiguracja skrótów, wiele alternatywnych kombinacji dla jednego polecenia oraz kontrola konfliktów. Bez narzucania Ctrl+Shift+Z; w0.8.1 ten skrót nadal nie uruchamia historii.
+
+Pozostałe backlogi i etapy planu zachowane, bez implementacji powyższych funkcji.

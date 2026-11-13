@@ -1,0 +1,59 @@
+# Plan i punkt wznowienia 0.8.1
+
+Baza potwierdzona: HEAD42933cd, kod9ae0d8b. Git czysty przy rozpoczęciu. Brak AGENTS.md/instrukcji wykrytych w repo. Przeczytano plan/raport0.8.0 i tylko zależne fragmenty. Nie ponawiamy odbioru0.8.0 ani kampanii gumki/WPF/autozapisu.
+
+## Plan
+
+1. Wspólna liczba: filtrowanie całego wpisu/wklejki, oba separatory, normalizacja round-away/clamp/overflow, zakończenie na neutralnym kliknięciu/dezaktywacji bez połykania kliknięcia; scrub capture oddzielnie.
+2. Istniejący globalny stos: sesyjne ustawienia rozmiaru/szerokości/wysokości oraz rysika/gumki jako jedna akcja, bez dirty/formatu. Lokalna historia całego roboczego koloru (HEX/RGB/HSV/gest), native Undo tylko podczas tekstu; brak wycieku do mapy.
+3. Wspólny switch wszystkich faktycznych binarnych checkboxów, zachowanie zależności i czytelnego disabled; wspólny dokładny styl ChoiceStyle dla Save/Low. Rename prezentacja, zoom rozmiar/toggle i źródło krawędzi.
+4. Stempel z nieograniczonym offsetowym środkiem, przecięcie z istniejącą siatką, zgodny preview i integracje terrain/icon/Fog/DarkBrush; wiadra i pojedyncze obiekty bez zmiany. Wybór terrain/icon z DarkBrush/DarkBucket przechodzi do Brush jak Fog.
+5. Jedna ograniczona próba hybrydy: standardowy HWND/frame + DWM nonclient, prawdziwe MenuStrip, natywne caption buttons. Sprawdzić wykonalność i bezpieczeństwo bez migracji; jeśli istotne regresje, wycofać aktywny eksperyment i pozostawić0.8.0 z konkretną przeszkodą. Bez kolejnych alternatywnych reworków.
+6. Kilka jawnych Case fields/history, stamp, UI/frame. Finalbuild0.8.1 dopiero po zakresie, byte-identical kopia w tests/_work i jedna krótka sesja UI. Docs/backlogi/commity/status.
+
+## Inwentaryzacja zależności
+
+Wspólne liczby: ScrubNumber; ustawienia przybornika sizePicker/heightPicker1–15 i inkSize1–200 (default5). Obiekty/grupy zachowują LiveNumber i rollback wraz z deltamiFog. EditAction / ApplyAction / TryHistory to wspólny stos; sesyjna akcja musi ominąć dokumentową rewizję i dirty, zachowując kolejność względem pozostałych.
+
+Kolor: EditorColorDialog z RGB/HEX i dwiema HsvSurface; PaintPickerDialog osadza ten sam edytor. ChoiceStyle rzeczywiste kolory: aktywne tło(38,65,96), ramka(90,145,205), border2, tekstWhiteSmoke, hover(43,77,114). Nie dobieramy nowego niebieskiego.
+
+Checkboxy znalezione podczas wymaganej zamiany: AppearancePool apply/preserve; przybornik fill; instancja Locked/Reveal/Light; grupa radiusOverride/lightRadiusOverride/frame; ObjectStateDialog reveal/update; UngroupDialog7 opcji zachowania; IconEditDialog light/update; StateRemoval deleteFile. W tych miejscach brak ThreeState/CheckState w aktualnym kodzie. Nie robimy osobnego szerokiego audytu.
+
+Stempel: BrushGeometry.Stamp przyjmuje teraz tylko index; IconEditing.PaintAlong/DrawBrushPreview i CanvasMouseDown/Move odrzucają hit<0. Do zmiany tylko ta ścieżka, bez bucket region/refactor rendererów.
+
+## Stan
+
+Wykonane: baza/inwentaryzacja/plan. Implementacja i testy jeszcze nie rozpoczęte. Własne procesy/okna0.8.1: brak. Ostatnia niepewna operacja: brak. RootEXE nadal ukończony0.8.0. Pozostały cały zakres opisany wyżej.
+
+## Etap implementacji — 13.11.2026
+Wdrożone, jeszcze bez zaliczenia testów: NumberTextBox/normalizacja/router kliknięć, akcja ToolNumbers na istniejącym stosie bez rewizji dokumentu, SwitchBox we wskazanych binarnych miejscach, ChoiceStyle Save/Low, rename prezentacja, zoom toggle/rozmiar i usunięcie domyślnej krawędzi ToolStrip, stempel z nieograniczonym środkiem i przełączenia Dark→Brush. Lokalna historia EditorColorDialog oraz osadzonego PaintPicker jest w trakcie kontroli. Ostatni build roboczy powstał (900608 bajtów); nie potwierdza jeszcze najnowszych zmian koloru. RootEXE bez zmian0.8.0; własnych okien brak. Pozostałe: jedna próba hybrydy, celowane Case, finalne UI/build/dokumentacja. Źródło mechanizmu ramki: Microsoft Learn Custom Window Frame Using DWM oraz DwmDefWindowProc; zachowanie natywnych przycisków wymaga ich obsługi przed własnym hit-testem.
+
+## Próby metod i kontrolek
+PASS fields (86df3d90114a492bb083fe3c5a48cb1f) i stamp (8be4d12d904a4a9b81d06b580dc1f614); nie powtarzać bez zmiany zależności. controls PASS aa046033b5aa419081e91f8724b53355 po korekcie wyłącznie fixture z końcowym separatorem katalogu (wcześniej PathForName słusznie odrzucał tę ścieżkę). Hybryda prototypowo działa w testowym HWND: DWM, HTCAPTION, sześć menu, maximize/restore; teraz wymaga rzeczywistej próby przycisków/ramki w EXE. Data systemu przeszła na14.11.2026; metadane końcowej wersji przyjąć14.11.2026. RootEXE bez zmiany.
+
+## Pierwsza rzeczywista próba hybrydy
+Własne okno tests/_work/patch-081-ui-00f59a0f4a53409fa82cd3272275eb0d/HexMapEditor.exe otwarte z Próba0.8.1.hexmap, bez zmian dokumentu. DWM rzeczywiście pokazuje natywne przyciski i dwa wiersze; nie zaliczono jeszcze obsługi przycisków/resize. Znaleziono konkretny problem: PreferredSize całego nieautosizowanego MenuStrip rezerwował nadmiar szerokości, ukrywając nazwę; poprawiono szerokość na sumę faktycznych pozycji. Switch dostał jawne ciemne tło/wyłączone visual-style background, bo w rzeczywistym disabled rysował się czarny fragment. Preview poza siatką wymaga invalidacji także przy zmianie nieograniczonego środka bez zmiany hit=-1; dodane. Te wpływające korekty uzasadniają ponowienie tylko controls/stamp. fields zaliczony nieunieważniony.
+
+## Finalny kandydat do próby EXE
+14.11: fields PASS bez powtórzenia. stamp ponowiono z powodu naprawy invalidacji i dodano bezpośrednie terrain/icon integracje: PASS bff9d2175cb846cc99b3befea3604393. controls ponowiono po korekcie menu/krótkiej nazwy/switcha/rename: PASS0bf1aebdfc0648ebab930f47a3930d28. Wcześniejsza asercja centrowania wykryła próg ukrywający krótką nazwę mimo miejsca; naprawione. Runner bez Case odmawia, bez uruchamiania prób. Prototypowe okno zamknięte potwierdzonym [] z inventory. Kandydat0.8.1 zbudowany do root i skopiowany do patch-081-ui-00f59a0f4a53409fa82cd3272275eb0d, hash porównany. Pozostała końcowa próba zwykłego EXE, docs i commity; nie ogłoszono ukończenia.
+
+## Wpływająca korekta finalnej próby
+Końcowa kopia pokazała natywne maximize i wyśrodkowaną nazwę, ale przy maksymalizacji pierwszy wiersz przesuwał się ku górze: WindowState podczas NCCALCSIZE i sam FrameBorderSize nie są bezpiecznym źródłem pełnego insetu. Skorygowano na natywne IsZoomed i WorkingArea.Top. Switch nadal miał czarny prostokąt za tekstem; jawny BackColor samej kontrolki nie wystarczył, więc DrawText dostaje jawny kolor tła. Ta wąska korekta wymaga nowego builda/hash i ponowienia tylko controls oraz właściwych elementów sesji UI. Własne testowe okno jest otwarte, bez zmian mapy. Pozostałe fields/stamp pozostają zaliczone.
+
+## Decyzja ramki — fallback zgodny z promptem
+Jedna implementacja standardowy HWND+DWM+NCCALCSIZE rzeczywiście pokazała natywne przyciski i interaktywne menu. Ograniczona próba systemowego SC_MAXIMIZE/SC_RESTORE wykryła regresję RestoreBounds:1440×940→1440×971, kolejne odtworzenia mogły powiększać okno. Zwykłe ustawienie WindowState w teście nie ujawniało tego błędu; test zmieniono na prawdziwe polecenia systemowe po obserwacji UI. Bez kolejnej przebudowy frame: usunięto HybridCaption.cs i wszystkie aktywne odwołania, przywrócono działający layout0.8.0, rzeczywisty tytuł/dirty i natywne przyciski. Nazwa mapy nie jest dublowana w nowym panelu. To jawnie niewdrożona hybryda w dozwolonym wariancie zakończenia. Switch wymagał FlatStyle.Flat, bo Standard w CheckBox potrafił domalowywać natywną treść przy własnym OnPaint. Poprzednia kopia UI zamykana; należy potwierdzić [] przed podmianą.
+
+## Build — potwierdzona operacja
+Ostatnia podmiana rootEXE w piaskownicy nie powiodła się (stary hashC5FAB8… zachowany). Ustalono wynik PRZED ponowieniem: rootEXE Archive, brak procesu root, CIM z uprawnieniem pokazał wyłącznie własny tests/_work/PID1888. Build z jawnym require_escalated zakończył się sukcesem. To blokada operacji plikowej w piaskownicy, nie zamknięcie użytkownikowego okna. Przed podmianą własnej kopii trzeba potwierdzić jej zamknięcie. controls PASS4898c8b96ac04b8fb762a7b38910a5dc (GDI+ pełne tło i tekst switcha); fields/stamp bez powtórzenia. Root wersja0.8.1, końcowa sesja UI jeszcze do wykonania.
+
+## Wpływająca korekta: rzeczywiste CtrlZ po polu
+Sesja hashD881B520…: zoom drugim kliknięciem zamknięty (świeży kolejny odczyt, metadane pierwszej klatki spóźnione); finalny switch poprawny On/Off/Disabled i Space. Fizyczne klawisze5,5 + klik etykiety dały6 bez dirty. CtrlZ jednak trafiło w ukryty tekst: Finish Focus() na UserControl mógł oddawać fokus potomnemu TextBox. Zmieniono na fokus rodzica przed ukryciem oraz rozpoznanie zakończonego ScrubNumber przed ogólną ścieżką TextBox w głównym handlerze. fields wymaga powtórzenia i dodano reprezentatywną asercję skrótu po zakończeniu wpisu. UI kopia jest nadal otwarta, bez zmian mapy; należy zamknąć własne okno przed podmianą, a rootbuild powtórzyć z wymaganym uprawnieniem. Pozostałe stamp/controls nieunieważnione.
+
+## Doprecyzowanie skrótów wklejki
+Dodatkowa bezpośrednia asercja zachowania natywnego Undo po poprawnej wklejce wykryła SelectedText czyszczące undo-buffer TextBox. Poprawiono wspólny Insert: po walidacji całej propozycji używa EM_REPLACESEL z undo=TRUE. Niepoprawna wklejka nadal nie mutuje tekstu. To celowany test bez kampanii per instancja; fields powtórzony tylko z tego powodu. Ostatnia UI sesja hashCE4DD… potwierdziła globalny inkSize6→5→6 bez dirty, lokalne RGB255→80→Undo255→Redo80 po neutralnym kliknięciu + Anuluj, stempel koło5 ze środkiem poza lewą siatką malujący6 pól, rename bez rozszerzeń/Cancel, Save dirty+Low wspólny styl i CtrlS clean, zoom open/close. Własna mapa zapisana i okno zamykane; trzeba potwierdzić wynik. Pozostała podmiana finalnego EXE po wąskiej poprawce natywnej wklejki i jej krótka próba; reszty nie powtarzać.
+
+## Etap zakończony — weryfikacja
+fields ostatni PASSdf97415c70d9455795a345449385f352 z natywnym Undo wklejki. stamp PASSbff9d2175cb846cc99b3befea3604393; controls PASS4898c8b96ac04b8fb762a7b38910a5dc; bez ich nieuzasadnionego powtórzenia. Kopia finalnaF3B31AECE259E5318813EB74CA2476EAD1FA53DCA710A6AABFC6016F69F433F3, hash zgodny z root, File/Product0.8.1.0. SesjaCE4DD sprzed jedynej poprawki EM_REPLACESEL: realny toolUndo/Redo bez dirty, RGBUndo/Redo poza polem i Cancel, stempel spoza mapy6pól+Save, rename wizualne, wspólnySave/Lowblue, zoomtoggle. Ostatnia identyczna z root kopiaF3B31: kopiowanie15→wpis9→CtrlA/V15→CtrlZ9, Anuluj aktywnego draftuNowa→start bez nowego pliku/MRU. Potwierdzono zamknięcie własnych okien[], prywatnych okien/danych nie dotykano. Hybryda świadomie wycofana z konkretnego powodu RestoreBounds940→971px; dozwolony fallback0.8.0. Nie zaliczono fizycznegoDPI/snap/pełnej kampanii/przenośności. Pozostałe: przegląd końcowego diff/dokumentów, lokalny commit kodu i dokumentacji, statusGit. Ostatnia niepewna operacja: brak; build i zamknięcie potwierdzone.
+
+## Zakończenie0.8.1
+Kod/testy/EXE w lokalnym0c52b28. Zakres ukończony w jawnie dozwolonym wariancie fallback standardowej ramki; hybrydy nie deklarujemy. Ostatni hashF3B31AECE259E5318813EB74CA2476EAD1FA53DCA710A6AABFC6016F69F433F3 i File/Product0.8.1.0 potwierdzone. Końcowa kopia ma identyczne bajty. Finalna wąska próba po poprawceEM_REPLACESEL: Nowa draft, kopiowanie15→wpis9→wklej15→natywneCtrlZ9, Anuluj aktywnego wpisu→start bez pliku/MRU; własny start zamknięty i potwierdzony[]. Pozostałe próby i ich właściwe buildy dokładnie opisane w raporcie, bez nieuzasadnionych powtórzeń i bez pełnej kampanii. Bieżący commit dokumentacji zapisuje ukończenie; ostatnią techniczną operacją będzie jego utworzenie i odczyt Git/status/hash. Jeśli nastąpi przerwa przed odpowiedzią końcową, sprawdzić git log -2 i git status, nie ponawiać buildu ani testów. Brak własnych otwartych okien i niepewnych operacji dyskowych przed commitem dokumentacji.
