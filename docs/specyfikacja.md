@@ -887,3 +887,37 @@ Sukces zgodnego stanu ustawia punkt zapisu i czysty tytuł, zachowuje Undo, nie 
 Obok niezmienionej dużej nazwy jest `by amdesar`, mniejszym fontem i kolorem dotychczasowej wersji, wyrównane do linii pisma. Drugi wiersz zachowuje pozycję/styl: `Wersja 0.7.2 • 13.11.2026`. Jedynym źródłem daty jest jawna stała `ReleaseMetadata.Date`; nie zegar startu ani czas modyfikacji EXE. Bez trzeciego wiersza, nowego logo, linku GitHub i połączeń aktualizacyjnych.
 
 Map11/preset4 oraz limity bez zmian. Stan pierwszego zapisu, zegar, fingerprint i worker nie są autorytatywnymi danymi mapy. Aktualizator 0.13.0 ma jedynie dopisany nierozstrzygnięty wybór szczegółów wydania (link do konkretnego Release albo osobne okno opisu). Szersze preferencje po 1.0 są oddzielone od trwałości układu w 0.12.0; teraz bez implementacji. Wyniki i ograniczenia: [raport 0.7.2](raport-0.7.2.md).
+
+## 43. Wersja 0.8.0 — menu, szybkie polecenia i wspólne pola
+
+Zastępuje układ górnego pojedynczego/zawijanego paska z wcześniejszych sekcji. Dane map11/preset4, limity, dwie ścieżki Nowa, needsFirstSave, autozapis5min, WPF startup, kamera, geometria rysunków, High/Low i historia12kolorów zachowane.
+
+### Góra i dostęp do poleceń
+
+Standardowa ramka Windows pozostaje, bez borderless/custom chrome. Dark caption przez DWM20/19 best-effort, brak API lub niepowodzenie pozostawia zwykły pasek. Tytuł HexMapEditor — Nazwa mapy * wynika z dokumentu i stanu zapisu. Dawna powtórzona nazwa w środku paska usunięta.
+
+Dwa wiersze ponad panelami/płótnem: MenuStrip Plik / Edycja / Mapa / Widok / Biblioteka / Pomoc i kompaktowy ToolStrip. Szybkie ikony: Nowa/Otwórz/Zapisz, separator, Cofnij/Ponów, separator, bieżący zoom, Dopasuj mapę, Dopasuj wszystko, separator, tekst High/Low. Stałe odstępy, standardowy overflow, bez zawijania w trzeci wiersz i bez reorganizowania. Dotychczasowe minimum1180×748. Menu i pasek korzystają ze wspólnego dispatchera i stanu poleceń. Tekstowe i lokalne historie pozostają właściwe dla fokusu; nie przypisujemy globalnego CtrlZ do mapy. Dotychczasowe skróty pokazane przy poleceniach, CtrlShiftZ nadal bez operacji.
+
+Plik: Nowa/Otwórz/Ostatnie projekty, separator, Zapisz/Zapisz jako, separator, Zakończ. MRU istniejące30/5 i walidacja pliku, bez skanowania/nowej historii. Edycja: Cofnij/Ponów, separator, Zmień nazwę pliku. Mapa: Rozmiar, Orientacja Pointy/Flat, Tło. Widok: Warstwy (wszystkie7 w dotychczasowej kolejności), Osie (zachowane Axes/InCells/None), Jakość Wysoka/Niska, separator, Powiększenie i Dopasuj widok. Biblioteka: główny folder, separator, rzeczywiste kategorie katalogów. Pomoc: O programie z istniejącą ikoną i wspólnym ReleaseMetadata. Bez Ustawień/Aktualizacji/Zamknij kartę i innych placeholderów.
+
+Biblioteka wyłącznie otwiera Explorer przez ProcessStartInfo.UseShellExecute, bez cmd. Kategorie: Tereny, Presety terenów, Grafiki terenów, Ikony, Obiekty, Stany obiektów, Tła, Mapy, Eksport obrazów, Eksport tekstu. Standardowe katalogi przez istniejące EnsureDirectories. MessageBox tylko przy błędzie. Przyciski selektorów/zarządzania w odpowiednich edytorach bez zmian.
+
+Zoompresety25/50/75/100/125/150/200/300/400%, wszystkie w istniejącym zakresie. Custom1–12800%, precyzja2, krok1. Zmiana menu/paska zachowuje środek płótna; kółko zachowuje stare zachowanie/zakres. Bez dirty i pełnego UpdateUI dla wheel. Jakość jeden stan sesyjny z resetHigh po udanym Nowa/Otwórz. Low ma akcent#4FA7A0, Zapisz dirty/needsFirstSave #D77A68: ikona/napis i ramka, delikatne tło, ta sama geometria, hover/focus/disabled. Clean/High neutralne, brak migania/złota. Błąd zapisu nie gasi akcentu; gwiazdka pozostaje.
+
+### Rzeczywiste przemianowanie pliku
+
+Wyłącznie dla dokumentu ze ścieżką, w tym samym folderze, bez kopii i bez zapisywania zmian z pamięci. Wspólna walidacja PathForName: nazwy Windows/rozszerzenie/reserved/traversal/długość. Kolizja case-insensitive nie nadpisuje. Case-only przez własną nazwę pośrednią, kontrola fingerprint przed i po przeniesieniu. Rollback po błędzie; obcy plik nie jest nadpisywany nawet gdy blokuje rollback, zachowana ścieżka danych trafia do komunikatu. Etap pośredni nie jest gwarancją każdej awarii zasilania.
+
+CurrentPath/tytuł/MRU po sukcesie używają nowej nazwy, stary MRU usuwany, fingerprint nadal potwierdza te same bajty. Nazwa widoczna wynika ze ścieżki, treść MapData.Name i pliku bez zmiany. Clean pozostaje clean, dirty pozostaje w pamięci; bez fikcyjnego Undo mapy. Autojob/gumka blokują rename, rewizja chroni zgodność; następny Save/autosave używa nowej ścieżki. Sam rename nie resetuje okresu. Pamięciowa Nowa ma nieaktywne polecenie z wyjaśnieniem pierwszego zapisu.
+
+### Wspólna liczba i motyw
+
+ScrubNumber zastępuje wszystkie własne pola liczbowe: NewMap kolumny/wiersze1–200, Resize cztery delty-199–199, TableSize1–100, narzędzia1–15 i rysik/gumka1–200(default5), rozmiar instancji8–1024, promienie Fog/pola widzenia instancji/grup0–20, grupa delta/rozmiar-1016–1024 z dotychczasowymi regułami trybu, ikona promień0–20, RGB0–255 oraz custom zoom. Dawne kroki/precyzje i jednostki zachowane. TrackBar kadr/gradient/efekty pozostają graficznymi suwakami, HEX tekstem; WPF i systemowe Open/Save nie są zastępowane.
+
+Spoczynek bez spinnerów, ciemne pole i subtelna ramka. Klik bez drag otwiera tekst, dopiero ruch ponad próg uruchamia scrub. Prawo zwiększa/lewo zmniejsza według drogi i kroku, nie czasu. Bazowo8 logicznych px/krok, zoom4; DPI uwzględnione. Capture odbiera MouseUp i zapobiega rozpoczęciu gestu mapy. Enter waliduje/zatwierdza liczbę PRZED AcceptButton formularza; Escape przywraca początek; Tab waliduje i przechodzi dalej. Wpis/kursor/zaznaczanie/CtrlA i zwykłe tekstowe Undo pozostają. Kółko/strzałki tylko z fokusem. Brak częściowego zastosowania invalid input, wykładnika lub nowych konwersji; separator kultury, np. polski przecinek. Utrata capture/dezaktywacja/disable anuluje drag.
+
+Dokumentowe właściwości mają jeden scalony krok po drag; Cancel/no-op odwraca prowizoryczną akcję wraz z deltami Fog i przywraca gałąź Undo/Redo. Modal pracuje na draftach i zachowuje swoją historię, narzędzia bez edycji mapy. Capture i focus kończą się przed nowym gestem płótna; zachowano canvas.Focus przed inicjalizacją stroke, bez regresji pierwszej kropki.
+
+DarkForm/EditorTheme dopasowują własne formy, zwykłe TextBox/ComboBox/ListBox i domyślne przyciski; DarkTextBox ma ciemne tło/subtelną ramkę i aktywny obszar, bez scrub tekstu. Theme nie schodzi do RichNoteEditor/ElementHost, nie przemalowuje kolorów/grafik/podglądów. Systemowe Open/Save/MessageBox, natywne glyphy/strzałki i część obramowań pozostają systemowe. Bez WS_EX_COMPOSITED i przebudowy bogatego edytora.
+
+Autor na starcie mierzony po Shown w rzeczywistym DC, z GDI paddingiem i około6px odstępu; duża nazwa i mały styl/baseline autora, drugi wiersz wersja/data zachowane. Dane i wyjątki, pełne mapowanie poleceń/pól, testy i ograniczenia: [raport0.8.0](raport-0.8.0.md). [Backlog UI po0.8](backlog-ui-po-0.8.md) to jedynie toasty po zakładkach, kopiowanie po1.0, źródła/kolejka0.12 i ewentualne menu zamykania kart0.11; bez wdrożenia teraz.

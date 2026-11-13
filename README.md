@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.7.2
+﻿# HexMapEditor 0.8.0
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.7.2** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.8.0** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -16,13 +16,19 @@ Ta wersja odczytuje mapy 11 i presety 4. Nowe formaty zachowują pełne źródł
 
 ## Start i jakość podglądu
 
+Edytor ma dwa stałe wiersze nad całym obszarem pracy: **Plik / Edycja / Mapa / Widok / Biblioteka / Pomoc** oraz kompaktowe ikony Nowa/Otwórz/Zapisz, Cofnij/Ponów, zoom, dwa dopasowania i High/Low. Standardowa ramka Windows pozostaje; tytuł pokazuje nazwę mapy i gwiazdkę. Zapis z niezapisanymi zmianami ma koralowy akcent, Low turkusowy. Przy braku miejsca szybki pasek ma overflow, bez trzeciego wiersza. Zachowano minimum 1180×748.
+
+**Edycja → Zmień nazwę pliku…** przenosi aktualny plik w tym samym folderze, bez kopii i zapisywania zmian z pamięci. Kolizja nie nadpisuje danych. Po sukcesie tytuł/MRU i przyszły autozapis używają nowej ścieżki; dirty pozostaje. Dokument bez pliku musi najpierw zostać zapisany. **Biblioteka** otwiera wyłącznie rzeczywiste foldery w Eksploratorze; selektory zasobów pozostały w odpowiednich edytorach.
+
+Własne pola liczbowe: klik rozpoczyna wpis, poziomy drag po przekroczeniu progu zmienia wartość; Enter zatwierdza liczbę, Escape przywraca początek edycji/gestu, Tab waliduje i przechodzi dalej. Bez spinnerów. Narzędzia zachowują 8 logicznych px na krok, rysik/gumka 1–200, domyślnie5. Ułamki według kultury systemu (np. polski przecinek), bez zapisu wykładniczego. Jeden drag właściwości to jeden krok historii; Cancel/no-op bez wpisu. Suwaki graficzne kadru/efektów i WPF nie są zastępowane.
+
 Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz nowy projekt oraz do5 dostępnych ostatnich map. Okno ma stały rozmiar, a wycentrowana lista ostatnich map około połowy szerokości. Anulowanie lub błąd pozostawia ekran startowy. Można przekazać ścieżkę `.hexmap` jako argument EXE — walidowana mapa omija start, bez chwilowego pustego projektu. Library jest odczytywana dopiero po wyborze projektu. Jedynie host opisu WPF przygotowuje się raz przed pętlą okien; nie ładuje bibliotek ani obrazów na zapas. Start zamyka się dopiero po skutecznym pokazaniu edytora.
 
 **Nowy projekt ze startu**: po nazwie i parametrach program tworzy `Library/Hexmaps/<nazwa>.hexmap` obok EXE, bez dialogu wyboru ścieżki. Kolizja nazwy (również różniącej się tylko wielkością liter) wymaga poprawienia nazwy; parametry pozostają, bez nadpisania i automatycznych sufiksów. Błąd pozostawia działający start. Po sukcesie projekt ma plik, czysty stan, wpis MRU i gotowe Ctrl+S.
 
 **Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
 
-Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.7.2 • 13.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.8.0 • 13.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 
@@ -30,13 +36,13 @@ Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.7.2 • 13.
 
 Wynik przygotowuje jeden worker na odłączonej migawce. Podczas zapisu konfliktujące polecenia dostają informację w statusie; Escape lub próba zamknięcia anuluje oczekujące przygotowanie (po zakończeniu ponów zamknięcie). Nie przerywa się połowy publikacji pliku. Sukces pokazuje „Zapisano automatycznie”, zachowuje Undo i nie przebudowuje paneli. Błąd pozostawia niezapisane dane i kolejną próbę najwcześniej po 5 minutach. Obca zmiana lub zniknięcie pliku wstrzymuje autozapis — rozwiąż konflikt ręcznie albo użyj Zapisz jako. Ochrona porównuje bajty pliku przez SHA-256; nie jest systemem odzyskiwania po awarii dysku lub zasilania.
 
-Przycisk **Wysoka jakość / Niska jakość** dotyczy tylko sesji. High jest domyślny i wraca po udanym Nowa/Otwórz. Low pomija tło, pokazuje średni kolor właściwego kadru/gradientu heksa z zachowaniem pokrycia alpha oraz pierwszy kolor gradientowej kreski/wskaźnika. Zachowuje dane, fazę, geometrię, maski i flagi Widoku. Powrót do High przywraca pełny wygląd, także kreski narysowanej w Low. Nie zapisuje jakości ani dirty/historii; edytory nadal pokazują pełne źródła.
+Przycisk **High / Low** (także Widok → Jakość) dotyczy tylko sesji. High jest domyślny i wraca po udanym Nowa/Otwórz. Low pomija tło, pokazuje średni kolor właściwego kadru/gradientu heksa z zachowaniem pokrycia alpha oraz pierwszy kolor gradientowej kreski/wskaźnika. Zachowuje dane, fazę, geometrię, maski i flagi Widoku. Powrót do High przywraca pełny wygląd, także kreski narysowanej w Low. Nie zapisuje jakości ani dirty/historii; edytory nadal pokazują pełne źródła.
 
 Pickery współdzielą **12 kolorów sesji** w dwóch rzędach po6. Zatwierdzenie jednolitego koloru dodaje go na początek bez duplikatów; gradient i Anuluj niczego nie dopisują. Próbka może zmienić aktywny punkt gradientu. Restart zeruje pulę; brak pliku i wpisów głównej historii.
 
 Gumka przygotowuje dokładny wynik poza UI na odłączonej migawce. Puste trafienia, także wewnątrz otworu, odrzuca test powierzchni bez uruchamiania przetwarzania. Podczas pracy konfliktujące polecenia są blokowane logicznie z informacją, bez wygaszania całych drzew kontrolek. Pasek **Przetwarzanie…** pojawia się dopiero po180ms, bez przesuwania layoutu; można anulować lub zamknąć program. Podgląd wymazania pozostaje do przejęcia przez dokładny wynik. Wynik jest stosowany atomowo do zgodnego dokumentu jako jeden krok historii. Anulowanie/błąd przywraca oryginał. Pan mapy wykorzystuje poprzedni cache i dorysowuje odsłonięte pasy. Przy serii zoomu oddzielny ograniczony cache przejściowej klatki pomija powtarzane przeliczanie identycznego podglądu; po120ms od końca serii powstaje dokładny obraz. Nie zmienia zapisanych kolorów i powierzchni.
 
-[Plan wydań](docs/plan-wersji.md), [raport 0.7.2](docs/raport-0.7.2.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
+[Plan wydań](docs/plan-wersji.md), [raport 0.8.0](docs/raport-0.8.0.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
 
 ## Podmiana ikony programu
 
@@ -46,7 +52,7 @@ Okno odczytuje ICO z katalogu programu. Przy braku lub błędzie odczytu używa 
 
 ## Widok warstw
 
-Menu **Widok** na górnym pasku przełącza kolejno Tło, Tereny, Ikony, Obiekty, Ograniczenie widoczności, Mgłę i Rysik. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
+Menu **Widok → Warstwy** przełącza kolejno Tło, Tereny, Ikony, Obiekty, Ograniczenie widoczności, Mgłę i Rysik. Można zmienić kilka pozycji przed zamknięciem menu. Ukryty teren przyjmuje neutralny kolor. Wyłączenie obiektów usuwa je z rysunku i hit-testu. Wyłączenie mgły pokazuje dane pod spodem. Flagi są chwilowe, a Nowa/Otwórz przywracają pełną widoczność. Próba edycji ukrytej warstwy pozwala ją pokazać. Po zgodzie ponów operację.
 
 ## Rysik, gumka, ograniczenie widoczności i pole widzenia
 
@@ -93,7 +99,7 @@ Picker terenu, stanu i ramki pozostaje wspólnym HSV/HEX: `#RRGGBB`, sześć cyf
 
 Prawy klik narzędzia mgły → **Wygląd mgły…** otwiera ten sam edytor puli i lokalną historię. Domyślnie jest dotychczasowa szarość. Nałożenie wybiera i zapamiętuje wariant. Grafika zachowuje alpha **bez nieprzezroczystej bazy**: warstwy pod nią mogą prześwitywać. Pole nadal ma logiczny Fog, więc alpha nie ujawnia danych w szczegółach/listach ani nie zmienia hit-testu i reguł odkrywania. Nie analizujemy pikseli do maskowania. Domyślnie wyłączone „Zastosuj wygląd do obecnie zasłoniętych heksów” zmienia wyłącznie istniejący wygląd w jednym Undo. Zależna opcja zachowania rozmieszczenia działa po ID jak dla terenu, a usunięta pozycja pozostawia stare migawki. Aktywni odkrywcy nadal chronią swój zasięg.
 
-**Tło** obok Biblioteki: import/zmiana, prostokątne przycięcie myszą (narożniki, środki czterech krawędzi albo nowy prostokąt), krycie 0–100%, nasycenie 0–200% z resetem 100% i rozmycie 0–24 px. „Podgląd na płótnie” zachowuje proporcje aktualnego obszaru mapy i tę samą logikę cover/centrowania. Zachowujemy pełne źródło i parametry. Tło proporcjonalnie wypełnia płótno, niezależnie od kamery; pan i zoom mapy go nie ruszają. Dopasowania je pomijają. Efekty są buforowane do rozmiaru płótna (największy wymiar bufora do 2048). Zatwierdzenie/usunięcie ma jedno Undo; Anuluj nie zmienia mapy. Widok → Tło jest wyłącznie flagą widoku. MMB w lewym podglądzie przesuwa cały prostokąt kadru, bez zmiany jego wymiarów; LPM zachowuje zaznaczanie i uchwyty.
+**Mapa → Tło mapy…**: import/zmiana, prostokątne przycięcie myszą (narożniki, środki czterech krawędzi albo nowy prostokąt), krycie 0–100%, nasycenie 0–200% z resetem 100% i rozmycie 0–24 px. „Podgląd na płótnie” zachowuje proporcje aktualnego obszaru mapy i tę samą logikę cover/centrowania. Zachowujemy pełne źródło i parametry. Tło proporcjonalnie wypełnia płótno, niezależnie od kamery; pan i zoom mapy go nie ruszają. Dopasowania je pomijają. Efekty są buforowane do rozmiaru płótna (największy wymiar bufora do 2048). Zatwierdzenie/usunięcie ma jedno Undo; Anuluj nie zmienia mapy. Widok → Tło jest wyłącznie flagą widoku. MMB w lewym podglądzie przesuwa cały prostokąt kadru, bez zmiany jego wymiarów; LPM zachowuje zaznaczanie i uchwyty.
 
 **Z biblioteki…** odtwarza pełne źródło, kadr, krycie, nasycenie i rozmycie. Biblioteka ma ciemny selektor, rename, usuwanie i jawną edycję/zastąpienie. Po Zatwierdź zmienionego tła wybierasz: Zapisz jako nowe tło (nazwa), Nadpisz wybrane tło (jednoznaczny cel), Tylko zastosuj do mapy albo Wróć do edycji. Sam import/suwaki nie zapisują plików; niezmienione zatwierdzenie nie mnoży wpisów. Błąd zapisu pozostawia edytor otwarty. Usunięcie tła z mapy nie usuwa biblioteki.
 
@@ -167,10 +173,10 @@ Library jest lokalne i ignorowane przez Git. Program tworzy brakujące Backgroun
 Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego polecenia.** Nowe scenariusze wybierane pojedynczo:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch072Tests.ps1 -Case autosave
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch080Tests.ps1 -Case numbers
 ```
 
-Bieżące Case0.7.2: creation, editor, autosave, controls i safety. Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 42 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
+Bieżące Case0.8.0: numbers, commands i rename. Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 43 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
 Na później pozostają widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 

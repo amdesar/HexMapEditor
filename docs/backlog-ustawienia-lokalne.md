@@ -12,6 +12,8 @@ Zapewnić przycisk przywracania ustawień domyślnych. Walidować zapisane warto
 
 ## Lewy panel — oddzielne przyszłe dopracowanie
 
+W0.8.0 wspólne pola liczbowe zastąpiły osobny uchwyt gestem w samym polu (także istniejąca druga liczba korzysta z tej samej kontrolki). Nie jest to funkcjonalny rework lewego panelu. Etykiety X/Y/szerokość–wysokość i dalszy układ pozostają do0.9; [pozostałe uzgodnienia UI](backlog-ui-po-0.8.md) są tylko backlogiem.
+
 - Czytelniejszy wygląd uchwytów przeciągania rozmiaru.
 - Etykiety X/Y albo szerokość/wysokość dla figur dwuwymiarowych.
 - Uchwyt drugiej wartości takich figur, spójny z pierwszym.
