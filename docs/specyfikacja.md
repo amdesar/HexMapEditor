@@ -833,3 +833,31 @@ Start: nazwa/istniejąca ikona/wersja, Otwórz/Stwórz nowy, do5dostępnych proj
 ### Format i kolejne wydania
 
 Map11/preset4 bez zmian — wszystkie nowe flagi/cache/MRU/kolory są poza dokumentem; powierzchnie i gradienty mają poprzednią reprezentację. Bez migracji0.x i bez kasowania danych. [Plan wydań](plan-wersji.md) zastępuje wcześniejsze luźne przypisania backlogu. Od1.0 przyszła zgodność wstecz, teraz bez implementacji migracji.
+
+## 41. Poprawki 0.7.1 — start, nowy plik, gumka i zoom
+
+Sekcja zastępuje opis disabled całych gałęzi podczas gumki w sekcji 40. High/Low, kolory sesji, gradienty, logiczne maski, map11/preset4 i limity danych pozostają bez zmian.
+
+### Start i tworzenie projektu
+
+Start jest właścicielem ApplicationContext aż edytor zakończy Load/Shown i potwierdzi Visible/Handle. Dopiero wtedy MainForm przechodzi na edytor i start jest zamykany. Guard blokuje reentrancję. Błąd/earlyClose powoduje rollback kandydata, działający start i komunikat. Argument mapy nie pokazuje chwilowo startu ani pustej mapy. Jednorazowy host opisu WPF jest przygotowany przed pętlą WinForms i przekazywany do edytora: pierwsza inicjalizacja nie odbywa się w natywnym callbacku po modalnym dialogu. Nie przygotowuje Library, dokumentu ani pełnych źródeł; nie odtwarza opisów przy zmianie zaznaczenia. Bez globalnego WS_EX_COMPOSITED, DoEvents i Sleep.
+
+Start ma stały logiczny obszar 650×550, bez resize/maximize. Zachowuje przesuwanie/zamknięcie. Rozmiar ograniczony do WorkingArea, z przewijaniem na małym ekranie. Główne przyciski 280 px bez zmiany; recent 324 px (~50%), wycentrowane, ellipsis/tooltip, nadal 5 spośród 30 i ten sam model MRU.
+
+Nowy ze startu i edytora: istniejące parametry → standardowy wybór nazwy/miejsca → wspólny dotychczasowy serializer/walidator/atomowy writer → przyjęcie dokumentu ze ścieżką i czystym stanem. Ctrl+S zapisuje ten sam plik. Cancel/błąd nie podmienia starej mapy. Nadpisanie potwierdzane przed zapisem; obcy plik, który pojawił się po wyborze nowej ścieżki, nie zostaje po cichu nadpisany. MRU dopiero po skutecznym zapisie. Nie tworzy się losowych automatycznych plików projektu.
+
+Opcjonalna lokalna diagnostyka: zmienna `HEXMAPEDITOR_START_TRACE` wskazuje jawny plik; bez niej nie ma zapisu logu. Do 128 zdarzeń pamięci i około 64 KiB pliku: fazy konstrukcji/ready/rollback/closed/handleDestroyed/loop.exit oraz typ/HResult i stos wyjątku. Bez tytułów, ścieżek/treści map i komunikatów wyjątku. To diagnostyka, bez globalnego pustego catch i restartowania aplikacji.
+
+### Gumka: no-op i przekazanie obrazu
+
+Test kapsuły bada faktyczną powierzchnię, nie tylko obwiednię. Niewymazane polilinie: odległości odcinków z szerokością, bez WPF boolean. Kontury z otworami: buforowana spłaszczona ścieżka, test wnętrza i granic. Flatten współdzieli dotychczasowy łączny budżet 200000 punktów InkPathCache; zbyt duży wynik ma lokalny nativeRegion fallback. Konserwatywny pas tolerancji max(.0005, grubość/65536) nadal rozstrzyga dokładny worker. Nietrafione próbki przed pierwszym trafieniem nie tworzą geometrii cięcia — nie mogły zmienić żadnej niezmiennej powierzchni.
+
+No-op nie uruchamia historii/dirty, stanu oczekiwania ani pełnego UpdateUI. Trafienie zachowuje odłączoną migawkę, jeden worker MTA, referencje/rewizję i dokładne Exclude, bez kolejki. Wąska blokada poleceń/inputu zabezpiecza edycję, zapis i historię bez wizualnego disabled całych drzew. Próba konfliktu daje status; Escape/Anuluj anuluje, zamknięcie pozostaje dostępne. Overlay bez Dock/layoutu pojawia się po 180 ms, timer jest anulowany przy krótkiej operacji. Commit aktualizuje model/historię/caption i przyciski historii, bez pełnego UpdateUI.
+
+Preview jest instalowany przed przygotowaniem migawki i trwa do atomowego zastosowania. Sukces najpierw ustawia dokładne dane i czyści stary cache; utrzymany klip jest zwalniany przy pierwszym rysowaniu nowego wyniku. Cancel/błąd świadomie przywraca oryginał; stale nie trafia do innej mapy. Nadal jeden gest = jeden Undo/Redo, bez ponownego losowania/boolean podczas Redo. Surface/Points/Distance i kolory pozostałości bez zmiany.
+
+### Naprzemienny zoom
+
+Jedna oddzielna przejściowa bitmapa ma klucz kamery dokładnej i aktualnej; nigdy nie staje się exact cache. Powtarzany Paint tej samej kamery nie przelicza ponownie odsłoniętych pasów. Suma dokładnej i przejściowej bitmapy nadal ≤5,8 mln pikseli + scratch256. Większy viewport używa fallback bez drugiej bitmapy, bez obniżania jakości końcowej. Dispose przy zmianie źródeł/kamery dokładnej/Clear. Seria koła w tym samym punkcie ma kamerę bazową i całkowite kroki: powrót do 0 odtwarza dokładny pan/zoom bez dryfu float. Wheel odświeża tylko caption zoomu i płótno. Timer120ms żąda obrazu końcowego raz i zatrzymuje się. Brak kolejki kamer i stałego renderowania.
+
+Wyniki i ograniczenia opisuje [raport 0.7.1](raport-0.7.1.md). [Aktualizator 0.13.0](plan-wersji.md) pozostaje wyłącznie backlogiem, bez sieci w tej wersji.

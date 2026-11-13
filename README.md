@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.7.0
+﻿# HexMapEditor 0.7.1
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.7.0** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.7.1** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -14,9 +14,11 @@ Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, 
 
 Ta wersja odczytuje mapy 11 i presety 4. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
 
-## Start i jakość podglądu 0.7.0
+## Start i jakość podglądu
 
-Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz nowy projekt oraz do5 dostępnych ostatnich map. Anulowanie lub błąd pozostawia ekran startowy. Można przekazać ścieżkę `.hexmap` jako argument EXE — walidowana mapa omija start, bez chwilowego pustego projektu. Library jest odczytywana dopiero po wyborze projektu.
+Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz nowy projekt oraz do5 dostępnych ostatnich map. Okno ma stały rozmiar, a wycentrowana lista ostatnich map około połowy szerokości. Anulowanie lub błąd pozostawia ekran startowy. Można przekazać ścieżkę `.hexmap` jako argument EXE — walidowana mapa omija start, bez chwilowego pustego projektu. Library jest odczytywana dopiero po wyborze projektu. Jedynie host opisu WPF przygotowuje się raz przed pętlą okien; nie ładuje bibliotek ani obrazów na zapas. Start zamyka się dopiero po skutecznym pokazaniu edytora.
+
+**Nowy projekt** ze startu i z edytora: po parametrach wybierz nazwę i miejsce zapisu `.hexmap`. Dopiero udany bezpieczny zapis przydziela ścieżkę i otwiera nowy dokument, bez gwiazdki; Ctrl+S od razu zapisuje ten plik. Anulowanie parametrów/zapisu lub błąd zachowuje start albo poprzednią mapę. Nadpisanie istniejącego pliku wymaga potwierdzenia. MRU zmienia się dopiero po udanym zapisie.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 
@@ -24,9 +26,9 @@ Przycisk **Wysoka jakość / Niska jakość** dotyczy tylko sesji. High jest dom
 
 Pickery współdzielą **12 kolorów sesji** w dwóch rzędach po6. Zatwierdzenie jednolitego koloru dodaje go na początek bez duplikatów; gradient i Anuluj niczego nie dopisują. Próbka może zmienić aktywny punkt gradientu. Restart zeruje pulę; brak pliku i wpisów głównej historii.
 
-Gumka przygotowuje dokładny wynik poza UI na odłączonej migawce. Podczas **Przetwarzanie…** edycje, zapis i historia są jawnie niedostępne; można anulować lub zamknąć program. Wynik jest stosowany atomowo do zgodnego dokumentu jako jeden krok historii. Anulowanie/błąd nie pozostawiają częściowego wymazania. Pan mapy wykorzystuje poprzedni cache i dorysowuje odsłonięte pasy. Przy serii zoomu chwilowy przekształcony podgląd przechodzi w dokładny render po zakończeniu; nie zmienia zapisanych kolorów i powierzchni.
+Gumka przygotowuje dokładny wynik poza UI na odłączonej migawce. Puste trafienia, także wewnątrz otworu, odrzuca test powierzchni bez uruchamiania przetwarzania. Podczas pracy konfliktujące polecenia są blokowane logicznie z informacją, bez wygaszania całych drzew kontrolek. Pasek **Przetwarzanie…** pojawia się dopiero po180ms, bez przesuwania layoutu; można anulować lub zamknąć program. Podgląd wymazania pozostaje do przejęcia przez dokładny wynik. Wynik jest stosowany atomowo do zgodnego dokumentu jako jeden krok historii. Anulowanie/błąd przywraca oryginał. Pan mapy wykorzystuje poprzedni cache i dorysowuje odsłonięte pasy. Przy serii zoomu oddzielny ograniczony cache przejściowej klatki pomija powtarzane przeliczanie identycznego podglądu; po120ms od końca serii powstaje dokładny obraz. Nie zmienia zapisanych kolorów i powierzchni.
 
-[Plan wydań](docs/plan-wersji.md), [raport 0.7.0](docs/raport-0.7.0.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
+[Plan wydań](docs/plan-wersji.md), [raport 0.7.1](docs/raport-0.7.1.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
 
 ## Podmiana ikony programu
 
@@ -157,10 +159,10 @@ Library jest lokalne i ignorowane przez Git. Program tworzy brakujące Backgroun
 Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego polecenia.** Nowe scenariusze wybierane pojedynczo:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch070Tests.ps1 -Case quality
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch071Tests.ps1 -Case ink
 ```
 
-Bieżące Case0.7.0: eraser-async, camera, quality, picker, start i integration; eraser-profile to diagnostyka, fixture tylko generator. Nie wybieraj ich hurtowo. Przypadki starszego przyrostu0.4.1 to model, fog i controls. Źródła i skrypty są śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 40 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
+Bieżące Case0.7.1: lifecycle, argument, new-file, ink, ink-wait i zoom; baseline służy porównaniu kodu bazowego, fixture tylko generuje dane do okna. Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 41 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
 Na później pozostają widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 

@@ -85,3 +85,7 @@ Pozostała jeszcze jedna krótka finalna próba cold Start→Nowy (ze względu n
 ## Etap 7 — zamknięcie prób UI
 
 Drugi niezależny start finalnego zwykłego EXE→Nowy→Ponowny start 0.7.1→standardowy Save→edytor także poprawny, clean ze ścieżką. Następnie Nowa z tego edytora→parametryOK→Cancel w standardowym Save zachował dokument Ponowny start 0.7.1 bez gwiazdki. Zamknięto własny edytor, inventory brak własnych okien. Dwa finalne coldprocess przejścia udane; nie jest to gwarancja wykluczenia wszystkich sporadycznych awarii. Nie powtarzano gumki/zoomu. Pliki prób zachowane w tests/_work dla odtwarzalności, brak sprzątania. Pozostałe tylko dokończenie spec/raportu i lokalne commity/Git. Ostatnia niepewna operacja: brak.
+
+## Zakończenie 0.7.1
+
+Wykonane wszystkie etapy uzgodnionego zakresu; finalny główny EXE0.7.1.0 zgodny bajtowo z kopią dwóch zwykłych prób Start→Nowy. Kod/EXE/testy/plan zapisane lokalnie w092c584. README/specsekcja41/planwersji i raport0.7.1 aktualizowane w końcowym commicie dokumentacji. Aktualizator opisany tylko jako backlog0.13.0. Map11/preset4 i budżety bez zmiany. Testy i ograniczenia rozdzielone w raporcie: nie zaliczono pełnej płynności, braku pojedynczej migającej klatki ani pełnej regresji. Nie powtarzano dawnych kampanii, nie sprzątano tests/_work/prywatnych danych. Własne procesy/dialogi zamknięte i inventory potwierdzone. Pozostałe: wyłącznie zapis końcowego commitu dokumentacji i odczyt Git/statusu; bez push/tagu/Release'a. Ostatnia niepewna operacja: brak.
