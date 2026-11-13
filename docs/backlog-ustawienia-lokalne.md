@@ -19,3 +19,5 @@ Zapewnić przycisk przywracania ustawień domyślnych. Walidować zapisane warto
 Nie przebudowywać tych kontrolek w 0.6.2. Prawy brzeg i header jitter przy zmianie szerokości nadal należą do przyszłej przebudowy prawego panelu. Jeżeli pozostałe etapowe natywne pokazanie szczegółów wymaga zmiany kompozycji, ocenić je tam z zachowaniem izolacji ElementHost/WPF.
 
 Istniejąca [kolejka importu z folderów](backlog-import-z-folderow.md) pozostaje osobnym, niewdrożonym backlogiem.
+
+Plan wydań0.7.0 przypisuje przebudowę górnego paska do0.8.0, a trwałe lokalne ustawienia i kolejkę do0.12.0: [aktualny plan](plan-wersji.md). Przy omawianiu góry nie zapomnieć o tej odrębnej trwałości układu. Jakość High/Low jest wyjątkiem: pozostaje zawsze sesyjna i nie może zostać utrwalona przez przyszły system ustawień. Mały recent-projects.json0.7.0 przechowuje wyłącznie ścieżki MRU, nie implementuje systemu preferencji układu.

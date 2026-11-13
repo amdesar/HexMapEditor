@@ -801,3 +801,35 @@ Biblioteka grafik nie tworzy ponownie pełnych wyników 1024×1024 dla małych m
 ### Formaty i zamknięte zakresy
 
 Map 11 / preset 4 pozostają. Nie zmieniają się autorytatywne Gradient/Points/Distance/CycleWorld/Surface; zmiana składania wynika z istniejącej kolejności. Cache i robocze kapsuły nie są zapisem. Bez migracji, kasowania lub regenerowania starych bibliotek. Wszystkie dotychczasowe budżety źródeł, geometrii i 300 historii pozostają. Zachowane odroczenie panelu, resize tła, zamknięte zgłoszenie grup i wszystkie backlogi; żaden nie został zaimplementowany.
+
+## 40. Wersja 0.7.0 — responsywność, jakość sesji i start
+
+### Dokładne zakończenie gumki
+
+Po gestach nadal odejmowana jest suma wszystkich kapsuł, bez usuwania zakrętów lub upraszczania danych. Kapsuły odrzucane są obwiednią osobno dla każdej kreski. Nie zmieniamy precyzji boolean ani zapisanych faz/kolorów. Przygotowanie wyniku na jednym workerze MTA z odłączoną migawką modelu; tylko zamrożone Freezables i stringi przekraczają wątki. Worker tworzy własne geometrie/ścieżki, wykonuje Exclude, serializację i walidację. UI kontroluje referencję dokumentu/listy oraz rewizję. Stosuje cały wynik jako jedną historię albo odrzuca całość. Nie ma kolejki operacji ani workera na próbkę.
+
+Widoczny stan Przetwarzanie… z Anuluj wymazywanie. Konfliktujące kontrolki są disabled; skróty i bezpośrednie ścieżki zapisu/historii/zmiany dokumentu odmawiają z komunikatem. Zamknięcie anuluje; spóźniony wynik nie trafia do innej mapy. Anulowanie sprawdzane między kreskami, pojedynczy natywny boolean nie jest przerywany w połowie. Budżety geometrii/historii bez zwiększania. UI używa przygotowanej serializacji Ink do dirty, bez ponownego pełnego sprawdzania mapy na zastosowaniu.
+
+### Kamera i grube łączenia
+
+Pan mapy o całkowite piksele przesuwa ograniczony cache viewportu i dokładnie dorysowuje tylko nowe pasy. Przesuwanie pamięci zachowuje alpha. Zoom podczas interakcji przekształca poprzedni cache, dorysowuje odsłonięte obszary; po zakończeniu pełny dokładny render. Prostokąt PointF nie przeskakuje przez zaokrąglenie. Timer120ms wykrywa koniec serii koła, nie jest stałym odrysowywaniem aplikacji. Brak kolejki kamer, bitmapy świata i obniżania trwałej rozdzielczości. Cache nadal≤5,8mln pikseli +scratch256, poniżej dawnego24MiB. Native GDI paths mają dotychczasowe ograniczenia.
+
+Gruby gradient: tylko odkryty zewnętrzny sektor round-join zamiast pełnego jednolitego dysku próbki. Pole koloru zachodzi1,5piksela na sąsiedni korpus, właściwa wektorowa maska bez zmiany. Późniejsza część nadal wygrywa na przecięciu. Cykl300px/80–20, preset Tęcza, droga i eraser Surface zachowane.
+
+### Wysoka / Niska jakość
+
+Wyłącznie sesyjny stan widoku, bez plików, dirty i Undo. High przy starcie i po skutecznym Nowa/Otwórz; Anuluj/błąd nie resetuje. Low pomija statyczne tło bez zmiany jego flagi, zastępuje grafiki i gradienty heksów/mozaiki średnim kolorem oraz gradienty rysika/wskaźnika pierwszym kolorem. Zachowuje zapis pełnej definicji i drogi nowej kreski; powrót do High odtwarza przebieg. Nie ukrywa ikon/obiektów/opisów, nie zmienia geometrii, logicznych masek lub kolejności. Okna edycji i biblioteki pokazują pełne dane.
+
+Kolor z64×64deterministycznych środków próbek wewnątrz właściwego heksa. Grafika z właściwym kadrem/transformacją/orientacją, RGB ważone alpha, alpha to średnie pokrycie wnętrza; zero alpha pozostaje przezroczyste. Gradient próbkowany przestrzennie z jego kierunkiem/projekcją heksa. Cache≤256samych kolorów; klucz treści zastosowanej grafiki/gradientu+orientacja, nie TerrainId ani aktualna biblioteka. Źródła dekodowane tylko przy cache miss i od razu zwalniane. High/Low rozdziela cache warstwy/mozaiki; brak bitmapy Low pozostającej w High.
+
+### Kolory i start
+
+Jedna statyczna historia12jednolitych RGB w2×6, tooltipHEX, bez duplikatów/move-front po OK. Anuluj i zatwierdzenie gradientu nie dopisują. W gradiencie klik zmienia tylko wybrany punkt; puste są nieaktywne. Historia procesu, bez plików i głównego Undo. Jednolity/Gradient mają ciemnoniebieskie zaznaczenie tła i ramki, z hover/focus/disabled. Czerwone akcje bez zmian.
+
+Start: nazwa/istniejąca ikona/wersja, Otwórz/Stwórz nowy, do5dostępnych projektów lub pusty stan. Nie ładuje Library przed wyborem. Wspólny dialog/konstrukcja nowej mapy i wyodrębniony istniejący walidator odczytu. Argument mapy walidowany przed utworzeniem edytora — bez chwilowej pustej mapy. Błąd wraca do startu; Anuluj pozostaje na starcie. Edytor przygotowuje layout i biblioteki przed pokazaniem; nie ma Sleep/DoEvents/globalnego WS_EX_COMPOSITED.
+
+`recent-projects.json` obok EXE, poza Library: max30 pełnych znormalizowanych ścieżek, case-insensitiveWindows, max256KiB. Atomowy Flush+Replace, po udanym odczycie/zapisie, bez modyfikowania map lub dat. Błąd/uszkodzenie nie blokuje startu. Zniknięte pliki pozostają w historii, pomijane przy5widocznych. Dostępność w tle:1checker lokalny i max2UNC; wynik sieci może oczekiwać na timeout systemu, UI nie czeka. Bez skanowania dysków i kolejki bez limitu; klik ponownie waliduje plik (wyścig z usunięciem obsługiwany błędem).
+
+### Format i kolejne wydania
+
+Map11/preset4 bez zmian — wszystkie nowe flagi/cache/MRU/kolory są poza dokumentem; powierzchnie i gradienty mają poprzednią reprezentację. Bez migracji0.x i bez kasowania danych. [Plan wydań](plan-wersji.md) zastępuje wcześniejsze luźne przypisania backlogu. Od1.0 przyszła zgodność wstecz, teraz bez implementacji migracji.

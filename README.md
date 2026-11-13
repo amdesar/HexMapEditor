@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.6.4
+﻿# HexMapEditor 0.7.0
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.6.4** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.7.0** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -13,6 +13,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
 Ta wersja odczytuje mapy 11 i presety 4. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
+
+## Start i jakość podglądu 0.7.0
+
+Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz nowy projekt oraz do5 dostępnych ostatnich map. Anulowanie lub błąd pozostawia ekran startowy. Można przekazać ścieżkę `.hexmap` jako argument EXE — walidowana mapa omija start, bez chwilowego pustego projektu. Library jest odczytywana dopiero po wyborze projektu.
+
+`recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
+
+Przycisk **Wysoka jakość / Niska jakość** dotyczy tylko sesji. High jest domyślny i wraca po udanym Nowa/Otwórz. Low pomija tło, pokazuje średni kolor właściwego kadru/gradientu heksa z zachowaniem pokrycia alpha oraz pierwszy kolor gradientowej kreski/wskaźnika. Zachowuje dane, fazę, geometrię, maski i flagi Widoku. Powrót do High przywraca pełny wygląd, także kreski narysowanej w Low. Nie zapisuje jakości ani dirty/historii; edytory nadal pokazują pełne źródła.
+
+Pickery współdzielą **12 kolorów sesji** w dwóch rzędach po6. Zatwierdzenie jednolitego koloru dodaje go na początek bez duplikatów; gradient i Anuluj niczego nie dopisują. Próbka może zmienić aktywny punkt gradientu. Restart zeruje pulę; brak pliku i wpisów głównej historii.
+
+Gumka przygotowuje dokładny wynik poza UI na odłączonej migawce. Podczas **Przetwarzanie…** edycje, zapis i historia są jawnie niedostępne; można anulować lub zamknąć program. Wynik jest stosowany atomowo do zgodnego dokumentu jako jeden krok historii. Anulowanie/błąd nie pozostawiają częściowego wymazania. Pan mapy wykorzystuje poprzedni cache i dorysowuje odsłonięte pasy. Przy serii zoomu chwilowy przekształcony podgląd przechodzi w dokładny render po zakończeniu; nie zmienia zapisanych kolorów i powierzchni.
+
+[Plan wydań](docs/plan-wersji.md), [raport 0.7.0](docs/raport-0.7.0.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
 
 ## Podmiana ikony programu
 
@@ -143,19 +157,19 @@ Library jest lokalne i ignorowane przez Git. Program tworzy brakujące Backgroun
 Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego polecenia.** Nowe scenariusze wybierane pojedynczo:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Groups041Tests.ps1 -Case model
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch070Tests.ps1 -Case quality
 ```
 
-Przypadki starszego przyrostu to model, fog i controls. Źródła i skrypty są śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 32 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
+Bieżące Case0.7.0: eraser-async, camera, quality, picker, start i integration; eraser-profile to diagnostyka, fixture tylko generator. Nie wybieraj ich hurtowo. Przypadki starszego przyrostu0.4.1 to model, fog i controls. Źródła i skrypty są śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 40 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
-Na później pozostają widok gracza, high/low detail, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
+Na później pozostają widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 
 Katalogi ikon, wzorców obiektów, stanów i presetów używają trwałej kolejności dodania. Starsze wpisy bez kolejności startują według stabilnego ID. Edycja zachowuje pozycję. Kolejność terenów jest kolejnością tablicy w palecie. Lista obiektów na mapie ma odrębny cykl sortowania rosnąco, malejąco i w kolejności dokumentu. Pokazuje grupę i znacznik efektywnego stanu. Sortuje maskowane teksty według widocznego `???` i mgłę liczbowo.
 
 Wszystkie uzgodnione funkcje, poprawki i audyty kończymy przed 1.0.0. Przyszłe przejście na 1.0.0 obejmie tylko oznaczenia wersji, bez dodatkowych zmian funkcjonalnych lub stylistycznych.
 
 
-Bieżące próby 0.6.4 wybiera jawny pojedynczy Case `profile`, `comparison`, `image`, `picker`, `input` albo `library` w `tests/Run-Patch064Tests.ps1`; `fixture` tworzy tylko własne dane. `comparison` odtwarza bazowy renderer z lokalnego commita 0cf9c24 w tests/_work, bez zależności od pozostałości starych prób. Brak Case kończy się błędem. [Raport i checklista 0.6.4](docs/raport-0.6.4.md). Bez pełnego zestawu bez osobnego polecenia.
+Historyczne próby 0.6.4 wybiera jawny pojedynczy Case `profile`, `comparison`, `image`, `picker`, `input` albo `library` w `tests/Run-Patch064Tests.ps1`; `fixture` tworzy tylko własne dane. `comparison` odtwarza bazowy renderer z lokalnego commita 0cf9c24 w tests/_work, bez zależności od pozostałości starych prób. Brak Case kończy się błędem. [Raport i checklista 0.6.4](docs/raport-0.6.4.md). Bez pełnego zestawu bez osobnego polecenia.
 
 Kolejka importu z folderów to wyłącznie [szczegółowy backlog](docs/backlog-import-z-folderow.md). Nie ma skanowania wejść, okien startowych ani usuwania oryginałów.
 
