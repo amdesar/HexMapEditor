@@ -15,10 +15,12 @@ namespace HexMapEditor
     }
     internal static class ChoiceStyle
     {
+        internal static readonly Color ActiveBack=Color.FromArgb(38,65,96),ActiveBorder=Color.FromArgb(90,145,205),ActiveHover=Color.FromArgb(43,77,114),NeutralBack=Color.FromArgb(49,54,67),NeutralBorder=Color.FromArgb(74,81,98);
+        internal static void Apply(Button control,bool active){control.ForeColor=Color.WhiteSmoke;control.BackColor=active?ActiveBack:NeutralBack;control.FlatAppearance.BorderColor=active?ActiveBorder:NeutralBorder;control.FlatAppearance.BorderSize=active?2:1;control.FlatAppearance.MouseOverBackColor=active?ActiveHover:Color.FromArgb(60,67,82);}
         internal static void Apply(RadioButton control)
         {
             control.FlatStyle=FlatStyle.Flat;control.UseVisualStyleBackColor=false;
-            Action sync=()=>{bool active=control.Checked;control.BackColor=active?Color.FromArgb(38,65,96):Color.FromArgb(49,54,67);control.ForeColor=Color.WhiteSmoke;control.FlatAppearance.BorderColor=active?Color.FromArgb(90,145,205):Color.FromArgb(74,81,98);control.FlatAppearance.BorderSize=active?2:1;control.FlatAppearance.CheckedBackColor=Color.FromArgb(38,65,96);control.FlatAppearance.MouseOverBackColor=active?Color.FromArgb(43,77,114):Color.FromArgb(60,67,82);};
+            Action sync=()=>{bool active=control.Checked;control.BackColor=active?ActiveBack:NeutralBack;control.ForeColor=Color.WhiteSmoke;control.FlatAppearance.BorderColor=active?ActiveBorder:NeutralBorder;control.FlatAppearance.BorderSize=active?2:1;control.FlatAppearance.CheckedBackColor=ActiveBack;control.FlatAppearance.MouseOverBackColor=active?ActiveHover:Color.FromArgb(60,67,82);};
             control.CheckedChanged+=(s,e)=>sync();sync();
         }
     }

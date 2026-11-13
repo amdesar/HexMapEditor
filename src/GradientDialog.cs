@@ -19,6 +19,7 @@ namespace HexMapEditor
         GradientDefinition draft;
         string uniform;
         bool updating;
+        ColorDraftHistory history;
         readonly bool cyclic;
         internal string Hex {get;private set;}
         internal GradientDefinition Gradient {get;private set;}
@@ -34,14 +35,23 @@ namespace HexMapEditor
             var rainbow=new Button{Text="Tęcza",Bounds=new Rectangle(442,235,78,27)};var shuffle=new Button{Text="Losuj",Bounds=new Rectangle(525,235,78,27)};remove.Bounds=new Rectangle(608,235,130,27);var hint=LabelAt(cyclic?"Cykl300px: 80% paleta, 20% płynny powrót.":"0°: lewo→prawo; 90°: góra→dół.",430,450);Controls.AddRange(new Control[]{rainbow,shuffle,remove,hint});shuffle.Click+=(s,e)=>Randomize(random);gradientMode.CheckedChanged+=(s,e)=>shuffle.Enabled=gradientMode.Checked;
             angle.Bounds=new Rectangle(440,438,240,32);angleValue.Location=new Point(680,441);if(!cyclic){Controls.Add(angle);Controls.Add(angleValue);hint.Top=475;}
             rainbow.Click+=(s,e)=>{draft=GradientRules.Rainbow();bar.Draft=draft;bar.Selected=0;gradientMode.Checked=true;SyncColor();RefreshPreview();};remove.Click+=(s,e)=>{bar.RemoveSelected();SyncColor();RefreshPreview();};
-            angle.ValueChanged+=(s,e)=>{if(updating)return;draft.Angle=angle.Value;RefreshPreview();};
+            angle.ValueChanged+=(s,e)=>{if(updating)return;draft.Angle=angle.Value;RefreshPreview();};angle.MouseUp+=(s,e)=>CommitColorDraft();angle.KeyUp+=(s,e)=>CommitColorDraft();
             var cancel=new Button{Text="Anuluj",DialogResult=DialogResult.Cancel,Bounds=new Rectangle(650,490,96,28)};accept.Bounds=new Rectangle(538,490,105,28);Controls.AddRange(new Control[]{accept,cancel});AcceptButton=accept;CancelButton=cancel;
             accept.Click+=(s,e)=>{if(!color.ColorValid)return;GradientRules.Validate(draft);Gradient=gradientMode.Checked?draft.Copy():null;Hex=Gradient==null?uniform:Gradient.Stops[0].Color;if(Gradient==null)RecentColors.Add(ColorTranslator.FromHtml(Hex));DialogResult=DialogResult.OK;};
             color.Changed=c=>{if(updating)return;if(gradientMode.Checked){if(bar.Selected<0||bar.Selected>=draft.Stops.Count)return;draft.Stops[bar.Selected].Color=color.Hex;}else uniform=color.Hex;RefreshPreview();};color.ValidityChanged=valid=>accept.Enabled=valid;
             solidMode.CheckedChanged+=(s,e)=>{if(solidMode.Checked){SyncColor();RefreshPreview();}};gradientMode.CheckedChanged+=(s,e)=>{if(gradientMode.Checked){SyncColor();RefreshPreview();}};gradientMode.Checked=gradient!=null||startGradient;solidMode.Checked=!gradientMode.Checked;shuffle.Enabled=gradientMode.Checked;
             foreach(var button in Controls.OfType<Button>()){button.FlatStyle=FlatStyle.Flat;button.BackColor=Color.FromArgb(49,54,67);button.ForeColor=ForeColor;}
             SyncColor();RefreshPreview();
+            history=new ColorDraftHistory(CaptureColorDraft,RestoreColorDraft);color.EditCompleted=CommitColorDraft;color.ExternalHistory=repeat=>history.Move(repeat);
+            bar.Completed=CommitColorDraft;
+            foreach(var b in new[]{rainbow,shuffle,remove})b.Click+=(s,e)=>CommitColorDraft();
+            solidMode.CheckedChanged+=(s,e)=>{if(!updating)CommitColorDraft();};gradientMode.CheckedChanged+=(s,e)=>{if(!updating)CommitColorDraft();};
         }
+        string CaptureColorDraft(){return MapLogic.Serializer().Serialize(new PaintDraftState{Uniform=uniform,Gradient=draft,GradientMode=gradientMode.Checked});}
+        void RestoreColorDraft(string state){var saved=MapLogic.Serializer().Deserialize<PaintDraftState>(state);updating=true;try{uniform=saved.Uniform;draft=saved.Gradient;bar.Draft=draft;bar.Selected=Math.Max(0,Math.Min(bar.Selected,draft.Stops.Count-1));gradientMode.Checked=saved.GradientMode;solidMode.Checked=!saved.GradientMode;}finally{updating=false;}SyncColor();RefreshPreview();}
+        void CommitColorDraft(){if(history!=null&&!updating)history.Commit();}
+        protected override void OnDeactivate(EventArgs e){color.FinishTextEdit();CommitColorDraft();base.OnDeactivate(e);}
+        protected override bool ProcessCmdKey(ref Message msg,Keys keys){if(keys==(Keys.Control|Keys.Shift|Keys.Z))return true;if(keys==(Keys.Control|Keys.Z)||keys==(Keys.Control|Keys.Y)){if(color.NativeColorText)return base.ProcessCmdKey(ref msg,keys);history.Move(keys==(Keys.Control|Keys.Y));return true;}return base.ProcessCmdKey(ref msg,keys);}
         static Label LabelAt(string text,int x,int y){return new Label{Text=text,AutoSize=true,Location=new Point(x,y)};}
         internal void Randomize(Random generator){foreach(var stop in draft.Stops)stop.Color=String.Format("#{0:X2}{1:X2}{2:X2}",generator.Next(256),generator.Next(256),generator.Next(256));SyncColor();RefreshPreview();}
         void SyncColor(){updating=true;try{color.SetColor(ColorTranslator.FromHtml(gradientMode.Checked?draft.Stops[bar.Selected].Color:uniform));angle.Value=(int)Math.Round(draft.Angle);}finally{updating=false;}}
@@ -60,15 +70,16 @@ namespace HexMapEditor
     }
     internal sealed class GradientBar : Control
     {
-        internal GradientDefinition Draft;internal int Selected;internal Action Changed;bool dragging;
+        internal GradientDefinition Draft;internal int Selected;internal Action Changed,Completed;bool dragging;
         internal GradientBar(){DoubleBuffered=true;Cursor=Cursors.Hand;AccessibleName="Punkty gradientu: klik dodaje, przeciągnij punkt, odstęp minimum 0,01";}
         internal bool Add(double t){if(Draft.Stops.Count>=16||Draft.Stops.Any(s=>Math.Abs(s.Position-t)<.01))return false;var c=GradientRules.At(Draft,t);var stop=new GradientStop{Position=t,Color=String.Format("#{0:X2}{1:X2}{2:X2}",c.R,c.G,c.B)};Draft.Stops.Add(stop);Draft.Stops=Draft.Stops.OrderBy(s=>s.Position).ToList();Selected=Draft.Stops.IndexOf(stop);return true;}
         internal void MoveSelected(double t){if(Selected<=0||Selected>=Draft.Stops.Count-1)return;Draft.Stops[Selected].Position=Math.Max(Draft.Stops[Selected-1].Position+.01,Math.Min(Draft.Stops[Selected+1].Position-.01,t));}
-        internal void RemoveSelected(){if(Selected<=0||Selected>=Draft.Stops.Count-1)return;Draft.Stops.RemoveAt(Selected);Selected=Math.Min(Selected,Draft.Stops.Count-1);if(Changed!=null)Changed();}
+        internal void RemoveSelected(){if(Selected<=0||Selected>=Draft.Stops.Count-1)return;Draft.Stops.RemoveAt(Selected);Selected=Math.Min(Selected,Draft.Stops.Count-1);if(Changed!=null)Changed();if(Completed!=null)Completed();}
         protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);if(e.Button!=MouseButtons.Left||Draft==null)return;double t=Math.Max(0,Math.Min(1,(e.X-7.0)/Math.Max(1,Width-14)));int at=Draft.Stops.FindIndex(s=>Math.Abs((Width-14)*s.Position+7-e.X)<=7);if(at>=0)Selected=at;else if(!Add(t))return;dragging=true;Capture=true;if(Changed!=null)Changed();}
         protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(!dragging)return;MoveSelected(Math.Max(0,Math.Min(1,(e.X-7.0)/Math.Max(1,Width-14))));if(Changed!=null)Changed();}
-        protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);dragging=false;Capture=false;}
-        protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture)dragging=false;}
+        void EndGesture(){if(!dragging)return;dragging=false;if(Completed!=null)Completed();}
+        protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);EndGesture();Capture=false;}
+        protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture)EndGesture();}
         protected override void OnPaint(PaintEventArgs e){if(Draft==null)return;for(int x=7;x<Width-7;x++)using(var p=new Pen(GradientRules.At(Draft,(x-7.0)/(Width-14))))e.Graphics.DrawLine(p,x,0,x,29);for(int i=0;i<Draft.Stops.Count;i++){float x=7+(float)Draft.Stops[i].Position*(Width-14);using(var b=new SolidBrush(ColorTranslator.FromHtml(Draft.Stops[i].Color)))e.Graphics.FillRectangle(b,x-6,32,12,18);using(var p=new Pen(i==Selected?Color.Gold:Color.Gray,i==Selected?3:1))e.Graphics.DrawRectangle(p,x-6,32,12,18);}}
     }
 }

@@ -39,10 +39,11 @@ namespace HexMapEditor
         static string DescriptionHistoryState(CellData cell) { return cell.RichDescription == null ? "plain:" + (cell.Description ?? "") : "rich:" + cell.RichDescription; }
         void PushAction(EditAction action)
         {
-            documentRevision++; undo.Push(action); if (undo.Count > 300) { var keep = undo.Reverse().Skip(1).ToArray(); undo.Clear(); foreach (var item in keep) undo.Push(item); } redo.Clear();
+            if(action.BeforeTool==null)documentRevision++; undo.Push(action); if (undo.Count > 300) { var keep = undo.Reverse().Skip(1).ToArray(); undo.Clear(); foreach (var item in keep) undo.Push(item); } redo.Clear();
         }
         void ApplyAction(EditAction action, bool after)
         {
+            if(action.BeforeTool!=null){ApplyToolNumbers(after?action.AfterTool:action.BeforeTool);return;}
             // Nothing in memory or on either stack changes before the checked disk transition.
             if(action.BackgroundFileChange!=null)ApplyBackgroundFile(action.BackgroundFileChange,after);
             if (action.LibraryChange != null) ApplyIconLibrary(action.LibraryChange, after);

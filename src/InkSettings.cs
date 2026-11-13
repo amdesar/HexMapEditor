@@ -14,6 +14,7 @@ namespace HexMapEditor
             var label=new Label{Text="Grubość / gumka",AutoSize=true,Location=new Point(0,3)};inkSettings.Controls.Add(label);
             inkSize=new ScrubNumber{Minimum=1,Maximum=200,DecimalPlaces=0,Increment=1,Value=5,Width=68,Location=new Point(115,0),AccessibleName="Grubość rysika / średnica gumki (logiczne piksele ekranu)"};inkSettings.Controls.Add(inkSize);
             inkSize.ValueChanged+=(s,e)=>{if(updating)return;EndCanvasGesture(true);inkToolSize=(float)inkSize.Value;canvas.Invalidate();};
+            BindToolNumber(inkSize);
             inkColorButton=SmallButton(inkSettings,"Kolor kreski",()=>ChooseInkColor(false),112);inkColorButton.Location=new Point(0,28);
             pointerColorButton=SmallButton(inkSettings,"Wskaźnik",()=>ChooseInkColor(true),100);pointerColorButton.AccessibleName="Kolor chwilowego wskaźnika";tips.SetToolTip(pointerColorButton,pointerColorButton.AccessibleName);
             inkSettings.Layout+=(s,e)=>{int half=inkSettings.ClientSize.Width/2;inkColorButton.SetBounds(0,28,half-2,28);pointerColorButton.SetBounds(half+2,28,inkSettings.ClientSize.Width-half-2,28);};

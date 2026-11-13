@@ -14,8 +14,8 @@ namespace HexMapEditor
         readonly Label detailIcon=new Label();
         readonly TextBox objectName=new DarkTextBox{MaxLength=200};
         readonly ScrubNumber objectSize=new ScrubNumber{Minimum=8,Maximum=1024,Value=30},objectRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};
-        readonly CheckBox objectLocked=new CheckBox{Text="Blokada ruchu",AutoSize=true},objectReveal=new CheckBox{Text="Odkrywa mgłę",AutoSize=true};
-        readonly CheckBox objectLight=new CheckBox{Text="Pole widzenia",AutoSize=true};
+        readonly CheckBox objectLocked=new SwitchBox{Text="Blokada ruchu",AutoSize=true},objectReveal=new SwitchBox{Text="Odkrywa mgłę",AutoSize=true};
+        readonly CheckBox objectLight=new SwitchBox{Text="Pole widzenia",AutoSize=true};
         readonly ScrubNumber objectLightRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};
         Label objectCount,memberGroupLabel,effectiveLabel;
         FlowLayoutPanel stateTiles;
@@ -33,7 +33,7 @@ namespace HexMapEditor
         {
             EditAction[] beforeUndo=null,beforeRedo=null;
             number.EditStarting+=(s,e)=>{EndObjectPropertyEdit();beforeUndo=undo.ToArray();beforeRedo=redo.ToArray();};
-            number.EditFinished+=(s,e)=>{EndObjectPropertyEdit();if(beforeUndo!=null&&(e.Cancelled||!e.Changed)){foreach(var a in undo.TakeWhile(a=>!beforeUndo.Contains(a)).ToArray())ApplyAction(a,false);undo.Clear();foreach(var a in beforeUndo.Reverse())undo.Push(a);redo.Clear();foreach(var a in beforeRedo.Reverse())redo.Push(a);dirty=savedState.CheckAll(map);}beforeUndo=null;beforeRedo=null;UpdateUI();};
+            number.EditFinished+=(s,e)=>{commandTarget=number;EndObjectPropertyEdit();if(beforeUndo!=null&&(e.Cancelled||!e.Changed)){foreach(var a in undo.TakeWhile(a=>!beforeUndo.Contains(a)).ToArray())ApplyAction(a,false);undo.Clear();foreach(var a in beforeUndo.Reverse())undo.Push(a);redo.Clear();foreach(var a in beforeRedo.Reverse())redo.Push(a);dirty=savedState.CheckAll(map);}beforeUndo=null;beforeRedo=null;UpdateUI();};
         }
         void ClearIconMaterial(){activeIcon=null;iconMaterial=false;objectMaterial=false;noMaterial=true;UpdateMaterialIndicator();canvas.Invalidate();}
         void UpdateBrushAvailability(){if(shapePicker==null)return;bool applicable=currentTool==EditorTool.FogBrush||currentTool==EditorTool.DarkBrush||currentTool==EditorTool.Brush&&!objectMaterial&&!noMaterial;shapePicker.Enabled=applicable;sizePicker.Enabled=applicable&&brushShape!=BrushShape.Point;heightPicker.Enabled=applicable;fillPicker.Enabled=applicable&&brushShape!=BrushShape.Point&&brushShape!=BrushShape.Horizontal&&brushShape!=BrushShape.Vertical;UpdateInkSettings();}

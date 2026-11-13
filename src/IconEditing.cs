@@ -137,6 +137,8 @@ namespace HexMapEditor
         }
         void PaintStamp(int start)
         { foreach (int index in BrushGeometry.Stamp(map, start, brushShape, brushSize, brushHeight, brushFilled)) PaintMaterial(index); }
+        System.Collections.Generic.List<int> StampAt(Point mouse){return BrushGeometry.Stamp(map,ObjectGeometry.Nearest(map,World(mouse)),brushShape,brushSize,brushHeight,brushFilled);}
+        void PaintStampAt(Point mouse){foreach(int i in StampAt(mouse))PaintMaterial(i);}
         void VisitBucketRegion(int start)
         {
             if (bucketOrigin == null || bucketProcessed.Contains(start)) return;
@@ -148,15 +150,15 @@ namespace HexMapEditor
         }
         void PaintAlong(Point mouse, int hit)
         {
-            if (!canvas.ClientRectangle.Contains(mouse) || hit < 0) { previousStrokePoint = null; return; }
+            if (!canvas.ClientRectangle.Contains(mouse)) { previousStrokePoint = null; return; }
             var point = new PointF((mouse.X - pan.X) / scale, (mouse.Y - pan.Y) / scale);
             if (previousStrokePoint.HasValue)
             {
                 var before = previousStrokePoint.Value; float dx = point.X - before.X, dy = point.Y - before.Y;
                 int steps = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(dx * dx + dy * dy) / (BaseRadius * .4f)));
-                for (int i = 1; i < steps; i++) { var p = new Point((int)Math.Round(pan.X + (before.X + dx * i / steps) * scale), (int)Math.Round(pan.Y + (before.Y + dy * i / steps) * scale)); int at = HitTest(p); if (at >= 0) PaintStamp(at); }
+                for (int i = 1; i < steps; i++) { var p = new Point((int)Math.Round(pan.X + (before.X + dx * i / steps) * scale), (int)Math.Round(pan.Y + (before.Y + dy * i / steps) * scale)); PaintStampAt(p); }
             }
-            PaintStamp(hit); previousStrokePoint = point;
+            PaintStampAt(mouse); previousStrokePoint = point;
         }
         void DrawCellIcon(Graphics graphics, CellData cell, PointF center)
         {
@@ -166,8 +168,8 @@ namespace HexMapEditor
         }
         void DrawBrushPreview(Graphics graphics)
         {
-            if (previewCell < 0 || (currentTool != EditorTool.Brush && currentTool != EditorTool.FogBrush && currentTool != EditorTool.DarkBrush)) return;
-            using (var pen = new Pen(Color.FromArgb(210, 130, 220, 255), 1.6f)) foreach (int i in BrushGeometry.Stamp(map, previewCell, brushShape, brushSize, brushHeight, brushFilled)) using (var path = HexPath(ScreenCenter(i % map.Columns, i / map.Columns), BaseRadius * scale * .94f)) graphics.DrawPath(pen, path);
+            if (!canvas.ClientRectangle.Contains(brushMouse) || (currentTool != EditorTool.Brush && currentTool != EditorTool.FogBrush && currentTool != EditorTool.DarkBrush) || currentTool==EditorTool.Brush&&(objectMaterial||noMaterial)) return;
+            using (var pen = new Pen(Color.FromArgb(210, 130, 220, 255), 1.6f)) foreach (int i in StampAt(brushMouse)) using (var path = HexPath(ScreenCenter(i % map.Columns, i / map.Columns), BaseRadius * scale * .94f)) graphics.DrawPath(pen, path);
         }
     }
 }

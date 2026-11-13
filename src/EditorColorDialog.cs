@@ -7,7 +7,7 @@ namespace HexMapEditor
 {
     internal sealed class EditorColorDialog : DarkForm
     {
-        readonly TextBox hex = new DarkTextBox { MaxLength = 32, AccessibleName = "Kolor HEX" };
+        readonly ColorHexBox hex = new ColorHexBox { MaxLength = 32, AccessibleName = "Kolor HEX" };
         readonly Label error = new Label { Text = "Wpisz # i dokładnie sześć cyfr szesnastkowych.", AutoSize = true, ForeColor = Color.Salmon };
         readonly Panel next = new Panel();
         readonly Button[] recent=new Button[12];
@@ -23,6 +23,18 @@ namespace HexMapEditor
         internal void Embed(){TopLevel=false;FormBorderStyle=FormBorderStyle.None;foreach(Control c in Controls)if(c is Button && !recent.Contains((Button)c))c.Visible=false;}
         double h, s, v;
         bool updating;
+        bool hexEditing;
+        ColorDraftHistory history;
+        internal Action EditStarted,EditCompleted;
+        internal Func<bool,bool> ExternalHistory;
+        internal bool NativeColorText{get{return hexEditing&&hex.ContainsFocus||rgb.Any(n=>n.IsEditing&&n.Controls[0].ContainsFocus);}}
+        void BeginColorEdit(){if(EditStarted!=null)EditStarted();}
+        void EndColorEdit(){if(EditCompleted!=null)EditCompleted();else if(history!=null)history.Commit();}
+        void FinishHex(){if(!hexEditing)return;hexEditing=false;EndColorEdit();}
+        internal void FinishTextEdit(){foreach(var number in rgb)number.CommitText();FinishHex();}
+        internal bool MoveColorHistory(bool redo){return ExternalHistory!=null?ExternalHistory(redo):history.Move(redo);}
+        protected override void OnDeactivate(EventArgs e){FinishTextEdit();base.OnDeactivate(e);}
+        protected override bool ProcessCmdKey(ref Message msg,Keys keys){if(keys==(Keys.Control|Keys.Shift|Keys.Z))return true;if(keys==(Keys.Control|Keys.Z)||keys==(Keys.Control|Keys.Y)){if(NativeColorText)return base.ProcessCmdKey(ref msg,keys);MoveColorHistory(keys==(Keys.Control|Keys.Y));return true;}return base.ProcessCmdKey(ref msg,keys);}
 
         internal Color SelectedColor { get; private set; }
         internal string Hex { get { return Format(SelectedColor); } }
@@ -40,6 +52,7 @@ namespace HexMapEditor
             Font = new Font("Segoe UI", 9);
             saturation = new HsvSurface(false, (x, y) => { s = x; v = 1 - y; RefreshColor(true); }) { Bounds = new Rectangle(16, 16, 326, 195), AccessibleName = "Nasycenie i jasność" };
             hue = new HsvSurface(true, (x, y) => { h = y * 359.99; RefreshColor(true); }) { Bounds = new Rectangle(354, 16, 44, 195), AccessibleName = "Odcień" };
+            foreach(var surface in new[]{saturation,hue}){surface.Started=()=>{BeginColorEdit();};surface.Completed=()=>{EndColorEdit();};}
             hex.SetBounds(55, 225, 108, 25);
             hex.BackColor = Color.FromArgb(48, 53, 65);
             hex.ForeColor = Color.WhiteSmoke;
@@ -54,7 +67,7 @@ namespace HexMapEditor
             hex.TabIndex=2;accept.TabIndex=6;cancel.TabIndex=7;
             Controls.AddRange(new Control[] { saturation, hue, hex, old, next, error, accept, cancel,
                 LabelAt("HEX", 16, 228), LabelAt("Poprzedni", 193, 257), LabelAt("Nowy", 303, 257) });
-            for(int i=0;i<12;i++){int at=i;var b=recent[i]=new Button{Bounds=new Rectangle(146+(i%6)*42,289+(i/6)*38,36,30),FlatStyle=FlatStyle.Flat,TabIndex=8+i};b.Click+=(s,e)=>{var colors=RecentColors.Values;if(at<colors.Length)SetColor(colors[at]);};Controls.Add(b);}
+            for(int i=0;i<12;i++){int at=i;var b=recent[i]=new Button{Bounds=new Rectangle(146+(i%6)*42,289+(i/6)*38,36,30),FlatStyle=FlatStyle.Flat,TabIndex=8+i};b.Click+=(s,e)=>{var colors=RecentColors.Values;if(at<colors.Length){BeginColorEdit();SetColor(colors[at]);EndColorEdit();}};Controls.Add(b);}
             RecentColors.Changed+=RefreshRecent;Disposed+=(s,e)=>{RecentColors.Changed-=RefreshRecent;recentTips.Dispose();};RefreshRecent();
             Controls.Add(LabelAt("Kolory sesji (ostatnie 12)",146,272));
             AcceptButton = accept;
@@ -63,6 +76,7 @@ namespace HexMapEditor
             hex.TextChanged += (sender, e) =>
             {
                 if (updating) return;
+                if(!hexEditing){hexEditing=true;BeginColorEdit();}
                 accept.Enabled = MapLogic.ValidColor(hex.Text);
                 error.Visible = !accept.Enabled;
                 if(ValidityChanged!=null)ValidityChanged(accept.Enabled);
@@ -70,6 +84,10 @@ namespace HexMapEditor
             };
             ReadColor(initial);
             RefreshColor(true);
+            history=new ColorDraftHistory(()=>Hex,value=>SetColor(ColorTranslator.FromHtml(value)));
+            foreach(var number in rgb){number.EditStarting+=(a,b)=>BeginColorEdit();number.EditFinished+=(a,b)=>EndColorEdit();}
+            hex.Enter+=(a,b)=>{if(!hexEditing){hexEditing=true;BeginColorEdit();}};hex.LostFocus+=(a,b)=>FinishHex();hex.Commit=FinishHex;
+            Action<Control> outside=target=>{if(!NumberInputRouter.Within(target,hex))FinishHex();};NumberInputRouter.PointerDown+=outside;Disposed+=(a,b)=>NumberInputRouter.PointerDown-=outside;
             ActiveControl = hex;
         }
 
@@ -129,6 +147,7 @@ namespace HexMapEditor
             readonly Action<double, double> choose;
             Bitmap gradient;
             double hue = -1, x, y;
+            internal Action Started,Completed;bool gesture;
 
             internal HsvSurface(bool hueOnly, Action<double, double> choose)
             {
@@ -166,9 +185,11 @@ namespace HexMapEditor
             }
 
             void Pick(Point p) { choose(Math.Max(0, Math.Min(1, (double)p.X / Math.Max(1, Width - 1))), Math.Max(0, Math.Min(1, (double)p.Y / Math.Max(1, Height - 1)))); }
-            protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) { Capture = true; Pick(e.Location); } }
+            protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) { gesture=true;if(Started!=null)Started();Capture = true; Pick(e.Location); } }
             protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); if (Capture) Pick(e.Location); }
-            protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == MouseButtons.Left) Capture = false; }
+            protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == MouseButtons.Left) {Capture = false;FinishGesture();} }
+            void FinishGesture(){if(!gesture)return;gesture=false;if(Completed!=null)Completed();}
+            protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture)FinishGesture();}
             protected override void Dispose(bool disposing) { if (disposing && gradient != null) gradient.Dispose(); base.Dispose(disposing); }
         }
     }

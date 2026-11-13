@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,7 +9,7 @@ namespace HexMapEditor
     internal sealed class StateRemovalDialog : EditorDialog
     {
         readonly ComboBox replacement = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        readonly CheckBox deleteFile = new CheckBox { Text = "Usuń również z biblioteki", AutoSize = true };
+        readonly CheckBox deleteFile = new SwitchBox { Text = "Usuń również z biblioteki", AutoSize = true };
         public Func<bool> CanAccept;
         public string ReplacementId { get { return ((ObjectStateDefinition)replacement.SelectedItem).Id; } }
         public bool DeleteFile { get { return deleteFile.Checked; } }

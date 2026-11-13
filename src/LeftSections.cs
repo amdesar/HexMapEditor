@@ -40,10 +40,11 @@ namespace HexMapEditor
             shapePicker = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Kształt pędzla" }; shapePicker.Items.AddRange(new object[] { "Punkt", "Kwadrat", "Prostokąt", "Koło", "Heksagon", "Pięciokąt foremny", "Linia pozioma", "Linia pionowa" }); shapePicker.SelectedIndex = 0; toolbox.Controls.Add(shapePicker);
             var sizeLabel = new Label { Text = "Rozmiar", Width = 52, Height = 22 }; toolbox.Controls.Add(sizeLabel);
             sizePicker = new ScrubNumber { Minimum = 1, Maximum = 15, Value = 1, Width = 60, AccessibleName = "Rozmiar lub szerokość pędzla" }; heightPicker = new ScrubNumber { Minimum = 1, Maximum = 15, Value = 1, Width = 60, Visible = false, AccessibleName = "Wysokość prostokąta" }; toolbox.Controls.Add(sizePicker); toolbox.Controls.Add(heightPicker);
-            fillPicker = new CheckBox { Text = "Wypełnienie", Checked = true, AutoSize = true, AccessibleName = "Wypełnienie figury; wyłącz, aby malować obrys" }; toolbox.Controls.Add(fillPicker);
+            fillPicker = new SwitchBox { Text = "Wypełnienie", Checked = true, AutoSize = true, AccessibleName = "Wypełnienie figury; wyłącz, aby malować obrys" }; toolbox.Controls.Add(fillPicker);
             tips.SetToolTip(sizePicker, "1–15. Heksagon: promień w pierścieniach + pole środkowe. Pozostałe: wymiar figury w odstępach siatki. Punkt zawsze 1 heks."); tips.SetToolTip(heightPicker, "Drugi wymiar prostokąta: wysokość 1–15");
             Action settings = () => { EndCanvasGesture(true); brushShape = (BrushShape)shapePicker.SelectedIndex; brushSize = (int)sizePicker.Value; brushHeight = (int)heightPicker.Value; brushFilled = fillPicker.Checked; heightPicker.Visible = brushShape == BrushShape.Rectangle; UpdateBrushAvailability(); tips.SetToolTip(sizeLabel, brushShape == BrushShape.Point ? "Punkt obejmuje zawsze jeden heks; rozmiar i wypełnienie nie mają zastosowania." : "Wymiar figury w jednostkach siatki: 1–15."); canvas.Invalidate(); };
             shapePicker.SelectedIndexChanged += (s, e) => settings(); sizePicker.ValueChanged += (s, e) => settings(); heightPicker.ValueChanged += (s, e) => settings(); fillPicker.CheckedChanged += (s, e) => settings(); settings();
+            BindToolNumber(sizePicker);BindToolNumber(heightPicker);
             toolbox.Layout+=(s,e)=>{int w=toolbox.ClientSize.Width;foreach(Control b in paletteTools.Controls){b.Width=(w-8)/4;b.Height=26;}shapeLabel.Location=new Point(0,87);shapePicker.SetBounds(52,85,Math.Max(80,w-52),22);sizeLabel.Location=new Point(0,110);sizePicker.Location=new Point(52,108);heightPicker.Location=new Point(w-60,108);fillPicker.Location=new Point(0,131);};
             BuildInkSettings(toolbox);
             var presets = Section("Presety", 1);
@@ -75,7 +76,7 @@ namespace HexMapEditor
             IconAction(objectActions,"new","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);deleteObjectButton=IconAction(objectActions,"trash","Usuń wzorzec obiektu",DeleteObjectTemplate);SmallButton(objectActions,"…",OpenObjectLibrary,32);IconAction(objectActions,"labels","Lista obiektów na mapie",OpenObjectInstances);
             objectPreview=new BufferedFlowPanel{Dock=DockStyle.Fill,AutoScroll=false,WrapContents=true};objects.Controls.Add(objectPreview);objectPreview.BringToFront();
             SelectTool(EditorTool.Select); LayoutPalette(); RefreshPresetPicker(); UpdateMaterialIndicator();
-            canvas.MouseLeave += (s, e) => { if(pointerActive){EndCanvasGesture(true);ClearPointerContext();} inkCursor=null;inkPrevious=null;activeStroke=null;previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
+            canvas.MouseLeave += (s, e) => { if(pointerActive){EndCanvasGesture(true);ClearPointerContext();} brushMouse=new Point(-100,-100);inkCursor=null;inkPrevious=null;activeStroke=null;previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
             Disposed += (s, e) => { foreach (var b in documentBitmaps.Values) b.Dispose(); foreach (var b in libraryBitmaps.Values) b.Dispose(); };
         }
         bool layingOutPalette;

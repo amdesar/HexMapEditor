@@ -7,6 +7,7 @@ namespace HexMapEditor
     public class DarkForm:Form
     {
         protected override void OnLoad(EventArgs e){EditorTheme.FormReady(this);base.OnLoad(e);}
+        protected override void OnDeactivate(EventArgs e){NumberInputRouter.CommitFor(this);base.OnDeactivate(e);}
     }
     internal class DarkTextBox:TextBox
     {

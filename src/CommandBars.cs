@@ -16,7 +16,7 @@ namespace HexMapEditor
         Control commandFocus,commandTarget;
         readonly Dictionary<EditorCommand,Button> quickCommands=new Dictionary<EditorCommand,Button>();
         internal readonly Dictionary<EditorCommand,int> CommandExecutions=new Dictionary<EditorCommand,int>();
-        static readonly Color SaveAccent=ColorTranslator.FromHtml("#D77A68"),LowAccent=ColorTranslator.FromHtml("#4FA7A0");
+        static readonly Color SaveAccent=ChoiceStyle.ActiveBorder,LowAccent=ChoiceStyle.ActiveBorder;
         ToolStripMenuItem AddCommand(ToolStripMenuItem parent,string text,EditorCommand command,string shortcut=null)
         {var item=new ToolStripMenuItem(text){ShortcutKeyDisplayString=shortcut};item.Click+=(s,e)=>ExecuteCommand(command);parent.DropDownItems.Add(item);commandMenus[command]=item;return item;}
         ToolStripMenuItem Category(string text){var item=new ToolStripMenuItem(text);mainMenu.Items.Add(item);return item;}
@@ -43,10 +43,10 @@ namespace HexMapEditor
             foreach(var folder in LibraryFolders()){string relative=folder.Value;library.DropDownItems.Add(new ToolStripMenuItem(folder.Key,null,(s,e)=>OpenLibraryFolder(relative)));}
             var help=Category("&Pomoc");AddCommand(help,"O programie…",EditorCommand.About);
             foreach(ToolStripMenuItem category in mainMenu.Items){category.DropDownOpening+=(s,e)=>UpdateCommandState();StyleMenus(category);}
-            quickStrip=new ToolStrip{Dock=DockStyle.None,AutoSize=false,Height=36,GripStyle=ToolStripGripStyle.Hidden,CanOverflow=true,LayoutStyle=ToolStripLayoutStyle.HorizontalStackWithOverflow,BackColor=shellToolbar.BackColor,ForeColor=Color.WhiteSmoke,Renderer=new ToolStripProfessionalRenderer(new FitMenuColors()),Padding=new Padding(4,1,4,1)};shellToolbar.Controls.Add(quickStrip);
+            quickStrip=new ToolStrip{Dock=DockStyle.None,AutoSize=false,Height=36,GripStyle=ToolStripGripStyle.Hidden,CanOverflow=true,LayoutStyle=ToolStripLayoutStyle.HorizontalStackWithOverflow,BackColor=shellToolbar.BackColor,ForeColor=Color.WhiteSmoke,Renderer=new FitButtonRenderer(),Padding=new Padding(4,1,4,1)};shellToolbar.Controls.Add(quickStrip);
             Quick(new Button(),EditorCommand.New,"new","Nowa mapa",32);Quick(new Button(),EditorCommand.Open,"open","Otwórz mapę",32);Quick(saveButton,EditorCommand.Save,"save","Zapisz (Ctrl+S)",32);quickStrip.Items.Add(new ToolStripSeparator());
             Quick(undoButton,EditorCommand.Undo,"undo","Cofnij (Ctrl+Z)",32);Quick(redoButton,EditorCommand.Redo,"redo","Ponów (Ctrl+Y)",32);quickStrip.Items.Add(new ToolStripSeparator());
-            ConfigureButton(zoomButton,"100% ▾","fit","Powiększenie — presety i wartość niestandardowa",ShowZoomMenu,82);zoomButton.Image=null;Host(zoomButton);
+            ConfigureButton(zoomButton,"100% ▾","fit","Powiększenie — presety i wartość niestandardowa",ShowZoomMenu,ZoomButtonWidth());zoomButton.Image=null;zoomButton.MouseDown+=(s,e)=>{if(GetMessageTime()!=zoomClosingStamp)suppressZoomOpen=false;};zoomButton.KeyDown+=(s,e)=>suppressZoomOpen=false;Host(zoomButton);
             Quick(new Button(),EditorCommand.FitMap,"fit","Dopasuj mapę",32);Quick(new Button(),EditorCommand.FitAll,"fitall","Dopasuj wszystko — widoczne warstwy",32);quickStrip.Items.Add(new ToolStripSeparator());qualityButton=new Button();Quick(qualityButton,EditorCommand.Quality,null,"Wysoka / Niska jakość — tylko podgląd sesji",60);
             MenuFence(quickStrip.OverflowButton.DropDown);UpdateQualityButton();UpdateCommandState();
         }
@@ -81,7 +81,9 @@ namespace HexMapEditor
             refresh();RecentAvailability.Refresh(paths,()=>{try{if(!IsDisposed&&IsHandleCreated)BeginInvoke(refresh);}catch(InvalidOperationException){}});
         }
         void FillZoomMenu(ToolStripItemCollection items){foreach(int p in new[]{25,50,75,100,125,150,200,300,400}){int percent=p;items.Add(new ToolStripMenuItem(p+"%",null,(s,e)=>SetZoomPercent(percent)));}items.Add(new ToolStripSeparator());items.Add(new ToolStripMenuItem("Niestandardowe…",null,(s,e)=>{using(var d=new ZoomDialog(scale*100))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)SetZoomPercent((float)d.Value);}));}
-        void ShowZoomMenu(){if(BlockInkCommit())return;EndCanvasGesture(true);if(zoomPopup==null){zoomPopup=new ContextMenuStrip{Renderer=new ToolStripProfessionalRenderer(new FitMenuColors()),BackColor=shellToolbar.BackColor,ForeColor=Color.WhiteSmoke};FillZoomMenu(zoomPopup.Items);MenuFence(zoomPopup);Disposed+=(s,e)=>zoomPopup.Dispose();}zoomPopup.Show(zoomButton,new Point(0,zoomButton.Height));}
+        bool suppressZoomOpen;int zoomClosingStamp;
+        int ZoomButtonWidth(){return TextRenderer.MeasureText("12800% ▾",Font,Size.Empty,TextFormatFlags.NoPadding).Width+12;}
+        void ShowZoomMenu(){if(BlockInkCommit())return;if(zoomPopup!=null&&zoomPopup.Visible){zoomPopup.Close();return;}if(suppressZoomOpen){suppressZoomOpen=false;return;}EndCanvasGesture(true);if(zoomPopup==null){zoomPopup=new ContextMenuStrip{Renderer=new ToolStripProfessionalRenderer(new FitMenuColors()),BackColor=shellToolbar.BackColor,ForeColor=Color.WhiteSmoke};FillZoomMenu(zoomPopup.Items);MenuFence(zoomPopup);zoomPopup.Closing+=(s,e)=>{if(e.CloseReason==ToolStripDropDownCloseReason.AppClicked&&zoomButton.RectangleToScreen(zoomButton.ClientRectangle).Contains(Control.MousePosition)){suppressZoomOpen=true;zoomClosingStamp=GetMessageTime();}};Disposed+=(s,e)=>zoomPopup.Dispose();}zoomPopup.Show(zoomButton,new Point(0,zoomButton.Height));}
         void SetZoomPercent(float percent){if(BlockInkCommit())return;if(percent<1||percent>12800||!ObjectGeometry.Finite(percent))throw new ArgumentOutOfRangeException("percent");EndCanvasGesture(true);EndCameraInteraction();var center=new PointF(canvas.ClientSize.Width/2f,canvas.ClientSize.Height/2f);float next=percent/100,factor=next/scale;pan=new PointF(center.X-(center.X-pan.X)*factor,center.Y-(center.Y-pan.Y)*factor);scale=next;UpdateZoomCaption();canvas.Invalidate();}
         void UpdateZoomCaption(){zoomButton.Text=Math.Round(scale*100)+"% ▾";}
         void UpdateCommandState()
@@ -96,9 +98,9 @@ namespace HexMapEditor
             pointyMenu.Checked=map.Orientation=="PointyTop";flatMenu.Checked=!pointyMenu.Checked;qualityHigh.Checked=!lowQuality;qualityLow.Checked=lowQuality;
             foreach(ToolStripMenuItem item in axesMenu.DropDownItems)item.Checked=(string)item.Tag==map.LabelMode;UpdateLayerChecks();
         }
-        static void Accent(Button b,bool active,Color color){b.ForeColor=active?color:Color.WhiteSmoke;b.FlatAppearance.BorderSize=1;b.FlatAppearance.BorderColor=active?color:Color.FromArgb(76,83,98);b.BackColor=active?Color.FromArgb(34+color.R/12,38+color.G/12,48+color.B/12):Color.FromArgb(49,54,67);b.FlatAppearance.MouseOverBackColor=Color.FromArgb(59,66,81);b.FlatAppearance.MouseDownBackColor=Color.FromArgb(42,49,65);}
+        static void Accent(Button b,bool active,Color color){ChoiceStyle.Apply(b,active);}
         void UpdateSaveAccent(){saveButton.Text="";Accent(saveButton,HasUnsavedChanges,SaveAccent);var prior=saveButton.Image;saveButton.Image=SaveImage(HasUnsavedChanges);if(prior!=null&&!ReferenceEquals(prior,EditorIcons.Small("save")))prior.Dispose();}
-        static Image SaveImage(bool active){if(!active)return EditorIcons.Small("save");var image=new Bitmap(18,18);using(var g=Graphics.FromImage(image))using(var attrs=new ImageAttributes()){attrs.SetColorMatrix(new ColorMatrix(new[]{new float[]{0,0,0,0,0},new float[]{0,0,0,0,0},new float[]{0,0,0,0,0},new float[]{0,0,0,1,0},new float[]{SaveAccent.R/255f,SaveAccent.G/255f,SaveAccent.B/255f,0,1}}));g.DrawImage(EditorIcons.Small("save"),new Rectangle(0,0,18,18),0,0,18,18,GraphicsUnit.Pixel,attrs);}return image;}
+        static Image SaveImage(bool active){return EditorIcons.Small("save");}
     }
     internal sealed class ZoomDialog:EditorDialog
     {

@@ -9,8 +9,8 @@ namespace HexMapEditor
     internal sealed class AppearancePoolDialog : DarkForm
     {
         readonly TextBox name = new DarkTextBox { MaxLength = 200 };
-        readonly CheckBox apply = new CheckBox { AutoSize = true };
-        readonly CheckBox preserve = new CheckBox { Text = "Zachowaj rozmieszczenie wariantów", AutoSize = true, Checked = true, Enabled = false };
+        readonly CheckBox apply = new SwitchBox { AutoSize = true };
+        readonly CheckBox preserve = new SwitchBox { Text = "Zachowaj rozmieszczenie wariantów", AutoSize = true, Checked = true, Enabled = false };
         readonly FlowLayoutPanel tiles = new FlowLayoutPanel { AutoScroll = true, Dock = DockStyle.Fill, Padding = new Padding(8) };
         readonly bool flat;
         readonly Dictionary<string, Bitmap> thumbnails = new Dictionary<string, Bitmap>();

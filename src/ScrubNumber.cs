@@ -8,7 +8,7 @@ namespace HexMapEditor
     // One control and transaction boundary for all application-owned numeric fields.
     internal sealed class ScrubNumber:UserControl
     {
-        readonly TextBox input=new TextBox{BorderStyle=BorderStyle.None,TextAlign=HorizontalAlignment.Right,Visible=false,TabStop=false};
+        readonly NumberTextBox input=new NumberTextBox{BorderStyle=BorderStyle.None,TextAlign=HorizontalAlignment.Right,Visible=false,TabStop=false};
         decimal current,min,max=100,step=1,original;int precision,startX;float dragDpi=1;bool down,scrubbing,editing,finishing,hover;
         internal event EventHandler EditStarting;
         internal event EventHandler<NumberEditEventArgs> EditFinished;
@@ -18,7 +18,7 @@ namespace HexMapEditor
         public decimal Increment{get{return step;}set{if(value<=0)throw new ArgumentOutOfRangeException();step=value;}}
         public int DecimalPlaces{get{return precision;}set{precision=Math.Max(0,Math.Min(6,value));Value=current;}}
         public int PixelsPerStep{get;set;}
-        public decimal Value{get{return current;}set{decimal next=Math.Max(min,Math.Min(max,Decimal.Round(value,precision)));bool changed=next!=current;current=next;if(!editing||finishing)input.Text=Format();Invalidate();if(changed&&ValueChanged!=null)ValueChanged(this,EventArgs.Empty);}}
+        public decimal Value{get{return current;}set{decimal next=Math.Max(min,Math.Min(max,Decimal.Round(value,precision,MidpointRounding.AwayFromZero)));bool changed=next!=current;current=next;if(!editing||finishing)input.Text=Format();Invalidate();if(changed&&ValueChanged!=null)ValueChanged(this,EventArgs.Empty);}}
         public override string Text{get{return editing?input.Text:Format();}set{if(input!=null)input.Text=value;}}
         internal bool IsEditing{get{return editing||scrubbing;}}
         internal void CancelDrag(){if(down||scrubbing){down=false;Finish(true);Capture=false;}}
@@ -26,22 +26,32 @@ namespace HexMapEditor
         const NumberStyles InputStyle=NumberStyles.AllowLeadingSign|NumberStyles.AllowDecimalPoint|NumberStyles.AllowLeadingWhite|NumberStyles.AllowTrailingWhite;
         public ScrubNumber()
         {
+            NumberInputRouter.Ensure();Disposed+=(s,e)=>NumberInputRouter.Leave(this);
             Size=new Size(80,26);MinimumSize=new Size(36,23);PixelsPerStep=8;TabStop=true;DoubleBuffered=true;BackColor=Color.FromArgb(41,46,58);ForeColor=Color.WhiteSmoke;Cursor=Cursors.SizeWE;
             input.BackColor=Color.FromArgb(39,55,78);input.ForeColor=ForeColor;Controls.Add(input);
             input.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){CommitText();e.Handled=e.SuppressKeyPress=true;}else if(e.KeyCode==Keys.Escape){Finish(true);e.Handled=e.SuppressKeyPress=true;}};
-            input.Validating+=(s,e)=>{if(editing&&!ValidText()) {System.Media.SystemSounds.Beep.Play();e.Cancel=true;}};
+            input.Validating+=(s,e)=>CommitText();
             input.LostFocus+=(s,e)=>{if(editing&&!ContainsFocus)CommitText();};
             EnabledChanged+=(s,e)=>{if(!Enabled)Finish(true);Invalidate();};
             var tip=new ToolTip();tip.SetToolTip(this,"Kliknij, aby wpisać. Przeciągaj poziomo po przekroczeniu progu. Enter zatwierdza, Escape przywraca. Strzałki działają z fokusem.");Disposed+=(s,e)=>tip.Dispose();
         }
-        bool ValidText(){decimal n;return Decimal.TryParse(input.Text,InputStyle,CultureInfo.CurrentCulture,out n)&&n>=min&&n<=max&&Decimal.Round(n,precision)==n;}
+        internal static decimal Normalize(string text,decimal previous,decimal minimum,decimal maximum,int places)
+        {
+            if(!NumberTextBox.Draft(text)||String.IsNullOrEmpty(text)||text=="-"||text.EndsWith(".")||text.EndsWith(","))return previous;
+            bool negative=text[0]=='-';string unsigned=negative?text.Substring(1):text;string[] parts=unsigned.Replace(',','.').Split('.');
+            string whole=parts[0].TrimStart('0');if(whole.Length==0)whole="0";
+            if(whole.Length>29)return negative?minimum:maximum;
+            string fraction=parts.Length==1?"":parts[1].Substring(0,Math.Min(parts[1].Length,places+1));
+            decimal parsed;if(!Decimal.TryParse((negative?"-":"")+whole+(fraction.Length==0?"":"."+fraction),NumberStyles.AllowLeadingSign|NumberStyles.AllowDecimalPoint,CultureInfo.InvariantCulture,out parsed))return negative?minimum:maximum;
+            return Math.Max(minimum,Math.Min(maximum,Decimal.Round(parsed,places,MidpointRounding.AwayFromZero)));
+        }
         void Start(){if(editing||scrubbing)return;original=current;if(EditStarting!=null)EditStarting(this,EventArgs.Empty);}
-        internal void BeginText(){if(!Enabled)return;if(editing)return;Start();editing=true;input.Text=Format();input.Visible=true;input.Focus();input.SelectAll();Invalidate();}
-        internal bool CommitText(){if(!editing)return true;if(!ValidText()){input.BackColor=Color.FromArgb(90,40,45);input.Focus();return false;}Value=Decimal.Parse(input.Text,InputStyle,CultureInfo.CurrentCulture);Finish(false);return true;}
+        internal void BeginText(){if(!Enabled)return;if(editing)return;Start();editing=true;NumberInputRouter.Enter(this);input.Text=Format();input.Visible=true;input.Focus();input.SelectAll();Invalidate();}
+        internal bool CommitText(){if(!editing)return true;Value=Normalize(input.Text,original,min,max,precision);Finish(false);return true;}
         internal void Finish(bool cancel)
         {
             if(finishing||(!editing&&!scrubbing))return;finishing=true;bool changed=current!=original;
-            try{if(cancel)Value=original;editing=false;scrubbing=false;down=false;Capture=false;input.Visible=false;input.BackColor=Color.FromArgb(39,55,78);if(EditFinished!=null)EditFinished(this,new NumberEditEventArgs(cancel,changed));}
+            try{if(cancel)Value=original;editing=false;NumberInputRouter.Leave(this);scrubbing=false;down=false;Capture=false;if(input.ContainsFocus){if(Parent!=null)Parent.Focus();else Focus();}input.Visible=false;input.BackColor=Color.FromArgb(39,55,78);if(EditFinished!=null)EditFinished(this,new NumberEditEventArgs(cancel,changed));}
             finally{finishing=false;Invalidate();}
         }
         internal void BeginScrub(int x){if(!Enabled)return;if(editing&&!CommitText())return;down=true;startX=x;using(var g=CreateGraphics())dragDpi=g.DpiX/96f;Focus();Capture=true;}
@@ -53,7 +63,7 @@ namespace HexMapEditor
         protected override void OnMouseCaptureChanged(EventArgs e){if(!Capture&&down){down=false;Finish(true);}base.OnMouseCaptureChanged(e);}
         protected override void OnMouseEnter(EventArgs e){hover=true;Invalidate();base.OnMouseEnter(e);}
         protected override void OnMouseLeave(EventArgs e){hover=false;Invalidate();base.OnMouseLeave(e);}
-        protected override void OnEnter(EventArgs e){base.OnEnter(e);if(!down&&!editing)BeginText();Invalidate();}
+        protected override void OnEnter(EventArgs e){base.OnEnter(e);if(!finishing&&!down&&!editing)BeginText();Invalidate();}
         protected override void OnLeave(EventArgs e){if(editing&&!ContainsFocus)CommitText();if(scrubbing)Finish(true);base.OnLeave(e);Invalidate();}
         protected override void OnLayout(LayoutEventArgs e){base.OnLayout(e);input.SetBounds(6,Math.Max(3,(Height-input.PreferredHeight)/2),Math.Max(10,Width-12),input.PreferredHeight);}
         protected override bool ProcessCmdKey(ref Message msg,Keys keys)

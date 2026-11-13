@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -60,7 +60,7 @@ namespace HexMapEditor
             var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex, map.Orientation == "FlatTop",lowQuality); tile.Delete.Enabled = !PresetReadOnly; }
         }
         void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; objectMaterial=false;noMaterial=false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); } }
-        void MaterialChosen() { if (!updating && (currentTool == EditorTool.FogBrush || currentTool == EditorTool.FogBucket)) SelectTool(EditorTool.Brush); }
+        void MaterialChosen() { if (!updating && (currentTool == EditorTool.FogBrush || currentTool == EditorTool.FogBucket || currentTool == EditorTool.DarkBrush || currentTool == EditorTool.DarkBucket)) SelectTool(EditorTool.Brush); }
         void SelectPreset(string id)
         {
             if (id == map.ActivePresetId) return; var chosen = AvailablePresets().First(p => p.Id == id);

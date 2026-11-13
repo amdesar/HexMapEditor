@@ -21,9 +21,13 @@ namespace HexMapEditor
         public static List<int> Stamp(MapData map, int start, BrushShape shape, int size, int height, bool filled)
         {
             if (start < 0 || start >= map.Cells.Count) return new List<int>();
+            return Stamp(map,new Point(start%map.Columns,start/map.Columns),shape,size,height,filled);
+        }
+        public static List<int> Stamp(MapData map, Point grid, BrushShape shape, int size, int height, bool filled)
+        {
             size = Math.Max(1, Math.Min(15, size)); height = Math.Max(1, Math.Min(15, height));
-            if (shape == BrushShape.Point) return new List<int> { start };
-            int c = start % map.Columns, r = start / map.Columns, extent = 2 * Math.Max(size, height) + 3;
+            if (shape == BrushShape.Point) return grid.X>=0&&grid.Y>=0&&grid.X<map.Columns&&grid.Y<map.Rows?new List<int> { grid.Y*map.Columns+grid.X }:new List<int>();
+            int c = grid.X, r = grid.Y, extent = 2 * Math.Max(size, height) + 3;
             var origin = Center(map, c, r); var axial = Axial(map, c, r); var points = new HashSet<Point>();
             float halfX = size * 24.24871f, halfY = (shape == BrushShape.Rectangle ? height : size) * 24.24871f;
             var candidates = new List<Point>();

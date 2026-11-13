@@ -114,6 +114,7 @@ namespace HexMapEditor
 
     internal sealed class EditAction
     {
+        public ToolNumbers BeforeTool,AfterTool;
         public List<CellChange> Changes = new List<CellChange>();
         public List<LayerChange> Layers = new List<LayerChange>();
         public IconLibraryChange LibraryChange;
@@ -168,6 +169,7 @@ namespace HexMapEditor
         int selected = -1;
         int brushIndex = 2;
         bool dirty, leftCollapsed, updating, dragging, panGesture;
+        Point brushMouse=new Point(-100,-100);
         bool needsFirstSave;
         bool HasUnsavedChanges {get{return dirty||needsFirstSave;}}
         bool rightPanelOpen;
@@ -615,9 +617,11 @@ namespace HexMapEditor
             if ((key != Keys.Z && key != Keys.Y) || (keyData & Keys.Control) == 0) return false;
             if ((keyData & Keys.Modifiers) != Keys.Control) return true;
 
+            for(var c=FocusedEditorControl();c!=null;c=c.Parent){var n=c as ScrubNumber;if(n!=null&&!n.IsEditing){if(key==Keys.Y)Redo();else Undo();return true;}}
             if(FocusedEditorControl() is TextBoxBase&&!cellName.ContainsFocus)return false;
 
             bool repeat = key == Keys.Y;
+            var number=FocusedEditorControl() as ScrubNumber;if(number!=null&&!number.IsEditing){if(repeat)Redo();else Undo();return true;}
             if (cellName.ContainsFocus) TextUndo("name", repeat);
             else if (cellDescription.ContainsFocus) TextUndo("description", repeat);
             else if (objectDetailPanel.ContainsFocus || !TextInputFocused(this))
@@ -799,6 +803,7 @@ namespace HexMapEditor
 
         void CanvasMouseDown(object sender, MouseEventArgs e)
         {
+            brushMouse=e.Location;
             if(BlockInkCommit())return;
             if(e.Button==MouseButtons.Middle&&inkBefore!=null)EndCanvasGesture(true);
             if (modalDepth > 0 || rightResizing || waitingForMouseRelease || gestureButton != MouseButtons.None) return;
@@ -821,15 +826,16 @@ namespace HexMapEditor
             if (gestureTool == EditorTool.Bucket || (gestureTool == EditorTool.FogBucket || gestureTool == EditorTool.DarkBucket)) { int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); } return; }
             if (gestureTool == EditorTool.Brush || (gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.DarkBrush))
             {
-                strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); int hit = HitTest(e.Location); if (hit >= 0) { BeginMaterialStroke(hit, gestureTool); PaintAlong(e.Location, hit); } canvas.Capture = true;
+                strokeBefore.Clear(); layerBefore.Clear(); strokeVisited.Clear(); int hit = HitTest(e.Location);var targets=StampAt(e.Location);if(targets.Count>0){BeginMaterialStroke(hit>=0?hit:targets[0],gestureTool);PaintAlong(e.Location,hit);} canvas.Capture = true;
             }
         }
 
         void CanvasMouseMove(object sender, MouseEventArgs e)
         {
             if (autoSaving || InkCommitBusy || modalDepth > 0 || rightResizing) return;
+            brushMouse=e.Location;
             int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
-            if (previewCell != hit) { previewCell = hit; canvas.Invalidate(); }
+            if (previewCell != hit || hit<0&&(currentTool==EditorTool.Brush||currentTool==EditorTool.FogBrush||currentTool==EditorTool.DarkBrush)) { previewCell = hit; canvas.Invalidate(); }
             if(currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus){inkCursor=e.Location;canvas.Invalidate();}
             if (e.Button == MouseButtons.None) { waitingForMouseRelease = false; if (gestureButton != MouseButtons.None) EndCanvasGesture(true); return; }
             // A pressed button alone is not an editing gesture: its Down must belong to this canvas.
@@ -843,7 +849,7 @@ namespace HexMapEditor
                 if (!dragging) { BeginCameraInteraction(false); dragging = true; panOrigin = pan; }
                 pan = new PointF(panOrigin.X + e.X - dragOrigin.X, panOrigin.Y + e.Y - dragOrigin.Y); canvas.Invalidate();
             }
-            if (gestureTool == EditorTool.Brush || (gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.DarkBrush)) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); PaintAlong(e.Location, hit); } else previousStrokePoint = null; }
+            if (gestureTool == EditorTool.Brush || (gestureTool == EditorTool.FogBrush || gestureTool == EditorTool.DarkBrush)) { if (Math.Abs(e.X - dragOrigin.X) + Math.Abs(e.Y - dragOrigin.Y) > 3) dragging = true; if (canvas.ClientRectangle.Contains(e.Location)) {if(!strokeStarted){var targets=StampAt(e.Location);if(targets.Count>0)BeginMaterialStroke(hit>=0?hit:targets[0],gestureTool);}if(strokeStarted)PaintAlong(e.Location,hit);}else previousStrokePoint=null; }
             if ((gestureTool == EditorTool.Bucket || (gestureTool == EditorTool.FogBucket || gestureTool == EditorTool.DarkBucket)) && hit >= 0 && canvas.ClientRectangle.Contains(e.Location)) { if (!strokeStarted) BeginMaterialStroke(hit, gestureTool); VisitBucketRegion(hit); }
         }
 
@@ -904,7 +910,7 @@ namespace HexMapEditor
         bool TryHistory(bool after, out string error)
         {
             if(autoSaving){error=AutoSaveBusyMessage;return false;}EndCanvasGesture(true); if(InkCommitBusy){error=InkBusyMessage;return false;} var from = after ? redo : undo; var to = after ? undo : redo; error = null; if (from.Count == 0) return true;
-            try { var action = from.Peek(); ApplyAction(action, after); documentRevision++; from.Pop(); to.Push(action); MarkDirty(); return true; }
+            try { var action = from.Peek(); ApplyAction(action, after); if(action.BeforeTool==null)documentRevision++; from.Pop(); to.Push(action); if(action.BeforeTool==null)MarkDirty();else{UpdateCommandState();canvas.Invalidate();} return true; }
             catch (Exception ex) { error = ex.Message; return false; }
         }
         void Undo() { string error; if (!TryHistory(false, out error)) ShowEditorMessage(error, "Nie można cofnąć", MessageBoxButtons.OK, MessageBoxIcon.Warning); }

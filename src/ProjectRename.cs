@@ -37,6 +37,13 @@ namespace HexMapEditor
     internal sealed class RenameProjectDialog:EditorDialog
     {
         readonly TextBox name=new DarkTextBox{MaxLength=200};
-        internal RenameProjectDialog(string initial,Func<string,bool> accept):base("Zmień nazwę pliku",170){name.Text=initial;Row(0,"Obecna nazwa",new Label{Text=initial,AutoEllipsis=true},true);Row(1,"Nowa nazwa",name,true);Buttons(2,()=>{if(accept(name.Text))DialogResult=DialogResult.OK;});}
+        internal RenameProjectDialog(string initial,Func<string,bool> accept):base("Zmień nazwę pliku",170)
+        {
+            string display=initial.EndsWith(".hexmap",StringComparison.OrdinalIgnoreCase)?initial.Substring(0,initial.Length-7):initial;
+            name.Text=display;Row(0,"Obecna nazwa:",new Label{Text=display,AutoEllipsis=true,TextAlign=System.Drawing.ContentAlignment.MiddleLeft},true);Row(1,"Nowa nazwa:",name,true);
+            foreach(var label in Layout.Controls.OfType<Label>().Where(c=>Layout.GetColumn(c)==0))label.TextAlign=System.Drawing.ContentAlignment.MiddleRight;
+            name.Margin=new Padding(3,Math.Max(0,(38-name.PreferredHeight)/2),3,0);
+            Buttons(2,()=>{if(accept(name.Text))DialogResult=DialogResult.OK;});
+        }
     }
 }
