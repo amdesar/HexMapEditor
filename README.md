@@ -1,10 +1,10 @@
-﻿# HexMapEditor 0.7.1
+﻿# HexMapEditor 0.7.2
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.7.1** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.7.2** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -18,9 +18,17 @@ Ta wersja odczytuje mapy 11 i presety 4. Nowe formaty zachowują pełne źródł
 
 Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz nowy projekt oraz do5 dostępnych ostatnich map. Okno ma stały rozmiar, a wycentrowana lista ostatnich map około połowy szerokości. Anulowanie lub błąd pozostawia ekran startowy. Można przekazać ścieżkę `.hexmap` jako argument EXE — walidowana mapa omija start, bez chwilowego pustego projektu. Library jest odczytywana dopiero po wyborze projektu. Jedynie host opisu WPF przygotowuje się raz przed pętlą okien; nie ładuje bibliotek ani obrazów na zapas. Start zamyka się dopiero po skutecznym pokazaniu edytora.
 
-**Nowy projekt** ze startu i z edytora: po parametrach wybierz nazwę i miejsce zapisu `.hexmap`. Dopiero udany bezpieczny zapis przydziela ścieżkę i otwiera nowy dokument, bez gwiazdki; Ctrl+S od razu zapisuje ten plik. Anulowanie parametrów/zapisu lub błąd zachowuje start albo poprzednią mapę. Nadpisanie istniejącego pliku wymaga potwierdzenia. MRU zmienia się dopiero po udanym zapisie.
+**Nowy projekt ze startu**: po nazwie i parametrach program tworzy `Library/Hexmaps/<nazwa>.hexmap` obok EXE, bez dialogu wyboru ścieżki. Kolizja nazwy (również różniącej się tylko wielkością liter) wymaga poprawienia nazwy; parametry pozostają, bez nadpisania i automatycznych sufiksów. Błąd pozostawia działający start. Po sukcesie projekt ma plik, czysty stan, wpis MRU i gotowe Ctrl+S.
+
+**Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
+
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.7.2 • 13.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
+
+**Autozapis co 5 minut** dotyczy tylko zmienionej mapy z przypisaną ścieżką. Zapisuje bieżący plik, bez backupów i dialogu sukcesu. Udany zapis ręczny/automatyczny oraz otwarcie/utworzenie pliku zaczyna nowy okres; samo malowanie nie resetuje licznika. Gest, modalny edytor, gumka lub aktywna sesja edycji odracza jedno żądanie do bezpiecznego stanu. Mapa bez ścieżki nigdy nie dostaje automatycznego pliku.
+
+Wynik przygotowuje jeden worker na odłączonej migawce. Podczas zapisu konfliktujące polecenia dostają informację w statusie; Escape lub próba zamknięcia anuluje oczekujące przygotowanie (po zakończeniu ponów zamknięcie). Nie przerywa się połowy publikacji pliku. Sukces pokazuje „Zapisano automatycznie”, zachowuje Undo i nie przebudowuje paneli. Błąd pozostawia niezapisane dane i kolejną próbę najwcześniej po 5 minutach. Obca zmiana lub zniknięcie pliku wstrzymuje autozapis — rozwiąż konflikt ręcznie albo użyj Zapisz jako. Ochrona porównuje bajty pliku przez SHA-256; nie jest systemem odzyskiwania po awarii dysku lub zasilania.
 
 Przycisk **Wysoka jakość / Niska jakość** dotyczy tylko sesji. High jest domyślny i wraca po udanym Nowa/Otwórz. Low pomija tło, pokazuje średni kolor właściwego kadru/gradientu heksa z zachowaniem pokrycia alpha oraz pierwszy kolor gradientowej kreski/wskaźnika. Zachowuje dane, fazę, geometrię, maski i flagi Widoku. Powrót do High przywraca pełny wygląd, także kreski narysowanej w Low. Nie zapisuje jakości ani dirty/historii; edytory nadal pokazują pełne źródła.
 
@@ -28,7 +36,7 @@ Pickery współdzielą **12 kolorów sesji** w dwóch rzędach po6. Zatwierdzeni
 
 Gumka przygotowuje dokładny wynik poza UI na odłączonej migawce. Puste trafienia, także wewnątrz otworu, odrzuca test powierzchni bez uruchamiania przetwarzania. Podczas pracy konfliktujące polecenia są blokowane logicznie z informacją, bez wygaszania całych drzew kontrolek. Pasek **Przetwarzanie…** pojawia się dopiero po180ms, bez przesuwania layoutu; można anulować lub zamknąć program. Podgląd wymazania pozostaje do przejęcia przez dokładny wynik. Wynik jest stosowany atomowo do zgodnego dokumentu jako jeden krok historii. Anulowanie/błąd przywraca oryginał. Pan mapy wykorzystuje poprzedni cache i dorysowuje odsłonięte pasy. Przy serii zoomu oddzielny ograniczony cache przejściowej klatki pomija powtarzane przeliczanie identycznego podglądu; po120ms od końca serii powstaje dokładny obraz. Nie zmienia zapisanych kolorów i powierzchni.
 
-[Plan wydań](docs/plan-wersji.md), [raport 0.7.1](docs/raport-0.7.1.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
+[Plan wydań](docs/plan-wersji.md), [raport 0.7.2](docs/raport-0.7.2.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
 
 ## Podmiana ikony programu
 
@@ -159,10 +167,10 @@ Library jest lokalne i ignorowane przez Git. Program tworzy brakujące Backgroun
 Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego polecenia.** Nowe scenariusze wybierane pojedynczo:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch071Tests.ps1 -Case ink
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch072Tests.ps1 -Case autosave
 ```
 
-Bieżące Case0.7.1: lifecycle, argument, new-file, ink, ink-wait i zoom; baseline służy porównaniu kodu bazowego, fixture tylko generuje dane do okna. Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 41 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
+Bieżące Case0.7.2: creation, editor, autosave, controls i safety. Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 42 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
 Na później pozostają widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 

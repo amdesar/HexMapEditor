@@ -861,3 +861,29 @@ Preview jest instalowany przed przygotowaniem migawki i trwa do atomowego zastos
 Jedna oddzielna przejściowa bitmapa ma klucz kamery dokładnej i aktualnej; nigdy nie staje się exact cache. Powtarzany Paint tej samej kamery nie przelicza ponownie odsłoniętych pasów. Suma dokładnej i przejściowej bitmapy nadal ≤5,8 mln pikseli + scratch256. Większy viewport używa fallback bez drugiej bitmapy, bez obniżania jakości końcowej. Dispose przy zmianie źródeł/kamery dokładnej/Clear. Seria koła w tym samym punkcie ma kamerę bazową i całkowite kroki: powrót do 0 odtwarza dokładny pan/zoom bez dryfu float. Wheel odświeża tylko caption zoomu i płótno. Timer120ms żąda obrazu końcowego raz i zatrzymuje się. Brak kolejki kamer i stałego renderowania.
 
 Wyniki i ograniczenia opisuje [raport 0.7.1](raport-0.7.1.md). [Aktualizator 0.13.0](plan-wersji.md) pozostaje wyłącznie backlogiem, bez sieci w tej wersji.
+
+## 42. Wersja 0.7.2 — dwie ścieżki Nowa i autozapis
+
+Ta sekcja zastępuje wspólną regułę początkowego wyboru pliku z sekcji 41. Cykl życia start/edytor, inicjalizacja WPF, gumka, kamera, High/Low i historia kolorów pozostają bez zmian.
+
+### Tworzenie i pierwszy zapis
+
+Ze startu istniejący dialog zbiera nazwę i parametry, a następnie tworzy plik w `LibraryPaths.Hexmaps`, czyli `Library/Hexmaps` obok uruchomionego EXE. Nie pokazuje SaveFileDialog. Nazwa podlega walidacji Windows: niedozwolone znaki, nazwy urządzeń, pusta nazwa, końcowa kropka/spacja, długość i wyjście poza katalog są odrzucane. Opcjonalne rozszerzenie `.hexmap` jest rozpoznawane bez rozróżniania wielkości liter. Kolizja pliku lub katalogu, także różniąca się wielkością liter, pozostawia dialog z wpisanymi parametrami i wymaga zmiany nazwy; bez sufiksu i overwrite. Publikacja używa create-only, więc także wyścig po wstępnym sprawdzeniu nie nadpisuje pliku. Ścieżka, czysty stan i MRU dopiero po sukcesie; błąd pozostawia działający start.
+
+Nowa z edytora przyjmuje te same dane mapy wyłącznie w pamięci: brak pliku, ścieżki i wpisu MRU. Odrębna flaga wymaganego pierwszego zapisu wywołuje gwiazdkę i ochronę przed porzuceniem także nietkniętej mapy. Nie jest fikcyjną zmianą heksów ani krokiem historii. Nowa/Otwórz/zamknięcie zachowują Zapisz/Nie zapisuj/Anuluj; anulowanie pierwszego zapisu nie porzuca dokumentu. Pierwsze Ctrl+S pokazuje istniejący dialog, po sukcesie kolejne zapisuje bieżący plik. Zapisz jako i potwierdzenie nadpisania pozostają.
+
+### Autozapis i ochrona pliku
+
+Stały interwał to 300000 ms monotonicznego zegara. Udane otwarcie, utworzenie pliku, zapis ręczny lub automatyczny rozpoczyna nowy okres. Edycja go nie przesuwa. Tani timer sprawdza tylko termin, dirty, ścieżkę i stan wejścia; nie waliduje ani nie serializuje mapy przy każdym tyknięciu. Jest najwyżej jedno oczekujące żądanie. Dokument bez ścieżki i czysty dokument nie są zapisywane. Aktywny gest, modalny edytor, gumka i aktywna sesja edycji odraczają zapis do bezpiecznego stanu.
+
+Odłączona migawka kopiuje metadane, parametry i punkty, współdzieląc niezmienne payloady źródeł/tekstów. Jeden worker MTA używa wspólnego walidatora, serializera i writera. Przed publikacją UI sprawdza referencję dokumentu, rewizję, ścieżkę i anulowanie. Podczas jednego zapisu konfliktujące wejścia/polecenia mają logiczną blokadę i odpowiedź w statusie, bez disabled całych paneli. Nie ma kolejki zapisów. Escape lub próba zamknięcia anuluje oczekujące przygotowanie; zamknięcie należy ponowić po zakończeniu. Rozpoczęta publikacja pliku kończy transakcję zamiast przerywać ją w połowie.
+
+Plik jest najpierw przygotowany i Flush(true) w tym samym katalogu. Pierwszy zapis używa create-only. Zapis tego samego otwartego pliku porównuje długość i SHA-256 odczytanej/zapisanej wersji. Sprawdzenie następuje ponownie po przeniesieniu dotychczasowego celu do prywatnej nazwy transakcji; publikacja nowego pliku nie nadpisuje ścieżki zajętej w międzyczasie. Błąd próbuje przywrócić poprzedni plik; jeśli obca ścieżka uniemożliwia rollback, stare bajty pozostają pod wskazaną w błędzie nazwą transakcji. Oznacza to krótki odstęp między dwoma atomowymi rename, a nie gwarancję odporności na każdą awarię zasilania. Jawny Zapisz jako z potwierdzonym overwrite zachowuje dotychczasowe Flush/Replace. To wspólny writer, bez uproszczonego serializera autozapisu i bez systemu backupów.
+
+Sukces zgodnego stanu ustawia punkt zapisu i czysty tytuł, zachowuje Undo, nie dodaje historii i nie przebudowuje paneli; status brzmi „Zapisano automatycznie”. Błąd pozostawia dirty, komunikat niemodalny i ponowienie najwcześniej po kolejnym okresie. Wykryta zewnętrzna zmiana lub zniknięcie pliku wstrzymuje autozapis do ręcznego rozwiązania/Zapisz jako. Nie ma dialogów z timera, autozapisu biblioteki/presetów, konfiguratora ani kopii odzyskiwania.
+
+### Metadane i zakres
+
+Obok niezmienionej dużej nazwy jest `by amdesar`, mniejszym fontem i kolorem dotychczasowej wersji, wyrównane do linii pisma. Drugi wiersz zachowuje pozycję/styl: `Wersja 0.7.2 • 13.11.2026`. Jedynym źródłem daty jest jawna stała `ReleaseMetadata.Date`; nie zegar startu ani czas modyfikacji EXE. Bez trzeciego wiersza, nowego logo, linku GitHub i połączeń aktualizacyjnych.
+
+Map11/preset4 oraz limity bez zmian. Stan pierwszego zapisu, zegar, fingerprint i worker nie są autorytatywnymi danymi mapy. Aktualizator 0.13.0 ma jedynie dopisany nierozstrzygnięty wybór szczegółów wydania (link do konkretnego Release albo osobne okno opisu). Szersze preferencje po 1.0 są oddzielone od trwałości układu w 0.12.0; teraz bez implementacji. Wyniki i ograniczenia: [raport 0.7.2](raport-0.7.2.md).
