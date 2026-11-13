@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class HistoryNameBox : TextBox
+    internal sealed class HistoryNameBox : DarkTextBox
     {
         public string EditKind = "typing";
         public Action HistoryUndo;

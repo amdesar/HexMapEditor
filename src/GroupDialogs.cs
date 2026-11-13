@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -7,7 +7,7 @@ namespace HexMapEditor
 {
     internal sealed class ObjectStateDialog : EditorDialog
     {
-        readonly TextBox name=new TextBox{MaxLength=200};
+        readonly TextBox name=new DarkTextBox{MaxLength=200};
         readonly CheckBox reveal=new CheckBox{Text="Pozwala odkrywać mgłę",AutoSize=true};
         string color="#777F91";
         public string StateName{get{return name.Text.Trim();}}

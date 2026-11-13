@@ -20,7 +20,7 @@ namespace HexMapEditor
             if(wheelSteps==0){scale=wheelBaseScale;pan=wheelBasePan;}
             else{float factor=next/wheelBaseScale;pan=new PointF(e.X-(e.X-wheelBasePan.X)*factor,e.Y-(e.Y-wheelBasePan.Y)*factor);scale=next;}
             if(proposed!=next&&(next==Math.Min(wheelBaseScale,.01f)||next==Math.Max(wheelBaseScale,128f))){wheelBaseScale=scale;wheelBasePan=pan;wheelSteps=0;}
-            zoomButton.Text=Math.Round(scale*100)+"%";canvas.Invalidate();
+            UpdateZoomCaption();canvas.Invalidate();
         }
         void EndCameraInteraction(){cameraIdle.Stop();wheelSeries=false;if(!cameraInteraction)return;cameraInteraction=false;cameraFinalRequests++;canvas.Invalidate();}
     }

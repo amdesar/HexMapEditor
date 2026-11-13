@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class BackgroundDialog : Form
+    internal sealed class BackgroundDialog : DarkForm
     {
         MapBackground draft;
         readonly BackgroundCropSurface crop = new BackgroundCropSurface { Bounds = new Rectangle(12, 58, 365, 310) };

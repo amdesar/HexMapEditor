@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -17,22 +17,22 @@ namespace HexMapEditor
         TextBox groupName;
         ListBox groupMembers;
         ComboBox groupState,groupLock,groupReveal,groupSizeMode,groupLight;
-        NumericUpDown groupLightRadius;CheckBox groupLightRadiusOverride;
-        NumericUpDown groupRadius,groupSize;
+        ScrubNumber groupLightRadius;CheckBox groupLightRadiusOverride;
+        ScrubNumber groupRadius,groupSize;
         CheckBox groupRadiusOverride, groupFrame;
         Button groupFrameColor;
         string groupStateSignature,groupMembersSignature;
         ComboBox OverrideChoice(){var c=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};c.Items.AddRange(new object[]{"Indywidualnie","Tak","Nie"});c.SelectedIndex=0;return c;}
         void BuildGroupDetails(Control parent)
         {
-            groupLayout=PropertyTable(parent);groupLayout.Visible=false;groupName=new TextBox{MaxLength=200};PropertyRow(groupLayout,0,"Nazwa grupy",groupName);
+            groupLayout=PropertyTable(parent);groupLayout.Visible=false;groupName=new DarkTextBox{MaxLength=200};PropertyRow(groupLayout,0,"Nazwa grupy",groupName);
             groupMembers=new ListBox{Height=108,IntegralHeight=false,AccessibleName="Członkowie trwałej grupy"};SpanRow(groupLayout,1,groupMembers);
             SpanRow(groupLayout,2,PropertyButton("Wybierz pojedynczego członka",()=>{var chosen=groupMembers.SelectedItem as GroupMemberChoice;if(chosen!=null){EndCanvasGesture(true);selectedGroupId=null;selectedObjects.Clear();selectedObjects.Add(chosen.Id);UpdateUI();}}));
             groupState=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};PropertyRow(groupLayout,3,"Stan",groupState);
             groupLock=OverrideChoice();PropertyRow(groupLayout,4,"Blokada",groupLock);groupReveal=OverrideChoice();PropertyRow(groupLayout,5,"Odkrywanie",groupReveal);
-            groupRadiusOverride=new CheckBox{Text="Nadpisz promień",AutoSize=true};SpanRow(groupLayout,6,groupRadiusOverride);groupRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,7,"Promień",groupRadius);
+            groupRadiusOverride=new CheckBox{Text="Nadpisz promień",AutoSize=true};SpanRow(groupLayout,6,groupRadiusOverride);groupRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,7,"Promień",groupRadius);
             groupSizeMode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};groupSizeMode.Items.AddRange(new object[]{"Indywidualnie","Przesunięcie","Wspólny"});groupSizeMode.SelectedIndex=0;PropertyRow(groupLayout,8,"Rozmiar",groupSizeMode);
-            groupSize=new NumericUpDown{Minimum=-1016,Maximum=1024};PropertyRow(groupLayout,9,"Wartość",groupSize);
+            groupSize=new ScrubNumber{Minimum=-1016,Maximum=1024};PropertyRow(groupLayout,9,"Wartość",groupSize);
             SpanRow(groupLayout,10,new Label{Text="Nakładka nie zmienia wartości indywidualnych. Przesunięcie jest liczone od ich rozmiaru i ograniczane do 8–1024. Stan bez uprawnienia zawsze blokuje skuteczne odkrywanie.",AutoSize=true,MaximumSize=new Size(340,0)});
             SpanRow(groupLayout,17,PropertyButton("Rozwiąż grupę",()=>{var g=CurrentGroup();if(g!=null)UnlinkWithDialog(g,g.Members.ToArray());}));
             groupFrame = new CheckBox { Text = "Ramka członków", AutoSize = true };
@@ -40,7 +40,7 @@ namespace HexMapEditor
             groupFrameColor = PropertyButton("Wybierz kolor", ChooseFrameColor);
             PropertyRow(groupLayout, 16, "Kolor ramki", groupFrameColor);
             SpanRow(groupLayout,18,PropertyButton("Usuń instancje grupy",ConfirmDeleteSelectedObjects,true));
-            groupLight=OverrideChoice();PropertyRow(groupLayout,12,"Pole widzenia",groupLight);groupLightRadiusOverride=new CheckBox{Text="Nadpisz promień widzenia",AutoSize=true};SpanRow(groupLayout,13,groupLightRadiusOverride);groupLightRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,14,"Promień widzenia",groupLightRadius);
+            groupLight=OverrideChoice();PropertyRow(groupLayout,12,"Pole widzenia",groupLight);groupLightRadiusOverride=new CheckBox{Text="Nadpisz promień widzenia",AutoSize=true};SpanRow(groupLayout,13,groupLightRadiusOverride);groupLightRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,14,"Promień widzenia",groupLightRadius);
             groupLight.SelectedIndexChanged+=(s,e)=>EditGroup("light",g=>g.LightEnabled=ReadOverride(groupLight),false);groupLightRadiusOverride.CheckedChanged+=(s,e)=>EditGroup("light-radius-mode",g=>g.LightRadius=groupLightRadiusOverride.Checked?(int?)groupLightRadius.Value:null,false);groupLightRadius.ValueChanged+=(s,e)=>{if(groupLightRadiusOverride.Checked)EditGroup("light-radius",g=>g.LightRadius=(int)groupLightRadius.Value,true);};LiveNumber(groupLightRadius);groupLightRadius.LostFocus+=(s,e)=>EndObjectPropertyEdit();
             groupFrame.CheckedChanged += (s, e) => EditGroup("frame", g => g.FrameEnabled = groupFrame.Checked, false);
             groupName.TextChanged+=(s,e)=>{if(!String.IsNullOrWhiteSpace(groupName.Text))EditGroup("name",g=>g.Name=groupName.Text.Trim(),true);};

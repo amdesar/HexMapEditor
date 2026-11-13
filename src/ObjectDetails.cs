@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -12,11 +12,11 @@ namespace HexMapEditor
         Control hexDetailScroll;
         Label detailTitle;
         readonly Label detailIcon=new Label();
-        readonly TextBox objectName=new TextBox{MaxLength=200};
-        readonly NumericUpDown objectSize=new NumericUpDown{Minimum=8,Maximum=1024,Value=30},objectRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
+        readonly TextBox objectName=new DarkTextBox{MaxLength=200};
+        readonly ScrubNumber objectSize=new ScrubNumber{Minimum=8,Maximum=1024,Value=30},objectRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};
         readonly CheckBox objectLocked=new CheckBox{Text="Blokada ruchu",AutoSize=true},objectReveal=new CheckBox{Text="Odkrywa mgłę",AutoSize=true};
         readonly CheckBox objectLight=new CheckBox{Text="Pole widzenia",AutoSize=true};
-        readonly NumericUpDown objectLightRadius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
+        readonly ScrubNumber objectLightRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};
         Label objectCount,memberGroupLabel,effectiveLabel;
         FlowLayoutPanel stateTiles;
         Button addStateTile;
@@ -27,9 +27,14 @@ namespace HexMapEditor
         string stateTileSignature,propertyEditKey;
         EditAction propertyEditAction;
         bool clearAfterIconEdit;
-        static bool TextInputFocused(Control parent){if(parent.ContainsFocus&&(parent is TextBoxBase||parent is NumericUpDown||parent is RichNoteEditor))return true;return parent.Controls.Cast<Control>().Any(TextInputFocused);}
+        static bool TextInputFocused(Control parent){if(parent.ContainsFocus&&(parent is TextBoxBase||parent is ScrubNumber||parent is RichNoteEditor))return true;return parent.Controls.Cast<Control>().Any(TextInputFocused);}
         void EndObjectPropertyEdit(){propertyEditKey=null;propertyEditAction=null;}
-        void LiveNumber(NumericUpDown number){number.TextChanged+=(s,e)=>{decimal value;if(!updating&&Decimal.TryParse(number.Text,System.Globalization.NumberStyles.Integer,System.Globalization.CultureInfo.CurrentCulture,out value)&&value>=number.Minimum&&value<=number.Maximum)number.Value=value;};}
+        void LiveNumber(ScrubNumber number)
+        {
+            EditAction[] beforeUndo=null,beforeRedo=null;
+            number.EditStarting+=(s,e)=>{EndObjectPropertyEdit();beforeUndo=undo.ToArray();beforeRedo=redo.ToArray();};
+            number.EditFinished+=(s,e)=>{EndObjectPropertyEdit();if(beforeUndo!=null&&(e.Cancelled||!e.Changed)){foreach(var a in undo.TakeWhile(a=>!beforeUndo.Contains(a)).ToArray())ApplyAction(a,false);undo.Clear();foreach(var a in beforeUndo.Reverse())undo.Push(a);redo.Clear();foreach(var a in beforeRedo.Reverse())redo.Push(a);dirty=savedState.CheckAll(map);}beforeUndo=null;beforeRedo=null;UpdateUI();};
+        }
         void ClearIconMaterial(){activeIcon=null;iconMaterial=false;objectMaterial=false;noMaterial=true;UpdateMaterialIndicator();canvas.Invalidate();}
         void UpdateBrushAvailability(){if(shapePicker==null)return;bool applicable=currentTool==EditorTool.FogBrush||currentTool==EditorTool.DarkBrush||currentTool==EditorTool.Brush&&!objectMaterial&&!noMaterial;shapePicker.Enabled=applicable;sizePicker.Enabled=applicable&&brushShape!=BrushShape.Point;heightPicker.Enabled=applicable;fillPicker.Enabled=applicable&&brushShape!=BrushShape.Point&&brushShape!=BrushShape.Horizontal&&brushShape!=BrushShape.Vertical;UpdateInkSettings();}
         TableLayoutPanel PropertyTable(Control parent){var t=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=2,Padding=new Padding(4)};t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));parent.Controls.Add(t);return t;}

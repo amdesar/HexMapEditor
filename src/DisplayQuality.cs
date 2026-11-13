@@ -42,6 +42,6 @@ namespace HexMapEditor
             lowQuality=low;InkLayerRenderer.Clear();UpdateQualityButton();UpdateTerrainSelection();canvas.Invalidate();
         }
         void ResetQuality(){lowQuality=false;InkLayerRenderer.Clear();UpdateQualityButton();UpdateTerrainSelection();}
-        void UpdateQualityButton(){if(qualityButton==null)return;qualityButton.Text=lowQuality?"Niska jakość":"Wysoka jakość";qualityButton.AccessibleDescription=qualityButton.Text;qualityButton.BackColor=lowQuality?Color.FromArgb(38,65,96):Color.FromArgb(49,54,67);qualityButton.FlatAppearance.BorderColor=lowQuality?Color.FromArgb(90,145,205):Color.Gray;}
+        void UpdateQualityButton(){if(qualityButton==null)return;qualityButton.Text=lowQuality?"Low":"High";qualityButton.AccessibleDescription=lowQuality?"Niska jakość":"Wysoka jakość";Accent(qualityButton,lowQuality,LowAccent);UpdateCommandState();}
     }
 }

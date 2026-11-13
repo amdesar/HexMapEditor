@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal class EditorDialog : Form
+    internal class EditorDialog : DarkForm
     {
         protected new readonly TableLayoutPanel Layout;
         protected readonly Button Ok = new Button { Text = "OK", Width = 92, Height = 30 };
@@ -24,13 +24,13 @@ namespace HexMapEditor
     }
     internal sealed class NameDialog : EditorDialog
     {
-        readonly TextBox name = new TextBox(); public string Value { get { return name.Text.Trim(); } }
+        readonly TextBox name = new DarkTextBox(); public string Value { get { return name.Text.Trim(); } }
         public NameDialog(string title, string initial) : base(title, 120) { name.Text = initial; name.MaxLength = 200; Row(0, "Nazwa", name, true); Buttons(1, () => { if (Value.Length > 0) DialogResult = DialogResult.OK; }); }
     }
     internal sealed class SavePresetDialog : EditorDialog
     {
         readonly RadioButton overwrite = new RadioButton { Text = "Nadpisz bieżący preset", AutoSize = true }, asNew = new RadioButton { Text = "Zapisz jako nowy preset", AutoSize = true };
-        readonly TextBox name = new TextBox { MaxLength = 200 };
+        readonly TextBox name = new DarkTextBox { MaxLength = 200 };
         public bool AsNew { get { return asNew.Checked; } } public string PresetName { get { return name.Text.Trim(); } }
         public SavePresetDialog(TerrainPreset preset, bool saved) : base("Zapisz preset", 255)
         {
@@ -46,7 +46,7 @@ namespace HexMapEditor
     }
     internal sealed class TableSizeDialog : EditorDialog
     {
-        readonly NumericUpDown rows = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 2 }, columns = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 2 };
+        readonly ScrubNumber rows = new ScrubNumber { Minimum = 1, Maximum = 100, Value = 2 }, columns = new ScrubNumber { Minimum = 1, Maximum = 100, Value = 2 };
         public int Rows { get { return (int)rows.Value; } } public int Columns { get { return (int)columns.Value; } }
         public TableSizeDialog() : base("Wstaw tabelę (1–100)", 155) { Row(0, "Wiersze", rows, true); Row(1, "Kolumny", columns, true); Buttons(2, () => DialogResult = DialogResult.OK); }
     }

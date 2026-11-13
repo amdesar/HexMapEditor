@@ -16,11 +16,14 @@ namespace HexMapEditor
         internal RecentProjects(string path){this.path=path;try{if(!File.Exists(path))return;if(new FileInfo(path).Length>262144)throw new InvalidDataException("Historia projektów jest zbyt duża.");var read=MapLogic.Serializer().Deserialize<string[]>(File.ReadAllText(path,Encoding.UTF8));if(read==null||read.Length>30)throw new InvalidDataException("Nieprawidłowa historia projektów.");foreach(var item in read){var normalized=Normalize(item);if(!entries.Contains(normalized,StringComparer.OrdinalIgnoreCase))entries.Add(normalized);}}catch(Exception ex){entries.Clear();Warning="Nie odczytano historii projektów: "+ex.Message;}}
         static string Normalize(string item){if(String.IsNullOrWhiteSpace(item)||item.Length>32767)throw new InvalidDataException("Nieprawidłowa ścieżka projektu.");return Path.GetFullPath(item);}
         internal void Touch(string item)
+        {try{var normalized=Normalize(item);Persist(new[]{normalized}.Concat(entries.Where(p=>!String.Equals(p,normalized,StringComparison.OrdinalIgnoreCase))).Take(30).ToList());}catch(Exception ex){Warning="Nie zapisano historii projektów: "+ex.Message;}}
+        internal void Renamed(string previous,string next)
+        {try{var normalized=Normalize(next);Persist(new[]{normalized}.Concat(entries.Where(p=>!String.Equals(p,previous,StringComparison.OrdinalIgnoreCase)&&!String.Equals(p,normalized,StringComparison.OrdinalIgnoreCase))).Take(30).ToList());}catch(Exception ex){Warning="Nie zapisano historii projektów: "+ex.Message;}}
+        void Persist(List<string> next)
         {
             string temp=null;
             try
             {
-                var normalized=Normalize(item);var next=new[]{normalized}.Concat(entries.Where(p=>!String.Equals(p,normalized,StringComparison.OrdinalIgnoreCase))).Take(30).ToList();
                 temp=Path.Combine(Path.GetDirectoryName(path),".recent-"+Guid.NewGuid().ToString("N")+".tmp");var bytes=new UTF8Encoding(false).GetBytes(MapLogic.Serializer().Serialize(next));
                 if(bytes.Length>262144)throw new InvalidDataException("Historia ścieżek przekracza 256 KiB; poprzedni plik pozostawiono bez zmian.");
                 using(var stream=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){stream.Write(bytes,0,bytes.Length);stream.Flush(true);}

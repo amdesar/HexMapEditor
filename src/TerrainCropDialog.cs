@@ -4,7 +4,7 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class TerrainCropDialog : Form
+    internal sealed class TerrainCropDialog : DarkForm
     {
         readonly GraphicDefinition draft;
         readonly CropSurface surface;

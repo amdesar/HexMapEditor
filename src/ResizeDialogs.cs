@@ -25,14 +25,14 @@ namespace HexMapEditor
             }
         }
     }
-    internal sealed class ResizeDialog : Form
+    internal sealed class ResizeDialog : DarkForm
     {
-        readonly NumericUpDown topDelta = NewAmount(), bottomDelta = NewAmount(), leftDelta = NewAmount(), rightDelta = NewAmount();
+        readonly ScrubNumber topDelta = NewAmount(), bottomDelta = NewAmount(), leftDelta = NewAmount(), rightDelta = NewAmount();
         readonly Label result = new Label();
         public int TopDelta { get { return (int)topDelta.Value; } } public int BottomDelta { get { return (int)bottomDelta.Value; } }
         public int LeftDelta { get { return (int)leftDelta.Value; } } public int RightDelta { get { return (int)rightDelta.Value; } }
-        static NumericUpDown NewAmount() { return new NumericUpDown { Minimum = -199, Maximum = 199, Value = 0, Width = 108 }; }
-        static Control Field(string name, NumericUpDown amount)
+        static ScrubNumber NewAmount() { return new ScrubNumber { Minimum = -199, Maximum = 199, Value = 0, Width = 108 }; }
+        static Control Field(string name, ScrubNumber amount)
         {
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 }; layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 25)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
             layout.Controls.Add(new Label { Text = name, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter }, 0, 0);
@@ -57,7 +57,7 @@ namespace HexMapEditor
             topDelta.TabIndex = 0; bottomDelta.TabIndex = 1; leftDelta.TabIndex = 2; rightDelta.TabIndex = 3;
         }
     }
-    internal sealed class ResizeWarningDialog : Form
+    internal sealed class ResizeWarningDialog : DarkForm
     {
         internal readonly TextBox coordinates;
         internal readonly List<TextBox> GroupCoordinates = new List<TextBox>();
@@ -70,7 +70,7 @@ namespace HexMapEditor
             var tabs = new TabControl { Dock = DockStyle.Fill }; layout.Controls.Add(tabs, 0, 1);
             foreach (var group in groups)
             {
-                var text = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, WordWrap = true, MaxLength = int.MaxValue, Dock = DockStyle.Fill, AccessibleName = group.Title + ": pełne współrzędne przed zmianą", Text = String.Join(", ", group.Coordinates) };
+                var text = new DarkTextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, WordWrap = true, MaxLength = int.MaxValue, Dock = DockStyle.Fill, AccessibleName = group.Title + ": pełne współrzędne przed zmianą", Text = String.Join(", ", group.Coordinates) };
                 var tab = new TabPage(group.Title + " (" + group.Coordinates.Length + ")") { Padding = new Padding(5) }; tab.Controls.Add(text); tabs.TabPages.Add(tab); GroupCoordinates.Add(text);
             }
             coordinates = GroupCoordinates.FirstOrDefault();

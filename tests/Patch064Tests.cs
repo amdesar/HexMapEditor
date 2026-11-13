@@ -220,7 +220,7 @@ namespace HexMapEditor.Tests
 
             using(var solid=new EditorColorDialog(Color.Black))
 
-            {solid.Show();var rgb=(NumericUpDown[])Get(solid,"rgb");Check(rgb[0].Left==rgb[1].Left&&rgb[1].Left==rgb[2].Left&&rgb[0].Bottom<rgb[1].Top&&rgb[1].Bottom<rgb[2].Top,"RGB not vertical");var hex=(TextBox)Get(solid,"hex");hex.Text="#Ab12CD";Check(rgb[0].Value==171&&rgb[1].Value==18&&rgb[2].Value==205,"HEX sync");rgb[1].Value=250;Check(solid.Hex=="#ABFACD","RGB sync");hex.Text="#12";Check(!solid.ColorValid&&!((Button)Get(solid,"accept")).Enabled,"Invalid HEX accepted");solid.SetColor(Color.Blue);Check(solid.Hex=="#0000FF"&&rgb[2].Value==255,"HSV sync");Check(!solid.Controls.OfType<RadioButton>().Any(),"Gradient shown in solid context");solid.Close();}
+            {solid.Show();var rgb=(ScrubNumber[])Get(solid,"rgb");Check(rgb[0].Left==rgb[1].Left&&rgb[1].Left==rgb[2].Left&&rgb[0].Bottom<rgb[1].Top&&rgb[1].Bottom<rgb[2].Top,"RGB not vertical");var hex=(TextBox)Get(solid,"hex");hex.Text="#Ab12CD";Check(rgb[0].Value==171&&rgb[1].Value==18&&rgb[2].Value==205,"HEX sync");rgb[1].Value=250;Check(solid.Hex=="#ABFACD","RGB sync");hex.Text="#12";Check(!solid.ColorValid&&!((Button)Get(solid,"accept")).Enabled,"Invalid HEX accepted");solid.SetColor(Color.Blue);Check(solid.Hex=="#0000FF"&&rgb[2].Value==255,"HSV sync");Check(!solid.Controls.OfType<RadioButton>().Any(),"Gradient shown in solid context");solid.Close();}
 
             var definition=GradientRules.Rainbow();definition.Angle=70;string input=Json(definition);
 
@@ -264,7 +264,7 @@ namespace HexMapEditor.Tests
         {
             using(var w=new MainWindow())
             {
-                w.Show();Call(w,"StartNewProject",15,10,"PointyTop","Own input",PresetCatalog.Default());Call(w,"SelectTool",EditorTool.Stylus);var size=(NumericUpDown)Get(w,"inkSize");size.Focus();size.Controls.OfType<TextBox>().Single().Text="40";Check((float)Get(w,"inkToolSize")==5,"Fixture prematurely committed numeric value");
+                w.Show();Call(w,"StartNewProject",15,10,"PointyTop","Own input",PresetCatalog.Default());Call(w,"SelectTool",EditorTool.Stylus);var size=(ScrubNumber)Get(w,"inkSize");size.Focus();size.Controls.OfType<TextBox>().Single().Text="40";Check((float)Get(w,"inkToolSize")==5,"Fixture prematurely committed numeric value");
                 var canvas=(Control)Get(w,"canvas");Call(w,"CanvasMouseDown",canvas,new MouseEventArgs(MouseButtons.Left,1,150,100,0));Check((MouseButtons)Get(w,"gestureButton")==MouseButtons.Left,"Numeric blur ended fresh Down");Call(w,"CanvasMouseMove",canvas,new MouseEventArgs(MouseButtons.Left,0,450,100,0));Call(w,"EndCanvasGesture",true);var strokes=((MapData)Get(w,"map")).Ink;Check(strokes.Count==1&&strokes[0].Points.Count>=2,"First drag after size edit became dot");
             }
             Console.WriteLine("input PASS numeric blur completes before starting a fresh stroke");

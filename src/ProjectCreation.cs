@@ -10,13 +10,15 @@ namespace HexMapEditor
     internal static class ProjectCreation
     {
         internal static string StartPath(string name)
+        {return PathForName(LibraryPaths.Hexmaps,name);}
+        internal static string PathForName(string directory,string name)
         {
             if(String.IsNullOrWhiteSpace(name)||name!=name.Trim()||name.EndsWith(".")||name.IndexOfAny(Path.GetInvalidFileNameChars())>=0)
                 throw new IOException("Nazwa projektu zawiera niedozwolone znaki, kropkę lub spację na końcu.");
             string stem=name.EndsWith(".hexmap",StringComparison.OrdinalIgnoreCase)?name.Substring(0,name.Length-7):name;
             if(String.IsNullOrWhiteSpace(stem)||stem.EndsWith(".")||stem.EndsWith(" ")||Regex.IsMatch(stem.Split('.')[0].TrimEnd(' '),@"^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant))
                 throw new IOException("Wybierz poprawną nazwę pliku. Ta nazwa jest pusta lub zastrzeżona przez Windows.");
-            string root=Path.GetFullPath(LibraryPaths.Hexmaps),path=Path.GetFullPath(Path.Combine(root,stem+".hexmap"));
+            string root=Path.GetFullPath(directory),path=Path.GetFullPath(Path.Combine(root,stem+".hexmap"));
             if(!String.Equals(Path.GetDirectoryName(path),root,StringComparison.OrdinalIgnoreCase)||path.Length>=260)
                 throw new IOException("Niepoprawna lub zbyt długa ścieżka projektu. Wybierz krótszą nazwę.");
             return path;

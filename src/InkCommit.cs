@@ -96,7 +96,7 @@ namespace HexMapEditor
                 }
                 map.Ink=after;
                 var history=Stopwatch.StartNew();PushAction(new EditAction{Label="Gumka",BeforeInk=job.Before,AfterInk=after});
-                dirty=savedState.CheckInkSerialized(result.Serialized);UpdateCaption();undoButton.Enabled=undo.Count>0;redoButton.Enabled=redo.Count>0;result.Timing.History=history.Elapsed.TotalMilliseconds;
+                dirty=savedState.CheckInkSerialized(result.Serialized);UpdateCaption();result.Timing.History=history.Elapsed.TotalMilliseconds;
                 InkLayerRenderer.Clear();inkHandoff=job.Preview;inkHandoffResult=after;
             }
             else {if(current)map.Ink=job.Before;job.Preview.Dispose();}

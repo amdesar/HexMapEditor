@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -56,7 +56,7 @@ namespace HexMapEditor
                 else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 11), new Point(10, 3), new Point(18, 11), new Point(10, 19) }); g.DrawLine(p, 3, 11, 17, 11); g.DrawEllipse(p, 18, 13, 3, 5); }
                 else if (key == "pencil") { g.DrawPolygon(p, new[] { new Point(3, 19), new Point(5, 12), new Point(15, 2), new Point(20, 7), new Point(10, 17) }); g.DrawLine(p, 12, 5, 17, 10); }
                 else if (key == "trash") { g.DrawRectangle(p, 6, 7, 11, 13); g.DrawLine(p, 3, 5, 20, 5); g.DrawLine(p, 9, 2, 14, 2); g.DrawLine(p, 9, 10, 9, 17); g.DrawLine(p, 14, 10, 14, 17); }
-                else if (key == "fit") { foreach (int x in new[] { 2, 20 }) foreach (int y in new[] { 2, 20 }) { g.DrawLine(p, x, y, x == 2 ? 8 : 14, y); g.DrawLine(p, x, y, x, y == 2 ? 8 : 14); } }
+                else if (key == "fit" || key=="fitall") { foreach (int x in new[] { 2, 20 }) foreach (int y in new[] { 2, 20 }) { g.DrawLine(p, x, y, x == 2 ? 8 : 14, y); g.DrawLine(p, x, y, x, y == 2 ? 8 : 14); } if(key=="fitall"){g.DrawEllipse(p,6,6,10,10);g.DrawLine(p,8,11,14,11);g.DrawLine(p,11,8,11,14);} }
                 else if (key == "refresh") { g.DrawArc(p, 4, 4, 14, 14, 40, 285); g.DrawLines(p, new[] { new Point(12, 2), new Point(18, 4), new Point(17, 10) }); }
                 else { g.DrawRectangle(p, 3, 3, 16, 16); g.DrawLine(p, 7, 8, 15, 8); g.DrawLine(p, 7, 13, 15, 13); }
             }
@@ -67,7 +67,7 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         Panel shellToolbar;
-        FlowLayoutPanel fileGroup, viewGroup;
+
         readonly Label detailCoordinate = new Label(), detailTerrain = new Label();
         readonly FlowLayoutPanel paletteTiles = new BufferedFlowPanel();
         readonly Label presetStateLabel = new Label();
@@ -86,38 +86,7 @@ namespace HexMapEditor
         { var button = new Button(); ConfigureButton(button, text, icon, help, action, width); parent.Controls.Add(button); return button; }
         void InitializeShell()
         {
-            shellToolbar = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.FromArgb(34, 38, 48) }; Controls.Add(shellToolbar);
-            var file = fileGroup = new FlowLayoutPanel { Location = new Point(4, 4), Height = 34, WrapContents = false };
-            var view = viewGroup = new FlowLayoutPanel { Height = 34, WrapContents = false };
-            shellToolbar.Controls.Add(file); shellToolbar.Controls.Add(view);
-            ShellButton(file, "Nowa", "new", "Nowa mapa", NewProject, 70); ShellButton(file, "Otwórz", "open", "Otwórz mapę", OpenProject, 80);
-            ConfigureButton(saveButton, "Zapisz", "save", "Zapisz (Ctrl+S)", () => SaveProject(), 86); file.Controls.Add(saveButton);
-            ShellButton(file, "Zapisz jako", "saveas", "Zapisz jako (Ctrl+Shift+S)", () => SaveAsProject(), 100);
-            ConfigureButton(undoButton, "", "undo", "Cofnij operację mapy", Undo, 32); file.Controls.Add(undoButton);
-            ConfigureButton(redoButton, "", "redo", "Ponów operację mapy", Redo, 32); file.Controls.Add(redoButton);
-            ShellButton(file, "Biblioteka", "library", "Otwórz folder Library w Eksploratorze", OpenLibraryFolder, 98);
-            ShellButton(file, "Tło", "open", "Tło mapy", EditBackground, 65);
-            ConfigureButton(orientationToggle, "Pointy Top", "pointy", "Zmień orientację", () => ChangeOrientation(map.Orientation == "PointyTop" ? "FlatTop" : "PointyTop"), 128); view.Controls.Add(orientationToggle);
-            ConfigureButton(labelToggle, "Osie", "labels", "Zmień tryb etykiet", CycleLabelMode, 110); view.Controls.Add(labelToggle);
-            ConfigureButton(zoomButton, "100%", "fit", "Ustaw skalę 100%", SetZoom100, 62); zoomButton.Image = null; view.Controls.Add(zoomButton);
-            BuildViewMenu(view);
-            qualityButton=ShellButton(view,"Wysoka jakość","labels","Wysoka / Niska jakość — tylko podgląd tej sesji",()=>SetLowQuality(!lowQuality),124);
-            var fitMenu=new ContextMenuStrip();fitMenu.Items.Add("Dopasuj mapę",null,(s,e)=>FitMap());fitMenu.Items.Add("Dopasuj wszystko",null,(s,e)=>FitEverything());
-            fitMenu.BackColor=Color.FromArgb(34,38,48);fitMenu.ForeColor=Color.WhiteSmoke;fitMenu.Renderer=new ToolStripProfessionalRenderer(new FitMenuColors());
-            fitMenu.Opening+=(s,e)=>EndCanvasGesture(true);fitMenu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};
-            var fitStrip = new ToolStrip { AutoSize = false, Size = new Size(94, 32), Margin = new Padding(1),
-                Padding = Padding.Empty, GripStyle = ToolStripGripStyle.Hidden, CanOverflow = false,
-                BackColor = Color.FromArgb(49, 54, 67), Renderer = new FitButtonRenderer() };
-            var fitButton = new ToolStripDropDownButton("Dopasuj", EditorIcons.Small("fit"))
-            {
-                AutoSize = false, Size = new Size(94, 32), Margin = Padding.Empty, ShowDropDownArrow = false,
-                ForeColor = ForeColor, AccessibleName = "Dopasuj mapę / Dopasuj wszystko",
-                ToolTipText = "Dopasuj mapę / Dopasuj wszystko", DropDown = fitMenu
-            };
-            fitStrip.Items.Add(fitButton);
-            view.Controls.Add(fitStrip);
-            ShellButton(view, "Rozmiar", "labels", "Dodaj lub usuń wiersze i kolumny", ResizeProject, 90);
-            mapName.TextAlign = ContentAlignment.MiddleCenter; mapName.Font = new Font(Font, FontStyle.Bold); mapName.AutoEllipsis = true; mapName.AccessibleName = "Nazwa projektu"; shellToolbar.Controls.Add(mapName);
+            BuildCommandBars();
             var status = new Panel { Dock = DockStyle.Bottom, Height = 27, BackColor = shellToolbar.BackColor }; statusLabel.Dock = DockStyle.Fill; statusLabel.Padding = new Padding(10, 4, 0, 0); status.Controls.Add(statusLabel); Controls.Add(status);
             canvas.BackColor = Color.FromArgb(25, 28, 36); canvas.TabStop = true; Controls.Add(canvas); canvas.SendToBack();
             canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel;
@@ -129,12 +98,7 @@ namespace HexMapEditor
         }
         void LayoutMainToolbar()
         {
-            fileGroup.Width = fileGroup.Controls.Cast<Control>().Sum(c => c.Width + c.Margin.Horizontal);
-            viewGroup.Width = viewGroup.Controls.Cast<Control>().Sum(c => c.Width + c.Margin.Horizontal);
-            bool wrap=fileGroup.Width+viewGroup.Width+16>shellToolbar.ClientSize.Width;
-            shellToolbar.Height=wrap?78:42;fileGroup.Location = new Point(4, 4); viewGroup.Location = new Point(Math.Max(4,shellToolbar.ClientSize.Width - viewGroup.Width - 4), wrap?40:4);
-            int titleHeight = mapName.Font.Height + 2;
-            mapName.Bounds = new Rectangle(fileGroup.Right + 8, 4 + (34 - titleHeight) / 2, Math.Max(0, (wrap?shellToolbar.ClientSize.Width-4:viewGroup.Left) - fileGroup.Right - 16), titleHeight);
+            LayoutCommandBars();
         }
         void BuildPalettePanel() { BuildSections(); }
         Button SmallButton(Control parent, string text, Action action, int width)

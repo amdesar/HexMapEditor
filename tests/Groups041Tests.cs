@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -58,7 +58,7 @@ namespace HexMapEditor.Tests
         {
             using(var w=new MainWindow()){
                 var template=Setup(w);var obj=Place(w,2,2);Call(w,"ChooseObjectMember",obj,false,true);Call(w,"CaptureSavedState");var name=(TextBox)Get(w,"objectName");int count=Count(w,"undo");name.Text="G";name.Text="Go";name.Text="Goblin";Check(Count(w,"undo")==count+1&&Map(w).Objects[0].Name=="Goblin"&&(bool)Get(w,"dirty"),"Name each letter undo");Call(w,"EndObjectPropertyEdit");Undo(w);Check(Map(w).Objects[0].Name=="Przeciwnik"&&!(bool)Get(w,"dirty"),"Name session Undo");Undo(w,true);name.Text="";Check(Map(w).Objects[0].Name=="Goblin","Empty name entered model");Call(w,"EndObjectPropertyEdit");Call(w,"UpdateUI");
-                var size=(NumericUpDown)Get(w,"objectSize");count=Count(w,"undo");size.Text="31";size.Text="35";size.Text="42";Check(Count(w,"undo")==count+1&&Map(w).Objects[0].Size==42,"Numeric session split");Call(w,"EndObjectPropertyEdit");Undo(w);Check(Map(w).Objects[0].Size==30,"Numeric Undo");Undo(w,true);
+                var size=(ScrubNumber)Get(w,"objectSize");count=Count(w,"undo");size.BeginText();size.Text="31";size.Text="35";size.Text="42";size.CommitText();Check(Count(w,"undo")==count+1&&Map(w).Objects[0].Size==42,"Numeric session split");Call(w,"EndObjectPropertyEdit");Undo(w);Check(Map(w).Objects[0].Size==30,"Numeric Undo");Undo(w,true);
                 count=Count(w,"undo");((CheckBox)Get(w,"objectLocked")).Checked=true;Check(Count(w,"undo")==count+1&&Map(w).Objects[0].Locked,"Checkbox transaction");
                 Call(w,"FitMap");var pan=(PointF)Get(w,"pan");float scale=(float)Get(w,"scale");Call(w,"FitEverything");Check((PointF)Get(w,"pan")==pan&&(float)Get(w,"scale")==scale,"Contained object fit differs");var second=Place(w,3,2);SelectBoth(w);Call(w,"CreateObjectGroup","Duże");var group=Map(w).Groups.Single().Copy();group.SizeMode="Common";group.SizeValue=1000;Call(w,"ChangeObjectGroup",group,null);Call(w,"FitEverything");Check((float)Get(w,"scale")<scale,"Effective bounds ignored");
                 Call(w,"SelectTool",EditorTool.Select);Point empty=new Point(5,5);Selected(w).Clear();Set(w,"selectedGroupId",null);Set(w,"selected",0);Set(w,"rightPanelOpen",true);Call(w,"CanvasMouseDown",null,Mouse(empty));Call(w,"CanvasMouseUp",null,Mouse(empty));Check((int)Get(w,"selected")==-1&&!(bool)Get(w,"rightPanelOpen"),"Empty outside click keeps hex panel");

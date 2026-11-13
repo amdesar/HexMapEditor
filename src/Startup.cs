@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -78,7 +78,7 @@ namespace HexMapEditor
         void ReportFailure(Exception error){StartupTrace.Write("transition.error",start,error);if(Failure!=null)Failure(error);else MessageBox.Show(start,(start==null?"Edytor jest otwarty, ale wystąpił błąd zamykania startu.":"Nie można otworzyć edytora. Ekran startowy pozostaje dostępny.")+"\n\n"+error.Message,"Błąd otwierania",MessageBoxButtons.OK,MessageBoxIcon.Error);}
         protected override void ExitThreadCore(){exiting=true;DetachException();StartupTrace.Write("loop.exit",MainForm);if(preparedNotes!=null){preparedNotes.Dispose();preparedNotes=null;}if(candidate!=null){var old=candidate;candidate=null;old.InitialDisplayComplete=null;old.Dispose();}base.ExitThreadCore();}
     }
-    internal sealed class StartWindow : Form
+    internal sealed class StartWindow : DarkForm
     {
         readonly Action<MapData,string> open;
         readonly FlowLayoutPanel projects=new FlowLayoutPanel{FlowDirection=FlowDirection.TopDown,WrapContents=false};
@@ -95,7 +95,9 @@ namespace HexMapEditor
             var title=new Label{Name="appTitle",Text="HexMapEditor",Font=new Font(Font.FontFamily,28,FontStyle.Bold),AutoSize=true,Location=new Point(120,32)};Controls.Add(title);
             float bigAscent=title.Font.FontFamily.GetCellAscent(title.Font.Style)*title.Font.SizeInPoints*96/72/title.Font.FontFamily.GetEmHeight(title.Font.Style);
             float smallAscent=Font.FontFamily.GetCellAscent(Font.Style)*Font.SizeInPoints*96/72/Font.FontFamily.GetEmHeight(Font.Style);
-            Controls.Add(new Label{Name="appAuthor",Text="by amdesar",ForeColor=Color.Silver,AutoSize=true,Location=new Point(title.Right+8,title.Top+(int)Math.Round(bigAscent-smallAscent))});
+            int nameWidth=TextRenderer.MeasureText(title.Text,title.Font,Size.Empty,TextFormatFlags.NoPadding).Width;
+            var author=new Label{Name="appAuthor",Text="by amdesar",ForeColor=Color.Silver,AutoSize=true,Location=new Point(title.Left+nameWidth+4,title.Top+(int)Math.Round(bigAscent-smallAscent))};Controls.Add(author);
+            Shown+=(s,e)=>{using(var g=CreateGraphics()){var flags=TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix;int width=TextRenderer.MeasureText(g,title.Text,title.Font,Size.Empty,flags|TextFormatFlags.NoPadding).Width;int titlePad=(TextRenderer.MeasureText(g,title.Text,title.Font,Size.Empty,flags).Width-width)/2;int authorPad=(TextRenderer.MeasureText(g,author.Text,author.Font,Size.Empty,flags).Width-TextRenderer.MeasureText(g,author.Text,author.Font,Size.Empty,flags|TextFormatFlags.NoPadding).Width)/2;author.Left=title.Left+titlePad+width+6-authorPad;author.BringToFront();}};
             Controls.Add(new Label{Name="appVersion",Text="Wersja "+MainWindow.Version+" • "+ReleaseMetadata.Date,ForeColor=Color.Silver,AutoSize=true,Location=new Point(124,83)});
             var load=ButtonAt("Otwórz projekt",36,132);var create=ButtonAt("Stwórz nowy projekt",334,132);load.Click+=(s,e)=>ChooseOpen();create.Click+=(s,e)=>ChooseNew();
             Controls.Add(new Label{Text="Ostatnie projekty",AutoSize=true,Font=new Font(Font,FontStyle.Bold),Location=new Point(36,198)});

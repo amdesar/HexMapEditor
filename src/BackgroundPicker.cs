@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class BackgroundPicker : Form
+    internal sealed class BackgroundPicker : DarkForm
     {
         readonly Func<List<BackgroundEntry>> entries;
         readonly ListView list=new ListView{Dock=DockStyle.Fill,View=View.LargeIcon,MultiSelect=false,HideSelection=false};

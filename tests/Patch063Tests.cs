@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -50,7 +50,7 @@ namespace HexMapEditor.Tests
             bool rejected=false;var bad=definition.Copy();bad.Stops[1].Position=Double.NaN;try{GradientRules.Validate(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"NaN accepted");
             using(var picker=new EditorColorDialog(Color.Black))
             {
-                picker.Show();var hex=(TextBox)Get(picker,"hex");hex.Text="#aB12cd";Check(picker.Hex=="#AB12CD","HEX");var rgb=(NumericUpDown[])Get(picker,"rgb");Check(rgb[0].Value==171&&rgb[1].Value==18&&rgb[2].Value==205,"HEX to RGB");rgb[0].Value=32;Check(picker.Hex=="#2012CD","RGB to HEX/HSV");string valid=picker.Hex;hex.Text="#12";Check(!picker.ColorValid&&!((Button)Get(picker,"accept")).Enabled&&picker.Hex==valid,"Partial HEX changed valid data");picker.SetColor(Color.Lime);Check(hex.Text=="#00FF00"&&rgb[1].Value==255,"HSV/color sync");Check(!picker.Controls.Cast<Control>().Any(c=>c.Text=="Gradient"),"Solid context offers gradient");picker.CancelButton.PerformClick();
+                picker.Show();var hex=(TextBox)Get(picker,"hex");hex.Text="#aB12cd";Check(picker.Hex=="#AB12CD","HEX");var rgb=(ScrubNumber[])Get(picker,"rgb");Check(rgb[0].Value==171&&rgb[1].Value==18&&rgb[2].Value==205,"HEX to RGB");rgb[0].Value=32;Check(picker.Hex=="#2012CD","RGB to HEX/HSV");string valid=picker.Hex;hex.Text="#12";Check(!picker.ColorValid&&!((Button)Get(picker,"accept")).Enabled&&picker.Hex==valid,"Partial HEX changed valid data");picker.SetColor(Color.Lime);Check(hex.Text=="#00FF00"&&rgb[1].Value==255,"HSV/color sync");Check(!picker.Controls.Cast<Control>().Any(c=>c.Text=="Gradient"),"Solid context offers gradient");picker.CancelButton.PerformClick();
             }
             string before=Json(definition);using(var picker=new PaintPickerDialog(Color.Black,definition,true)){picker.Show();((GradientDefinition)Get(picker,"draft")).Stops[1].Color="#FFFFFF";picker.CancelButton.PerformClick();}Check(Json(definition)==before,"Picker cancel mutated definition");
             using(var picker=new PaintPickerDialog(Color.Black,definition,false)){picker.Show();picker.AcceptButton.PerformClick();Check(picker.DialogResult==DialogResult.OK&&GradientRules.Same(picker.Gradient,definition),"No-op gradient result");}

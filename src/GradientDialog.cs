@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 namespace HexMapEditor
 {
-    internal sealed class PaintPickerDialog : Form
+    internal sealed class PaintPickerDialog : DarkForm
     {
         readonly RadioButton solidMode=new RadioButton{Text="Jednolity",Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter};
         readonly RadioButton gradientMode=new RadioButton{Text="Gradient",Appearance=Appearance.Button,TextAlign=ContentAlignment.MiddleCenter};

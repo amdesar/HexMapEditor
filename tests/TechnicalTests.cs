@@ -137,10 +137,10 @@ namespace HexMapEditor.Tests
                 });
                 Test("new map dialog always resets dimensions and displays limits", w =>
                 {
-                    using (var first = new NewMapDialog("FlatTop")) { ((NumericUpDown)Get(first, "cols")).Value = 200; ((NumericUpDown)Get(first, "rows")).Value = 1; }
+                    using (var first = new NewMapDialog("FlatTop")) { ((ScrubNumber)Get(first, "cols")).Value = 200; ((ScrubNumber)Get(first, "rows")).Value = 1; }
                     using (var second = new NewMapDialog("FlatTop"))
                     {
-                        var cols = (NumericUpDown)Get(second, "cols"); var rows = (NumericUpDown)Get(second, "rows");
+                        var cols = (ScrubNumber)Get(second, "cols"); var rows = (ScrubNumber)Get(second, "rows");
                         Check(cols.Value == 15 && rows.Value == 10 && cols.Minimum == 1 && cols.Maximum == 200 && rows.Minimum == 1 && rows.Maximum == 200, "New dimensions/limits incorrect");
                         var labels = second.Controls[0].Controls.OfType<Label>().Select(l => l.Text).ToArray();
                         Check(labels.Contains("Kolumny") && labels.Contains("Wiersze"), "Axis labels changed");

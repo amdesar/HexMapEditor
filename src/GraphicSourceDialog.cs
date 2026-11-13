@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 namespace HexMapEditor
 {
-    internal sealed class GraphicSourceDialog : Form
+    internal sealed class GraphicSourceDialog : DarkForm
     {
         public bool FromLibrary { get; private set; }
         public GraphicSourceDialog(string title,string library)

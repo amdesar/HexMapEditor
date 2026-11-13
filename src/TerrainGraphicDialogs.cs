@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -44,7 +44,7 @@ namespace HexMapEditor
         protected override void Dispose(bool disposing) { if (disposing && image != null) image.Dispose(); base.Dispose(disposing); }
     }
 
-    internal sealed class TerrainGraphicPicker : Form
+    internal sealed class TerrainGraphicPicker : DarkForm
     {
         readonly ListView list = new ListView { Dock = DockStyle.Fill, View = View.LargeIcon, MultiSelect = false, HideSelection = false };
         readonly ImageList images = new ImageList { ImageSize = new Size(88, 72), ColorDepth = ColorDepth.Depth32Bit };
@@ -139,7 +139,7 @@ namespace HexMapEditor
 
     internal sealed class TerrainGraphicEditDialog : EditorDialog
     {
-        readonly TextBox name = new TextBox { MaxLength = 200 };
+        readonly TextBox name = new DarkTextBox { MaxLength = 200 };
         internal Func<bool, GraphicDefinition> ChooseImage;
         internal GraphicDefinition Asset { get; private set; }
         internal string GraphicName { get { return name.Text.Trim(); } }

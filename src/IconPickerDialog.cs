@@ -5,7 +5,7 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class IconPickerDialog : Form
+    internal sealed class IconPickerDialog : DarkForm
     {
         public LibraryIcon Chosen { get; private set; }
         public IconPickerDialog(IEnumerable<LibraryIcon> icons, Func<LibraryIcon,Action,Button> makeButton, Color background)

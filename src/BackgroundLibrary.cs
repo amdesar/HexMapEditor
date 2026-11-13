@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -73,7 +73,7 @@ namespace HexMapEditor
             LibraryFiles.Transition(from==null?null:from.Path,from==null?null:from.Bytes,to==null?null:to.Path,to==null?null:to.Bytes);
         }
     }
-    internal sealed class BackgroundSaveDialog : Form
+    internal sealed class BackgroundSaveDialog : DarkForm
     {
         internal int Choice;
         internal BackgroundSaveDialog(bool overwrite,bool applyMap=true)

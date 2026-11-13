@@ -31,6 +31,17 @@ namespace HexMapEditor
         public override Color ImageMarginGradientMiddle{get{return ToolStripDropDownBackground;}}
         public override Color ImageMarginGradientEnd{get{return ToolStripDropDownBackground;}}
         public override Color MenuItemSelected{get{return Color.FromArgb(70,84,112);}}
+        public override Color MenuItemSelectedGradientBegin{get{return MenuItemSelected;}}
+        public override Color MenuItemSelectedGradientEnd{get{return MenuItemSelected;}}
+        public override Color MenuItemPressedGradientBegin{get{return Color.FromArgb(45,57,77);}}
+        public override Color MenuItemPressedGradientMiddle{get{return MenuItemPressedGradientBegin;}}
+        public override Color MenuItemPressedGradientEnd{get{return MenuItemPressedGradientBegin;}}
+        public override Color MenuStripGradientBegin{get{return ToolStripDropDownBackground;}}
+        public override Color MenuStripGradientEnd{get{return ToolStripDropDownBackground;}}
+        public override Color ToolStripBorder{get{return Color.FromArgb(74,81,98);}}
+        public override Color ToolStripGradientBegin{get{return ToolStripDropDownBackground;}}
+        public override Color ToolStripGradientMiddle{get{return ToolStripDropDownBackground;}}
+        public override Color ToolStripGradientEnd{get{return ToolStripDropDownBackground;}}
         public override Color MenuItemBorder{get{return Color.FromArgb(115,135,174);}}
         public override Color MenuBorder{get{return Color.FromArgb(74,81,98);}}
     }

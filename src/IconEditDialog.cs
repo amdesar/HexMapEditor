@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -8,11 +8,11 @@ namespace HexMapEditor
     internal sealed class IconEditDialog : EditorDialog
     {
         readonly CheckBox light=new CheckBox{Text="Pole widzenia nowych instancji",AutoSize=true};
-        readonly NumericUpDown radius=new NumericUpDown{Minimum=0,Maximum=20,Value=1};
+        readonly ScrubNumber radius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};
         public bool DefaultLight{get{return light.Checked;}}
         public int DefaultLightRadius{get{return (int)radius.Value;}}
         public void SetLightDefaults(bool enabled,int value){light.Checked=enabled;radius.Value=value;}
-        readonly TextBox name = new TextBox { MaxLength = 200 };
+        readonly TextBox name = new DarkTextBox { MaxLength = 200 };
         readonly CheckBox update = new CheckBox { Text = "Zaktualizuj wystąpienia na bieżącej mapie", AutoSize = true, Checked = false };
         readonly PictureBox preview = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom };
         public string IconName { get { return name.Text.Trim(); } }

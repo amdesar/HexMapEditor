@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class GraphicDuplicateDialog : Form
+    internal sealed class GraphicDuplicateDialog : DarkForm
     {
         internal GraphicDuplicateDialog(TerrainGraphic existing, GraphicDefinition proposed)
         {

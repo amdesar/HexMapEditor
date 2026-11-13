@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -138,7 +138,7 @@ namespace HexMapEditor
         public PaletteState BeforePalette, AfterPalette;
     }
 
-    public sealed partial class MainWindow : Form
+    public sealed partial class MainWindow : DarkForm
     {
         static readonly string[] TerrainNames = { "Teren neutralny", "Woda", "Równina", "Góry", "Pustynia", "Czerń / Pustka" };
         static readonly string[] TerrainColors = { "#777F91", "#287DB3", "#72A65B", "#8D8174", "#D1A94E", "#252735" };
@@ -151,7 +151,6 @@ namespace HexMapEditor
         readonly ComboBox terrainPicker = new ComboBox();
         readonly Button orientationToggle = new Button();
         readonly Button labelToggle = new Button();
-        readonly Label mapName = new Label();
         readonly HistoryNameBox cellName = new HistoryNameBox();
         readonly RichNoteEditor cellDescription;
         internal static RichNoteEditor CreateNoteEditor(){StartupTrace.Write("editor.notes.begin");try{var editor=new RichNoteEditor();StartupTrace.Write("editor.notes.ready");return editor;}catch(Exception ex){StartupTrace.Write("editor.notes.failed",null,ex);throw;}}
@@ -209,6 +208,9 @@ namespace HexMapEditor
             LoadProgramIcon();
             StartupTrace.Write("editor.construct.icon",this);
             InitializeShell(); InitInk(); InitBackgroundResize(); InitCameraInteraction();
+            Disposed+=(s,e)=>{if(saveButton.Image!=null&&!ReferenceEquals(saveButton.Image,EditorIcons.Small("save")))saveButton.Image.Dispose();};
+            TrackCommandFocus(this);
+            Deactivate+=(s,e)=>CancelNumberDrags(this);
             StartupTrace.Write("editor.construct.shell",this);
             Application.AddMessageFilter(this); Disposed += (s,e) => Application.RemoveMessageFilter(this);
             Shown += (s,e)=>{PositionOverlays();FitMap();UpdateUI();if(!prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();}};
@@ -279,8 +281,8 @@ namespace HexMapEditor
         }
         void UpdateCaption()
         {
-            Text = "HexMapEditor " + AppVersion + (previewWithoutFog ? " [PODGLĄD BEZ MGŁY]" : "") + (HasUnsavedChanges ? " *" : ""); mapName.Text = ProjectTitle(currentPath, map.Name) + (HasUnsavedChanges ? " *" : ""); tips.SetToolTip(mapName, ProjectTitle(currentPath, map.Name));
-            saveButton.Text = HasUnsavedChanges ? "Zapisz *" : "Zapisz"; saveButton.BackColor = HasUnsavedChanges ? Color.FromArgb(83, 92, 122) : Color.FromArgb(49, 54, 67);
+            Text = "HexMapEditor — " + ProjectTitle(currentPath,map.Name) + (HasUnsavedChanges ? " *" : "");
+            UpdateSaveAccent();UpdateCommandState();
         }
 
         internal int UiRefreshCount;
@@ -293,8 +295,8 @@ namespace HexMapEditor
             right.SuspendLayout();
             try
             {
-                UpdateCaption(); undoButton.Enabled = undo.Count > 0; redoButton.Enabled = redo.Count > 0;
-                zoomButton.Text = Math.Round(scale * 100) + "%"; tips.SetToolTip(zoomButton, "Skala względem bazowego rozmiaru rysowania. Kliknij, aby ustawić 100%.");
+                UpdateCaption();
+                UpdateZoomCaption();
                 statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
                 dimensionsLabel.Text = map.Columns + " × " + map.Rows;
                 orientationToggle.Text = OrientationNames.Display(map.Orientation); orientationToggle.Image = EditorIcons.Small(map.Orientation == "FlatTop" ? "flat" : "pointy");
@@ -597,8 +599,8 @@ namespace HexMapEditor
         {
             if(InkCommitBusy&&!(e.Alt&&e.KeyCode==Keys.F4)){if(e.KeyCode==Keys.Escape)CancelInkCommit();else BlockInkCommit();e.Handled=true;e.SuppressKeyPress=true;return;}
             if ((e.KeyCode==Keys.Escape || e.KeyCode==Keys.Delete && selectedObjects.Count>0 && !left.ContainsFocus) && !TextInputFocused(this)) { if(e.KeyCode==Keys.Delete)ConfirmDeleteSelectedObjects();else {EndCanvasGesture(true);selectedObjects.Clear();UpdateUI();} e.Handled=true;e.SuppressKeyPress=true;return; }
-            if (e.Control && e.Shift && e.KeyCode == Keys.S) { SaveAsProject(); e.Handled = true; e.SuppressKeyPress = true; }
-            else if (e.Control && !e.Shift && e.KeyCode == Keys.S) { SaveProject(); e.Handled = true; e.SuppressKeyPress = true; }
+            if (e.KeyData == (Keys.Control|Keys.Shift|Keys.S)) { ExecuteCommand(EditorCommand.SaveAs); e.Handled = true; e.SuppressKeyPress = true; }
+            else if (e.KeyData == (Keys.Control|Keys.S)) { ExecuteCommand(EditorCommand.Save); e.Handled = true; e.SuppressKeyPress = true; }
             else if (HandleHistoryShortcut(e.KeyData)) { e.Handled = true; e.SuppressKeyPress = true; }
         }
 
@@ -612,6 +614,8 @@ namespace HexMapEditor
             var key = keyData & Keys.KeyCode;
             if ((key != Keys.Z && key != Keys.Y) || (keyData & Keys.Control) == 0) return false;
             if ((keyData & Keys.Modifiers) != Keys.Control) return true;
+
+            if(FocusedEditorControl() is TextBoxBase&&!cellName.ContainsFocus)return false;
 
             bool repeat = key == Keys.Y;
             if (cellName.ContainsFocus) TextUndo("name", repeat);
@@ -670,9 +674,7 @@ namespace HexMapEditor
 
         void SetZoom100()
         {
-            if(inkBefore!=null)EndCanvasGesture(true);
-            var center = new PointF(canvas.ClientSize.Width / 2f, canvas.ClientSize.Height / 2f);
-            float factor = 1f / scale; pan = new PointF(center.X - (center.X - pan.X) * factor, center.Y - (center.Y - pan.Y) * factor); scale = 1f; UpdateUI();
+            SetZoomPercent(100);
         }
 
         PointF ScreenCenter(int col, int row) { var p = Center(col, row); return new PointF(pan.X + p.X * scale, pan.Y + p.Y * scale); }
@@ -921,11 +923,11 @@ namespace HexMapEditor
         public string Orientation { get; private set; }
         public string ProjectName { get; private set; }
         public TerrainPreset Preset { get; private set; }
-        readonly NumericUpDown cols = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 15 };
-        readonly NumericUpDown rows = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 10 };
+        readonly ScrubNumber cols = new ScrubNumber { Minimum = 1, Maximum = 200, Value = 15 };
+        readonly ScrubNumber rows = new ScrubNumber { Minimum = 1, Maximum = 200, Value = 10 };
         readonly ComboBox orient = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         readonly ComboBox presets = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Name" };
-        readonly TextBox initialName = new TextBox { Text = "Nowa mapa", MaxLength = 200 };
+        readonly TextBox initialName = new DarkTextBox { Text = "Nowa mapa", MaxLength = 200 };
         internal Func<bool> AcceptProject;
         internal CreatedProject CreatedProject;
         public NewMapDialog(string o) : this(o, new List<TerrainPreset> { PresetCatalog.Default() }) { }

@@ -1,13 +1,13 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class EditorColorDialog : Form
+    internal sealed class EditorColorDialog : DarkForm
     {
-        readonly TextBox hex = new TextBox { MaxLength = 32, AccessibleName = "Kolor HEX" };
+        readonly TextBox hex = new DarkTextBox { MaxLength = 32, AccessibleName = "Kolor HEX" };
         readonly Label error = new Label { Text = "Wpisz # i dokładnie sześć cyfr szesnastkowych.", AutoSize = true, ForeColor = Color.Salmon };
         readonly Panel next = new Panel();
         readonly Button[] recent=new Button[12];
@@ -15,7 +15,7 @@ namespace HexMapEditor
         readonly Button accept = new Button { Text = "Zatwierdź" };
         readonly HsvSurface saturation;
         readonly HsvSurface hue;
-        readonly NumericUpDown[] rgb={new NumericUpDown(),new NumericUpDown(),new NumericUpDown()};
+        readonly ScrubNumber[] rgb={new ScrubNumber(),new ScrubNumber(),new ScrubNumber()};
         internal Action<Color> Changed;
         internal Action<bool> ValidityChanged;
         internal bool ColorValid {get{return MapLogic.ValidColor(hex.Text);}}

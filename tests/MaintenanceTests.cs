@@ -141,7 +141,7 @@ namespace HexMapEditor.Tests
                 {
                     using(var d=new ResizeDialog(15,10))
                     {
-                        d.Show(); Application.DoEvents(); var fields=new[]{"topDelta","bottomDelta","leftDelta","rightDelta"}.Select(n=>(NumericUpDown)typeof(ResizeDialog).GetField(n,F).GetValue(d)).ToArray();
+                        d.Show(); Application.DoEvents(); var fields=new[]{"topDelta","bottomDelta","leftDelta","rightDelta"}.Select(n=>(ScrubNumber)typeof(ResizeDialog).GetField(n,F).GetValue(d)).ToArray();
                         var diagram=d.Controls[0].Controls.OfType<ResizeDiagram>().Single(); Func<Control,Rectangle> bounds=c=>new Rectangle(d.PointToClient(c.PointToScreen(Point.Empty)),c.Size);
                         Check(bounds(fields[0]).Bottom<bounds(diagram).Top && bounds(fields[1]).Top>bounds(diagram).Bottom && bounds(fields[2]).Right<bounds(diagram).Left && bounds(fields[3]).Left>bounds(diagram).Right,"Fields not spatial: "+String.Join(";",fields.Select(c=>bounds(c).ToString()))+" diagram="+bounds(diagram));
                         fields[0].Value=-10;Check(!((Button)d.AcceptButton).Enabled,"Removed full old axis");

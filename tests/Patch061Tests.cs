@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -99,7 +99,7 @@ namespace HexMapEditor.Tests
                 string before=Json(Model(w).Ink);Set(w,"gestureTool",EditorTool.Eraser);Call(w,"BeginInk",new MouseEventArgs(MouseButtons.Left,1,275,150,0));Call(w,"MoveInk",new Point(275,250));Call(w,"FinishInk",true);string erased=Json(Model(w).Ink);Check(before!=erased&&Model(w).Ink.Count>=2,"Partial eraser failed");History(w,false);Check(Json(Model(w).Ink)==before,"Erase exact Undo");History(w,true);Check(Json(Model(w).Ink)==erased,"Erase exact Redo");
                 Model(w).Ink.Add(new InkStroke{Width=InkSizeMath.World(200,.01f,96),Points=new List<InkPoint>{new InkPoint(new PointF(0,0))}});InkGeometry.Validate(Model(w).Ink);
                 var save=new object[]{Path.Combine(root,"Rozmiar061.hexmap"),false,null};Check((bool)Call(w,"TrySaveTo",save),"Width save");using(var other=new MainWindow()){var load=new object[]{save[0],null,false};Check((bool)Call(other,"TryLoadProject",load)&&Model(other).Ink.Last().Width==20000,"World width roundtrip");}
-                var size=(NumericUpDown)Get(w,"inkSize");Call(w,"SelectTool",EditorTool.Eraser);Check(size.Minimum==1&&size.Maximum==200&&size.Value==40,"Shared eraser setting");Call(w,"SelectTool",EditorTool.Stylus);Check(size.Value==40,"Shared stylus setting");
+                var size=(ScrubNumber)Get(w,"inkSize");Call(w,"SelectTool",EditorTool.Eraser);Check(size.Minimum==1&&size.Maximum==200&&size.Value==40,"Shared eraser setting");Call(w,"SelectTool",EditorTool.Stylus);Check(size.Value==40,"Shared stylus setting");
                 int actions=((System.Collections.ICollection)Get(w,"undo")).Count;string document=Json(Model(w));Set(w,"gestureTool",EditorTool.Stylus);Set(w,"gestureButton",MouseButtons.Right);Call(w,"BeginInk",new MouseEventArgs(MouseButtons.Right,1,200,200,0));Check(((InkCanvas)canvas).PointerHidden,"Pointer cursor not hidden");Call(w,"PointerAt",new Point(250,220));Call(w,"FinishInk",true);Check(!((InkCanvas)canvas).PointerHidden,"Pointer cursor stuck");Check(((System.Collections.ICollection)Get(w,"undo")).Count==actions&&Json(Model(w))==document,"Pointer edited document");
                 System.Threading.Thread.Sleep(760);Call(w,"AgePointer");Check(((System.Collections.ICollection)Get(w,"pointerTrail")).Count==0&&!((Timer)Get(w,"pointerTimer")).Enabled,"Pointer didn't expire/stop");Call(w,"ClearPointerContext");
             }

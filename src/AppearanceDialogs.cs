@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -6,9 +6,9 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class AppearancePoolDialog : Form
+    internal sealed class AppearancePoolDialog : DarkForm
     {
-        readonly TextBox name = new TextBox { MaxLength = 200 };
+        readonly TextBox name = new DarkTextBox { MaxLength = 200 };
         readonly CheckBox apply = new CheckBox { AutoSize = true };
         readonly CheckBox preserve = new CheckBox { Text = "Zachowaj rozmieszczenie wariantów", AutoSize = true, Checked = true, Enabled = false };
         readonly FlowLayoutPanel tiles = new FlowLayoutPanel { AutoScroll = true, Dock = DockStyle.Fill, Padding = new Padding(8) };
