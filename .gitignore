@@ -6,3 +6,5 @@
 *.bak
 /Library/
 /tests/_work/
+
+/recent-projects.json

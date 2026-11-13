@@ -54,7 +54,8 @@ namespace HexMapEditor
     {
         Random appearanceRandom = new Random();
         FillVariant NextFill(List<FillVariant> pool) { return pool[appearanceRandom.Next(pool.Count)].Copy(); }
-        IEnumerable<GraphicDefinition> DocumentGraphics()
+        IEnumerable<GraphicDefinition> DocumentGraphics(){return DocumentGraphics(map);}
+        static IEnumerable<GraphicDefinition> DocumentGraphics(MapData map)
         {
             return map.Cells.Select(c => c.Texture).Concat(map.Presets.SelectMany(p => p.Terrains).SelectMany(t => t.Variants).Select(f => f.Graphic))
                 .Concat(map.Cells.Select(c => c.FogFill == null ? null : c.FogFill.Graphic)).Concat(map.FogPalette.Select(f => f.Graphic)).Concat(map.DarkPalette.Select(f=>f.Graphic)).Concat(map.Cells.Select(c=>c.DarkFill==null?null:c.DarkFill.Graphic));

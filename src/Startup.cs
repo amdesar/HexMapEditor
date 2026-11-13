@@ -8,16 +8,75 @@ namespace HexMapEditor
     internal sealed class StartupContext : ApplicationContext
     {
         StartWindow start;
+        MainWindow candidate;
+        RichNoteEditor preparedNotes;
+        internal Func<MapData,string,MainWindow> EditorFactory;
+        internal Action<Exception> Failure;
+        bool opening,exiting;
+        Exception transitionError;
+        void TransitionException(object sender,System.Threading.ThreadExceptionEventArgs e){transitionError=e.Exception;StartupTrace.Write("transition.nativeCallback.failed",candidate,e.Exception);if(candidate!=null)candidate.InitialDisplayError=e.Exception;}
+        void DetachException(){Application.ThreadException-=TransitionException;}
         internal StartupContext(string path)
         {
-            if(!String.IsNullOrEmpty(path))try{var data=MainWindow.ReadProjectData(path);Open(data,Path.GetFullPath(path));RecentProjects.Shared.Touch(path);return;}catch(Exception ex){MessageBox.Show("Nie można otworzyć projektu.\n\n"+ex.Message,"Błąd odczytu",MessageBoxButtons.OK,MessageBoxIcon.Error);}
-            start=new StartWindow(Open);MainForm=start;start.Show();
+            // Initialize the one WPF text host before the native WinForms message loop.
+            // Constructing it for the first time from a post-dialog callback can reenter
+            // a WPF DisableProcessing scope. No libraries, images or document are preloaded.
+            preparedNotes=MainWindow.CreateNoteEditor();
+            EditorFactory=(data,file)=>{var notes=preparedNotes;preparedNotes=null;try{return new MainWindow(data,file,true,notes);}catch{if(notes!=null)notes.Dispose();throw;}};
+            start=new StartWindow(Open);MainForm=start;
+            start.FormClosed+=(s,e)=>StartupTrace.Write("start.closed",s as Form);
+            start.HandleDestroyed+=(s,e)=>StartupTrace.Write("start.handleDestroyed",s as Form);
+            if(!String.IsNullOrEmpty(path))try{MainForm=null;var data=MainWindow.ReadProjectData(path);Open(data,Path.GetFullPath(path));RecentProjects.Shared.Touch(path);return;}catch(Exception ex){ReportFailure(ex);}
+            MainForm=start;start.Show();StartupTrace.Write("start.shown",start);
         }
-        void Open(MapData data,string path)
+        internal void Open(MapData data,string path)
         {
-            var editor=new MainWindow(data,path); // Layout prepared before Show, no placeholder map.
-            MainForm=editor;editor.Show();if(start!=null){start.Close();start=null;}
+            if(opening||exiting)throw new InvalidOperationException("Trwa już otwieranie projektu.");
+            opening=true;start.Transition=true;StartupTrace.Write("transition.queued",start);
+            try
+            {
+                // Unwind the native file-dialog/button callback before initializing WPF hosts.
+                // The start still owns the application loop until the editor reports ready.
+                var handle=start.Handle;
+                start.BeginInvoke((Action)(()=>{if(!exiting&&opening&&start!=null&&!start.IsDisposed)OpenCore(data,path);}));
+            }
+            catch(Exception ex){Rollback(null,ex);}
         }
+        void OpenCore(MapData data,string path)
+        {
+            transitionError=null;Application.ThreadException+=TransitionException;StartupTrace.Write("transition.begin",start);
+            MainWindow editor=null;
+            try
+            {
+                editor=EditorFactory(data,path);candidate=editor;if(transitionError!=null)throw transitionError;editor.Owner=null;
+                editor.FormClosed+=(s,e)=>{StartupTrace.Write("editor.closed",editor);if(!exiting&&ReferenceEquals(candidate,editor))Rollback(editor,new InvalidOperationException("Edytor zamknięto przed zakończeniem otwierania."));};
+                editor.HandleDestroyed+=(s,e)=>StartupTrace.Write("editor.handleDestroyed",editor);
+                editor.InitialDisplayComplete=error=>
+                {
+                    if(!ReferenceEquals(candidate,editor)||exiting)return;
+                    if(error!=null){Rollback(editor,error);return;}
+                    try
+                    {
+                        if(editor.IsDisposed||!editor.Visible||!editor.IsHandleCreated)throw new InvalidOperationException("Nie udało się pokazać edytora.");
+                        StartupTrace.Write("editor.ready",editor);MainForm=editor;candidate=null;opening=false;DetachException();
+                        var previous=start;start=null;previous.Transition=false;previous.Close();StartupTrace.Write("transition.committed",editor);
+                    }catch(Exception ex){if(candidate!=null)Rollback(editor,ex);else{StartupTrace.Write("transition.closeStart.failed",editor,ex);ReportFailure(ex);}}
+                };
+                editor.Show();StartupTrace.Write("editor.showReturned",editor);
+                if(editor.InitialDisplayError!=null)throw editor.InitialDisplayError;
+                if(editor.IsDisposed||!editor.Visible)throw new InvalidOperationException("Edytor nie został otwarty.");
+            }
+            catch(Exception ex){Rollback(editor,ex);}
+        }
+        void Rollback(MainWindow editor,Exception error,bool report=true)
+        {
+            if(!opening)return;candidate=null;opening=false;DetachException();StartupTrace.Write("transition.rollback",editor,error);
+            if(editor!=null&&!editor.IsDisposed){editor.InitialDisplayComplete=null;editor.Dispose();}
+            if(start!=null&&!start.IsDisposed){MainForm=start;start.Transition=false;start.Show();start.Activate();}
+            if(report)ReportFailure(error);
+        }
+        void ReportFailure(Exception error){StartupTrace.Write("transition.error",start,error);if(Failure!=null)Failure(error);else MessageBox.Show(start,(start==null?"Edytor jest otwarty, ale wystąpił błąd zamykania startu.":"Nie można otworzyć edytora. Ekran startowy pozostaje dostępny.")+"\n\n"+error.Message,"Błąd otwierania",MessageBoxButtons.OK,MessageBoxIcon.Error);}
+        protected override void ExitThreadCore(){exiting=true;DetachException();StartupTrace.Write("loop.exit",MainForm);if(preparedNotes!=null){preparedNotes.Dispose();preparedNotes=null;}if(candidate!=null){var old=candidate;candidate=null;old.InitialDisplayComplete=null;old.Dispose();}base.ExitThreadCore();}
     }
     internal sealed class StartWindow : Form
     {
@@ -26,24 +85,25 @@ namespace HexMapEditor
         readonly ToolTip tips=new ToolTip();
         string[] paths;
         int refreshQueued;
-        bool choosing;
+        bool choosing,transition;
+        internal bool Transition {get{return transition;}set{transition=value;}}
         internal StartWindow(Action<MapData,string> open)
         {
-            this.open=open;Text="HexMapEditor";ClientSize=new Size(650,550);MinimumSize=new Size(620,570);StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(25,28,36);ForeColor=Color.WhiteSmoke;Font=new Font("Segoe UI",10);DoubleBuffered=true;
+            this.open=open;Text="HexMapEditor";ClientSize=new Size(650,550);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;AutoScaleMode=AutoScaleMode.Dpi;AutoScroll=true;StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(25,28,36);ForeColor=Color.WhiteSmoke;Font=new Font("Segoe UI",10);DoubleBuffered=true;
             Icon icon=null;try{using(var external=new Icon(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","app","icon.ico")))icon=(Icon)external.Clone();}catch{try{icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{}}
             if(icon!=null){Icon=icon;var picture=new PictureBox{Image=icon.ToBitmap(),SizeMode=PictureBoxSizeMode.Zoom,Bounds=new Rectangle(38,36,64,64)};Controls.Add(picture);Disposed+=(s,e)=>{picture.Image.Dispose();icon.Dispose();};}
             Controls.Add(new Label{Text="HexMapEditor",Font=new Font(Font.FontFamily,28,FontStyle.Bold),AutoSize=true,Location=new Point(120,32)});
             Controls.Add(new Label{Text="Wersja "+MainWindow.Version,ForeColor=Color.Silver,AutoSize=true,Location=new Point(124,83)});
             var load=ButtonAt("Otwórz projekt",36,132);var create=ButtonAt("Stwórz nowy projekt",334,132);load.Click+=(s,e)=>ChooseOpen();create.Click+=(s,e)=>ChooseNew();
             Controls.Add(new Label{Text="Ostatnie projekty",AutoSize=true,Font=new Font(Font,FontStyle.Bold),Location=new Point(36,198)});
-            projects.Bounds=new Rectangle(36,232,578,280);Controls.Add(projects);Shown+=(s,e)=>RefreshProjects();
-            Resize+=(s,e)=>{projects.Width=ClientSize.Width-72;};Disposed+=(s,e)=>tips.Dispose();
+            projects.Bounds=new Rectangle(163,232,324,280);Controls.Add(projects);Shown+=(s,e)=>{StartupTrace.Write("start.visible",this);RefreshProjects();};
+            Load+=(s,e)=>{var area=Screen.FromControl(this).WorkingArea;Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);};Disposed+=(s,e)=>tips.Dispose();
         }
         Button ButtonAt(string text,int x,int y){var b=new Button{Text=text,Bounds=new Rectangle(x,y,280,44),FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(38,65,96)};b.FlatAppearance.BorderColor=Color.FromArgb(90,145,205);Controls.Add(b);return b;}
         internal void RefreshProjects()
         {
             paths=RecentProjects.Shared.Entries;RenderProjects();
-            if(paths.Length>0)RecentAvailability.Refresh(paths,()=>{try{if(!IsDisposed&&IsHandleCreated&&System.Threading.Interlocked.Exchange(ref refreshQueued,1)==0){BeginInvoke((Action)(()=>{System.Threading.Interlocked.Exchange(ref refreshQueued,0);if(!IsDisposed)RenderProjects();}));}}catch(InvalidOperationException){}});
+            if(paths.Length>0)RecentAvailability.Refresh(paths,()=>{try{if(!IsDisposed&&IsHandleCreated&&System.Threading.Interlocked.Exchange(ref refreshQueued,1)==0){BeginInvoke((Action)(()=>{System.Threading.Interlocked.Exchange(ref refreshQueued,0);if(!IsDisposed&&!transition)RenderProjects();}));}}catch(InvalidOperationException){}});
         }
         void RenderProjects()
         {
@@ -52,16 +112,16 @@ namespace HexMapEditor
                 foreach(var path in visible){var b=new Button{Text=Path.GetFileNameWithoutExtension(path),Width=projects.Width-8,Height=43,Margin=new Padding(0,0,0,8),TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true,FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(34,38,48)};tips.SetToolTip(b,path);b.Click+=(s,e)=>OpenPath(path);projects.Controls.Add(b);}
             }finally{projects.ResumeLayout(true);}
         }
-        void ChooseOpen(){if(choosing)return;choosing=true;try{using(var dialog=new OpenFileDialog{Filter="Projekt HexMapEditor (*.hexmap)|*.hexmap",RestoreDirectory=true,Title="Otwórz projekt"})if(dialog.ShowDialog(this)==DialogResult.OK)OpenPathCore(dialog.FileName);}finally{choosing=false;}}
-        internal bool OpenPath(string path){if(choosing)return false;choosing=true;try{return OpenPathCore(path);}finally{choosing=false;}}
+        void ChooseOpen(){if(choosing||transition)return;choosing=true;try{using(var dialog=new OpenFileDialog{Filter="Projekt HexMapEditor (*.hexmap)|*.hexmap",RestoreDirectory=true,Title="Otwórz projekt"})if(dialog.ShowDialog(this)==DialogResult.OK)OpenPathCore(dialog.FileName);}finally{choosing=false;}}
+        internal bool OpenPath(string path){if(choosing||transition)return false;choosing=true;try{return OpenPathCore(path);}finally{choosing=false;}}
         bool OpenPathCore(string path)
         {
             try{var data=MainWindow.ReadProjectData(path);open(data,Path.GetFullPath(path));RecentProjects.Shared.Touch(path);return true;}catch(Exception ex){MessageBox.Show(this,"Nie można otworzyć projektu.\n\n"+ex.Message,"Błąd odczytu",MessageBoxButtons.OK,MessageBoxIcon.Error);RefreshProjects();return false;}
         }
         void ChooseNew()
         {
-            if(choosing)return;choosing=true;
-            try{string warning;var presets=PresetCatalog.Load(LibraryPaths.Presets,out warning);if(warning.Length>0)MessageBox.Show(this,warning,"Pominięte presety",MessageBoxButtons.OK,MessageBoxIcon.Warning);var data=MainWindow.ChooseNewProject(this,"PointyTop",presets);if(data!=null)open(data,null);}
+            if(choosing||transition)return;choosing=true;
+            try{string warning;var presets=PresetCatalog.Load(LibraryPaths.Presets,out warning);if(warning.Length>0)MessageBox.Show(this,warning,"Pominięte presety",MessageBoxButtons.OK,MessageBoxIcon.Warning);var data=MainWindow.ChooseNewProject(this,"PointyTop",presets);if(data!=null){string stateWarning;data.ObjectStates=StateLibrary.Load(Path.Combine(LibraryPaths.Root,"Objects","States"),out stateWarning).Select(entry=>entry.Definition.Copy()).ToList();if(stateWarning.Length>0)MessageBox.Show(this,stateWarning,"Pominięte stany",MessageBoxButtons.OK,MessageBoxIcon.Warning);var project=ProjectCreation.ChooseFile(this,data);if(project!=null)open(project.Data,project.Path);}}
             catch(Exception ex){MessageBox.Show(this,ex.Message,"Nie można utworzyć projektu",MessageBoxButtons.OK,MessageBoxIcon.Error);}
             finally{choosing=false;}
         }

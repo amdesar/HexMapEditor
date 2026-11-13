@@ -10,13 +10,16 @@ namespace HexMapEditor
     // Together with the 256px scratch field this stays below the former 24 MiB raster budget.
     internal static class InkLayerRenderer
     {
-        static Bitmap image;
+        static Bitmap image,previewImage;
+        static float[] previewCamera,previewBaseCamera;
+        internal static long ExactBuilds,PreviewBuilds,PreviewHits,PanUpdates;
+        static void ClearPreview(){if(previewImage!=null)previewImage.Dispose();previewImage=null;previewCamera=previewBaseCamera=null;}
         static InkStroke[] snapshot;
         static float[] camera;
         static Rectangle device;
         static bool quality;
         [DllImport("kernel32.dll",EntryPoint="RtlMoveMemory")]static extern void MoveBytes(IntPtr destination,IntPtr source,UIntPtr bytes);
-        internal static void Clear(){if(image!=null)image.Dispose();image=null;snapshot=null;camera=null;}
+        internal static void Clear(){ClearPreview();if(image!=null)image.Dispose();image=null;snapshot=null;camera=null;}
         static void PaintRegion(Rectangle region,InkStroke[] strokes,float[] transform)
         {
             if(region.Width<=0||region.Height<=0)return;
@@ -31,6 +34,7 @@ namespace HexMapEditor
             if(image==null||viewport!=device||!strokes.SequenceEqual(snapshot)||!transform.Take(4).SequenceEqual(camera.Take(4)))return false;
             double x=transform[4]-camera[4],y=transform[5]-camera[5];int dx=(int)Math.Round(x),dy=(int)Math.Round(y);
             if(Math.Abs(x-dx)>.0001||Math.Abs(y-dy)>.0001||Math.Abs(dx)>=image.Width||Math.Abs(dy)>=image.Height)return false;
+            ClearPreview();PanUpdates++;
             var data=image.LockBits(new Rectangle(0,0,image.Width,image.Height),System.Drawing.Imaging.ImageLockMode.ReadWrite,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
             try
             {
@@ -47,6 +51,21 @@ namespace HexMapEditor
             camera=transform;return true;
         }
         static void Preview(Graphics g,InkStroke[] strokes,float[] transform,Rectangle viewport)
+        {
+            if(viewport.Location==Point.Empty&&(long)viewport.Width*viewport.Height*2<=5800000)
+            {
+                if(previewImage==null||!transform.SequenceEqual(previewCamera)||!camera.SequenceEqual(previewBaseCamera))
+                {
+                    ClearPreview();previewImage=new Bitmap(viewport.Width,viewport.Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);PreviewBuilds++;
+                    using(var local=Graphics.FromImage(previewImage))using(var matrix=new Matrix(transform[0],transform[1],transform[2],transform[3],transform[4],transform[5])){local.Transform=matrix;local.SmoothingMode=SmoothingMode.AntiAlias;RenderPreview(local,strokes,transform,viewport);}
+                    previewCamera=(float[])transform.Clone();previewBaseCamera=(float[])camera.Clone();
+                }
+                else PreviewHits++;
+                var saved=g.Save();g.ResetTransform();g.DrawImageUnscaled(previewImage,viewport.Location);g.Restore(saved);return;
+            }
+            PreviewBuilds++;RenderPreview(g,strokes,transform,viewport);
+        }
+        static void RenderPreview(Graphics g,InkStroke[] strokes,float[] transform,Rectangle viewport)
         {
             double ratio=transform[0]/camera[0];var target=new RectangleF((float)(device.X*ratio+transform[4]-camera[4]*ratio),(float)(device.Y*ratio+transform[5]-camera[5]*ratio),(float)(image.Width*ratio),(float)(image.Height*ratio));
             var saved=g.Save();g.ResetTransform();g.InterpolationMode=InterpolationMode.HighQualityBilinear;
@@ -75,7 +94,7 @@ namespace HexMapEditor
                 Clear();
                 if(viewport.Width>0&&viewport.Height>0&&(long)viewport.Width*viewport.Height<=5800000)
                 {
-                    image=new Bitmap(viewport.Width,viewport.Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                    ExactBuilds++;image=new Bitmap(viewport.Width,viewport.Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                     using(var local=Graphics.FromImage(image))using(var m=new Matrix(transform[0],transform[1],transform[2],transform[3],transform[4]-viewport.X,transform[5]-viewport.Y))
                     {local.Transform=m;local.SmoothingMode=SmoothingMode.AntiAlias;foreach(var s in complete)if(local.VisibleClipBounds.IntersectsWith(InkGeometry.Bounds(s)))InkGeometry.Draw(local,s,quality);}
                     snapshot=complete;camera=transform;device=viewport;

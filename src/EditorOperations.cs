@@ -9,12 +9,12 @@ namespace HexMapEditor
     {
         void NameEdited()
         {
-            if (updating || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
+            if (updating || BlockInkCommit() || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
             var history = textHistory.For(cell.Id, "name", cell.Name); history.Record(cellName.Text, cellName.EditKind); textHistory.Trim(); cell.Name = cellName.Text; MarkCellDirty(cell);
         }
         void DescriptionEdited(string document, string plain, string kind)
         {
-            if (updating || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
+            if (updating || BlockInkCommit() || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
             if (cell.RichDescription == null && document == NoteCodec.Write(NoteCodec.FromPlain(cell.Description))) return;
             string initial = DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, "description", initial); history.Record("rich:" + document, kind); textHistory.Trim();

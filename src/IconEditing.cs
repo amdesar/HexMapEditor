@@ -96,10 +96,11 @@ namespace HexMapEditor
             using (var dialog = new IconPickerDialog(libraryIcons, IconButton, BackColor)) return RunModal(() => dialog.ShowDialog(owner)) == DialogResult.OK ? dialog.Chosen : null;
         }
         void OpenIconLibrary() { var chosen = PickLibraryIcon(this); if (chosen != null) SelectIcon(chosen.Id); }
-        MapData MapForSave()
+        MapData MapForSave(){return MapForSave(map);}
+        internal static MapData MapForSave(MapData map)
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
-            var terrainAssets = TerrainTextures.Collect(DocumentGraphics());
+            var terrainAssets = TerrainTextures.Collect(DocumentGraphics(map));
             return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), FogPalette = map.FogPalette, DarkPalette=map.DarkPalette, Ink=map.Ink, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
         }
         void BeginMaterialStroke(int start, EditorTool tool)

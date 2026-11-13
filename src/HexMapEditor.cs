@@ -151,7 +151,8 @@ namespace HexMapEditor
         readonly Button labelToggle = new Button();
         readonly Label mapName = new Label();
         readonly HistoryNameBox cellName = new HistoryNameBox();
-        readonly RichNoteEditor cellDescription = new RichNoteEditor();
+        readonly RichNoteEditor cellDescription;
+        internal static RichNoteEditor CreateNoteEditor(){StartupTrace.Write("editor.notes.begin");try{var editor=new RichNoteEditor();StartupTrace.Write("editor.notes.ready");return editor;}catch(Exception ex){StartupTrace.Write("editor.notes.failed",null,ex);throw;}}
         readonly Label statusLabel = new Label();
         readonly Label dimensionsLabel = new Label();
         readonly Label coordinateLabel = new Label();
@@ -178,7 +179,7 @@ namespace HexMapEditor
         float scale = 1f;
         const float BaseRadius = 28f;
         internal static string Version {get{return AppVersion;}}
-        const string AppVersion = "0.7.0";
+        const string AppVersion = "0.7.1";
         readonly SavedMapState savedState = new SavedMapState();
         readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
@@ -187,20 +188,31 @@ namespace HexMapEditor
         readonly Stack<EditAction> undo = new Stack<EditAction>();
         readonly Stack<EditAction> redo = new Stack<EditAction>();
 
+        internal Action<Exception> InitialDisplayComplete;
+        internal Exception InitialDisplayError;
+        protected override void OnLoad(EventArgs e){try{base.OnLoad(e);}catch(Exception ex){if(InitialDisplayComplete==null)throw;InitialDisplayError=ex;StartupTrace.Write("editor.load.failed",this,ex);}}
+        protected override void OnShown(EventArgs e){try{if(InitialDisplayError!=null)throw InitialDisplayError;base.OnShown(e);}catch(Exception ex){if(InitialDisplayComplete==null)throw;InitialDisplayError=ex;InitialDisplayComplete(ex);return;}if(InitialDisplayComplete!=null)InitialDisplayComplete(null);}
         public MainWindow() : this(NewMap(15,10,"PointyTop"),null,false) {}
         internal MainWindow(MapData initial,string path):this(initial,path,true) {}
-        MainWindow(MapData initial,string path,bool prepareLibraries)
+        MainWindow(MapData initial,string path,bool prepareLibraries):this(initial,path,prepareLibraries,null){}
+        internal MainWindow(MapData initial,string path,bool prepareLibraries,RichNoteEditor notes)
         {
+            StartupTrace.Write("editor.construct.begin");
+            cellDescription=notes??CreateNoteEditor();
             map=initial;currentPath=path;
             Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 748); Size = new Size(1440, 940);
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
             LoadProgramIcon();
+            StartupTrace.Write("editor.construct.icon",this);
             InitializeShell(); InitInk(); InitBackgroundResize(); InitCameraInteraction();
+            StartupTrace.Write("editor.construct.shell",this);
             Application.AddMessageFilter(this); Disposed += (s,e) => Application.RemoveMessageFilter(this);
-            Shown += (s, e) => { PositionOverlays(); FitMap(); UpdateUI(); if(!prepareLibraries){LoadLibraryPresets(true); LoadIcons(); LoadObjects(); LoadStateLibrary();} };
+            Shown += (s,e)=>{PositionOverlays();FitMap();UpdateUI();if(!prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();}};
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
             if(prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();}
+            StartupTrace.Write("editor.construct.libraries",this);
             PositionOverlays();FitMap();CaptureSavedState(); UpdateUI();
+            StartupTrace.Write("editor.construct.ready",this);
         }
 
         static MapData NewMap(int cols, int rows, string orientation)
@@ -266,8 +278,10 @@ namespace HexMapEditor
             saveButton.Text = dirty ? "Zapisz *" : "Zapisz"; saveButton.BackColor = dirty ? Color.FromArgb(83, 92, 122) : Color.FromArgb(49, 54, 67);
         }
 
+        internal int UiRefreshCount;
         void UpdateUI()
         {
+            UiRefreshCount++;
             bool opening = rightPanelOpen && !right.Visible;
             bool showingHex = selectedObjects.Count == 0 && selected >= 0 && hexDetailScroll != null && !hexDetailScroll.Visible;
             updating = true;
@@ -329,12 +343,17 @@ namespace HexMapEditor
             if (!ConfirmDiscard()) return;
             var choices = AvailablePresets();
             var created=RunModal(()=>ChooseNewProject(this,map.Orientation,choices));if(created==null)return;
-            StartNewProject(created.Columns,created.Rows,created.Orientation,created.Name,created.Presets[0]);
+            created.ObjectStates=NewStateDefinitions();
+            var project=RunModal(()=>ProjectCreation.ChooseFile(this,created));if(project!=null)AdoptNewProject(project.Data,project.Path);
         }
         void StartNewProject(int columns, int rows, string orientation, string name, TerrainPreset sourcePreset)
         {
-            EndCanvasGesture(true); if(BlockInkCommit())return; documentRevision++; ResetObjectDocument(); ClearDocumentIcons(); map = CreateProjectData(columns,rows,orientation,name,sourcePreset); map.ObjectStates = NewStateDefinitions();
-            currentPath = null; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
+            var data=CreateProjectData(columns,rows,orientation,name,sourcePreset);data.ObjectStates=NewStateDefinitions();AdoptNewProject(data,null);
+        }
+        void AdoptNewProject(MapData data,string path)
+        {
+            EndCanvasGesture(true);if(BlockInkCommit())return;documentRevision++;ResetObjectDocument();ClearDocumentIcons();map=data;
+            currentPath = path; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
             ResetQuality(); CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
         }
 
@@ -350,6 +369,7 @@ namespace HexMapEditor
         }
         void ChangeOrientation(string orientation)
         {
+            if(BlockInkCommit())return;
             if (map.Orientation == orientation) return;
             EndCanvasGesture(true);
             var geometry = new MapData { Orientation=orientation, RowParity=map.RowParity, ColumnParity=map.ColumnParity };
@@ -464,23 +484,27 @@ namespace HexMapEditor
         {
             EndCanvasGesture(true);
             error = null; if(InkCommitBusy){error=InkBusyMessage;return false;}
-            string temp = null;
             try
             {
-                var output = MapForSave(); ValidateMap(output);
-                string directory = Path.GetDirectoryName(Path.GetFullPath(path));
-                temp = Path.Combine(directory, ".hexmap-" + Guid.NewGuid().ToString("N") + ".tmp");
-                byte[] bytes = new UTF8Encoding(false).GetBytes(json.Serialize(output));
-                if (bytes.LongLength > GraphicLimits.MapBytes) throw new InvalidDataException("Mapa przekracza limit pliku 256 MiB. Zmniejsz zawartość opisów przed zapisem.");
-                using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
-                if (allowOverwrite && File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
+                WriteProjectData(map,path,allowOverwrite);
                 currentPath = Path.GetFullPath(path); CaptureSavedState(); UpdateUI();RecentProjects.Shared.Touch(currentPath); return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) { error=ex.Message;return false; }
+        }
+        internal static void WriteProjectData(MapData data,string path,bool allowOverwrite)
+        {
+            string temp=null;
+            try
             {
-                if (temp != null) try { if (File.Exists(temp)) File.Delete(temp); } catch { }
-                error = ex.Message; return false;
+                var output=MapForSave(data);ValidateMap(output);var serializer=MapLogic.Serializer();
+                string directory=Path.GetDirectoryName(Path.GetFullPath(path));
+                byte[] bytes=new UTF8Encoding(false).GetBytes(serializer.Serialize(output));
+                if(bytes.LongLength>GraphicLimits.MapBytes)throw new InvalidDataException("Mapa przekracza limit pliku 256 MiB.");
+                temp=Path.Combine(directory,".hexmap-"+Guid.NewGuid().ToString("N")+".tmp");
+                using(var stream=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){stream.Write(bytes,0,bytes.Length);stream.Flush(true);}
+                if(allowOverwrite&&File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);temp=null;
             }
+            finally{if(temp!=null)try{File.Delete(temp);}catch(IOException){ }catch(UnauthorizedAccessException){ }}
         }
 
         static string SafeFileName(string name) { foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_'); return String.IsNullOrWhiteSpace(name) ? "Nowa mapa" : name; }
@@ -708,8 +732,10 @@ namespace HexMapEditor
 
         T RunModal<T>(Func<T> show)
         {
+            if(BlockInkCommit())return default(T);
             EndRightResize();
             EndCanvasGesture(true);
+            if(BlockInkCommit())return default(T);
             modalDepth++;
             try { return show(); }
             finally
@@ -770,7 +796,7 @@ namespace HexMapEditor
 
         void CanvasMouseMove(object sender, MouseEventArgs e)
         {
-            if (modalDepth > 0 || rightResizing) return;
+            if (InkCommitBusy || modalDepth > 0 || rightResizing) return;
             int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
             if (previewCell != hit) { previewCell = hit; canvas.Invalidate(); }
             if(currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus){inkCursor=e.Location;canvas.Invalidate();}
@@ -812,9 +838,7 @@ namespace HexMapEditor
         {
             if (rightResizing || modalDepth > 0 || BlockInkCommit()) return;
             if(inkBefore!=null)EndCanvasGesture(true);
-            if(BlockInkCommit())return; BeginCameraInteraction(true);
-            float old = scale, next = Math.Max(Math.Min(old, .01f), Math.Min(Math.Max(old, 128f), old * (e.Delta > 0 ? 1.12f : 1f / 1.12f)));
-            float factor = next / old; pan = new PointF(e.X - (e.X - pan.X) * factor, e.Y - (e.Y - pan.Y) * factor); scale = next; UpdateUI();
+            if(BlockInkCommit())return;WheelCamera(e);
         }
 
         void PaintCell(int index)
@@ -890,9 +914,10 @@ namespace HexMapEditor
         [STAThread]
         static void Main(string[] args)
         {
-            Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            AppDomain.CurrentDomain.UnhandledException+=(sender,error)=>StartupTrace.Write("program.unhandled",null,error.ExceptionObject as Exception);
             try { Application.Run(new StartupContext(args.Length>0?args[0]:null)); }
-            catch (Exception ex) { MessageBox.Show("Aplikacja napotkała błąd:\n\n" + ex.ToString(), "HexMapEditor — błąd", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception ex) { StartupTrace.Write("program.exception",null,ex);MessageBox.Show("Aplikacja napotkała błąd:\n\n" + ex.ToString(), "HexMapEditor — błąd", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
     }
 }

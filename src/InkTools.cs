@@ -33,7 +33,7 @@ namespace HexMapEditor
         static long PointerTime {get{return System.Diagnostics.Stopwatch.GetTimestamp()*1000/System.Diagnostics.Stopwatch.Frequency;}}
         void InitInk()
         {
-            pointerTimer.Tick+=(s,e)=>AgePointer();Disposed+=(s,e)=>{pointerTimer.Dispose();comet.Dispose();InkPathCache.Clear();InkGradientRenderer.Clear();TerrainGraphicThumbnails.Clear();if(eraseGesture!=null)eraseGesture.Dispose();if(pendingInk!=null){pendingInk.Cancellation.Cancel();pendingInk.Preview.Dispose();}};
+            inkProgressDelay.Tick+=(s,e)=>ShowInkProgress();pointerTimer.Tick+=(s,e)=>AgePointer();Disposed+=(s,e)=>{pointerTimer.Dispose();comet.Dispose();InkPathCache.Clear();InkGradientRenderer.Clear();TerrainGraphicThumbnails.Clear();if(eraseGesture!=null)eraseGesture.Dispose();ReleaseInkHandoff();inkProgressDelay.Dispose();if(pendingInk!=null){pendingInk.Cancellation.Cancel();pendingInk.Preview.Dispose();}};
             Deactivate+=(s,e)=>{EndCanvasGesture(true);ClearPointerContext();};
             canvas.LostFocus+=(s,e)=>{if(pointerActive){EndCanvasGesture(true);ClearPointerContext();}};
         }
@@ -43,7 +43,7 @@ namespace HexMapEditor
             if(e.Button==MouseButtons.Right){if(gestureTool==EditorTool.Stylus){using(var g=canvas.CreateGraphics()){pointerDpiFactor=g.DpiX/96f;pointerDiameter=18*pointerDpiFactor+2;}AgePointer();pointerActive=true;((InkCanvas)canvas).PointerHidden=true;PointerAt(e.Location);}else ClearInk();return true;}
             if(e.Button!=MouseButtons.Left)return true;
             InkGeometry.Validate(map.Ink);inkBasePointCost=map.Ink.Sum(s=>InkGeometry.PointCost(s));
-            inkGestureSize=InkWorldSize();inkCycleWorld=300.0*inkGestureSize/inkToolSize;inkBefore=new List<InkStroke>(map.Ink);map.Ink=new List<InkStroke>(map.Ink);inkError=null;inkPrevious=null;if(gestureTool==EditorTool.Eraser)eraseGesture=new InkEraseGesture(inkGestureSize);MoveInk(e.Location);return true;
+            inkGestureSize=InkWorldSize();inkCycleWorld=300.0*inkGestureSize/inkToolSize;inkBefore=new List<InkStroke>(map.Ink);map.Ink=new List<InkStroke>(map.Ink);inkError=null;inkPrevious=null;if(gestureTool==EditorTool.Eraser)eraseGesture=new InkEraseGesture(inkGestureSize,inkBefore);MoveInk(e.Location);return true;
         }
         void MoveInk(Point point)
         {
@@ -74,7 +74,7 @@ namespace HexMapEditor
             {
                 var source=inkBefore;var gesture=eraseGesture;inkBefore=null;eraseGesture=null;activeStroke=null;inkPrevious=null;
                 if(!commit||inkError!=null){gesture.Dispose();map.Ink=new List<InkStroke>(source);canvas.Invalidate();return;}
-                try{StartInkCommit(source,gesture);}
+                try{if(!gesture.MayAffect(source)){inkNoopCount++;gesture.Dispose();map.Ink=source;return;}StartInkCommit(source,gesture);}
                 catch(Exception ex){if(pendingInk!=null)CompleteInkCommit(pendingInk,null,ex);else gesture.Dispose();map.Ink=new List<InkStroke>(source);statusLabel.Text="Nie można przygotować gumki: "+ex.Message;canvas.Invalidate();}
                 return;
             }
@@ -109,12 +109,15 @@ namespace HexMapEditor
             if(!pointerActive&&pointerTrail.Count==0){pointerTimer.Stop();pointerPhase=0;pointerLast=null;}
             else if(pointerTrail.Count==0)pointerTimer.Stop(); // A stationary head has no animation once its trail is gone.
         }
-        void DrawInk(Graphics graphics)
+        internal double LastInkPaintMilliseconds;internal int InkPaintCount;
+        void DrawInk(Graphics graphics){var clock=System.Diagnostics.Stopwatch.StartNew();try{DrawInkCore(graphics);}finally{LastInkPaintMilliseconds=clock.Elapsed.TotalMilliseconds;InkPaintCount++;}}
+        void DrawInkCore(Graphics graphics)
         {
-            if(hideInk)return;var state=graphics.Save();graphics.TranslateTransform(pan.X,pan.Y);graphics.ScaleTransform(scale,scale);
-            var preview=eraseGesture??(pendingInk==null?null:pendingInk.Preview);if(preview!=null)graphics.SetClip(preview.Preview,CombineMode.Exclude);
+            if(hideInk){ReleaseInkHandoff();return;}var state=graphics.Save();graphics.TranslateTransform(pan.X,pan.Y);graphics.ScaleTransform(scale,scale);
+            if(inkHandoff!=null&&!ReferenceEquals(map.Ink,inkHandoffResult))ReleaseInkHandoff();
+            var preview=eraseGesture??(pendingInk==null?inkHandoff:pendingInk.Preview);if(preview!=null&&preview.Preview.PointCount>0)graphics.SetClip(preview.Preview,CombineMode.Exclude);
             InkLayerRenderer.Draw(graphics,map.Ink,activeStroke,canvas.ClientRectangle,cameraInteraction,lowQuality);
-            graphics.Restore(state);
+            graphics.Restore(state);if(inkHandoff!=null)ReleaseInkHandoff();
             if((currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus)&&inkCursor.HasValue&&!pointerActive)
             {
                 float r=inkToolSize*graphics.DpiX/96f/2;

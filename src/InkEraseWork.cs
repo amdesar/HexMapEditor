@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -46,6 +46,7 @@ namespace HexMapEditor
                     if(next!=null){result.Strokes.Add(next);result.OriginalIndices.Add(i);}
                 }
                 cancellation.ThrowIfCancellationRequested();
+                if(!result.HasChange)return result;
                 InkTiming.Measure(()=>{InkGeometry.Validate(result.Strokes);return true;},(m,t)=>m.Validate+=t);
                 result.Serialized=InkTiming.Measure(()=>MapLogic.Serializer().Serialize(result.Strokes),(m,t)=>m.Serialize+=t);
                 return result;

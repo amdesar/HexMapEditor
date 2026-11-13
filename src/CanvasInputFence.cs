@@ -13,7 +13,13 @@ namespace HexMapEditor {
             return closingClick.HasValue && elapsed>=0 && elapsed<=SystemInformation.DoubleClickTime &&
                 Math.Abs(screen.X-closingClick.Value.X)<=distance.Width/2 && Math.Abs(screen.Y-closingClick.Value.Y)<=distance.Height/2;
         }
+        [DllImport("user32.dll")]static extern bool IsChild(IntPtr parent,IntPtr child);
         public bool PreFilterMessage(ref Message message){
+            if(InkCommitBusy&&IsHandleCreated&&(message.HWnd==Handle||IsChild(Handle,message.HWnd))&&(inkProcessing==null||!inkProcessing.IsHandleCreated||message.HWnd!=inkProcessing.Handle&&!IsChild(inkProcessing.Handle,message.HWnd)))
+            {
+                bool keyboard=message.Msg>=0x100&&message.Msg<=0x109,mouse=message.Msg>=0x201&&message.Msg<=0x20e;
+                if(keyboard||mouse){if(keyboard&&message.WParam.ToInt64()==(int)Keys.F4&&(Control.ModifierKeys&Keys.Alt)!=0)return false;if(message.Msg==0x100&&message.WParam.ToInt64()==(int)Keys.Escape)CancelInkCommit();else BlockInkCommit();return true;}
+            }
             // Covers owned WinForms dialogs/native text boxes too; WPF has its exact-modifier handler.
             if ((message.Msg==0x100 || message.Msg==0x104) && message.WParam.ToInt64()==(int)Keys.Z && Control.ModifierKeys==(Keys.Control|Keys.Shift)) return true;
             if(!canvas.IsHandleCreated || message.HWnd!=canvas.Handle ||
