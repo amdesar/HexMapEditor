@@ -22,6 +22,7 @@ namespace HexMapEditor
         }
         void TextUndo(string field, bool repeat)
         {
+            if(BlockInkCommit())return;
             if (selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
             string initial = field == "name" ? cell.Name : DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, field, initial); int before = history.Cursor;

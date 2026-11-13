@@ -92,8 +92,11 @@ namespace HexMapEditor
             this.open=open;Text="HexMapEditor";ClientSize=new Size(650,550);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;AutoScaleMode=AutoScaleMode.Dpi;AutoScroll=true;StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(25,28,36);ForeColor=Color.WhiteSmoke;Font=new Font("Segoe UI",10);DoubleBuffered=true;
             Icon icon=null;try{using(var external=new Icon(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","app","icon.ico")))icon=(Icon)external.Clone();}catch{try{icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{}}
             if(icon!=null){Icon=icon;var picture=new PictureBox{Image=icon.ToBitmap(),SizeMode=PictureBoxSizeMode.Zoom,Bounds=new Rectangle(38,36,64,64)};Controls.Add(picture);Disposed+=(s,e)=>{picture.Image.Dispose();icon.Dispose();};}
-            Controls.Add(new Label{Text="HexMapEditor",Font=new Font(Font.FontFamily,28,FontStyle.Bold),AutoSize=true,Location=new Point(120,32)});
-            Controls.Add(new Label{Text="Wersja "+MainWindow.Version,ForeColor=Color.Silver,AutoSize=true,Location=new Point(124,83)});
+            var title=new Label{Name="appTitle",Text="HexMapEditor",Font=new Font(Font.FontFamily,28,FontStyle.Bold),AutoSize=true,Location=new Point(120,32)};Controls.Add(title);
+            float bigAscent=title.Font.FontFamily.GetCellAscent(title.Font.Style)*title.Font.SizeInPoints*96/72/title.Font.FontFamily.GetEmHeight(title.Font.Style);
+            float smallAscent=Font.FontFamily.GetCellAscent(Font.Style)*Font.SizeInPoints*96/72/Font.FontFamily.GetEmHeight(Font.Style);
+            Controls.Add(new Label{Name="appAuthor",Text="by amdesar",ForeColor=Color.Silver,AutoSize=true,Location=new Point(title.Right+8,title.Top+(int)Math.Round(bigAscent-smallAscent))});
+            Controls.Add(new Label{Name="appVersion",Text="Wersja "+MainWindow.Version+" • "+ReleaseMetadata.Date,ForeColor=Color.Silver,AutoSize=true,Location=new Point(124,83)});
             var load=ButtonAt("Otwórz projekt",36,132);var create=ButtonAt("Stwórz nowy projekt",334,132);load.Click+=(s,e)=>ChooseOpen();create.Click+=(s,e)=>ChooseNew();
             Controls.Add(new Label{Text="Ostatnie projekty",AutoSize=true,Font=new Font(Font,FontStyle.Bold),Location=new Point(36,198)});
             projects.Bounds=new Rectangle(163,232,324,280);Controls.Add(projects);Shown+=(s,e)=>{StartupTrace.Write("start.visible",this);RefreshProjects();};
@@ -121,7 +124,7 @@ namespace HexMapEditor
         void ChooseNew()
         {
             if(choosing||transition)return;choosing=true;
-            try{string warning;var presets=PresetCatalog.Load(LibraryPaths.Presets,out warning);if(warning.Length>0)MessageBox.Show(this,warning,"Pominięte presety",MessageBoxButtons.OK,MessageBoxIcon.Warning);var data=MainWindow.ChooseNewProject(this,"PointyTop",presets);if(data!=null){string stateWarning;data.ObjectStates=StateLibrary.Load(Path.Combine(LibraryPaths.Root,"Objects","States"),out stateWarning).Select(entry=>entry.Definition.Copy()).ToList();if(stateWarning.Length>0)MessageBox.Show(this,stateWarning,"Pominięte stany",MessageBoxButtons.OK,MessageBoxIcon.Warning);var project=ProjectCreation.ChooseFile(this,data);if(project!=null)open(project.Data,project.Path);}}
+            try{string warning;var presets=PresetCatalog.Load(LibraryPaths.Presets,out warning);if(warning.Length>0)MessageBox.Show(this,warning,"Pominięte presety",MessageBoxButtons.OK,MessageBoxIcon.Warning);string stateWarning;var states=StateLibrary.Load(Path.Combine(LibraryPaths.Root,"Objects","States"),out stateWarning).Select(entry=>entry.Definition.Copy()).ToList();if(stateWarning.Length>0)MessageBox.Show(this,stateWarning,"Pominięte stany",MessageBoxButtons.OK,MessageBoxIcon.Warning);using(var dialog=new NewMapDialog("PointyTop",presets)){ProjectCreation.ConfigureStart(dialog,states);if(dialog.ShowDialog(this)==DialogResult.OK)open(dialog.CreatedProject.Data,dialog.CreatedProject.Path);}}
             catch(Exception ex){MessageBox.Show(this,ex.Message,"Nie można utworzyć projektu",MessageBoxButtons.OK,MessageBoxIcon.Error);}
             finally{choosing=false;}
         }

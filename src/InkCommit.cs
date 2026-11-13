@@ -32,6 +32,7 @@ namespace HexMapEditor
         const string InkBusyMessage="Przetwarzanie gumki… Poczekaj na wynik albo wybierz Anuluj wymazywanie.";
         bool BlockInkCommit()
         {
+            if(autoSaving){statusLabel.Text=AutoSaveBusyMessage;return true;}
             if(!InkCommitBusy)return false;statusLabel.Text=InkBusyMessage;return true;
         }
         void CancelInkCommit()

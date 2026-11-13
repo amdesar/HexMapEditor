@@ -21,6 +21,7 @@ namespace HexMapEditor
             set { data = value; }
         }
         internal long EncodedLength { get { return data == null ? LibraryEncodedLength : data.Length; } }
+        internal GraphicSource SnapshotCopy(){return new GraphicSource{Id=Id,Width=Width,Height=Height,data=data,LibraryFile=LibraryFile,LibraryEncodedLength=LibraryEncodedLength};}
         internal GraphicSource Pin()
         {
             if (data != null) return this;
