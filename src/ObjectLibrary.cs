@@ -24,6 +24,7 @@ namespace HexMapEditor
     }
     internal sealed class ObjectLibraryChange
     {
+        internal QuickLibraryState RemovedLists;
         public ObjectTemplate Before,After;
         public int Index;
         public void Write(bool after){var a=after?Before:After;var b=after?After:Before;var directory=Path.GetDirectoryName(a==null?b.FilePath:a.FilePath);foreach(var path in Directory.GetFiles(directory,"*.json")){if(a!=null&&String.Equals(path,a.FilePath,StringComparison.OrdinalIgnoreCase))continue;var other=ObjectLibrary.Read(path);if((a!=null&&other.Id==a.Id)||(b!=null&&other.Id==b.Id))throw new IOException("Konflikt ID wzorca obiektu: "+path);}LibraryFiles.Transition(a==null?null:a.FilePath,a==null?null:a.DiskBytes,b==null?null:b.FilePath,b==null?null:b.DiskBytes);}
@@ -59,8 +60,8 @@ namespace HexMapEditor
         LibraryIcon PickObjectGraphic(IWin32Window owner)
         {using(var dialog=new IconPickerDialog(libraryObjects.Select(o=>o.Graphic()),IconButton,BackColor)){dialog.Text="Biblioteka obiektów — wybierz";return RunModal(()=>dialog.ShowDialog(owner))==DialogResult.OK?dialog.Chosen:null;}}
         void SelectObjectTemplate(string id){if(FindTemplate(id)==null)return;EndCanvasGesture(true);activeObject=id;objectMaterial=true;noMaterial=false;iconMaterial=false;MaterialChosen();UpdateMaterialIndicator();canvas.Invalidate();}
-        void RefreshObjectPreview(){if(objectPreview==null)return;foreach(Control c in objectPreview.Controls.Cast<Control>().ToArray())c.Dispose();objectPreview.Controls.Clear();foreach(string id in CurrentQuick.Objects.Visible){var o=FindTemplate(id);if(o==null)continue;var entry=o;var b=IconButton(o.Graphic(),()=>SelectObjectTemplate(entry.Id));b.AccessibleName="Obiekt: "+o.Name;QuickMenu(b,o.Id,true);objectPreview.Controls.Add(b);}QuickPlaceholders(objectPreview);RefreshObjectSelection();}
-        void RefreshObjectSelection(){if(deleteObjectButton!=null)deleteObjectButton.Enabled=objectMaterial&&libraryObjects.Any(o=>o.Id==activeObject);if(objectPreview==null)return;foreach(Button b in objectPreview.Controls){bool selected=objectMaterial&&(string)b.Tag==activeObject;b.FlatAppearance.BorderSize=selected?3:1;b.FlatAppearance.BorderColor=selected?ChoiceStyle.ActiveBorder:Color.Gray;}}
+        void RefreshObjectPreview(){UpdateQuickTiles(objectPreview,true);RefreshObjectSelection();}
+        void RefreshObjectSelection(){if(deleteObjectButton!=null)deleteObjectButton.Enabled=objectMaterial&&FindTemplate(activeObject)!=null;if(objectPreview==null)return;foreach(Button b in objectPreview.Controls){bool selected=objectMaterial&&(string)b.Tag==activeObject;b.FlatAppearance.BorderSize=selected?3:1;b.FlatAppearance.BorderColor=selected?ChoiceStyle.ActiveBorder:Color.Gray;}}
         void OpenObjectLibrary(){var o=PickObjectGraphic(this);if(o!=null){var template=libraryObjects.First(x=>x.Id==o.Id);CurrentQuick.ObjectRefs[o.Id]=template.Copy();SelectObjectTemplate(o.Id);}}
         void AddObjectTemplate()
         {
@@ -70,7 +71,7 @@ namespace HexMapEditor
                 var graphic=PickLibraryIcon(this);if(graphic!=null)SaveObjectTemplate(null,new ObjectTemplate{Name=graphic.Name,Asset=graphic.Asset},false);
             }
         }
-        void ImportObjectFile(){using(var d=new OpenFileDialog{Title="Dodaj wzorzec obiektu",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)try{var asset=IconAssets.Import(d.FileName);SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false);}catch(Exception ex){ShowEditorMessage(ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
+        void ImportObjectFile(){using(var d=new OpenFileDialog{Title="Dodaj wzorzec obiektu",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)try{var asset=CropImportedIcon(d.FileName);if(asset==null)return;SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false);}catch(Exception ex){ShowEditorMessage(ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
         void EditObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial){ShowEditorMessage("Zaznacz wzorzec obiektu","Edytuj obiekt",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}using(var d=new IconEditDialog(before.Graphic(),PickObjectGraphic,PickLibraryIcon,"Edytuj wzorzec obiektu")){
                 d.SetLightDefaults(before.LightEnabled,before.LightRadius);
                 d.CanAccept = () => !d.UpdateMap || !map.Objects.Any(obj => obj.TemplateId == before.Id) || GuardLayer(MapLayer.Objects, d);
@@ -100,6 +101,15 @@ namespace HexMapEditor
                 ApplyAction(action,true);PushAction(action);MarkDirty();return true;
             }catch(Exception ex){error=ex.Message;return false;}
         }
-        void ApplyObjectLibrary(ObjectLibraryChange change,bool after){change.Write(after);var removed=after?change.Before:change.After;var added=after?change.After:change.Before;if(removed!=null)libraryObjects.RemoveAll(o=>o.Id==removed.Id);if(added!=null)libraryObjects.Insert(Math.Min(change.Index,libraryObjects.Count),added.Copy());if(objectMaterial&&!libraryObjects.Any(o=>o.Id==activeObject)){objectMaterial=false;noMaterial=true;activeObject=null;}if(added!=null)CurrentQuick.ObjectRefs[added.Id]=added.Copy();if(after&&change.Before==null&&added!=null)UsedObject(added.Id,true);RefreshObjectPreview();}
+        void ApplyObjectLibrary(ObjectLibraryChange change,bool after)
+        {
+            change.Write(after);var removed=after?change.Before:change.After;var added=after?change.After:change.Before;
+            if(removed!=null)libraryObjects.RemoveAll(o=>o.Id==removed.Id);if(added!=null)libraryObjects.Insert(Math.Min(change.Index,libraryObjects.Count),added.Copy());
+            if(objectMaterial&&!libraryObjects.Any(o=>o.Id==activeObject)){objectMaterial=false;noMaterial=true;activeObject=null;}
+            if(added!=null)CurrentQuick.ObjectRefs[added.Id]=added.Copy();
+            if(added==null&&removed!=null){if(after&&change.After==null)change.RemovedLists=CaptureLibraryQuick();RemoveQuickEntry(removed.Id,true,true);}
+            if(!after&&change.After==null)RestoreLibraryQuick(change.RemovedLists);
+            if(after&&change.Before==null&&added!=null)UsedObject(added.Id,true);RefreshObjectPreview();
+        }
     }
 }

@@ -27,9 +27,9 @@ namespace HexMapEditor
         { var b = SmallButton(parent, "", action, 48); b.Height=26;b.Image = EditorIcons.Small(icon); b.AccessibleName = help; tips.SetToolTip(b, help); return b; }
         void BuildSections()
         {
-            left.AutoScroll=true;
-            leftSections = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty, Padding = Padding.Empty };
-            foreach (var style in new[] { new RowStyle(SizeType.Absolute, 222), new RowStyle(SizeType.Absolute, 128), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, 120), new RowStyle(SizeType.Absolute, 120) }) leftSections.RowStyles.Add(style);
+            left.AutoScroll=false;
+            leftSections = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty, Padding = Padding.Empty };
+            foreach (var style in new[] { new RowStyle(SizeType.Absolute, MaxToolSection), new RowStyle(SizeType.Absolute, PresetSection), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, 120), new RowStyle(SizeType.Absolute, 120) }) leftSections.RowStyles.Add(style);
             left.Controls.Add(leftSections);
             left.ClientSizeChanged+=(s,e)=>LayoutLeftSections();
             var toolbox = Section("Przybornik", 0);
@@ -40,14 +40,14 @@ namespace HexMapEditor
             AttachFogAppearanceMenu(); AttachDarkAppearanceMenu();
             var shapeLabel = shapeCaption = new Label { Text = "Kształt", Width = 52, Height = 22 }; toolbox.Controls.Add(shapeLabel);
             shapePicker = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Kształt pędzla" }; shapePicker.Items.AddRange(new object[] { "Punkt", "Linia", "Koło", "Trójkąt", "Kwadrat", "Prostokąt", "Pięciokąt", "Heksagon", "Oktagon" }); shapePicker.SelectedIndex = 0; toolbox.Controls.Add(shapePicker);
-            var sizeLabel = new Label { Text = "Rozmiar", Width = 52, Height = 22 }; toolbox.Controls.Add(sizeLabel);
+            var sizeLabel = new Label { Text = "Rozmiar", Width = 52, Height = 22, Visible=false }; toolbox.Controls.Add(sizeLabel);
             sizePicker = new ScrubNumber { Minimum = 1, Maximum = 100, Value = 1, Width = 60, AccessibleName = "Rozmiar lub szerokość pędzla" }; heightPicker = new ScrubNumber { Minimum = 1, Maximum = 100, Value = 1, Width = 60, Visible = false, AccessibleName = "Wysokość prostokąta" }; toolbox.Controls.Add(sizePicker); toolbox.Controls.Add(heightPicker);
             fillPicker = new SwitchBox { Text = "Wypełnienie", Checked = true, AutoSize = true, AccessibleName = "Wypełnienie figury; wyłącz, aby malować obrys" }; toolbox.Controls.Add(fillPicker);
             tips.SetToolTip(sizePicker, "1–100. Heksagon: promień w pierścieniach + pole środkowe. Pozostałe: wymiar figury w odstępach siatki. Punkt zawsze 1 heks."); tips.SetToolTip(heightPicker, "Drugi wymiar prostokąta: wysokość 1–100");
             rotationPicker=new ScrubNumber{Minimum=-360,Maximum=360,Width=65,ValueNormalizer=BrushAngles.Wrap,TextNormalizer=BrushAngles.Parse,Suffix="°",AccessibleName="Obrót figury; dodatni w prawo"};apexPicker=new ScrubNumber{Minimum=1,Maximum=179,Value=60,Width=65,Suffix="°",Visible=false,AccessibleName="Kąt wierzchołkowy trójkąta"};toolbox.Controls.Add(rotationPicker);toolbox.Controls.Add(apexPicker);tips.SetToolTip(rotationPicker,"Obrót w stopniach, w prawo; wokół środka figury");tips.SetToolTip(apexPicker,"Kąt wierzchołkowy trójkąta: 1–179°, domyślnie 60°"); Action settings = () => { EndCanvasGesture(true); brushShape = new[]{BrushShape.Point,BrushShape.Line,BrushShape.Circle,BrushShape.Triangle,BrushShape.Square,BrushShape.Rectangle,BrushShape.Pentagon,BrushShape.Hexagon,BrushShape.Octagon}[shapePicker.SelectedIndex]; brushSize = (int)sizePicker.Value; brushHeight = (int)heightPicker.Value; brushFilled = fillPicker.Checked; brushRotation=(int)rotationPicker.Value;brushApex=(int)apexPicker.Value;apexPicker.Visible=brushShape==BrushShape.Triangle; heightPicker.Visible = brushShape == BrushShape.Rectangle; UpdateBrushAvailability(); tips.SetToolTip(sizeLabel, brushShape == BrushShape.Point ? "Punkt obejmuje zawsze jeden heks; rozmiar i wypełnienie nie mają zastosowania." : "Wymiar figury w jednostkach siatki: 1–100."); canvas.Invalidate(); };
             shapePicker.SelectedIndexChanged += (s, e) => settings(); sizePicker.ValueChanged += (s, e) => settings(); heightPicker.ValueChanged += (s, e) => settings(); fillPicker.CheckedChanged += (s, e) => settings();rotationPicker.ValueChanged+=(s,e)=>settings();apexPicker.ValueChanged+=(s,e)=>settings(); settings();
             BindToolNumber(sizePicker);BindToolNumber(heightPicker);BindToolNumber(rotationPicker);BindToolNumber(apexPicker);
-            sizeCaption=new Label{Text="Rozm.",Height=16};secondCaption=new Label{Text="B",Height=16};rotationCaption=new Label{Text="Obrót",Height=16};toolbox.Controls.AddRange(new Control[]{sizeCaption,secondCaption,rotationCaption});toolbox.Layout+=(s,e)=>{int w=toolbox.ClientSize.Width;foreach(Control b in paletteTools.Controls){b.Width=48;b.Height=26;b.Margin=new Padding(3,1,Math.Max(3,(w-4*54)/4+3),1);}shapeLabel.Location=new Point(0,87);shapePicker.SetBounds(52,85,Math.Max(80,w-52),22);sizeLabel.Visible=false;int field=(w-8)/3;sizeCaption.SetBounds(0,110,field,16);secondCaption.SetBounds(field+4,110,field,16);rotationCaption.SetBounds(2*(field+4),110,field,16);sizePicker.SetBounds(0,126,field,26);heightPicker.SetBounds(field+4,126,field,26);apexPicker.SetBounds(field+4,126,field,26);rotationPicker.SetBounds(2*(field+4),126,field,26);fillPicker.Location=new Point(0,156);};
+            sizeCaption=new Label{Text="Rozm.",Height=16};secondCaption=new Label{Text="B",Height=16};rotationCaption=new Label{Text="Obrót",Height=16};toolbox.Controls.AddRange(new Control[]{sizeCaption,secondCaption,rotationCaption});toolbox.Layout+=(s,e)=>LayoutShapeParameters(toolbox);
             BuildInkSettings(toolbox);
             var presets = Section("Presety", 1);
             presetPickerRow = new Panel { Dock = DockStyle.None, Height = 28 }; presets.Controls.Add(presetPickerRow);
@@ -56,9 +56,8 @@ namespace HexMapEditor
             refreshPresetsButton = IconAction(presetPickerRow, "refresh", "Odśwież presety", () => LoadLibraryPresets(false));
             presetActions = new FlowLayoutPanel { Height = 32, WrapContents = false }; presets.Controls.Add(presetActions);
             IconAction(presetActions, "plus", "Nowy preset", CreatePreset); renamePresetButton = IconAction(presetActions, "pencil", "Edytuj nazwę", RenamePreset); IconAction(presetActions, "save", "Zapisz preset", SavePreset); deletePresetButton = IconAction(presetActions, "trash", "Usuń preset", RemovePreset);
-            var restorePreset=IconAction(presetPickerRow,"restore","Przywróć zapisane dane wybranych sekcji",RestorePresetSections);presetStateLabel.AutoEllipsis = true; presets.Controls.Add(presetStateLabel);
-            presets.Layout += (s, e) => { int w = presets.ClientSize.Width; presetPickerRow.SetBounds(0,28,w,28);terrainPicker.SetBounds(0,1,Math.Max(80,w-104),24);refreshPresetsButton.SetBounds(w-100,0,48,26);restorePreset.SetBounds(w-48,0,48,26);presetActions.SetBounds(0,0,w,28);foreach(Control b in presetActions.Controls){b.Width=48;b.Height=26;}presetStateLabel.SetBounds(0,57,w,45); };
-
+            var restorePreset=IconAction(presetActions,"restore","Przywróć zapisane dane wybranych sekcji",RestorePresetSections);presetStateLabel.AutoEllipsis = true; presets.Controls.Add(presetStateLabel);
+            presets.Layout += (s,e)=>{int w=presets.ClientSize.Width;LayoutFunctions(presetActions);presetActions.SetBounds(0,0,w,28);presetPickerRow.SetBounds(0,28,w,28);terrainPicker.SetBounds(2,1,w-FunctionWidth-10,24);refreshPresetsButton.SetBounds(w-FunctionWidth-2,0,FunctionWidth,26);presetStateLabel.SetBounds(0,57,w,30);};
             var terrains = Section("Tereny", 2);
             var terrainActions=new Panel{Dock=DockStyle.Top,Height=28};terrains.Controls.Add(terrainActions);
             addTerrainButton=SmallButton(terrainActions,"Dodaj teren",()=>EditTerrain(true),96);
@@ -72,17 +71,19 @@ namespace HexMapEditor
             paletteTiles.AutoSize = true; paletteTiles.AutoSizeMode = AutoSizeMode.GrowAndShrink; paletteTiles.FlowDirection = FlowDirection.TopDown; paletteTiles.WrapContents = false; paletteTiles.Margin = Padding.Empty; terrainScroll.Controls.Add(paletteTiles); terrainScroll.Layout += (s, e) => LayoutPalette(); paletteTiles.SizeChanged += (s, e) => LayoutPalette(); paletteTiles.ControlAdded += (s, e) => LayoutPalette(); paletteTiles.ControlRemoved += (s, e) => LayoutPalette();
 
             var iconSection = Section("Ikony", 3); var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 30, WrapContents = false }; iconSection.Controls.Add(actions);
-            IconAction(actions, "plus", "Dodaj ikonę z pliku", ImportIcon); IconAction(actions, "pencil", "Edytuj ikonę", EditLibraryIcon); deleteIconButton = IconAction(actions, "trash", "Usuń wybraną ikonę z biblioteki", DeleteLibraryIcon); var more = SmallButton(actions, "…", OpenIconLibrary, 48); more.Height=26;more.AccessibleName = "Pełna biblioteka ikon"; tips.SetToolTip(more, more.AccessibleName);
+            IconAction(actions, "plus", "Dodaj ikonę z pliku", ImportIcon); IconAction(actions, "pencil", "Edytuj ikonę", EditLibraryIcon); deleteIconButton = IconAction(actions, "trash", "Usuń wybraną ikonę z biblioteki", ChooseIconRemoval); var more = SmallButton(actions, "…", OpenIconLibrary, 48); more.Height=26;more.AccessibleName = "Pełna biblioteka ikon"; tips.SetToolTip(more, more.AccessibleName);
+            actions.Layout+=(s,e)=>LayoutFunctions(actions);
             iconPreview = new BufferedFlowPanel { Dock = DockStyle.Fill, WrapContents = true, AutoScroll = false, Padding = Padding.Empty }; iconSection.Controls.Add(iconPreview); iconPreview.BringToFront();
             var objects=Section("Obiekty",4);var objectActions=new FlowLayoutPanel{Dock=DockStyle.Top,Height=30,WrapContents=false};objects.Controls.Add(objectActions);
-            IconAction(objectActions,"plus","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);deleteObjectButton=IconAction(objectActions,"trash","Usuń wzorzec obiektu",DeleteObjectTemplate);var objectLibraryButton=SmallButton(objectActions,"…",OpenObjectLibrary,48);objectLibraryButton.Height=26;IconAction(objectActions,"labels","Lista obiektów na mapie",OpenObjectInstances);
+            IconAction(objectActions,"plus","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);deleteObjectButton=IconAction(objectActions,"trash","Usuń wzorzec obiektu",ChooseObjectRemoval);var objectLibraryButton=SmallButton(objectActions,"…",OpenObjectLibrary,48);objectLibraryButton.Height=26;IconAction(objectActions,"labels","Lista obiektów na mapie",OpenObjectInstances);
+            objectActions.Layout+=(s,e)=>LayoutFunctions(objectActions);
             objectPreview=new BufferedFlowPanel{Dock=DockStyle.Fill,AutoScroll=false,WrapContents=true};objects.Controls.Add(objectPreview);objectPreview.BringToFront();
             SelectTool(EditorTool.Select); LayoutPalette(); RefreshPresetPicker(); UpdateMaterialIndicator();
             canvas.MouseLeave += (s, e) => { if(pointerActive){EndCanvasGesture(true);ClearPointerContext();} brushMouse=new Point(-100,-100);inkCursor=null;inkPrevious=null;activeStroke=null;previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
             Disposed += (s, e) => { foreach (var b in documentBitmaps.Values) b.Dispose(); foreach (var b in libraryBitmaps.Values) b.Dispose(); };
         }
         bool layingOutPalette;
-        void LayoutLeftSections(){if(leftSections==null)return;int required=(int)leftSections.RowStyles.Cast<RowStyle>().Where(r=>r.SizeType==SizeType.Absolute).Sum(r=>r.Height)+126;int height=Math.Max(left.ClientSize.Height,required);if(leftSections.Height!=height)leftSections.Height=height;}
+        void LayoutLeftSections(){if(leftSections==null)return;LayoutQuickSections();LayoutShapeParameters(shapePicker.Parent);}
         Button TerrainScrollButton(Control parent, bool up)
         {
             var button = SmallButton(parent, "", () => ScrollTerrainRow(up ? -1 : 1), 208);

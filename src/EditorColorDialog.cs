@@ -10,9 +10,9 @@ namespace HexMapEditor
         readonly ColorHexBox hex = new ColorHexBox { MaxLength = 32, AccessibleName = "Kolor HEX" };
         readonly Label error = new Label { Text = "Wpisz # i dokładnie sześć cyfr szesnastkowych.", AutoSize = true, ForeColor = Color.Salmon };
         readonly Panel next = new Panel();
-        readonly Button[] recent=new Button[12];
+        readonly Button[] recent=new EditorButton[12];
         readonly ToolTip recentTips=new ToolTip();
-        readonly Button accept = new Button { Text = "Zatwierdź" };
+        readonly Button accept = new EditorButton { Text = "Zatwierdź" };
         readonly HsvSurface saturation;
         readonly HsvSurface hue;
         readonly ScrubNumber[] rgb={new ScrubNumber(),new ScrubNumber(),new ScrubNumber()};
@@ -59,7 +59,7 @@ namespace HexMapEditor
             var old = new Panel { BackColor = initial, Bounds = new Rectangle(193, 224, 93, 29), BorderStyle = BorderStyle.FixedSingle };
             next.SetBounds(303, 224, 95, 29);
             next.BorderStyle = BorderStyle.FixedSingle;
-            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(302, 410, 96, 29) };
+            var cancel = new EditorButton { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(302, 410, 96, 29) };
             accept.SetBounds(196, 410, 96, 29);
             foreach (var button in new[] { accept, cancel }) { button.FlatStyle = FlatStyle.Flat; button.BackColor = hex.BackColor; }
             error.Location = new Point(16, 382);
@@ -67,7 +67,7 @@ namespace HexMapEditor
             hex.TabIndex=2;accept.TabIndex=6;cancel.TabIndex=7;
             Controls.AddRange(new Control[] { saturation, hue, hex, old, next, error, accept, cancel,
                 LabelAt("HEX", 16, 228), LabelAt("Poprzedni", 193, 257), LabelAt("Nowy", 303, 257) });
-            for(int i=0;i<12;i++){int at=i;var b=recent[i]=new Button{Bounds=new Rectangle(146+(i%6)*42,289+(i/6)*38,36,30),FlatStyle=FlatStyle.Flat,TabIndex=8+i};b.Click+=(s,e)=>{var colors=RecentColors.Values;if(at<colors.Length){BeginColorEdit();SetColor(colors[at]);EndColorEdit();}};Controls.Add(b);}
+            for(int i=0;i<12;i++){int at=i;var b=recent[i]=new EditorButton{Bounds=new Rectangle(146+(i%6)*42,289+(i/6)*38,36,30),FlatStyle=FlatStyle.Flat,TabIndex=8+i};b.Click+=(s,e)=>{var colors=RecentColors.Values;if(at<colors.Length){BeginColorEdit();SetColor(colors[at]);EndColorEdit();}};Controls.Add(b);}
             RecentColors.Changed+=RefreshRecent;Disposed+=(s,e)=>{RecentColors.Changed-=RefreshRecent;recentTips.Dispose();};RefreshRecent();
             Controls.Add(LabelAt("Kolory sesji (ostatnie 12)",146,272));
             AcceptButton = accept;

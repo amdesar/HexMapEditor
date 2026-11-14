@@ -17,9 +17,9 @@ namespace HexMapEditor
             BindToolNumber(inkSize);
             inkColorButton=SmallButton(inkSettings,"Kolor rysika",()=>ChooseInkColor(false),112);inkColorButton.Location=new Point(0,28);
             pointerColorButton=SmallButton(inkSettings,"Kolor wskaźnika",()=>ChooseInkColor(true),100);pointerColorButton.AccessibleName="Kolor chwilowego wskaźnika";tips.SetToolTip(pointerColorButton,pointerColorButton.AccessibleName);
-            inkSettings.Layout+=(s,e)=>{int half=inkSettings.ClientSize.Width/2;inkSize.SetBounds(0,24,Math.Max(36,(inkSettings.ClientSize.Width-8)/3),26);inkColorButton.SetBounds(0,54,half-2,28);pointerColorButton.SetBounds(half+2,54,inkSettings.ClientSize.Width-half-2,28);};
+            inkSettings.Layout+=(s,e)=>{int half=inkSettings.ClientSize.Width/2;label.SetBounds(0,0,inkSettings.ClientSize.Width-ParameterWidth-5,26);label.AutoSize=false;label.TextAlign=ContentAlignment.MiddleLeft;inkSize.SetBounds(label.Right+5,0,ParameterWidth,26);inkColorButton.SetBounds(0,32,half-2,28);pointerColorButton.SetBounds(half+2,32,inkSettings.ClientSize.Width-half-2,28);};
             tips.SetToolTip(inkSize,"Wspólny rozmiar rysika/gumki 1–200 logicznych px ekranu (domyślnie 5). Nowy gest przelicza go na świat z zoomu i DPI. Obrys na płótnie pokazuje rozmiar. PPM rysika: chwilowy wskaźnik; PPM gumki: wyczyść rysunki z Undo.");
-            toolbox.Layout+=(s,e)=>inkSettings.SetBounds(0,86,toolbox.ClientSize.Width,86);
+            toolbox.Layout+=(s,e)=>inkSettings.SetBounds(0,86,toolbox.ClientSize.Width,62);
         }
         void UpdateInkSettings()
         {
@@ -29,7 +29,7 @@ namespace HexMapEditor
         }
         void ChooseInkColor(bool pointer)
         {
-            using(var d=new PaintPickerDialog(ColorTranslator.FromHtml(pointer?pointerColor:inkColor),pointer?pointerGradient:inkGradient,true))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK){if(pointer){ClearPointerContext();pointerColor=d.Hex;pointerGradient=d.Gradient;pointerPalette=pointerGradient==null?null:new GradientSampler(pointerGradient);}else{inkColor=d.Hex;inkGradient=d.Gradient;}}
+            using(var d=new PaintPickerDialog(ColorTranslator.FromHtml(pointer?pointerColor:inkColor),pointer?pointerGradient:inkGradient,true){Text=pointer?"Kolor wskaźnika":"Kolor rysika"})if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK){if(pointer){ClearPointerContext();pointerColor=d.Hex;pointerGradient=d.Gradient;pointerPalette=pointerGradient==null?null:new GradientSampler(pointerGradient);}else{inkColor=d.Hex;inkGradient=d.Gradient;}}
         }
     }
 }

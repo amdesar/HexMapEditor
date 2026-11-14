@@ -38,7 +38,7 @@ namespace HexMapEditor
         bool ConfirmPresetsBeforeClose()
         {
             foreach(string id in map.Presets.Where(WorkingPresetDirty).Select(p=>p.Id).ToArray()){
-                SelectPreset(id);var p=ActivePreset();var answer=ConfirmPresetForTest!=null?ConfirmPresetForTest(p):ShowEditorMessage("Preset „"+p.Name+"” ma niezapisane zmiany. Zapisać wszystkie trzy sekcje przed zamknięciem?","Niezapisany preset",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Warning);
+                SelectPreset(id);var p=ActivePreset();var answer=ConfirmPresetForTest!=null?ConfirmPresetForTest(p):ShowEditorMessage("Preset „"+p.Name+"” ma niezapisane zmiany. Czy chcesz je zapisać przed kontynuowaniem?","Niezapisany preset",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Warning);
                 if(answer==DialogResult.Cancel)return false;if(answer==DialogResult.Yes&&!(SavePresetAllForTest!=null?SavePresetAllForTest(p):SavePresetCore(true)))return false;
             }return true;
         }

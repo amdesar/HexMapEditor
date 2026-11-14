@@ -15,8 +15,8 @@ namespace HexMapEditor
         readonly bool flat;
         readonly Dictionary<string, Bitmap> thumbnails = new Dictionary<string, Bitmap>();
         readonly AppearanceHistory history;
-        readonly Button undoLocal = new Button { Image = EditorIcons.Small("undo"), Width = 36, Height = 26, AccessibleName = "Cofnij wariant" };
-        readonly Button redoLocal = new Button { Image = EditorIcons.Small("redo"), Width = 36, Height = 26, AccessibleName = "Ponów wariant" };
+        readonly Button undoLocal = new EditorButton { Image = EditorIcons.Small("undo"), Width = 36, Height = 26, AccessibleName = "Cofnij wariant" };
+        readonly Button redoLocal = new EditorButton { Image = EditorIcons.Small("redo"), Width = 36, Height = 26, AccessibleName = "Ponów wariant" };
         readonly ToolTip tips = new ToolTip();
         internal Func<IWin32Window, bool, GraphicDefinition> ChooseGraphic;
         internal Func<IWin32Window, GraphicDefinition, GraphicDefinition> EditCrop;
@@ -36,8 +36,8 @@ namespace HexMapEditor
             var header = new Panel { Dock = DockStyle.Top, Width = ClientSize.Width, Height = initialName == null ? 64 : 100 };
             if (initialName != null)
             {
-                name.Text = initialName; name.Bounds = new Rectangle(78, 10, 365, 25); name.Anchor |= AnchorStyles.Right;
-                header.Controls.Add(name); header.Controls.Add(new Label { Text = "Nazwa", Location = new Point(12, 13), AutoSize = true });
+                name.Text = initialName; name.Bounds = new Rectangle(78, 10, 365, name.PreferredHeight); name.Anchor |= AnchorStyles.Right;
+                header.Controls.Add(name); header.Controls.Add(new Label { Text = "Nazwa", Bounds = new Rectangle(12, 8, 62, 26), TextAlign=ContentAlignment.MiddleLeft });
             }
             header.Controls.Add(new Label { Text = "Warianty wyglądu — kliknij kafelek, aby go edytować.", Location = new Point(12, initialName == null ? 8 : 44), AutoSize = true });
             undoLocal.Location = new Point(12, initialName == null ? 32 : 68); redoLocal.Location = new Point(54, undoLocal.Top);
@@ -47,9 +47,9 @@ namespace HexMapEditor
             header.Controls.AddRange(new Control[] { undoLocal, redoLocal });
             var footer = new Panel { Dock = DockStyle.Bottom, Width = ClientSize.Width, Height = 110 };
             apply.Text = applyCaption; apply.Enabled = existing; apply.Location = new Point(12, 8);
-            preserve.Location = new Point(12, 33); apply.CheckedChanged += (s,e) => preserve.Enabled = apply.Checked;
-            var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(240, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
-            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(352, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            apply.AutoSize=preserve.AutoSize=false;apply.Size=new Size(446,24);preserve.SetBounds(12,33,446,24);footer.Layout+=(s,e)=>{apply.Width=preserve.Width=footer.ClientSize.Width-24;}; apply.CheckedChanged += (s,e) => preserve.Enabled = apply.Checked;
+            var accept = new EditorButton { Text = "Zatwierdź", Bounds = new Rectangle(240, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            var cancel = new EditorButton { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(352, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
             foreach (var button in new[] { accept, cancel }) button.MouseDown += (s,e) =>
             { if (e.Button == MouseButtons.Left) { ClosingClick = ((Control)s).PointToScreen(e.Location); ClosingClickTime = MainWindow.GetMessageTime(); } };
             accept.Click += (s, e) =>
@@ -102,7 +102,7 @@ namespace HexMapEditor
                     choose.Click += (s, e) => Edit(index);
                     tiles.Controls.Add(tile);
                 }
-                var add = new Button { Text = "+", Width = 88, Height = 88, Margin = new Padding(4), Enabled = Fills.Count < GraphicLimits.Pool, AccessibleName = "Dodaj wariant koloru lub grafiki" };
+                var add = new EditorButton { Text = "+", Width = 88, Height = 88, Margin = new Padding(4), Enabled = Fills.Count < GraphicLimits.Pool, AccessibleName = "Dodaj wariant koloru lub grafiki" };
                 add.Click += (s, e) => Edit(-1); tiles.Controls.Add(add);
                 undoLocal.Enabled = history.CanUndo; redoLocal.Enabled = history.CanRedo;
             }
@@ -166,63 +166,36 @@ namespace HexMapEditor
 
     internal sealed class FillVariantDialog : EditorDialog
     {
-        readonly ComboBox kind = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        readonly Button color = new Button();
-        readonly FlowLayoutPanel graphicButtons = new FlowLayoutPanel { WrapContents = false };
+        readonly RadioSwitch solid=new RadioSwitch{Text="Kolor"},gradient=new RadioSwitch{Text="Gradient"},graphic=new RadioSwitch{Text="Grafika"};
+        readonly Button color=new EditorButton();
+        readonly FlowLayoutPanel graphicButtons=new FlowLayoutPanel{WrapContents=false};
         readonly TerrainPreview preview;
         readonly FillVariant draft;
-        internal Func<IWin32Window, bool, GraphicDefinition> ChooseGraphic;
-        internal Func<IWin32Window, GraphicDefinition, GraphicDefinition> EditCrop;
-        readonly Button crop = new Button { Text = "Kadruj…", Width = 80 };
-        internal FillVariant Result { get; private set; }
-        internal FillVariantDialog(FillVariant initial, bool flat) : base("Wariant wyglądu", 285)
+        readonly Label valueLabel;
+        internal Func<IWin32Window,bool,GraphicDefinition> ChooseGraphic;
+        internal Func<IWin32Window,GraphicDefinition,GraphicDefinition> EditCrop;
+        readonly Button crop=new EditorButton{Text="Kadruj…",Width=80};
+        internal FillVariant Result{get;private set;}
+        int Kind{get{return graphic.Checked?2:gradient.Checked?1:0;}}
+        internal FillVariantDialog(FillVariant initial,bool flat):base("Wariant wyglądu",300)
         {
-            BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke;
-            draft = initial.Copy();
-            kind.Items.AddRange(new object[] { "Kolor", "Gradient", "Grafika" }); kind.SelectedIndex = draft.Graphic != null ? 2 : draft.Gradient!=null?1:0;
-            var library = new Button { Text = "Biblioteka…", Width = 88 };
-            var import = new Button { Text = "Importuj…", Width = 80 };
-            graphicButtons.Controls.AddRange(new Control[] { library, import, crop });
-            preview = new TerrainPreview(flat) { Dock = DockStyle.Fill };
-            Row(0, "Typ", kind, true); Row(1, "Kolor", color, true); Row(2, "Grafika", graphicButtons, true);
-            Layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); Layout.Controls.Add(preview, 0, 3); Layout.SetColumnSpan(preview, 3);
-            Buttons(4, () =>
-            {
-                if (kind.SelectedIndex == 2 && draft.Graphic == null) return;
-                if (kind.SelectedIndex != 2) { draft.Graphic = null; draft.GraphicId = null; }
-                if(kind.SelectedIndex!=1)draft.Gradient=null;
-                Result = draft.Copy(); DialogResult = DialogResult.OK;
-            });
-            color.Click += (s, e) =>
-            {
-                using (var picker = new PaintPickerDialog(ColorTranslator.FromHtml(draft.Color),draft.Gradient,false,flat,kind.SelectedIndex==1))
-                    if (picker.ShowDialog(this) == DialogResult.OK) { draft.Color = picker.Hex;draft.Gradient=picker.Gradient;kind.SelectedIndex=picker.Gradient==null?0:1; RefreshPreview(); }
-            };
-            library.Click += (s, e) => Pick(false); import.Click += (s, e) => Pick(true);
-            crop.Click += (s, e) =>
-            {
-                if (draft.Graphic == null || EditCrop == null) return;
-                var next = EditCrop(this, draft.Graphic);
-                if (next != null) { draft.Graphic = next; draft.GraphicId = next.Id; RefreshPreview(); }
-            };
-            kind.SelectedIndexChanged += (s, e) => RefreshPreview();
-            RefreshPreview();
+            draft=initial.Copy();var choices=new FlowLayoutPanel{WrapContents=false};choices.Controls.AddRange(new Control[]{solid,gradient,graphic});
+            var library=new EditorButton{Text="Biblioteka…",Width=88};var import=new EditorButton{Text="Importuj…",Width=80};graphicButtons.Controls.AddRange(new Control[]{import,library,crop});
+            Row(0,"Typ",choices,true);var value=new Panel();value.Controls.AddRange(new Control[]{color,graphicButtons});color.Dock=graphicButtons.Dock=DockStyle.Fill;Row(1,"Kolor",value,true);valueLabel=(Label)Layout.GetControlFromPosition(0,1);
+            preview=new TerrainPreview(flat){Dock=DockStyle.Fill};Layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));Layout.Controls.Add(preview,0,2);Layout.SetColumnSpan(preview,3);
+            Buttons(3,()=>{if(Kind==2&&draft.Graphic==null)return;if(Kind!=2){draft.Graphic=null;draft.GraphicId=null;}if(Kind!=1)draft.Gradient=null;Result=draft.Copy();DialogResult=DialogResult.OK;});
+            color.Click+=(s,e)=>{using(var picker=new PaintPickerDialog(ColorTranslator.FromHtml(draft.Color),draft.Gradient,false,flat,Kind==1))if(picker.ShowDialog(this)==DialogResult.OK){draft.Color=picker.Hex;draft.Gradient=picker.Gradient;if(picker.Gradient==null)solid.Checked=true;else gradient.Checked=true;RefreshPreview();}};
+            library.Click+=(s,e)=>Pick(false);import.Click+=(s,e)=>Pick(true);crop.Click+=(s,e)=>{if(draft.Graphic==null||EditCrop==null)return;var next=EditCrop(this,draft.Graphic);if(next!=null){draft.Graphic=next;draft.GraphicId=next.Id;RefreshPreview();}};
+            foreach(var option in new[]{solid,gradient,graphic})option.CheckedChanged+=(s,e)=>RefreshPreview();
+            if(draft.Graphic!=null)graphic.Checked=true;else if(draft.Gradient!=null)gradient.Checked=true;else solid.Checked=true;RefreshPreview();
         }
-        void Pick(bool import)
-        {
-            var next = ChooseGraphic(this, import);
-            if (next != null) { draft.Graphic = next; draft.GraphicId = next.Id; RefreshPreview(); }
-        }
+        void Pick(bool import){if(ChooseGraphic==null)return;var next=ChooseGraphic(this,import);if(next!=null){draft.Graphic=next;draft.GraphicId=next.Id;RefreshPreview();}}
         void RefreshPreview()
         {
-            color.Text = draft.Color; color.BackColor = ColorTranslator.FromHtml(draft.Color);
-            if(kind.SelectedIndex==1&&draft.Gradient==null)draft.Gradient=GradientRules.Two(draft.Color);
-            color.Text=kind.SelectedIndex==1?"Edytuj gradient…":draft.Color;
-            color.Enabled = kind.SelectedIndex != 2; graphicButtons.Enabled = kind.SelectedIndex == 2;
-            crop.Enabled = draft.Graphic != null;
-            preview.ShowFill(ColorTranslator.FromHtml(draft.Color), kind.SelectedIndex == 2 ? draft.Graphic : null);
-            preview.Gradient=kind.SelectedIndex==1?draft.Gradient:null;preview.Invalidate();
-            Ok.Enabled = kind.SelectedIndex != 2 || draft.Graphic != null;
+            if(preview==null)return;int kind=Kind;valueLabel.Text=kind==2?"Grafika":kind==1?"Gradient":"Kolor";
+            if(kind==1&&draft.Gradient==null)draft.Gradient=GradientRules.Two(draft.Color);
+            color.Text=kind==1?"Edytuj gradient…":draft.Color;color.BackColor=ColorTranslator.FromHtml(draft.Color);color.Visible=kind!=2;graphicButtons.Visible=kind==2;
+            crop.Enabled=draft.Graphic!=null;preview.ShowFill(ColorTranslator.FromHtml(draft.Color),kind==2?draft.Graphic:null);preview.Gradient=kind==1?draft.Gradient:null;preview.Invalidate();Ok.Enabled=kind!=2||draft.Graphic!=null;
         }
     }
 }

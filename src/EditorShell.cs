@@ -44,13 +44,15 @@ namespace HexMapEditor
                 else if (key == "select") g.DrawPolygon(p, new[] { new Point(4, 2), new Point(17, 12), new Point(11, 13), new Point(8, 19) });
                 else if(key=="rectangle"){p.DashStyle=DashStyle.Dash;g.DrawRectangle(p,3,4,16,14);}
                 else if(key=="lasso"){g.DrawEllipse(p,3,3,16,12);g.DrawBezier(p,new Point(8,14),new Point(2,22),new Point(16,21),new Point(12,15));}
-                else if (key == "hand") { g.DrawLines(p,new[]{new Point(7,20),new Point(3,12),new Point(5,10),new Point(8,14),new Point(8,4),new Point(10,3),new Point(11,11),new Point(12,2),new Point(14,3),new Point(14,11),new Point(16,4),new Point(18,5),new Point(17,12),new Point(20,8),new Point(21,10),new Point(18,19),new Point(7,20)}); }
-                else if (key == "brush") { using (var handle = new Pen(Color.WhiteSmoke, 3)) g.DrawLine(handle, 18, 2, 10, 12); g.FillPolygon(Brushes.WhiteSmoke, new[] { new Point(8, 10), new Point(13, 14), new Point(10, 20), new Point(2, 20), new Point(5, 16) }); }
+                else if(key=="hand"){
+                    using(var hand=new GraphicsPath()){hand.AddLines(new[]{new PointF(6,19),new PointF(2,12),new PointF(3,10),new PointF(6,13),new PointF(6,5)});hand.AddBezier(6,5,6,2,9,2,9,5);hand.AddLine(9,5,9,10);hand.AddLine(9,10,9,3);hand.AddBezier(9,3,9,1,12,1,12,3);hand.AddLine(12,3,12,10);hand.AddLine(12,10,12,4);hand.AddBezier(12,4,12,2,15,2,15,4);hand.AddLine(15,4,15,11);hand.AddLine(15,11,15,7);hand.AddBezier(15,7,15,5,18,5,18,7);hand.AddLines(new[]{new PointF(18,7),new PointF(18,14),new PointF(16,19),new PointF(6,19)});g.DrawPath(p,hand);}
+                }
+                else if(key=="brush"){g.DrawPolygon(p,new[]{new Point(11,11),new Point(16,2),new Point(19,3),new Point(14,13)});g.DrawLine(p,9,12,14,15);using(var bristles=new GraphicsPath()){bristles.AddBezier(9,13,5,12,7,18,2,19);bristles.AddBezier(2,19,8,21,13,20,13,16);bristles.CloseFigure();g.FillPath(Brushes.WhiteSmoke,bristles);}}
                 else if(key=="stylus"){g.DrawPolygon(p,new[]{new Point(3,20),new Point(5,14),new Point(16,2),new Point(20,6),new Point(9,18)});g.DrawLine(p,13,5,17,9);}
-                else if(key=="eraser"){g.DrawPolygon(p,new[]{new Point(2,14),new Point(12,3),new Point(20,10),new Point(11,20),new Point(8,20)});g.DrawLine(p,7,9,15,16);}
+                else if(key=="eraser"){g.DrawPolygon(p,new[]{new Point(3,13),new Point(12,3),new Point(20,10),new Point(11,19),new Point(8,19)});g.FillPolygon(Brushes.WhiteSmoke,new[]{new Point(3,13),new Point(8,8),new Point(16,14),new Point(11,19),new Point(8,19)});g.DrawLine(p,8,8,16,14);}
                 else if(key=="dark"||key=="darkbucket")
                 {
-                    using(var eye=new GraphicsPath()){eye.AddBezier(2,11,7,2,15,2,20,11);eye.AddBezier(20,11,15,20,7,20,2,11);if(key=="darkbucket"){eye.AddEllipse(8,8,6,6);eye.FillMode=FillMode.Alternate;g.FillPath(Brushes.WhiteSmoke,eye);}else{g.DrawPath(p,eye);g.DrawEllipse(p,8,8,6,6);}}
+                    using(var eye=new GraphicsPath()){eye.AddBezier(2,11,7,1,15,1,20,11);eye.AddBezier(20,11,15,21,7,21,2,11);if(key=="darkbucket"){eye.AddEllipse(8,8,6,6);eye.FillMode=FillMode.Alternate;g.FillPath(Brushes.WhiteSmoke,eye);}else{g.DrawPath(p,eye);g.DrawEllipse(p,8,8,6,6);}}
                 }
                 else if (key == "fog" || key == "fogbucket") {using(var cloud=new GraphicsPath()){cloud.AddBezier(3,17,0,12,2,8,6,9);cloud.AddBezier(6,9,5,2,14,2,15,8);cloud.AddBezier(15,8,22,6,23,17,18,18);cloud.AddLine(18,18,3,17);if(key=="fogbucket")g.FillPath(Brushes.WhiteSmoke,cloud);else g.DrawPath(p,cloud);}}
                 else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 10), new Point(10, 2), new Point(18, 10), new Point(10, 18) });g.FillPolygon(Brushes.WhiteSmoke,new[]{new Point(3,10),new Point(17,10),new Point(10,17)});g.DrawLine(p,3,10,17,10);g.FillClosedCurve(Brushes.WhiteSmoke,new[]{new Point(19,12),new Point(17,17),new Point(20,20),new Point(22,17)}); }
@@ -102,7 +104,7 @@ namespace HexMapEditor
         }
         void BuildPalettePanel() { BuildSections(); }
         Button SmallButton(Control parent, string text, Action action, int width)
-        { var b = new Button { Text = text, Width = width, Height = 28, Margin = new Padding(2), FlatStyle = FlatStyle.Flat, AccessibleName = text }; StyleButton(b); b.Click += (s, e) => action(); parent.Controls.Add(b); return b; }
+        { var b = new EditorButton { Text = text, Width = width, Height = 28, Margin = new Padding(2), FlatStyle = FlatStyle.Flat, AccessibleName = text }; StyleButton(b); b.Click += (s, e) => action(); parent.Controls.Add(b); return b; }
         void SelectTool(EditorTool tool)
         {
             EndCanvasGesture(true);if(currentTool!=tool)ClearPointerContext(); currentTool = tool;

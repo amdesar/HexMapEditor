@@ -7,6 +7,11 @@ namespace HexMapEditor
     internal sealed class TerrainChoiceButton : Button
     {
         internal Image FillImage;
+        bool keyboardFocus;
+        protected override bool ShowFocusCues{get{return false;}}
+        protected override void OnGotFocus(EventArgs e){keyboardFocus=Control.MouseButtons==MouseButtons.None;base.OnGotFocus(e);Invalidate();}
+        protected override void OnMouseDown(MouseEventArgs e){keyboardFocus=false;base.OnMouseDown(e);Invalidate();}
+        protected override void OnKeyDown(KeyEventArgs e){keyboardFocus=true;base.OnKeyDown(e);Invalidate();}
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -25,7 +30,7 @@ namespace HexMapEditor
             for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) if (x != 0 || y != 0)
                 TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(inner.X+x, inner.Y+y, inner.Width, inner.Height), outline, flags);
             TextRenderer.DrawText(e.Graphics, Text, Font, inner, ForeColor, flags);
-            if (Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(inner, -1, -1));
+            if (Focused&&keyboardFocus)using(var focus=new Pen(ChoiceStyle.ActiveBorder,2))e.Graphics.DrawRectangle(focus,Rectangle.Inflate(inner,-1,-1));
         }
     }
     internal sealed class BufferedFlowPanel : FlowLayoutPanel

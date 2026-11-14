@@ -9,17 +9,17 @@ namespace HexMapEditor
     internal class EditorDialog : DarkForm
     {
         protected new readonly TableLayoutPanel Layout;
-        protected readonly Button Ok = new Button { Text = "OK", Width = 92, Height = 30 };
+        protected readonly Button Ok = new EditorButton { Text = "OK", Width = 92, Height = 30 };
         protected EditorDialog(string title, int height)
         {
             Text = title; ClientSize = new Size(420, height); Font = new Font("Segoe UI", 9); FormBorderStyle = FormBorderStyle.FixedDialog; StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false;
             Layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 3 }; Layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); Layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); Layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); Controls.Add(Layout);
         }
         protected void Row(int row, string label, Control input, bool span)
-        { Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38)); Layout.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row); input.Dock = DockStyle.Fill; input.Margin = new Padding(3, 5, 3, 5); Layout.Controls.Add(input, 1, row); if (span) Layout.SetColumnSpan(input, 2); }
+        { Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38)); Layout.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row); Control content=input;var text=input as TextBox;if(text!=null&&!text.Multiline){var host=new Panel{Dock=DockStyle.Fill};text.Dock=DockStyle.None;text.Anchor=AnchorStyles.Left|AnchorStyles.Right;host.Controls.Add(text);host.Layout+=(s,e)=>text.SetBounds(0,Math.Max(0,(host.ClientSize.Height-text.PreferredHeight)/2),host.ClientSize.Width,text.PreferredHeight);content=host;}content.Dock=DockStyle.Fill;content.Margin=new Padding(3,5,3,5);Layout.Controls.Add(content,1,row);if(span)Layout.SetColumnSpan(content,2); }
         protected void Buttons(int row, Action accept)
         {
-            var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Width = 92, Height = 30 }; Ok.Click += (s, e) => accept(); panel.Controls.Add(Ok); panel.Controls.Add(cancel); Layout.Controls.Add(panel, 0, row); Layout.SetColumnSpan(panel, 3); Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); AcceptButton = Ok; CancelButton = cancel;
+            var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill }; var cancel = new EditorButton { Text = "Anuluj", DialogResult = DialogResult.Cancel, Width = 92, Height = 30 }; Ok.Click += (s, e) => accept(); panel.Controls.Add(Ok); panel.Controls.Add(cancel); Layout.Controls.Add(panel, 0, row); Layout.SetColumnSpan(panel, 3); Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); AcceptButton = Ok; CancelButton = cancel;
         }
     }
     internal sealed class NameDialog : EditorDialog
@@ -46,7 +46,7 @@ namespace HexMapEditor
             var sections=new FlowLayoutPanel{Dock=DockStyle.Fill,WrapContents=false};sections.Controls.AddRange(new Control[]{terrains,icons,objects});Layout.Controls.Add(sections,0,4);Layout.SetColumnSpan(sections,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,34));
             var hint=new Label{Dock=DockStyle.Fill};Layout.Controls.Add(hint,0,5);Layout.SetColumnSpan(hint,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
             Buttons(6, () => { if (Sections!=PresetSections.None&&(!AsNew || PresetName.Length > 0)) DialogResult = DialogResult.OK; }); Ok.Text = "Zapisz";
-            Action state=()=>{Ok.Enabled=Sections!=PresetSections.None;hint.Text=Ok.Enabled?(all?"Zapis podczas zamykania obejmuje wszystkie trzy sekcje.":""):"Wybierz przynajmniej jedną sekcję lub utwórz nowy pusty preset.";};foreach(var s in new[]{terrains,icons,objects}){s.Enabled=!all;s.CheckedChanged+=(sender,e)=>state();}state();
+            Action state=()=>{Ok.Enabled=Sections!=PresetSections.None;hint.Text=Ok.Enabled?(all?"Niezapisane zmiany pominiętych sekcji zostaną odrzucone dopiero po ostatecznym zamknięciu aplikacji.":""):"Wybierz przynajmniej jedną sekcję lub utwórz nowy pusty preset.";};foreach(var s in new[]{terrains,icons,objects}){s.CheckedChanged+=(sender,e)=>state();}state();
         }
     }
     internal sealed class TableSizeDialog : EditorDialog

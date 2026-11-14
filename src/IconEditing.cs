@@ -47,15 +47,9 @@ namespace HexMapEditor
             var button = new Button { Width = 46, Height = 32, Image = thumbnail, FlatStyle = FlatStyle.Flat, Tag = asset.Id, AccessibleName = "Ikona: " + asset.Name, Margin = new Padding(1) };
             StyleButton(button); tips.SetToolTip(button, asset.Name); button.Click += (s, e) => choose(); button.Disposed += (s, e) => { if (button.Image != null) button.Image.Dispose(); }; return button;
         }
-        void RefreshIconPreview()
-        {
-            if (iconPreview == null) return;
-            foreach (Control c in iconPreview.Controls.Cast<Control>().ToArray()) c.Dispose(); iconPreview.Controls.Clear();
-            foreach (string id in CurrentQuick.Icons.Visible) { var a=FindIcon(id);if(a==null)continue;var b=IconButton(a,()=>SelectIcon(a.Id));QuickMenu(b,a.Id,false);iconPreview.Controls.Add(b); }
-            QuickPlaceholders(iconPreview);RefreshIconSelection(); UpdateMaterialIndicator();
-        }
+        void RefreshIconPreview(){UpdateQuickTiles(iconPreview,false);RefreshIconSelection();UpdateMaterialIndicator();}
         void RefreshIconSelection()
-        { if (iconPreview == null) return; foreach (Button b in iconPreview.Controls) { bool chosen = iconMaterial && (string)b.Tag == activeIcon; b.FlatAppearance.BorderSize = chosen ? 3 : 1; b.FlatAppearance.BorderColor = chosen ? ChoiceStyle.ActiveBorder : Color.Gray; } if (deleteIconButton != null) deleteIconButton.Enabled = iconMaterial && activeIcon != null && libraryIcons.Any(a => a.Id == activeIcon); }
+        { if (iconPreview == null) return; foreach (Button b in iconPreview.Controls) { bool chosen = iconMaterial && (string)b.Tag == activeIcon; b.FlatAppearance.BorderSize = chosen ? 3 : 1; b.FlatAppearance.BorderColor = chosen ? ChoiceStyle.ActiveBorder : Color.Gray; } if (deleteIconButton != null) deleteIconButton.Enabled = iconMaterial && activeIcon != null && FindIcon(activeIcon)!=null; }
         void ImportIcon()
         {
             using(var choice=new GraphicSourceDialog("Dodaj ikonę","obiektów")){
@@ -67,7 +61,7 @@ namespace HexMapEditor
                 if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;
                 try
                 {
-                    var asset = IconAssets.Import(dialog.FileName); string error;
+                    var asset = CropImportedIcon(dialog.FileName);if(asset==null)return; string error;
                     if (!TryChangeLibraryIcon(null, new LibraryIcon { Name = asset.Name, Asset = asset }, false, Path.Combine(LibraryPaths.Root,"Icons"), out error)) throw new IOException(error);
                 }                catch (Exception ex) { ShowEditorMessage("Import nie powiódł się; mapa nie została zmieniona.\n" + ex.Message, "Import ikony", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             }

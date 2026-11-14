@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -138,7 +138,7 @@ namespace HexMapEditor
         void OpenObjectInstances()
         {
             EndCanvasGesture(true);
-            using (var dialog = new Form { Text = "Lista obiektów na mapie" + (previewWithoutFog ? " — podgląd bez mgły" : ""),
+            using (var dialog = new DarkForm { Text = "Lista obiektów na mapie" + (previewWithoutFog ? " — podgląd bez mgły" : ""),
                 Size = new Size(Math.Min(1200,System.Windows.Forms.Screen.FromControl(this).WorkingArea.Width-40), Math.Min(480,System.Windows.Forms.Screen.FromControl(this).WorkingArea.Height-60)), MinimumSize = new Size(460, 260), StartPosition = FormStartPosition.CenterParent,
                 BackColor = BackColor, ForeColor = ForeColor })
             using (var images = new ImageList { ImageSize = new Size(36, 36), ColorDepth = ColorDepth.Depth32Bit })

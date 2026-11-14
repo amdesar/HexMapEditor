@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -36,17 +36,20 @@ namespace HexMapEditor
             using (var stream = new MemoryStream(bytes)) using (var source = Image.FromStream(stream, true, true))
             { if (source.Width != asset.Width || source.Height != asset.Height) throw new InvalidDataException("Nieprawidłowe wymiary ikony."); return new Bitmap(source); }
         }
+        internal static Bitmap ReadImport(string path)
+        {
+            if(new FileInfo(path).Length>8*1024*1024)throw new InvalidDataException("Import: plik może mieć najwyżej 8 MiB.");
+            using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read))using(var image=Image.FromStream(stream,true,false)){
+                if(image is Metafile||image.Width>2048||image.Height>2048||image.Width<1||image.Height<1)throw new InvalidDataException("Import: bitmapa do2048×2048; bez metaplików i SVG.");
+                if(!new[]{ImageFormat.Png.Guid,ImageFormat.Jpeg.Guid,ImageFormat.Bmp.Guid,ImageFormat.Gif.Guid}.Contains(image.RawFormat.Guid)||image.GetFrameCount(new FrameDimension(image.FrameDimensionsList[0]))!=1)throw new InvalidDataException("Obsługiwane są nieruchome PNG, JPG, BMP i GIF.");
+                return new Bitmap(image);
+            }
+        }
         public static IconAsset Import(string path)
         {
-            if (new FileInfo(path).Length > 8 * 1024 * 1024) throw new InvalidDataException("Import: plik może mieć najwyżej 8 MiB.");
-            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) using (var image = Image.FromStream(stream, true, false))
-            {
-                if (image is Metafile || image.Width > 2048 || image.Height > 2048 || image.Width < 1 || image.Height < 1) throw new InvalidDataException("Import: bitmapa do 2048×2048; bez metaplików i SVG.");
-                if (!new[] { ImageFormat.Png.Guid, ImageFormat.Jpeg.Guid, ImageFormat.Bmp.Guid, ImageFormat.Gif.Guid }.Contains(image.RawFormat.Guid) || image.GetFrameCount(new FrameDimension(image.FrameDimensionsList[0])) != 1) throw new InvalidDataException("Obsługiwane są nieruchome PNG, JPG, BMP i GIF.");
-                float factor = Math.Min(1f, 512f / Math.Max(image.Width, image.Height));
-                using (var bitmap = new Bitmap(Math.Max(1, (int)(image.Width * factor)), Math.Max(1, (int)(image.Height * factor)), PixelFormat.Format32bppArgb))
-                { using (var g = Graphics.FromImage(bitmap)) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.DrawImage(image, new Rectangle(0, 0, bitmap.Width, bitmap.Height)); } return FromBitmap(bitmap, Path.GetFileNameWithoutExtension(path).Substring(0, Math.Min(200, Path.GetFileNameWithoutExtension(path).Length))); }
-            }
+            using(var image=ReadImport(path)){float factor=Math.Min(1f,512f/Math.Max(image.Width,image.Height));using(var bitmap=new Bitmap(Math.Max(1,(int)(image.Width*factor)),Math.Max(1,(int)(image.Height*factor)),PixelFormat.Format32bppArgb)){
+                using(var g=Graphics.FromImage(bitmap)){g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.DrawImage(image,new Rectangle(0,0,bitmap.Width,bitmap.Height));}string name=Path.GetFileNameWithoutExtension(path);return FromBitmap(bitmap,name.Substring(0,Math.Min(200,name.Length)));
+            }}
         }
         public static void Validate(IEnumerable<IconAsset> assets)
         {

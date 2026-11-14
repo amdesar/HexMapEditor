@@ -10,11 +10,12 @@
 | 0.8.2 | Hybrydowy tytuł głównego edytora: istniejące menu i natywne przyciski Windows, stabilna geometria przywracania |
 | 0.8.3 | Split zoomu, wyrównanie pól nazw, warunkowe przełączanie zasobów na pędzel i jasne strzałki podmenu |
 | 0.9.0 | Lewy panel 4×3 / 2×6, obracane figury, presety trzech sekcji, robocze wersje i szybki dostęp 24/12; niebieskie oznaczenia wyboru |
-| 0.9.1 / kolejne 0.9.x | Zbiorcze usuwanie i kadrowanie importu ikon/obiektów; zakres bibliotek i dalsze okna do uzgodnienia |
+| 0.9.1 | Poprawki kompaktowego lewego panelu, panel z aktualnego presetu biblioteki, częściowe zamykanie, kosz quick/biblioteka i kwadratowe kadrowanie importu ikon/obiektów |
+| 0.9.2 / kolejne 0.9.x | Zbiorcze usuwanie z bibliotek; dalszy zakres okien bibliotek do uzgodnienia |
 | 0.10.0 | Prawy panel i opisy z obrazami |
 | 0.11.0 | Niezależne mapy w zakładkach; lokalizacja do ponownej oceny na tym etapie |
-| 0.12.0 | Lokalne ustawienia i [kolejka importu](backlog-import-z-folderow.md) |
-| 0.13.0 | Aktualizator |
+| 0.12.0 | Instalacja / aktualizator; lokalny układ z resetem/fallback pozostaje osobnym uzgodnionym zakresem ustawień |
+| 0.13.0 | Rzeczywiste źródła grafik i [kolejka importu](backlog-import-z-folderow.md), docelowe foldery Library |
 | 0.13.x | Końcowa stabilizacja i uzgodnione testy |
 | 1.0.0 | Wyłącznie oznaczenia wersji, bez nowych zmian funkcjonalnych/stylistycznych |
 
@@ -22,9 +23,9 @@ Wszystkie funkcje, poprawki i audyty kończą się przed1.0. Od1.0 nowsze wydani
 
 Merge heksów i import osadzonych zasobów mapy do Library dopiero po1.0. Pozostałe backlogi paneli, UX zapisów presetów, lokalnych ustawień/górnego paska i kolejki pozostają odrębne. High/Low **nigdy nie będzie utrwalany** także przez przyszłe ustawienia lokalne.
 
-[Uzupełnienia UI po 0.8](backlog-ui-po-0.8.md): toasty po zakładkach (patch nieustalony), kopiowanie/wklejanie po1.0 po rozmowie z GM, widoczne źródła z metadanymi obok/kolejką w0.12 oraz ewentualne menu zamykania kart w0.11. Wyłącznie zapis pomysłów, bez wdrożenia w0.8.
+[Uzupełnienia UI po 0.8](backlog-ui-po-0.8.md): toasty po zakładkach (patch nieustalony), kopiowanie/wklejanie po1.0 po rozmowie z GM, widoczne źródła z metadanymi obok/kolejką w0.13 oraz ewentualne menu zamykania kart w0.11. Wyłącznie zapis pomysłów, bez wdrożenia w0.8.
 
-## Aktualizator 0.13.0 — uzgodniony backlog
+## Aktualizator 0.12.0 — uzgodniony backlog
 
 - Automatyczna kontrola aktualizacji w tle przy zwykłym starcie na ekranie powitalnym; brak internetu nie blokuje pracy.
 - Bez automatycznej instalacji: tylko informacja o dostępnej wersji i możliwość pominięcia.
@@ -34,8 +35,10 @@ Merge heksów i import osadzonych zasobów mapy do Library dopiero po1.0. Pozost
 
 W 0.7.1 nie ma połączenia z GitHubem ani implementacji aktualizatora.
 
-Do zaprojektowania w 0.13.0 po wykryciu dostępnej aktualizacji: A — link do konkretnego GitHub Release albo B — osobne okno z pobranym opisem wydania. Wybór A/B nie został zatwierdzony. Brak stałego przycisku GitHub w 0.7.2 nie blokuje przyszłego aktualizatora; w 0.7.2 nie implementujemy żadnego wariantu ani połączeń aktualizacyjnych.
+Do zaprojektowania w 0.12.0 po wykryciu dostępnej aktualizacji: A — link do konkretnego GitHub Release albo B — osobne okno z pobranym opisem wydania. Wybór A/B nie został zatwierdzony. Brak stałego przycisku GitHub w 0.7.2 nie blokuje przyszłego aktualizatora; w 0.7.2 nie implementujemy żadnego wariantu ani połączeń aktualizacyjnych.
 
 ## Po 1.0 — szersze preferencje użytkownika
 
 Oddzielny panel: interwał/włączenie autozapisu, preferowane wartości i kolory, użytkowy domyślny preset, konfigurowalne skróty z alternatywnymi kombinacjami i kontrolą konfliktów oraz preferencja uruchamiania w maksymalizacji. To inny zakres niż zapis układu/kolumn/paneli z resetem i fallback w 0.12.0. Przy reworku góry0.8 można przewidzieć przyszłe wejście; teraz bez aktywnego pustego okna i bez zmiany chronionego Domyślnego. Szczegóły: [backlog ustawień](backlog-ustawienia-lokalne.md). High/Low nadal wyłącznie sesyjny.
+
+Aktualizacja kolejności po odbiorze 0.9.0: 0.9.x poprawki/biblioteki → 0.10 prawy panel → 0.11 zakładki → 0.12 instalacja/aktualizator → 0.13 źródła/kolejka importu. Starsze numery w historycznych raportach opisują wcześniejszy plan. W 0.9.1 żaden późniejszy etap nie jest wdrożony.

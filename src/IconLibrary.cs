@@ -67,6 +67,7 @@ namespace HexMapEditor
     }
     internal sealed class IconLibraryChange
     {
+        internal QuickLibraryState RemovedLists;
         public LibraryIcon Before, After;
         public byte[] BeforeBytes, AfterBytes;
         public string BeforeSelected, AfterSelected;

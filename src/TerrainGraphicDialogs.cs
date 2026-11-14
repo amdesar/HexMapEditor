@@ -69,11 +69,11 @@ namespace HexMapEditor
             Font = new Font("Segoe UI", 9);
             BackColor=Color.FromArgb(34,38,48); ForeColor=Color.WhiteSmoke; list.BackColor=BackColor;list.ForeColor=ForeColor;
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 47, Padding = new Padding(6) };
-            var add = new Button { Text = "Importuj…", Width = 95 };
-            var edit = new Button { Text = "Edytuj…", Width = 85 };
-            var remove = new Button { Text = "Usuń…", Width = 85 };
-            var select = new Button { Text = "Wybierz", Width = 85 };
-            var cancel = new Button { Text = "Anuluj", Width = 85, DialogResult = DialogResult.Cancel };
+            var add = new EditorButton { Text = "Importuj…", Width = 95 };
+            var edit = new EditorButton { Text = "Edytuj…", Width = 85 };
+            var remove = new EditorButton { Text = "Usuń…", Width = 85, Destructive=true };
+            var select = new EditorButton { Text = "Wybierz", Width = 85 };
+            var cancel = new EditorButton { Text = "Anuluj", Width = 85, DialogResult = DialogResult.Cancel };
             buttons.Controls.AddRange(new Control[] { add, edit, remove, select, cancel });
             foreach(Button b in buttons.Controls){b.FlatStyle=FlatStyle.Flat;b.BackColor=Color.FromArgb(49,54,67);b.ForeColor=ForeColor;}
             select.Visible=!manage; cancel.Text=manage?"Zamknij":"Anuluj";
@@ -149,8 +149,8 @@ namespace HexMapEditor
             name.Text = item.Name;
             Asset = item.Asset;
             var actions = new FlowLayoutPanel { WrapContents = false };
-            var replace = new Button { Text = "Z pliku…", Width = 100 };
-            var recrop = new Button { Text = "Kadruj wycinek…", Width = 130 };
+            var replace = new EditorButton { Text = "Z pliku…", Width = 100 };
+            var recrop = new EditorButton { Text = "Kadruj wycinek…", Width = 130 };
             actions.Controls.AddRange(new Control[] { replace, recrop });
             var preview = new TerrainPreview(flat) { Dock = DockStyle.Fill, AccessibleName = "Podgląd grafiki terenu" };
             preview.ShowFill(Color.SlateGray, Asset);

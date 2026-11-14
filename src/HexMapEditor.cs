@@ -216,11 +216,11 @@ namespace HexMapEditor
             Deactivate+=(s,e)=>CancelNumberDrags(this);
             StartupTrace.Write("editor.construct.shell",this);
             Application.AddMessageFilter(this); Disposed += (s,e) => Application.RemoveMessageFilter(this);
-            Shown += (s,e)=>{PositionOverlays();FitMap();UpdateUI();if(!prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();}};
+            Shown += (s,e)=>{PositionOverlays();FitMap();UpdateUI();if(!prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();if(path!=null){AdoptLibraryPanel(map);RefreshPresetPicker();}}};
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
-            if(prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();}
+            if(prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();if(path!=null){AdoptLibraryPanel(map);RefreshPresetPicker();}}
             StartupTrace.Write("editor.construct.libraries",this);
-            PositionOverlays();FitMap();CaptureSavedState(); UpdateUI();
+            ConfigureLeftMinimum();PositionOverlays();FitMap();CaptureSavedState(); UpdateUI();
             InitAutoSave();ResetSaveClock(initial.LoadedFileVersion);
             StartupTrace.Write("editor.construct.ready",this);
         }
@@ -251,13 +251,13 @@ namespace HexMapEditor
             if (shellToolbar == null) return;
             LayoutMainToolbar();
             int top = shellToolbar.Height, bottom = 27, height = Math.Max(0, ClientSize.Height - top - bottom);
-            int inset = leftCollapsed ? 18 : 316;
+            int inset = leftCollapsed ? 18 : LeftPanelWidth+18;
             using (new CanvasUpdate(canvas, canvas.Left != inset))
             {
             if (canvas.Left != inset) pan = new PointF(pan.X + canvas.Left - inset, pan.Y);
             canvas.Bounds = new Rectangle(inset, top, Math.Max(0, ClientSize.Width - inset), height);
-            left.Bounds = new Rectangle(0, top, 298, height);
-            leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : 298, top, 18, height);
+            left.Bounds = new Rectangle(0, top, LeftPanelWidth, height);
+            leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : LeftPanelWidth, top, 18, height);
             leftToggle.Text = leftCollapsed ? "›" : "‹"; left.Visible = !leftCollapsed;
             int width = ClampRightWidth(requestedRightWidth); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
             }
@@ -342,7 +342,7 @@ namespace HexMapEditor
         bool ConfirmDiscard()
         {
             if (!HasUnsavedChanges) return true;
-            var result = ConfirmUnsavedForTest!=null?ConfirmUnsavedForTest():ShowEditorMessage("Są niezapisane zmiany. Czy zapisać je przed kontynuowaniem?", "Niezapisane zmiany", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
+            var result = ConfirmUnsavedForTest!=null?ConfirmUnsavedForTest():ShowEditorMessage("Mapa „"+map.Name+"” zawiera niezapisane zmiany. Czy chcesz je zapisać przed kontynuowaniem?", "Niezapisana mapa", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
             if (result == DialogResult.Cancel) return false;
             if (result == DialogResult.No) return true;
             return SaveProject();
@@ -432,7 +432,7 @@ namespace HexMapEditor
             error = null; migrated = false; if(InkCommitBusy||autoSaving){error=autoSaving?AutoSaveBusyMessage:InkBusyMessage;return false;}
             try
             {
-                var loaded=ReadProjectData(path);
+                var loaded=ReadProjectData(path);LoadLibraryPresets(true);AdoptLibraryPanel(loaded);
                 EndCanvasGesture(false); documentRevision++; ResetObjectDocument(); ClearDocumentIcons(); map = loaded;quickSets.Clear();quickPreset=null; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
                 needsFirstSave=false;ResetSaveClock(loaded.LoadedFileVersion);ResetQuality(); CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); RecentProjects.Shared.Touch(currentPath);return true;
             }

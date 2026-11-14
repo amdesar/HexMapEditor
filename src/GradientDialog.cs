@@ -15,7 +15,7 @@ namespace HexMapEditor
         readonly GradientSwatch old=new GradientSwatch(),preview=new GradientSwatch();
         readonly TrackBar angle=new TrackBar{Minimum=0,Maximum=360,TickStyle=TickStyle.None};
         readonly Label angleValue=new Label{AutoSize=true};
-        readonly Button remove=new Button{Text="Usuń punkt"},accept=new Button{Text="Zatwierdź"};
+        readonly Button remove=new EditorButton{Text="Usuń punkt",Destructive=true},accept=new EditorButton{Text="Zatwierdź"};
         GradientDefinition draft;
         string uniform;
         bool updating;
@@ -27,16 +27,16 @@ namespace HexMapEditor
         {
             this.cyclic=cyclic;uniform=ColorTranslator.ToHtml(Color.FromArgb(initial.ToArgb()));uniform=String.Format("#{0:X2}{1:X2}{2:X2}",initial.R,initial.G,initial.B);
             draft=gradient==null?GradientRules.Two(uniform):gradient.Copy();GradientRules.Validate(draft);
-            Text=cyclic?"Kolor kreski / wskaźnika":"Kolor wariantu heksa";ClientSize=new Size(760,525);FormBorderStyle=FormBorderStyle.FixedDialog;StartPosition=FormStartPosition.CenterParent;MaximizeBox=MinimizeBox=false;BackColor=Color.FromArgb(34,38,48);ForeColor=Color.WhiteSmoke;Font=new Font("Segoe UI",9);
+            Text=cyclic?"Kolor kreski / wskaźnika":"Kolor wariantu heksa";ClientSize=new Size(760,550);FormBorderStyle=FormBorderStyle.FixedDialog;StartPosition=FormStartPosition.CenterParent;MaximizeBox=MinimizeBox=false;BackColor=Color.FromArgb(34,38,48);ForeColor=Color.WhiteSmoke;Font=new Font("Segoe UI",9);
             solidMode.Bounds=new Rectangle(12,12,100,28);gradientMode.Bounds=new Rectangle(118,12,100,28);Controls.AddRange(new Control[]{solidMode,gradientMode});ChoiceStyle.Apply(solidMode);ChoiceStyle.Apply(gradientMode);
             color=new EditorColorDialog(initial);color.Embed();color.Location=new Point(0,48);Controls.Add(color);color.Show();
             old.Color=initial;old.Gradient=gradient==null?null:gradient.Copy();old.Cyclic=cyclic;old.Flat=flat;old.Hexagon=!cyclic;old.Bounds=new Rectangle(442,58,296,95);preview.Bounds=new Rectangle(442,294,296,140);preview.Cyclic=cyclic;preview.Flat=flat;preview.Hexagon=!cyclic;
             bar.Bounds=new Rectangle(442,177,296,55);bar.Draft=draft;bar.Changed=()=>{SyncColor();RefreshPreview();};Controls.AddRange(new Control[]{old,preview,bar,LabelAt("Obecny wygląd",442,35),LabelAt("Nowy wygląd",442,271)});
-            var rainbow=new Button{Text="Tęcza",Bounds=new Rectangle(442,235,78,27)};var shuffle=new Button{Text="Losuj",Bounds=new Rectangle(525,235,78,27)};remove.Bounds=new Rectangle(608,235,130,27);var hint=LabelAt(cyclic?"Cykl300px: 80% paleta, 20% płynny powrót.":"0°: lewo→prawo; 90°: góra→dół.",430,450);Controls.AddRange(new Control[]{rainbow,shuffle,remove,hint});shuffle.Click+=(s,e)=>Randomize(random);gradientMode.CheckedChanged+=(s,e)=>shuffle.Enabled=gradientMode.Checked;
+            var rainbow=new EditorButton{Text="Tęcza",Bounds=new Rectangle(442,235,78,27)};var shuffle=new EditorButton{Text="Losuj",Bounds=new Rectangle(525,235,78,27)};remove.Bounds=new Rectangle(608,235,130,27);var hint=LabelAt(cyclic?"Cykl300px: 80% paleta, 20% płynny powrót.":"0°: lewo→prawo; 90°: góra→dół.",430,450);Controls.AddRange(new Control[]{rainbow,shuffle,remove,hint});shuffle.Click+=(s,e)=>Randomize(random);gradientMode.CheckedChanged+=(s,e)=>shuffle.Enabled=gradientMode.Checked;
             angle.Bounds=new Rectangle(440,438,240,32);angleValue.Location=new Point(680,441);if(!cyclic){Controls.Add(angle);Controls.Add(angleValue);hint.Top=475;}
             rainbow.Click+=(s,e)=>{draft=GradientRules.Rainbow();bar.Draft=draft;bar.Selected=0;gradientMode.Checked=true;SyncColor();RefreshPreview();};remove.Click+=(s,e)=>{bar.RemoveSelected();SyncColor();RefreshPreview();};
             angle.ValueChanged+=(s,e)=>{if(updating)return;draft.Angle=angle.Value;RefreshPreview();};angle.MouseUp+=(s,e)=>CommitColorDraft();angle.KeyUp+=(s,e)=>CommitColorDraft();
-            var cancel=new Button{Text="Anuluj",DialogResult=DialogResult.Cancel,Bounds=new Rectangle(650,490,96,28)};accept.Bounds=new Rectangle(538,490,105,28);Controls.AddRange(new Control[]{accept,cancel});AcceptButton=accept;CancelButton=cancel;
+            var cancel=new EditorButton{Text="Anuluj",DialogResult=DialogResult.Cancel,Bounds=new Rectangle(650,515,96,28)};accept.Bounds=new Rectangle(538,515,105,28);Controls.AddRange(new Control[]{accept,cancel});AcceptButton=accept;CancelButton=cancel;
             accept.Click+=(s,e)=>{if(!color.ColorValid)return;GradientRules.Validate(draft);Gradient=gradientMode.Checked?draft.Copy():null;Hex=Gradient==null?uniform:Gradient.Stops[0].Color;if(Gradient==null)RecentColors.Add(ColorTranslator.FromHtml(Hex));DialogResult=DialogResult.OK;};
             color.Changed=c=>{if(updating)return;if(gradientMode.Checked){if(bar.Selected<0||bar.Selected>=draft.Stops.Count)return;draft.Stops[bar.Selected].Color=color.Hex;}else uniform=color.Hex;RefreshPreview();};color.ValidityChanged=valid=>accept.Enabled=valid;
             solidMode.CheckedChanged+=(s,e)=>{if(solidMode.Checked){SyncColor();RefreshPreview();}};gradientMode.CheckedChanged+=(s,e)=>{if(gradientMode.Checked){SyncColor();RefreshPreview();}};gradientMode.Checked=gradient!=null||startGradient;solidMode.Checked=!gradientMode.Checked;shuffle.Enabled=gradientMode.Checked;

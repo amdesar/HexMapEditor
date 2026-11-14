@@ -56,6 +56,8 @@ namespace HexMapEditor
             objectMaterial=!after&&change.BeforeObjectMaterial;noMaterial=after?change.AfterNoMaterial:change.BeforeNoMaterial;
             if (!libraryIcons.Any(i=>i.Id==activeIcon)) { activeIcon=null; iconMaterial=false; }
             if(entry!=null)CurrentQuick.IconRefs[entry.Id]=entry.Copy();
+            if(entry==null&&removed!=null){if(after&&change.After==null)change.RemovedLists=CaptureLibraryQuick();RemoveQuickEntry(removed.Id,false,true);}
+            if(!after&&change.After==null)RestoreLibraryQuick(change.RemovedLists);
             if(after&&change.Before==null&&entry!=null)UsedIcon(entry.Id,true);RefreshIconPreview();
         }
     }
