@@ -31,8 +31,10 @@ namespace HexMapEditor
     {
         readonly RadioButton overwrite = new RadioButton { Text = "Nadpisz bieżący preset", AutoSize = true }, asNew = new RadioButton { Text = "Zapisz jako nowy preset", AutoSize = true };
         readonly TextBox name = new DarkTextBox { MaxLength = 200 };
+        readonly SwitchBox terrains=new SwitchBox{Text="Tereny",Checked=true,AutoSize=true},icons=new SwitchBox{Text="Ikony",Checked=true,AutoSize=true},objects=new SwitchBox{Text="Obiekty",Checked=true,AutoSize=true};
+        internal PresetSections Sections{get{return (terrains.Checked?PresetSections.Terrains:0)|(icons.Checked?PresetSections.Icons:0)|(objects.Checked?PresetSections.Objects:0);}}
         public bool AsNew { get { return asNew.Checked; } } public string PresetName { get { return name.Text.Trim(); } }
-        public SavePresetDialog(TerrainPreset preset, bool saved) : base("Zapisz preset", 255)
+        public SavePresetDialog(TerrainPreset preset, bool saved,bool all=false) : base("Zapisz preset", 410)
         {
             overwrite.Enabled = saved && preset.Id != PresetCatalog.DefaultId; overwrite.Checked = overwrite.Enabled; asNew.Checked = !overwrite.Enabled;
             name.Text = preset.Name + (preset.Id == PresetCatalog.DefaultId || saved ? " — kopia" : ""); name.Enabled = asNew.Checked;
@@ -41,7 +43,10 @@ namespace HexMapEditor
             Row(2, "Nowa nazwa", name, true);
             var reason = new Label { Text = preset.Id == PresetCatalog.DefaultId ? "Domyślny jest chronionym wzorcem. Zapisz roboczą paletę jako nowy preset z własnym ID." : saved ? "Nadpisanie zapisuje roboczą paletę do bieżącego pliku presetu. Sesyjne Undo/Redo odtwarza pliki z ochroną konfliktów (do 300 wpisów, bez historii po restarcie)." : "Ten preset nie został jeszcze zapisany. Najpierw zapisz go jako nowy preset.", Dock = DockStyle.Fill };
             Layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); Layout.Controls.Add(reason, 0, 3); Layout.SetColumnSpan(reason, 3); asNew.CheckedChanged += (s, e) => name.Enabled = asNew.Checked;
-            Buttons(4, () => { if (!AsNew || PresetName.Length > 0) DialogResult = DialogResult.OK; }); Ok.Text = "Zapisz";
+            var sections=new FlowLayoutPanel{Dock=DockStyle.Fill,WrapContents=false};sections.Controls.AddRange(new Control[]{terrains,icons,objects});Layout.Controls.Add(sections,0,4);Layout.SetColumnSpan(sections,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,34));
+            var hint=new Label{Dock=DockStyle.Fill};Layout.Controls.Add(hint,0,5);Layout.SetColumnSpan(hint,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
+            Buttons(6, () => { if (Sections!=PresetSections.None&&(!AsNew || PresetName.Length > 0)) DialogResult = DialogResult.OK; }); Ok.Text = "Zapisz";
+            Action state=()=>{Ok.Enabled=Sections!=PresetSections.None;hint.Text=Ok.Enabled?(all?"Zapis podczas zamykania obejmuje wszystkie trzy sekcje.":""):"Wybierz przynajmniej jedną sekcję lub utwórz nowy pusty preset.";};foreach(var s in new[]{terrains,icons,objects}){s.Enabled=!all;s.CheckedChanged+=(sender,e)=>state();}state();
         }
     }
     internal sealed class TableSizeDialog : EditorDialog

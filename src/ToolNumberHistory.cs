@@ -3,12 +3,12 @@ namespace HexMapEditor
 {
     internal sealed class ToolNumbers
     {
-        internal int Size,Height;internal float Ink;
-        internal bool Same(ToolNumbers b){return Size==b.Size&&Height==b.Height&&Ink==b.Ink;}
+        internal int Size,Height,Rotation,Apex;internal float Ink;
+        internal bool Same(ToolNumbers b){return Size==b.Size&&Height==b.Height&&Ink==b.Ink&&Rotation==b.Rotation&&Apex==b.Apex;}
     }
     public sealed partial class MainWindow
     {
-        ToolNumbers CaptureToolNumbers(){return new ToolNumbers{Size=brushSize,Height=brushHeight,Ink=inkToolSize};}
+        ToolNumbers CaptureToolNumbers(){return new ToolNumbers{Size=brushSize,Height=brushHeight,Ink=inkToolSize,Rotation=brushRotation,Apex=brushApex};}
         void BindToolNumber(ScrubNumber number)
         {
             ToolNumbers before=null;
@@ -18,7 +18,7 @@ namespace HexMapEditor
         void ApplyToolNumbers(ToolNumbers numbers)
         {
             bool previous=updating;updating=true;
-            try{brushSize=numbers.Size;brushHeight=numbers.Height;inkToolSize=numbers.Ink;sizePicker.Value=numbers.Size;heightPicker.Value=numbers.Height;inkSize.Value=(decimal)numbers.Ink;}
+            try{brushSize=numbers.Size;brushHeight=numbers.Height;inkToolSize=numbers.Ink;brushRotation=numbers.Rotation;brushApex=numbers.Apex;sizePicker.Value=numbers.Size;heightPicker.Value=numbers.Height;rotationPicker.Value=numbers.Rotation;apexPicker.Value=numbers.Apex;inkSize.Value=(decimal)numbers.Ink;}
             finally{updating=previous;}
             UpdateBrushAvailability();canvas.Invalidate();
         }

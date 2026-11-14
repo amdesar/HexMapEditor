@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -44,13 +44,12 @@ namespace HexMapEditor
         }
         public static List<LibraryIcon> Load(string directory, out string warning)
         {
-            Directory.CreateDirectory(directory); string marker = Path.Combine(directory, ".starter-icons-v1");
+            Directory.CreateDirectory(directory); string marker = Path.Combine(directory, ".starter-icons-v2");
             if (!File.Exists(marker))
             {
-                int i = 0;
-                foreach (var asset in IconAssets.Starters())
+                foreach (var starter in StarterSets.Icons())
                 {
-                    var entry = new LibraryIcon { Id = "starter-" + i++, Name = asset.Name, Asset = asset };
+                    var entry = starter;
                     bool present = Directory.GetFiles(directory,"*.json").Any(f => { try { return Read(f).Id == entry.Id; } catch { return false; } });
                     if (!present) MapLogic.AtomicWrite(Destination(directory, entry.Name, null), MapLogic.Serializer().Serialize(entry), false);
                 }

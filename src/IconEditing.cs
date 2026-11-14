@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -23,6 +23,7 @@ namespace HexMapEditor
         IconAsset strokeAsset;
         BrushShape brushShape = BrushShape.Point;
         int brushSize = 1, brushHeight = 1, previewCell = -1;
+        int brushRotation,brushApex=60;
         bool brushFilled = true;
 
         void ClearDocumentIcons() { InkPathCache.Clear();InkGradientRenderer.Clear(); ClearBackgroundCache(); ClearTerrainBitmaps(); foreach (var image in documentBitmaps.Values) image.Dispose(); documentBitmaps.Clear(); layerBefore.Clear(); strokeVisited.Clear(); previewCell = -1; iconMaterial = false; activeIcon = null; UpdateMaterialIndicator(); }
@@ -34,7 +35,7 @@ namespace HexMapEditor
             catch (Exception ex) { ShowEditorMessage("Nie można odczytać ikon: " + ex.Message, "Biblioteka ikon", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         void SelectIcon(string id)
-        { EndCanvasGesture(true); if (!libraryIcons.Any(a => a.Id == id)) return; activeIcon = id; iconMaterial = true; objectMaterial=false;noMaterial=false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); canvas.Invalidate(); }
+        { EndCanvasGesture(true); if (FindIcon(id)==null) return; activeIcon = id; iconMaterial = true; objectMaterial=false;noMaterial=false; MaterialChosen(); QuickPlaceholders(iconPreview);RefreshIconSelection(); UpdateMaterialIndicator(); canvas.Invalidate(); }
         void UpdateMaterialIndicator()
         {
             UpdateTerrainSelection(); RefreshIconSelection(); RefreshObjectSelection(); UpdateBrushAvailability();
@@ -50,11 +51,11 @@ namespace HexMapEditor
         {
             if (iconPreview == null) return;
             foreach (Control c in iconPreview.Controls.Cast<Control>().ToArray()) c.Dispose(); iconPreview.Controls.Clear();
-            foreach (var asset in libraryIcons.Take(16)) { var a = asset; iconPreview.Controls.Add(IconButton(a, () => SelectIcon(a.Id))); }
-            RefreshIconSelection(); UpdateMaterialIndicator();
+            foreach (string id in CurrentQuick.Icons.Visible) { var a=FindIcon(id);if(a==null)continue;var b=IconButton(a,()=>SelectIcon(a.Id));QuickMenu(b,a.Id,false);iconPreview.Controls.Add(b); }
+            QuickPlaceholders(iconPreview);RefreshIconSelection(); UpdateMaterialIndicator();
         }
         void RefreshIconSelection()
-        { if (iconPreview == null) return; foreach (Button b in iconPreview.Controls) { bool chosen = iconMaterial && (string)b.Tag == activeIcon; b.FlatAppearance.BorderSize = chosen ? 3 : 1; b.FlatAppearance.BorderColor = chosen ? Color.Gold : Color.Gray; } if (deleteIconButton != null) deleteIconButton.Enabled = iconMaterial && activeIcon != null && libraryIcons.Any(a => a.Id == activeIcon); }
+        { if (iconPreview == null) return; foreach (Button b in iconPreview.Controls) { bool chosen = iconMaterial && (string)b.Tag == activeIcon; b.FlatAppearance.BorderSize = chosen ? 3 : 1; b.FlatAppearance.BorderColor = chosen ? ChoiceStyle.ActiveBorder : Color.Gray; } if (deleteIconButton != null) deleteIconButton.Enabled = iconMaterial && activeIcon != null && libraryIcons.Any(a => a.Id == activeIcon); }
         void ImportIcon()
         {
             using(var choice=new GraphicSourceDialog("Dodaj ikonę","obiektów")){
@@ -95,13 +96,13 @@ namespace HexMapEditor
         {
             using (var dialog = new IconPickerDialog(libraryIcons, IconButton, BackColor)) return RunModal(() => dialog.ShowDialog(owner)) == DialogResult.OK ? dialog.Chosen : null;
         }
-        void OpenIconLibrary() { var chosen = PickLibraryIcon(this); if (chosen != null) SelectIcon(chosen.Id); }
+        void OpenIconLibrary() { var chosen = PickLibraryIcon(this); if (chosen != null){CurrentQuick.IconRefs[chosen.Id]=chosen.Copy(); SelectIcon(chosen.Id);} }
         MapData MapForSave(){return MapForSave(map);}
         internal static MapData MapForSave(MapData map)
         {
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
             var terrainAssets = TerrainTextures.Collect(DocumentGraphics(map));
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).ToList(), FogPalette = map.FogPalette, DarkPalette=map.DarkPalette, Ink=map.Ink, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).Concat(PresetSets.Assets(map.Presets)).GroupBy(a=>a.Id).Select(g=>g.First()).ToList(), FogPalette = map.FogPalette, DarkPalette=map.DarkPalette, Ink=map.Ink, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {
@@ -110,7 +111,7 @@ namespace HexMapEditor
             bucketProcessed.Clear(); bucketOrigin = tool == EditorTool.Bucket || tool == EditorTool.FogBucket || tool == EditorTool.DarkBucket ? map.Cells.Select(c => new RegionState(c)).ToArray() : null;
             strokeFog = tool == EditorTool.FogBrush || tool == EditorTool.FogBucket; strokeDark = tool==EditorTool.DarkBrush||tool==EditorTool.DarkBucket; strokeIcons = !strokeFog && !strokeDark && iconMaterial;
             protectedFogCells=strokeFog?EffectiveFogCoverage(map):new HashSet<int>();
-            var entry = libraryIcons.FirstOrDefault(a => a.Id == activeIcon); strokeAsset = entry == null ? null : entry.Asset; strokeIcon = strokeAsset == null ? null : strokeAsset.Id; strokeEntry = entry == null ? null : entry.Id; strokeName = entry == null ? null : entry.Name;
+            var entry = FindIcon(activeIcon); strokeAsset = entry == null ? null : entry.Asset; strokeIcon = strokeAsset == null ? null : strokeAsset.Id; strokeEntry = entry == null ? null : entry.Id; strokeName = entry == null ? null : entry.Name;
             strokeRemoveIcon = strokeIcons && strokeIcon != null && (map.Cells[start].IconEntryId ?? map.Cells[start].IconId) == strokeEntry; strokeFogValue = !map.Cells[start].Fog; strokeDarkValue=!map.Cells[start].Darkness;
         }
         void PaintMaterial(int index)
@@ -132,12 +133,12 @@ namespace HexMapEditor
             {
                 change.FogAppearance = true; change.BeforeFill = cell.FogFill.Copy(); change.AfterFill = NextFill(map.FogPalette);
             }
-            layerBefore.Add(index, change); change.Apply(cell, true); dirty = true;
+            layerBefore.Add(index, change); change.Apply(cell, true);if(strokeIcons&&!strokeRemoveIcon)UsedIcon(strokeEntry); dirty = true;
             if (index == selected && strokeFog) { editorCellId = null; UpdateUI(); } else canvas.Invalidate();
         }
         void PaintStamp(int start)
-        { foreach (int index in BrushGeometry.Stamp(map, start, brushShape, brushSize, brushHeight, brushFilled)) PaintMaterial(index); }
-        System.Collections.Generic.List<int> StampAt(Point mouse){return BrushGeometry.Stamp(map,ObjectGeometry.Nearest(map,World(mouse)),brushShape,brushSize,brushHeight,brushFilled);}
+        { if(start>=0&&start<map.Cells.Count)foreach (int index in BrushGeometry.Stamp(map,new Point(start%map.Columns,start/map.Columns), brushShape, brushSize, brushHeight, brushFilled,brushRotation,brushApex)) PaintMaterial(index); }
+        System.Collections.Generic.List<int> StampAt(Point mouse){return BrushGeometry.Stamp(map,ObjectGeometry.Nearest(map,World(mouse)),brushShape,brushSize,brushHeight,brushFilled,brushRotation,brushApex);}
         void PaintStampAt(Point mouse){foreach(int i in StampAt(mouse))PaintMaterial(i);}
         void VisitBucketRegion(int start)
         {

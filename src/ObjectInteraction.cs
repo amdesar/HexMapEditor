@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -70,13 +70,13 @@ namespace HexMapEditor
                     if (selectedObjects.Contains(obj.Id))
                     {
                         var outline = RectangleF.Inflate(bounds, 6 / scale, 6 / scale);
-                        using (var pen = new Pen(Color.Gold, 2 / scale))
+                        using (var pen = new Pen(ChoiceStyle.ActiveBorder, 2 / scale))
                             g.DrawRectangle(pen, outline.X, outline.Y, outline.Width, outline.Height);
                     }
                     g.Restore(decorationState);
                 }
             }g.Restore(state);
-            if(objectSelecting&&selectionPath.Count>1)using(var pen=new Pen(Color.CornflowerBlue,1.5f)){var points=selectionPath.Select(Screen).ToArray();if(selectionKind==1){g.DrawLines(pen,points);g.DrawLine(pen,points[points.Length-1],points[0]);}else{var r=SelectionRectangle(selectionPath[0],selectionPath[selectionPath.Count-1]);var a=Screen(r.Location);g.DrawRectangle(pen,a.X,a.Y,r.Width*scale,r.Height*scale);}}
+            if(objectSelecting&&selectionPath.Count>1)using(var pen=new Pen(ChoiceStyle.ActiveBorder,1.5f)){var points=selectionPath.Select(Screen).ToArray();if(selectionKind==1){g.DrawLines(pen,points);g.DrawLine(pen,points[points.Length-1],points[0]);}else{var r=SelectionRectangle(selectionPath[0],selectionPath[selectionPath.Count-1]);var a=Screen(r.Location);g.DrawRectangle(pen,a.X,a.Y,r.Width*scale,r.Height*scale);}}
         }
         static RectangleF SelectionRectangle(PointF a,PointF b){return RectangleF.FromLTRB(Math.Min(a.X,b.X),Math.Min(a.Y,b.Y),Math.Max(a.X,b.X),Math.Max(a.Y,b.Y));}
         bool ObjectMouseDown(MouseEventArgs e)

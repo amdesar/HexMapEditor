@@ -40,7 +40,7 @@ namespace HexMapEditor
         internal RenameProjectDialog(string initial,Func<string,bool> accept):base("Zmień nazwę pliku",170)
         {
             string display=initial.EndsWith(".hexmap",StringComparison.OrdinalIgnoreCase)?initial.Substring(0,initial.Length-7):initial;
-            name.Text=display;Row(0,"Obecna nazwa:",new Label{Text=display,AutoEllipsis=true,TextAlign=System.Drawing.ContentAlignment.MiddleLeft},true);Row(1,"Nowa nazwa:",name,true);
+            name.Text=display;Row(0,"Obecna nazwa:",new EllipsisNameLabel{Text=display},true);Row(1,"Nowa nazwa:",name,true);
             name.Dock=DockStyle.None;name.Anchor=AnchorStyles.Left|AnchorStyles.Right;name.Height=name.PreferredHeight;
             foreach(var label in Layout.Controls.OfType<Label>().Where(c=>Layout.GetColumn(c)==0))label.TextAlign=System.Drawing.ContentAlignment.MiddleRight;
             name.Margin=new Padding(3,Math.Max(0,(38-name.PreferredHeight)/2),3,0);

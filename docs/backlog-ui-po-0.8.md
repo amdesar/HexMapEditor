@@ -28,4 +28,14 @@ Na dole, niezależne mapy; obok krzyżyków do rozważenia menu zamykania wybran
 Pozostałe backlogi i etapy planu zachowane, bez implementacji powyższych funkcji.
 # Obserwacja po odbiorze 0.8.2
 
-Bardzo długa wklejona nazwa wywołała ogólny komunikat o niedozwolonych znakach. Dokładne wejście i przyczyna nie są potwierdzone; ewentualną diagnostykę odłożyć. Nie zmieniano walidacji w 0.8.3.
+Bardzo długa wklejona nazwa wywołała ogólny komunikat o niedozwolonych znakach. Dokładne wejście i przyczyna nie są potwierdzone; ewentualną diagnostykę odłożyć. Nie zmieniano walidacji w 0.8.3 ani 0.9.0.
+
+## Po wykonaniu 0.9.0
+
+Niebieskie oznaczenia wyboru i przebudowa lewego panelu zostały wykonane w 0.9.0. Nie są już aktywnym zadaniem backlogu; wcześniejsze akapity opisują historię uzgodnień.
+
+- 0.9.1 / kolejne 0.9.x: zbiorcze usuwanie z bibliotek (tryb wyboru → zaznaczenie → potwierdzenie). Docelowe biblioteki do ustalenia. Kadrowanie importu ikon i obiektów oraz dalsze nieuzgodnione zmiany okien bibliotek pozostają przyszłym zakresem.
+- Nadal odłożone: przycinanie/zawijanie etykiet switchy „Zastosuj do bieżącej mapy” i „Zachowaj rozmieszczenie wariantów”, tekst i odstępy w edytorze gradientu. Bez osobnej kampanii tych dialogów w 0.9.0.
+- 0.11: niezależne mapy w zakładkach, wspólne narzędzia i szybkie zestawy. Przy pytaniu o mapę aktywować jej kartę bez resetu zoomu i położenia; lokalizacja kart do ponownej oceny.
+- 0.12: rzeczywiste źródła grafik, kolejka importu i docelowe foldery Library. Aktualny układ bibliotek nie jest migrowany.
+- Po 1.0: własne ciemne komunikaty, konfigurowalne/alternatywne skróty i wcześniejsze uzgodnione pomysły. Toasty nadal dopiero po zakładkach, dokładny patch nieustalony.

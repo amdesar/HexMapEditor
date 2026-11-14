@@ -9,7 +9,8 @@
 | 0.8.1 | Poprawki odbiorcze pól/historii, switchy, stempla i góry; hybryda wycofana po regresji RestoreBounds |
 | 0.8.2 | Hybrydowy tytuł głównego edytora: istniejące menu i natywne przyciski Windows, stabilna geometria przywracania |
 | 0.8.3 | Split zoomu, wyrównanie pól nazw, warunkowe przełączanie zasobów na pędzel i jasne strzałki podmenu |
-| 0.9.0 | Lewy panel, presety i ikony; niebieska ramka aktywnego narzędzia |
+| 0.9.0 | Lewy panel 4×3 / 2×6, obracane figury, presety trzech sekcji, robocze wersje i szybki dostęp 24/12; niebieskie oznaczenia wyboru |
+| 0.9.1 / kolejne 0.9.x | Zbiorcze usuwanie i kadrowanie importu ikon/obiektów; zakres bibliotek i dalsze okna do uzgodnienia |
 | 0.10.0 | Prawy panel i opisy z obrazami |
 | 0.11.0 | Niezależne mapy w zakładkach; lokalizacja do ponownej oceny na tym etapie |
 | 0.12.0 | Lokalne ustawienia i [kolejka importu](backlog-import-z-folderow.md) |

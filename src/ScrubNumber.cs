@@ -18,7 +18,10 @@ namespace HexMapEditor
         public decimal Increment{get{return step;}set{if(value<=0)throw new ArgumentOutOfRangeException();step=value;}}
         public int DecimalPlaces{get{return precision;}set{precision=Math.Max(0,Math.Min(6,value));Value=current;}}
         public int PixelsPerStep{get;set;}
-        public decimal Value{get{return current;}set{decimal next=Math.Max(min,Math.Min(max,Decimal.Round(value,precision,MidpointRounding.AwayFromZero)));bool changed=next!=current;current=next;if(!editing||finishing)input.Text=Format();Invalidate();if(changed&&ValueChanged!=null)ValueChanged(this,EventArgs.Empty);}}
+        internal Func<string,decimal,decimal> TextNormalizer;
+        internal Func<decimal,decimal> ValueNormalizer;
+        internal string Suffix="";
+        public decimal Value{get{return current;}set{decimal next=Math.Max(min,Math.Min(max,Decimal.Round(ValueNormalizer==null?value:ValueNormalizer(value),precision,MidpointRounding.AwayFromZero)));bool changed=next!=current;current=next;if(!editing||finishing)input.Text=Format();Invalidate();if(changed&&ValueChanged!=null)ValueChanged(this,EventArgs.Empty);}}
         public override string Text{get{return editing?input.Text:Format();}set{if(input!=null)input.Text=value;}}
         internal bool IsEditing{get{return editing||scrubbing;}}
         internal void CancelDrag(){if(down||scrubbing){down=false;Finish(true);Capture=false;}}
@@ -47,7 +50,7 @@ namespace HexMapEditor
         }
         void Start(){if(editing||scrubbing)return;original=current;if(EditStarting!=null)EditStarting(this,EventArgs.Empty);}
         internal void BeginText(){if(!Enabled)return;if(editing)return;Start();editing=true;NumberInputRouter.Enter(this);input.Text=Format();input.Visible=true;input.Focus();input.SelectAll();Invalidate();}
-        internal bool CommitText(){if(!editing)return true;Value=Normalize(input.Text,original,min,max,precision);Finish(false);return true;}
+        internal bool CommitText(){if(!editing)return true;Value=TextNormalizer==null?Normalize(input.Text,original,min,max,precision):TextNormalizer(input.Text,original);Finish(false);return true;}
         internal void Finish(bool cancel)
         {
             if(finishing||(!editing&&!scrubbing))return;finishing=true;bool changed=current!=original;
@@ -65,7 +68,7 @@ namespace HexMapEditor
         protected override void OnMouseLeave(EventArgs e){hover=false;Invalidate();base.OnMouseLeave(e);}
         protected override void OnEnter(EventArgs e){base.OnEnter(e);if(!finishing&&!down&&!editing)BeginText();Invalidate();}
         protected override void OnLeave(EventArgs e){if(editing&&!ContainsFocus)CommitText();if(scrubbing)Finish(true);base.OnLeave(e);Invalidate();}
-        protected override void OnLayout(LayoutEventArgs e){base.OnLayout(e);input.SetBounds(6,Math.Max(3,(Height-input.PreferredHeight)/2),Math.Max(10,Width-12),input.PreferredHeight);}
+        protected override void OnLayout(LayoutEventArgs e){base.OnLayout(e);input.SetBounds(6,Math.Max(3,(Height-input.PreferredHeight)/2),Math.Max(10,Width-12-(Suffix.Length>0?14:0)),input.PreferredHeight);}
         protected override bool ProcessCmdKey(ref Message msg,Keys keys)
         {
             if(keys==Keys.Enter&&editing){CommitText();return true;}
@@ -76,6 +79,6 @@ namespace HexMapEditor
             return base.ProcessCmdKey(ref msg,keys);
         }
         protected override void OnMouseWheel(MouseEventArgs e){if(ContainsFocus){Start();scrubbing=true;Value=current+(e.Delta>0?step:-step);Finish(false);}base.OnMouseWheel(e);}
-        protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var p=new Pen(!Enabled?Color.FromArgb(57,61,70):IsEditing?Color.FromArgb(89,136,183):hover?Color.FromArgb(112,123,144):Color.FromArgb(76,83,98)))e.Graphics.DrawRectangle(p,0,0,Width-1,Height-1);if(!editing)TextRenderer.DrawText(e.Graphics,Format(),Font,new Rectangle(5,1,Width-10,Height-2),Enabled?ForeColor:Color.Gray,TextFormatFlags.Right|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);}
+        protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var p=new Pen(!Enabled?Color.FromArgb(57,61,70):IsEditing?Color.FromArgb(89,136,183):hover?Color.FromArgb(112,123,144):Color.FromArgb(76,83,98)))e.Graphics.DrawRectangle(p,0,0,Width-1,Height-1);if(!editing)TextRenderer.DrawText(e.Graphics,Format(),Font,new Rectangle(5,1,Width-10-(Suffix.Length>0?14:0),Height-2),Enabled?ForeColor:Color.Gray,TextFormatFlags.Right|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);if(Suffix.Length>0)TextRenderer.DrawText(e.Graphics,Suffix,Font,new Rectangle(Width-17,1,14,Height-2),Enabled?ForeColor:Color.Gray,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPadding);}
     }
 }

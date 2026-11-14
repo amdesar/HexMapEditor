@@ -115,6 +115,7 @@ namespace HexMapEditor
     internal sealed class EditAction
     {
         public ToolNumbers BeforeTool,AfterTool;
+        internal string QuickPresetId;internal QuickSnapshot BeforeQuick,AfterQuick;
         public List<CellChange> Changes = new List<CellChange>();
         public List<LayerChange> Layers = new List<LayerChange>();
         public IconLibraryChange LibraryChange;
@@ -161,7 +162,7 @@ namespace HexMapEditor
         readonly Button saveButton = new Button();
         readonly Button undoButton = new Button();
         readonly Button redoButton = new Button();
-        readonly Button zoomButton = new Button();
+        readonly Button zoomButton = new SingleLineButton();
         readonly ToolTip tips = new ToolTip();
         MapData map;
         string currentPath;
@@ -250,13 +251,13 @@ namespace HexMapEditor
             if (shellToolbar == null) return;
             LayoutMainToolbar();
             int top = shellToolbar.Height, bottom = 27, height = Math.Max(0, ClientSize.Height - top - bottom);
-            int inset = leftCollapsed ? 18 : 238;
+            int inset = leftCollapsed ? 18 : 316;
             using (new CanvasUpdate(canvas, canvas.Left != inset))
             {
             if (canvas.Left != inset) pan = new PointF(pan.X + canvas.Left - inset, pan.Y);
             canvas.Bounds = new Rectangle(inset, top, Math.Max(0, ClientSize.Width - inset), height);
-            left.Bounds = new Rectangle(0, top, 220, height);
-            leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : 220, top, 18, height);
+            left.Bounds = new Rectangle(0, top, 298, height);
+            leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : 298, top, 18, height);
             leftToggle.Text = leftCollapsed ? "›" : "‹"; left.Visible = !leftCollapsed;
             int width = ClampRightWidth(requestedRightWidth); right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
             }
@@ -350,7 +351,7 @@ namespace HexMapEditor
         void NewProject()
         {
             if(BlockInkCommit())return;
-            if (!ConfirmDiscard()) return;
+            if (!ConfirmDiscard()||!ConfirmPresetsBeforeClose()) return;
             var choices = AvailablePresets();
             var created=RunModal(()=>ChooseNewProject(this,map.Orientation,choices));if(created==null)return;
             created.ObjectStates=NewStateDefinitions();
@@ -362,7 +363,7 @@ namespace HexMapEditor
         }
         void AdoptNewProject(MapData data,string path)
         {
-            EndCanvasGesture(true);if(BlockInkCommit())return;documentRevision++;ResetObjectDocument();ClearDocumentIcons();map=data;
+            EndCanvasGesture(true);if(BlockInkCommit())return;documentRevision++;ResetObjectDocument();ClearDocumentIcons();map=data;quickSets.Clear();quickPreset=null;
             currentPath = path; selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
             needsFirstSave=String.IsNullOrEmpty(path);
             ResetSaveClock(data.LoadedFileVersion);
@@ -392,7 +393,7 @@ namespace HexMapEditor
         void OpenProject()
         {
             if(BlockInkCommit())return;
-            if (!ConfirmDiscard()) return;
+            if (!ConfirmDiscard()||!ConfirmPresetsBeforeClose()) return;
             using (var d = new OpenFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap|Wszystkie pliki (*.*)|*.*", Title = "Otwórz mapę", RestoreDirectory = true })
             {
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
@@ -432,7 +433,7 @@ namespace HexMapEditor
             try
             {
                 var loaded=ReadProjectData(path);
-                EndCanvasGesture(false); documentRevision++; ResetObjectDocument(); ClearDocumentIcons(); map = loaded; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
+                EndCanvasGesture(false); documentRevision++; ResetObjectDocument(); ClearDocumentIcons(); map = loaded;quickSets.Clear();quickPreset=null; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
                 needsFirstSave=false;ResetSaveClock(loaded.LoadedFileVersion);ResetQuality(); CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); RecentProjects.Shared.Touch(currentPath);return true;
             }
             catch (Exception ex) { error = ex.Message; migrated = false; return false; }
@@ -581,7 +582,7 @@ namespace HexMapEditor
             var presets = new HashSet<string>();
             foreach (var p in m.Presets)
             {
-                TerrainTextures.Attach(p, textures);
+                TerrainTextures.Attach(p, textures);PresetSets.Attach(p,m.IconAssets);
                 PresetCatalog.Validate(p);
                 if (!presets.Add(p.Id)) throw new InvalidDataException("Powtórzony identyfikator presetu.");
                 foreach (var t in p.Terrains) CheckVariant(variants, t.VariantId, t.TerrainId, t.Revision, t.Name, t.Color, t.TextureId);
@@ -596,7 +597,7 @@ namespace HexMapEditor
             variants[variant] = signature;
         }
 
-        void OnFormClosing(object sender, FormClosingEventArgs e) { if(autoSaving){CancelAutoSave();e.Cancel=true;return;}if(InkCommitBusy)CancelInkCommit(); EndCanvasGesture(true); if(InkCommitBusy)CancelInkCommit(); if (!ConfirmDiscard()) e.Cancel = true; }
+        void OnFormClosing(object sender, FormClosingEventArgs e) { if(autoSaving){CancelAutoSave();e.Cancel=true;return;}if(InkCommitBusy)CancelInkCommit(); EndCanvasGesture(true); if(InkCommitBusy)CancelInkCommit(); if (!ConfirmDiscard()||!ConfirmPresetsBeforeClose()) e.Cancel = true; }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
             if(InkCommitBusy&&!(e.Alt&&e.KeyCode==Keys.F4)){if(e.KeyCode==Keys.Escape)CancelInkCommit();else BlockInkCommit();e.Handled=true;e.SuppressKeyPress=true;return;}
@@ -697,7 +698,7 @@ namespace HexMapEditor
                 int i = row * map.Columns + col;
                 using (var path = HexPath(c, BaseRadius * scale))
                 using (var brush = new SolidBrush(ParseColor(hideTerrain ? TerrainColors[0] : map.Cells[i].Color)))
-                using (var pen = new Pen(i == selected ? Color.FromArgb(255, 239, 190, 89) : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
+                using (var pen = new Pen(i == selected ? ChoiceStyle.ActiveBorder : Color.FromArgb(135, 19, 23, 30), i == selected ? 2.4f : 1.2f))
                 {
                     e.Graphics.FillPath(brush, path);
                     if(!hideTerrain&&lowQuality){using(var simple=new SolidBrush(RepresentativeColors.Get(map.Cells[i].Color,map.Cells[i].Texture,map.Cells[i].Gradient,map.Orientation=="FlatTop")))e.Graphics.FillPath(simple,path);}
@@ -741,7 +742,7 @@ namespace HexMapEditor
                     else if (fill.Graphic != null) DrawTerrainTexture(graphics, path, center, radius, fill.Graphic);
                     else if(fill.Gradient!=null)GradientRules.Fill(graphics,path,fill.Gradient);
                     else using (var brush = new SolidBrush(ColorTranslator.FromHtml(fill.Color))) graphics.FillPath(brush, path);
-                    using (var pen = new Pen(i == selected ? Color.FromArgb(255,239,190,89) : Color.FromArgb(135,19,23,30), i == selected ? 2.4f : 1.2f)) graphics.DrawPath(pen,path);
+                    using (var pen = new Pen(i == selected ? ChoiceStyle.ActiveBorder : Color.FromArgb(135,19,23,30), i == selected ? 2.4f : 1.2f)) graphics.DrawPath(pen,path);
                 }
             }
         }

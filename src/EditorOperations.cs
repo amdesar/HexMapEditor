@@ -70,6 +70,7 @@ namespace HexMapEditor
             selectedObjects.RemoveWhere(id=>!map.Objects.Any(o=>o.Id==id));
             if (!map.Groups.Any(g => g.Id == selectedGroupId && selectedObjects.SetEquals(g.Members))) selectedGroupId = null;
             if (action.BeforePalette != null) (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex);
+            if(action.BeforeQuick!=null)ApplyQuick(action.QuickPresetId,after?action.AfterQuick:action.BeforeQuick);
             if (action.Changes.Count != 0 || action.Layers.Count != 0)
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);

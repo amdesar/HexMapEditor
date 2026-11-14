@@ -1,10 +1,10 @@
-# HexMapEditor 0.8.3
+# HexMapEditor 0.9.0
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.8.3** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.9.0** zapisuje mapy w **formacie 11**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,9 +12,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-Ta wersja odczytuje mapy 11 i presety 4. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
+Ta wersja odczytuje mapy 11 i presety 4/5; brak sekcji ikon/obiektów w starym presecie 4 oznacza puste zestawy. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
 
-## Start i jakość podglądu
+## Lewy panel i presety 0.9.0
+
+Przybornik ma układ 4×3, a szybkie zestawy ikon i obiektów po 2×6 kafelków. Narzędzia, materiały i zaznaczenia używają wspólnego niebieskiego ChoiceStyle. Lista terenów pozostaje pełna; dodatkowa wysokość okna powiększa przede wszystkim ją. Panel można schować, nie ma użytkowego splittera.
+
+Figury: Punkt, Linia, Koło, Trójkąt, Kwadrat, Prostokąt, Pięciokąt, Heksagon i Oktagon. Rozmiar 1–100; prostokąt ma A/B, trójkąt kąt 1–179° (domyślnie 60°), a obrót całkowite stopnie w prawo, wokół środka. Wpis 400° daje 40°, -390° daje -30°, a niezerowe pełne obroty zachowują znak ±360°. Ustawienia są sesyjne, z jednym krokiem Undo na wpis/drag i bez dirty mapy. Rysik/gumka pozostają 1–200, domyślnie 5.
+
+Preset obejmuje tereny i do 12 startowych ikon oraz 12 obiektów. Nowy preset jest pusty; chroniony Domyślny dostarcza podstawowe tereny i zestawy 12+12. Ręczny zapis pozwala wybrać sekcje: nowy plik ma pozostałe puste, a nadpisanie zachowuje pozostałe z aktualnego pliku. Przywracanie odczytuje wybrane sekcje z dysku i nie przemalowuje heksów. Robocze wersje presetów są niezależne w sesji, ich zmiany nie są dirty mapy. Zamykanie pyta najpierw o mapę, potem o każdy niezapisany preset; zapis przy zamykaniu obejmuje wszystkie sekcje, a Anuluj przerywa całą procedurę.
+
+Każda lista szybkiego dostępu ma do 24 unikalnych pozycji, z których pierwsze 12 jest widoczne i trafia do presetu. Sam wybór nie przestawia listy; udane użycie pozycji z rezerwy lub dodanie/import nowej przenosi ją na początek. Użycie widocznej pozycji zachowuje kolejność. PPM → „Usuń z szybkiego dostępu” usuwa tylko pozycję listy; pliki i wystąpienia na mapie pozostają. Historia szybkiego dostępu sama nie oznacza niezapisanej zmiany presetu.
+
+Zoom 12800% i długa statyczna nazwa w rename mają jawny jednoliniowy render z pionowym centrowaniem; reset i dropdown pozostają osobnymi obszarami.
+
+## Start i jakość podglądu — zachowane zasady
 
 Edytor ma dwa stałe wiersze nad całym obszarem pracy: **Plik / Edycja / Mapa / Widok / Biblioteka / Pomoc** oraz kompaktowe ikony Nowa/Otwórz/Zapisz, Cofnij/Ponów, zoom, dwa dopasowania i High/Low. Menu jest zintegrowane z hybrydowym obszarem tytułu: ikona i nazwa aplikacji, sześć menu, nazwa mapy oraz natywne przyciski Windows. Nazwa mapy jest centrowana względem całego okna, ograniczana bez kolizji i skracana; rzeczywisty systemowy tytuł zachowuje nazwę i gwiazdkę. Wolny obszar po menu i nazwa mapy służą do przeciągania. Drugi wiersz to dotychczasowy szybki pasek po lewej. Zapis z niezapisanymi zmianami i aktywny Low mają wspólny zaakceptowany niebieski styl Jednolity/Gradient. Przy braku miejsca szybki pasek ma overflow, bez trzeciego wiersza. Zachowano minimum 1180×748.
 
@@ -30,7 +42,7 @@ Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz no
 
 **Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
 
-Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.8.3 • 14.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.9.0 • 14.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 
@@ -44,7 +56,7 @@ Pickery współdzielą **12 kolorów sesji** w dwóch rzędach po6. Zatwierdzeni
 
 Gumka przygotowuje dokładny wynik poza UI na odłączonej migawce. Puste trafienia, także wewnątrz otworu, odrzuca test powierzchni bez uruchamiania przetwarzania. Podczas pracy konfliktujące polecenia są blokowane logicznie z informacją, bez wygaszania całych drzew kontrolek. Pasek **Przetwarzanie…** pojawia się dopiero po180ms, bez przesuwania layoutu; można anulować lub zamknąć program. Podgląd wymazania pozostaje do przejęcia przez dokładny wynik. Wynik jest stosowany atomowo do zgodnego dokumentu jako jeden krok historii. Anulowanie/błąd przywraca oryginał. Pan mapy wykorzystuje poprzedni cache i dorysowuje odsłonięte pasy. Przy serii zoomu oddzielny ograniczony cache przejściowej klatki pomija powtarzane przeliczanie identycznego podglądu; po120ms od końca serii powstaje dokładny obraz. Nie zmienia zapisanych kolorów i powierzchni.
 
-[Plan wydań](docs/plan-wersji.md), [raport 0.8.3](docs/raport-0.8.3.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
+[Plan wydań](docs/plan-wersji.md), [raport 0.9.0](docs/raport-0.9.0.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
 
 Binarne opcje używają wspólnego kompaktowego switcha z czytelnym On/Off/Disabled. Stempel terenów, ikon i masek może mieć środek poza siatką; wynik jest przecięciem kształtu z istniejącymi heksami. Wiadro nadal wymaga heksa początkowego.
 
@@ -117,9 +129,9 @@ Obie zewnętrzne powierzchnie edytora tła mają równe wymiary. W czasie gestu 
 
 - Przybornik3×4: **Kursor | Rączka | Rysik | Gumka**; **Pędzel | Wiadro | Zaznaczenie prostokątne | Lasso**; **Mgła | Wiadro mgły | Ograniczenie widoczności | Wiadro ograniczenia widoczności**. Podpowiedzi, nazwy dostępności i aktywne ramki. Prawy przycisk nie jest potrzebny do wyboru lassa.
 - Rączka nad dostępną instancją przesuwa ją lub jej trwałą grupę, bez otwierania prawego panelu. Nad tłem przesuwa kamerę. Respektuje efektywne blokady i mgłę. Środkowy przycisk nadal przesuwa kamerę. Pusty klik poza mapą odznacza heks/zamyka jego panel, ale rozpoczęcie panowania tego nie robi.
-- Jeden materiał: teren, ikona albo wzorzec obiektu ze złotą ramką lub brak materiału. Wybór terenu/ikony po narzędziu mgły wybiera Pędzel; zwykłe Wiadro pozostaje Wiadrem. Wybór wzorca wybiera Pędzel do pojedynczego umieszczania. Sam wybór nie edytuje mapy.
+- Jeden materiał: teren, ikona albo wzorzec obiektu z niebieską ramką lub brak materiału. Wybór terenu/ikony po narzędziu mgły wybiera Pędzel; zwykłe Wiadro pozostaje Wiadrem. Wybór wzorca przełącza na Pędzel wyłącznie z narzędzi masek; inne narzędzie pozostaje aktywne. Sam wybór nie edytuje mapy.
 - Po udanym OK edycji ikony brak wybranego materiału, także bez zmiany wartości. Narzędzie pozostaje; Pędzel/Wiadro bez materiału nic nie edytują, mgła działa niezależnie. Anuluj zachowuje wybór.
-- Tylko lista terenów ma własne kółko/strzałki o jeden wiersz. Sekcje i szerokość treści panelu zachowane; miniatury ikon/obiektów kompaktowe, pełna biblioteka pod … . Pasek zwijania ma własne miejsce.
+- Lista terenów ma własne kółko/strzałki o jeden wiersz. Panel ma stałe 298 px plus uchwyt 18 px; przy minimalnej wysokości i rozwiniętych parametrach przewija się również cała kolumna. Ikony i obiekty mają po 2×6 kafelków, pełna biblioteka pod … . Pasek zwijania ma własne miejsce.
 - Prawy panel jest nakładką z uchwytem i resetem szerokości; samo otwarcie nie rusza kamery. Menu Dopasuj ma styl aplikacji i polecenia Dopasuj mapę / Dopasuj wszystko. Oba pomijają prawą nakładkę. Używają tego samego algorytmu i marginesu: jeśli grafiki mieszczą się w obwiedni mapy, zoom/pan są dokładnie takie same. Dopasuj wszystko uwzględnia efektywne prostokąty widocznych Obiektów i pozostałe kreski widocznego Rysika, także poza mapą. Ukryte warstwy nie rozszerzają kadru; samo przełączenie flag nie przesuwa kamery. Otwórz nadal dopasowuje samą mapę.
 
 ## Instancje i biblioteki
@@ -166,7 +178,7 @@ Format **8** zachowuje Objects z bazowymi właściwościami, ObjectStates oraz G
 
 Resize/orientacja zachowują zaakceptowane zasady obiektów i lokalnych osi offsetu; crop ich nie usuwa. Techniczne przeliczenie nie odkrywa nowej drogi. Wspólna historia 300 obejmuje mapę, instancje, grupy/stany, końcowe delty mgły i pliki bibliotek. Nazwa/pole liczbowe ma logiczną sesję; pusty/niezmieniony zapis nie tworzy operacji. Sam wybór/nawigacja/podgląd bez historii. Pliki bibliotek są cofane z bajtów sesji przez LibraryFiles, bez Kosza i cichego nadpisania obcego celu; konflikt nie przesuwa stosu, można ponowić. Reset/limit/zamknięcie usuwa możliwość cofania, nie aktywne pliki. Udane Nowa/Otwórz zeruje historie/wybór, błąd/anulowanie zachowuje dokument.
 
-Zachowano chroniony Domyślny, czytelne presety i odświeżanie, osiem geometrii figur i ciągłość pędzla, regiony wiader terenów/ikon/mgły, osobne historie tekstu, formatowane opisy i Ctrl+Shift+V. Nazwa projektu nadal pochodzi z pliku; nowy projekt proponuje 15×10, orientację/preset i etykiety Osie. Nie diagnozowano ponownie zaakceptowanych obszarów 0.4.0.
+Zachowano chroniony Domyślny, czytelne presety i odświeżanie, dziewięć geometrii figur i ciągłość pędzla, regiony wiader terenów/ikon/mgły, osobne historie tekstu, formatowane opisy i Ctrl+Shift+V. Nazwa projektu nadal pochodzi z pliku; nowy projekt proponuje 15×10, orientację/preset i etykiety Osie. Nie diagnozowano ponownie zaakceptowanych obszarów 0.4.0.
 
 ## Biblioteka, testy i dalsza praca
 
@@ -177,10 +189,10 @@ Library jest lokalne i ignorowane przez Git. Program tworzy brakujące Backgroun
 Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego polecenia.** Nowe scenariusze wybierane pojedynczo:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch081Tests.ps1 -Case fields
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch090Tests.ps1 -Case presets
 ```
 
-Bieżący Case0.8.3: controls (Run-Patch083Tests.ps1). Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 46 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
+Bieżące przypadki 0.9.0: geometry, quick, presets albo controls (Run-Patch090Tests.ps1). Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 47 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
 Na później pozostają widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 
@@ -194,6 +206,8 @@ Historyczne próby 0.6.4 wybiera jawny pojedynczy Case `profile`, `comparison`, 
 Kolejka importu z folderów to wyłącznie [szczegółowy backlog](docs/backlog-import-z-folderow.md). Nie ma skanowania wejść, okien startowych ani usuwania oryginałów.
 
 ## Historia zmian
+
+- **0.9.0** — lewy panel4×3/2×6 i niebieskie wybory, nowe figury z obrotem i kątem trójkąta, presety trzech sekcji z częściowym zapisem/przywracaniem, niezależne drafty i sekwencja zamykania, szybkie listy24/12 oraz startery20ikon/12obiektów. Jednoliniowe12800% i długa etykieta rename. Mapa11 bez zmiany, zapis preset5 i odczyt4/5.
 
 - **0.6.4** — renderer gradientów ograniczony do widoku, cache ukończonej warstwy i późniejszy fragment kreski na wierzchu; jedno dokładne odejmowanie całego gestu gumki; pionowe RGB, dwa przełączniki i Losuj; małe buforowane miniatury biblioteki. Mapa 11 / preset 4 bez zmiany.
 
@@ -262,7 +276,7 @@ Rysik/Wskaźnik mają cykl300logicznych px drogi:80% przebieg palety,20% płynny
 
 Optymalizacja gumki buforuje walidację niezmiennych konturów i ścieżki GDI+, zamiast odtwarzać je przy każdym Paint/nowej próbce. Dokładna powierzchnia i limity0.6.2 pozostają. Wyniki pomiarów nie są gwarancją FPS. Nowy cache gradientowych kolorów jest kafelkowy, ograniczony do32kafli256×256 (~24MiB z danymi roboczymi), bez bitmapy świata. Dodatkowe limity:16stopów/gradient,100000stopów/dokument i historia kresek,50000/preset; poprzednich limitów nie zwiększano.
 
-Mapa11 i preset4 zapisują gradienty oraz przebieg kolorów kreski. Brak migracji dawnych map/presetów, stare pliki pozostają nietknięte. Biblioteki grafik nadal format2; formatów źródeł/obiektów/teł nie zmieniono. Nie dołączamy nieużytej biblioteki do mapy.
+Mapa11 i preset5 zapisują gradienty; preset5 dodatkowo zawiera zestawy ikon/obiektów. Mapa11 zachowuje przebieg kolorów kreski. Odczyt preset4 pozostaje dostępny. Brak migracji dawnych map/presetów, stare pliki pozostają nietknięte. Biblioteki grafik nadal format2; formatów źródeł/obiektów/teł nie zmieniono. Nie dołączamy nieużytej biblioteki do mapy.
 
 Biblioteka grafik ma stały kafelek/odstęp120px, domyślnie4kolumny, więcej po poszerzeniu i mniej po zwężeniu. Lista obiektów startuje od sumy szerokości kolumn, a resztkowy nagłówek jest ciemny. Nie ma czerwonej aktywnej ramki Usuń tło, gdy brak tła. Odroczenie panelu i zaakceptowany resize0.6.2 pozostają; nie dodano ryzykownego Show w MouseDown.
 

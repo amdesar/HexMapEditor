@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -35,10 +35,10 @@ namespace HexMapEditor
         public static string Destination(string directory,string name,string current){var path=PresetFiles.Destination(directory,"object-"+PresetFiles.Stem(name),current);if(!Path.GetFileName(path).StartsWith("object-",StringComparison.Ordinal))throw new IOException("Za długa ścieżka obiektu.");return path;}
         public static List<ObjectTemplate> Load(string directory,out string warning)
         {
-            Directory.CreateDirectory(directory);string marker=Path.Combine(directory,".starter-objects-v1");
+            Directory.CreateDirectory(directory);string marker=Path.Combine(directory,".starter-objects-v2");
             if(!File.Exists(marker)){
-                int i=0;foreach(var asset in IconAssets.Starters().Where(a=>a.Name=="Namiot"||a.Name=="Wieża")){
-                    var o=new ObjectTemplate{Id="object-starter-"+i++,Name=asset.Name,Asset=asset};
+                foreach(var starter in StarterSets.Objects()){
+                    var o=starter;
                     if(!Directory.GetFiles(directory,"*.json").Any(p=>{try{return Read(p).Id==o.Id;}catch{return false;}}))MapLogic.AtomicWrite(Destination(directory,o.Name,null),MapLogic.Serializer().Serialize(o),false);
                 }MapLogic.AtomicWrite(marker,"1",false);
             }
@@ -58,10 +58,10 @@ namespace HexMapEditor
         void LoadObjects(){try{string warning;var items=ObjectLibrary.Load(ObjectsDirectory,out warning);libraryObjects.Clear();libraryObjects.AddRange(items);RefreshObjectPreview();if(warning.Length>0)ShowEditorMessage(warning,"Pominięte wzorce obiektów",MessageBoxButtons.OK,MessageBoxIcon.Warning);}catch(Exception ex){ShowEditorMessage(ex.Message,"Biblioteka obiektów",MessageBoxButtons.OK,MessageBoxIcon.Error);}}
         LibraryIcon PickObjectGraphic(IWin32Window owner)
         {using(var dialog=new IconPickerDialog(libraryObjects.Select(o=>o.Graphic()),IconButton,BackColor)){dialog.Text="Biblioteka obiektów — wybierz";return RunModal(()=>dialog.ShowDialog(owner))==DialogResult.OK?dialog.Chosen:null;}}
-        void SelectObjectTemplate(string id){if(!libraryObjects.Any(o=>o.Id==id))return;EndCanvasGesture(true);activeObject=id;objectMaterial=true;noMaterial=false;iconMaterial=false;MaterialChosen();UpdateMaterialIndicator();canvas.Invalidate();}
-        void RefreshObjectPreview(){if(objectPreview==null)return;foreach(Control c in objectPreview.Controls.Cast<Control>().ToArray())c.Dispose();objectPreview.Controls.Clear();foreach(var o in libraryObjects.Take(8)){var entry=o;var b=IconButton(o.Graphic(),()=>SelectObjectTemplate(entry.Id));b.AccessibleName="Obiekt: "+o.Name;objectPreview.Controls.Add(b);}RefreshObjectSelection();}
-        void RefreshObjectSelection(){if(deleteObjectButton!=null)deleteObjectButton.Enabled=objectMaterial&&libraryObjects.Any(o=>o.Id==activeObject);if(objectPreview==null)return;foreach(Button b in objectPreview.Controls){bool selected=objectMaterial&&(string)b.Tag==activeObject;b.FlatAppearance.BorderSize=selected?3:1;b.FlatAppearance.BorderColor=selected?Color.Gold:Color.Gray;}}
-        void OpenObjectLibrary(){var o=PickObjectGraphic(this);if(o!=null)SelectObjectTemplate(o.Id);}
+        void SelectObjectTemplate(string id){if(FindTemplate(id)==null)return;EndCanvasGesture(true);activeObject=id;objectMaterial=true;noMaterial=false;iconMaterial=false;MaterialChosen();UpdateMaterialIndicator();canvas.Invalidate();}
+        void RefreshObjectPreview(){if(objectPreview==null)return;foreach(Control c in objectPreview.Controls.Cast<Control>().ToArray())c.Dispose();objectPreview.Controls.Clear();foreach(string id in CurrentQuick.Objects.Visible){var o=FindTemplate(id);if(o==null)continue;var entry=o;var b=IconButton(o.Graphic(),()=>SelectObjectTemplate(entry.Id));b.AccessibleName="Obiekt: "+o.Name;QuickMenu(b,o.Id,true);objectPreview.Controls.Add(b);}QuickPlaceholders(objectPreview);RefreshObjectSelection();}
+        void RefreshObjectSelection(){if(deleteObjectButton!=null)deleteObjectButton.Enabled=objectMaterial&&libraryObjects.Any(o=>o.Id==activeObject);if(objectPreview==null)return;foreach(Button b in objectPreview.Controls){bool selected=objectMaterial&&(string)b.Tag==activeObject;b.FlatAppearance.BorderSize=selected?3:1;b.FlatAppearance.BorderColor=selected?ChoiceStyle.ActiveBorder:Color.Gray;}}
+        void OpenObjectLibrary(){var o=PickObjectGraphic(this);if(o!=null){var template=libraryObjects.First(x=>x.Id==o.Id);CurrentQuick.ObjectRefs[o.Id]=template.Copy();SelectObjectTemplate(o.Id);}}
         void AddObjectTemplate()
         {
             using(var choice=new GraphicSourceDialog("Dodaj wzorzec obiektu","ikon")){
@@ -100,6 +100,6 @@ namespace HexMapEditor
                 ApplyAction(action,true);PushAction(action);MarkDirty();return true;
             }catch(Exception ex){error=ex.Message;return false;}
         }
-        void ApplyObjectLibrary(ObjectLibraryChange change,bool after){change.Write(after);var removed=after?change.Before:change.After;var added=after?change.After:change.Before;if(removed!=null)libraryObjects.RemoveAll(o=>o.Id==removed.Id);if(added!=null)libraryObjects.Insert(Math.Min(change.Index,libraryObjects.Count),added.Copy());if(objectMaterial&&!libraryObjects.Any(o=>o.Id==activeObject)){objectMaterial=false;noMaterial=true;activeObject=null;}RefreshObjectPreview();}
+        void ApplyObjectLibrary(ObjectLibraryChange change,bool after){change.Write(after);var removed=after?change.Before:change.After;var added=after?change.After:change.Before;if(removed!=null)libraryObjects.RemoveAll(o=>o.Id==removed.Id);if(added!=null)libraryObjects.Insert(Math.Min(change.Index,libraryObjects.Count),added.Copy());if(objectMaterial&&!libraryObjects.Any(o=>o.Id==activeObject)){objectMaterial=false;noMaterial=true;activeObject=null;}if(added!=null)CurrentQuick.ObjectRefs[added.Id]=added.Copy();if(after&&change.Before==null&&added!=null)UsedObject(added.Id,true);RefreshObjectPreview();}
     }
 }

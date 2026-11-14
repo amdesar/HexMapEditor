@@ -51,7 +51,7 @@ namespace HexMapEditor
                     }
                     finally { paletteTiles.ResumeLayout(true); if (body != null) body.ResumeLayout(true); left.ResumeLayout(true); }
                 }
-                UpdateTerrainSelection(); UpdatePresetStatus(); UpdateMaterialIndicator();
+                bool quickChanged=quickPreset!=map.ActivePresetId||!quickSets.ContainsKey(map.ActivePresetId);EnsureQuickPreset();if(quickChanged){RefreshIconPreview();RefreshObjectPreview();}UpdateTerrainSelection(); UpdatePresetStatus(); UpdateMaterialIndicator();
             }
             finally { updating = previous; }
         }
@@ -75,15 +75,15 @@ namespace HexMapEditor
                 ShowEditorMessage(ex.Message, "Wybór presetu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-        string PresetContent(TerrainPreset preset) { return json.Serialize(new { preset.Name, preset.Terrains }); }
+        string PresetContent(TerrainPreset preset) { return json.Serialize(new { preset.Name, preset.Terrains,preset.Icons,preset.Objects }); }
         void UpdatePresetStatus()
         {
             var p = ActivePreset(); var stored = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
             if (renamePresetButton != null) renamePresetButton.Enabled = !PresetReadOnly;
             if (addTerrainButton != null) addTerrainButton.Enabled = !PresetReadOnly;
-            bool differs = p.Id == PresetCatalog.DefaultId ? PresetContent(p) != PresetContent(PresetCatalog.Default()) : stored == null || PresetContent(p) != PresetContent(stored);
+            bool differs = WorkingPresetDirty(p);
             string status = p.Id == PresetCatalog.DefaultId ? (differs ? "Kopia robocza wzorca Domyślny *" : "Domyślny: chroniony wzorzec") : stored == null ? "Preset niezapisany w bibliotece" : differs ? "Paleta różni się od zapisanego presetu *" : "Paleta zgodna z zapisanym presetem";
-            presetStateLabel.Text = status; presetStateLabel.ForeColor = differs ? Color.FromArgb(246, 207, 124) : ForeColor; tips.SetToolTip(presetStateLabel, status + "\nNazwa robocza: " + p.Name); presetStateLabel.AccessibleName = status;
+            presetStateLabel.Text = status; presetStateLabel.ForeColor = differs ? Color.FromArgb(244,113,113) : ForeColor; tips.SetToolTip(presetStateLabel, status + "\nNazwa robocza: " + p.Name); presetStateLabel.AccessibleName = status;
             if (deletePresetButton != null) { deletePresetButton.Enabled = p.Id != PresetCatalog.DefaultId && stored != null; tips.SetToolTip(deletePresetButton, p.Id == PresetCatalog.DefaultId ? "Chronionego wzorca Domyślny nie można usunąć." : stored == null ? "Ten roboczy preset nie ma pliku w bibliotece." : "Usuń własny preset z biblioteki; dane mapy pozostaną."); }
         }
         void LoadLibraryPresets(bool initial)
@@ -124,9 +124,9 @@ namespace HexMapEditor
             {
                 if (map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
                 if (map.Presets.Any(p => PresetCatalog.SameName(p.Name, name))) throw new InvalidDataException("Nazwa jest już używana w projekcie.");
-                var preset = new TerrainPreset { Name = (name ?? "").Trim() }; preset.Terrains.Add(PresetCatalog.Neutral());
+                var preset = new TerrainPreset { Name = (name ?? "").Trim() };
                 var file = PresetCatalog.PrepareWrite(preset,directory,false,null); var after = PaletteState.Capture(map,brushIndex);
-                after.Presets.Add(preset); after.ActivePresetId=preset.Id; after.BrushIndex=0; after.SelectedTerrainId=preset.Terrains[0].TerrainId;
+                after.Presets.Add(preset); after.ActivePresetId=preset.Id; after.BrushIndex=0; after.SelectedTerrainId=null;
                 CommitPresetFile(file,after,"Nowy zapisany preset"); return true;
             }
             catch (Exception ex) { error = ex.Message; return false; }
@@ -160,35 +160,40 @@ namespace HexMapEditor
             if (PresetReadOnly) return;
             var p = ActivePreset(); using (var d = new NameDialog(p.Id == PresetCatalog.DefaultId ? "Nazwa roboczej kopii Domyślnego" : "Nazwa roboczego presetu", p.Name)) if (RunModal(() => d.ShowDialog(this)) == DialogResult.OK) ChangePalette("Nazwa roboczego presetu", () => p.Name = d.Value);
         }
-        void SavePreset()
+        void SavePreset(){SavePresetCore(false);}
+        bool SavePresetCore(bool closing)
         {
             var p = ActivePreset(); bool saved = p.Id != PresetCatalog.DefaultId && libraryPresets.Any(t => t.Id == p.Id);
-            using (var d = new SavePresetDialog(p, saved))
+            using (var d = new SavePresetDialog(p, saved,closing))
             {
-                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
-                string error; if (!TrySaveWorkingPreset(LibraryPaths.Presets, d.AsNew, d.PresetName, out error)) ShowEditorMessage("Nie można zapisać presetu.\n" + error, "Błąd presetu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return false;
+                string error; bool success=TrySaveWorkingPreset(LibraryPaths.Presets, d.AsNew, d.PresetName,d.Sections, out error);if(!success) ShowEditorMessage("Nie można zapisać presetu.\n" + error, "Błąd presetu", MessageBoxButtons.OK, MessageBoxIcon.Error);return success;
             }
         }
-        bool TrySaveWorkingPreset(string directory, bool asNew, string name, out string error)
+        bool TrySaveWorkingPreset(string directory, bool asNew, string name, out string error){return TrySaveWorkingPreset(directory,asNew,name,PresetSections.All,out error);}
+        bool TrySaveWorkingPreset(string directory, bool asNew, string name,PresetSections sections, out string error)
         {
             error = null;
             try
             {
-                var current = ActivePreset(); var candidate = current.Copy();
+                if(sections==0)throw new InvalidDataException("Wybierz sekcję presetu.");var current = ActivePreset(); var candidate = WithVisibleSets(current);
                 bool firstSave = current.Id != PresetCatalog.DefaultId && !libraryPresets.Any(p => p.Id == current.Id);
+                // A partial new file must not replace an unsaved source draft's omitted sections.
+                bool replaceDraft = firstSave && sections == PresetSections.All;
                 if (asNew)
                 {
-                    if (!firstSave && map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
-                    if (!firstSave) candidate.Id = Guid.NewGuid().ToString("N"); candidate.Name = (name ?? "").Trim();
+                    if (!replaceDraft && map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
+                    if (!replaceDraft) candidate.Id = Guid.NewGuid().ToString("N"); candidate.Name = (name ?? "").Trim();
                     if (map.Presets.Any(p => p.Id != current.Id && PresetCatalog.SameName(p.Name, candidate.Name))) throw new InvalidDataException("Nazwa jest już używana przez inny preset projektu.");
                 }
                 var stored=libraryPresets.FirstOrDefault(p=>p.Id==candidate.Id);
                 if (!asNew && stored==null) throw new IOException("Preset nie ma zapisanego pliku. Zapisz jako nowy.");
-                var file=PresetCatalog.PrepareWrite(candidate,directory,!asNew,asNew ? null : stored);
+                var latest=asNew?null:PresetCatalog.ReadFile(stored.FilePath);candidate=PresetSets.Merge(candidate,latest,sections);var file=PresetCatalog.PrepareWrite(candidate,directory,!asNew,asNew ? null : stored);
                 var after=PaletteState.Capture(map,brushIndex);
+                if(!asNew){var working=after.Presets.First(p=>p.Id==current.Id);if(sections.HasFlag(PresetSections.Icons))working.Icons=candidate.Icons.Select(i=>i.Copy()).ToList();if(sections.HasFlag(PresetSections.Objects))working.Objects=candidate.Objects.Select(o=>o.Copy()).ToList();}
                 if (asNew)
                 {
-                    if(firstSave) after.Presets[after.Presets.FindIndex(p=>p.Id==current.Id)]=candidate;
+                    if(replaceDraft) after.Presets[after.Presets.FindIndex(p=>p.Id==current.Id)]=candidate;
                     else after.Presets.Add(candidate);
                     after.ActivePresetId=candidate.Id;
                 }

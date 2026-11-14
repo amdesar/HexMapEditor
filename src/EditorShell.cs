@@ -37,23 +37,23 @@ namespace HexMapEditor
                 else if (key == "pointy" || key == "flat")
                 { var points = Enumerable.Range(0, 6).Select(i => { double a = (i * 60 + (key == "flat" ? 0 : -90)) * Math.PI / 180; return new PointF(11 + 9 * (float)Math.Cos(a), 11 + 9 * (float)Math.Sin(a)); }).ToArray(); g.DrawPolygon(p, points); }
                 else if (key == "new") { g.DrawRectangle(p, 5, 2, 12, 18); g.DrawLine(p, 8, 11, 14, 11); g.DrawLine(p, 11, 8, 11, 14); }
+                else if(key=="plus"){g.DrawLine(p,4,11,18,11);g.DrawLine(p,11,4,11,18);}
+                else if(key=="restore"){g.DrawRectangle(p,4,3,14,16);g.DrawLine(p,7,7,15,7);g.DrawLines(p,new[]{new Point(15,12),new Point(7,12),new Point(10,9)});g.DrawLine(p,7,12,10,15);}
                 else if (key == "open" || key == "library") { g.DrawLines(p, new[] { new Point(2, 18), new Point(2, 5), new Point(9, 5), new Point(11, 8), new Point(20, 8), new Point(17, 18), new Point(2, 18) }); }
                 else if (key == "save" || key == "saveas") { g.DrawRectangle(p, 3, 3, 16, 16); g.DrawRectangle(p, 7, 3, 8, 6); g.DrawRectangle(p, 7, 13, 8, 6); if (key == "saveas") g.DrawLine(p, 1, 20, 20, 1); }
                 else if (key == "select") g.DrawPolygon(p, new[] { new Point(4, 2), new Point(17, 12), new Point(11, 13), new Point(8, 19) });
                 else if(key=="rectangle"){p.DashStyle=DashStyle.Dash;g.DrawRectangle(p,3,4,16,14);}
                 else if(key=="lasso"){g.DrawEllipse(p,3,3,16,12);g.DrawBezier(p,new Point(8,14),new Point(2,22),new Point(16,21),new Point(12,15));}
-                else if (key == "hand") { g.DrawEllipse(p, 5, 8, 12, 12); for (int x = 5; x <= 17; x += 4) g.DrawLine(p, x, 10, x, 2 + Math.Abs(x - 11) / 2); }
-                else if (key == "brush") { using (var handle = new Pen(Color.FromArgb(218, 170, 91), 4)) g.DrawLine(handle, 18, 2, 10, 12); g.FillPolygon(Brushes.WhiteSmoke, new[] { new Point(8, 10), new Point(13, 14), new Point(10, 20), new Point(2, 20), new Point(5, 16) }); }
-                else if(key=="stylus"){g.DrawLine(p,4,20,18,4);g.DrawLine(p,3,21,8,19);g.DrawEllipse(p,14,1,7,7);}
-                else if(key=="eraser"){g.FillPolygon(Brushes.Salmon,new[]{new Point(2,15),new Point(13,3),new Point(22,12),new Point(11,23)});g.DrawLine(p,2,15,11,23);g.DrawLine(p,10,7,19,16);}
+                else if (key == "hand") { g.DrawLines(p,new[]{new Point(7,20),new Point(3,12),new Point(5,10),new Point(8,14),new Point(8,4),new Point(10,3),new Point(11,11),new Point(12,2),new Point(14,3),new Point(14,11),new Point(16,4),new Point(18,5),new Point(17,12),new Point(20,8),new Point(21,10),new Point(18,19),new Point(7,20)}); }
+                else if (key == "brush") { using (var handle = new Pen(Color.WhiteSmoke, 3)) g.DrawLine(handle, 18, 2, 10, 12); g.FillPolygon(Brushes.WhiteSmoke, new[] { new Point(8, 10), new Point(13, 14), new Point(10, 20), new Point(2, 20), new Point(5, 16) }); }
+                else if(key=="stylus"){g.DrawPolygon(p,new[]{new Point(3,20),new Point(5,14),new Point(16,2),new Point(20,6),new Point(9,18)});g.DrawLine(p,13,5,17,9);}
+                else if(key=="eraser"){g.DrawPolygon(p,new[]{new Point(2,14),new Point(12,3),new Point(20,10),new Point(11,20),new Point(8,20)});g.DrawLine(p,7,9,15,16);}
                 else if(key=="dark"||key=="darkbucket")
                 {
-                    using(var eye=new GraphicsPath()){eye.AddBezier(2,10,7,2,15,2,20,10);eye.AddBezier(20,10,15,18,7,18,2,10);g.DrawPath(p,eye);}
-                    g.DrawEllipse(p,8,7,6,6);
-                    if(key=="darkbucket"){g.DrawLine(p,3,20,19,20);g.DrawLine(p,16,16,16,21);}
+                    using(var eye=new GraphicsPath()){eye.AddBezier(2,11,7,2,15,2,20,11);eye.AddBezier(20,11,15,20,7,20,2,11);if(key=="darkbucket"){eye.AddEllipse(8,8,6,6);eye.FillMode=FillMode.Alternate;g.FillPath(Brushes.WhiteSmoke,eye);}else{g.DrawPath(p,eye);g.DrawEllipse(p,8,8,6,6);}}
                 }
-                else if (key == "fog" || key == "fogbucket") { g.FillEllipse(Brushes.SlateGray, 1, 9, 20, 10); g.FillEllipse(Brushes.LightSlateGray, 4, 4, 10, 12); g.FillEllipse(Brushes.LightSlateGray, 10, 7, 10, 11); if (key == "fogbucket") g.DrawLine(p, 2, 21, 20, 21); }
-                else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 11), new Point(10, 3), new Point(18, 11), new Point(10, 19) }); g.DrawLine(p, 3, 11, 17, 11); g.DrawEllipse(p, 18, 13, 3, 5); }
+                else if (key == "fog" || key == "fogbucket") {using(var cloud=new GraphicsPath()){cloud.AddBezier(3,17,0,12,2,8,6,9);cloud.AddBezier(6,9,5,2,14,2,15,8);cloud.AddBezier(15,8,22,6,23,17,18,18);cloud.AddLine(18,18,3,17);if(key=="fogbucket")g.FillPath(Brushes.WhiteSmoke,cloud);else g.DrawPath(p,cloud);}}
+                else if (key == "bucket") { g.DrawPolygon(p, new[] { new Point(2, 10), new Point(10, 2), new Point(18, 10), new Point(10, 18) });g.FillPolygon(Brushes.WhiteSmoke,new[]{new Point(3,10),new Point(17,10),new Point(10,17)});g.DrawLine(p,3,10,17,10);g.FillClosedCurve(Brushes.WhiteSmoke,new[]{new Point(19,12),new Point(17,17),new Point(20,20),new Point(22,17)}); }
                 else if (key == "pencil") { g.DrawPolygon(p, new[] { new Point(3, 19), new Point(5, 12), new Point(15, 2), new Point(20, 7), new Point(10, 17) }); g.DrawLine(p, 12, 5, 17, 10); }
                 else if (key == "trash") { g.DrawRectangle(p, 6, 7, 11, 13); g.DrawLine(p, 3, 5, 20, 5); g.DrawLine(p, 9, 2, 14, 2); g.DrawLine(p, 9, 10, 9, 17); g.DrawLine(p, 14, 10, 14, 17); }
                 else if (key == "fit" || key=="fitall") { foreach (int x in new[] { 2, 20 }) foreach (int y in new[] { 2, 20 }) { g.DrawLine(p, x, y, x == 2 ? 8 : 14, y); g.DrawLine(p, x, y, x, y == 2 ? 8 : 14); } if(key=="fitall"){g.DrawEllipse(p,6,6,10,10);g.DrawLine(p,8,11,14,11);g.DrawLine(p,11,8,11,14);} }
@@ -106,7 +106,7 @@ namespace HexMapEditor
         void SelectTool(EditorTool tool)
         {
             EndCanvasGesture(true);if(currentTool!=tool)ClearPointerContext(); currentTool = tool;
-            foreach (var pair in toolButtons) { pair.Value.BackColor = pair.Key == tool ? Color.FromArgb(93, 111, 156) : Color.FromArgb(49, 54, 67); pair.Value.FlatAppearance.BorderSize = pair.Key == tool ? 3 : 1; pair.Value.AccessibleDescription = pair.Key == tool ? "Aktywne" : "Nieaktywne"; }
+            foreach (var pair in toolButtons) { ChoiceStyle.Apply(pair.Value,pair.Key==tool); pair.Value.FlatAppearance.BorderSize = pair.Key == tool ? 3 : 1; pair.Value.AccessibleDescription = pair.Key == tool ? "Aktywne" : "Nieaktywne"; }
             UpdateBrushAvailability();
         }
         void BuildDetailsPanel()

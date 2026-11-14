@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -84,7 +84,7 @@ namespace HexMapEditor
                 Choose.ForeColor = luminance > 145 ? Color.Black : Color.White;
             }
             else { /* Preserve the cached single text color for an unchanged graphic. */ }
-            Choose.FlatAppearance.BorderColor = selected ? Color.Gold : Color.Gray; Choose.FlatAppearance.BorderSize = selected ? 3 : 1; Choose.AccessibleName = "Teren: " + terrain.Name; Choose.AccessibleDescription = selected ? "Wybrany" : "Niewybrany";
+            Choose.FlatAppearance.BorderColor = selected ? ChoiceStyle.ActiveBorder : Color.Gray; Choose.FlatAppearance.BorderSize = selected ? 3 : 1; Choose.AccessibleName = "Teren: " + terrain.Name; Choose.AccessibleDescription = selected ? "Wybrany" : "Niewybrany";
             Edit.AccessibleName = "Edytuj teren " + terrain.Name; Delete.AccessibleName = "Usuń teren " + terrain.Name;
             tips.SetToolTip(Choose, terrain.Name + " · wersja " + terrain.Revision + " · warianty: " + terrain.Variants.Count); tips.SetToolTip(Edit, "Edytuj teren (F2)"); tips.SetToolTip(Delete, "Usuń teren (Delete)");
             Choose.Invalidate();

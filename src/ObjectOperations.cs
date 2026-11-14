@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -22,12 +22,12 @@ namespace HexMapEditor
         }
         MapObject PlaceObject(PointF point)
         {
-            var template=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(!objectMaterial||template==null)return null;
+            var template=FindTemplate(activeObject);if(!objectMaterial||template==null)return null;
             if(map.Objects.Count>=5000)throw new IOException("Limit 5000 instancji na mapie.");
             var obj=new MapObject{TemplateId=template.Id,Name=template.Name,AssetId=template.Asset.Id,X=point.X,Y=point.Y,LightEnabled=template.LightEnabled,LightRadius=template.LightRadius};
             ObjectGeometry.Validate(new MapData{Objects=new List<MapObject>{obj}},new HashSet<string>{template.Asset.Id});
             var action=new EditAction{Label="Umieszczenie obiektu"};RequireObjectAsset(action,template.Asset);action.Objects.Add(new ObjectChange{After=obj,Index=map.Objects.Count});AddReveal(action,obj,null);
-            CommitObjectTransaction(action);return map.Objects.First(o=>o.Id==obj.Id);
+            CommitObjectTransaction(action);UsedObject(template.Id);return map.Objects.First(o=>o.Id==obj.Id);
         }
         bool ChangeObject(MapObject next)
         {

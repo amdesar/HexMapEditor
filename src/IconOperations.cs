@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -55,7 +55,8 @@ namespace HexMapEditor
             activeIcon = after ? change.AfterSelected : change.BeforeSelected; iconMaterial = after ? change.AfterMaterial : change.BeforeMaterial;
             objectMaterial=!after&&change.BeforeObjectMaterial;noMaterial=after?change.AfterNoMaterial:change.BeforeNoMaterial;
             if (!libraryIcons.Any(i=>i.Id==activeIcon)) { activeIcon=null; iconMaterial=false; }
-            RefreshIconPreview();
+            if(entry!=null)CurrentQuick.IconRefs[entry.Id]=entry.Copy();
+            if(after&&change.Before==null&&entry!=null)UsedIcon(entry.Id,true);RefreshIconPreview();
         }
     }
 }
