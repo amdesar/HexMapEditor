@@ -943,3 +943,13 @@ Router lokalnych wiadomości aplikacji kończy wpis również po kliknięciu ety
 **Stempel:** środek wyliczany przez istniejącą nieskończoną siatkę offsetową ObjectGeometry.Nearest, także poza mapą. Wspólny BrushGeometry.Stamp najpierw tworzy kształt/obrys, potem przecina z istniejącymi heksami. Dotyczy terenów, ikon, FogBrush i DarkBrush; preview i wynik używają tej samej listy. Start i kontynuacja poza siatką działają w płótnie, bez heksów poza mapą. Dla startu maski/ikony bez środkowego heksa kierunek nakładania/usuwania ustala pierwszy stabilny istniejący heks stempla. Bucket/FogBucket/DarkBucket nadal wymagają heksa startowego; swobodne obiekty pozostają pojedynczym umieszczeniem. Wybór terenu/ikony z DarkBrush/DarkBucket przełącza do zwykłego Brush identycznie jak przy mgle.
 
 Wyniki, ograniczenia i checklista: [raport0.8.1](raport-0.8.1.md). Backlog0.9/0.11/0.12/po1.0 wyłącznie zapisany w [backlog UI](backlog-ui-po-0.8.md).
+
+## 45. Wersja 0.8.2 — hybrydowy pasek tytułu
+
+Zastępuje wyłącznie regułę ramki z sekcji 44. Główny edytor ma pierwszy wiersz: istniejąca ikona, HexMapEditor, sześć prawdziwych menu, nazwa mapy i natywne przyciski Windows. Drugi wiersz zachowuje szybkie polecenia po lewej i overflow. Start i pozostałe dialogi nie zmieniają ramki. Nie ma własnych imitacji przycisków ani drugiej architektury.
+
+Okno zachowuje WS_CAPTION/WS_THICKFRAME i menu systemowe. DWM rozszerza obszar klienta na tytuł; NCCALCSIZE zachowuje natywne boki/dół i margines maksymalizacji. Przy powrocie do normalnego stanu SetBoundsCore zachowuje zewnętrzny prostokąt już przywrócony przez Windows, zamiast ponownie doliczać tytuł do zapamiętanego klienta WinForms. Brak korekty stałą 31 px. Natywne prostokąty WM_GETTITLEBARINFOEX zapewniają hit-test przycisków także po maksymalizacji, gdy DwmDefWindowProc zwraca HTCLIENT.
+
+Nazwa mapy celuje w środek całej szerokości, jest przesuwana minimalnie do wolnego miejsca, skracana wielokropkiem, a przy przestrzeni poniżej80px ukrywana. Rzeczywisty tytuł systemowy, dirty/needsFirstSave i niebieski stan Zapisz pozostają niezależne od tego napisu. Obszar od końca Pomoc do przycisków, również nazwa mapy, daje HTCAPTION. Menu jest interaktywne i nie przeciąga okna. Minimum1180×748 pozostaje.
+
+Map11/preset4, Library, limity i wszystkie operacje dokumentu bez zmian. Nie dodano runtime, globalnego WS_EX_COMPOSITED ani funkcji 0.8.3. [Raport 0.8.2](raport-0.8.2.md) oddziela komunikaty Win32, symulowane skalowanie oraz rzeczywistą obsługę zwykłego EXE; snapping i fizyczne przełączanie DPI pozostają niezaliczone.

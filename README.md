@@ -1,10 +1,10 @@
-# HexMapEditor 0.8.1
+# HexMapEditor 0.8.2
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.8.1** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.8.2** zapisuje mapy w **formacie 11**, presety w formacie **4**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -16,7 +16,7 @@ Ta wersja odczytuje mapy 11 i presety 4. Nowe formaty zachowują pełne źródł
 
 ## Start i jakość podglądu
 
-Edytor ma dwa stałe wiersze nad całym obszarem pracy: **Plik / Edycja / Mapa / Widok / Biblioteka / Pomoc** oraz kompaktowe ikony Nowa/Otwórz/Zapisz, Cofnij/Ponów, zoom, dwa dopasowania i High/Low. Próba hybrydy została wycofana po wykryciu regresji natywnego przywracania rozmiaru; standardowa ramka Windows pozostaje; tytuł pokazuje nazwę mapy i gwiazdkę. Zapis z niezapisanymi zmianami i aktywny Low mają wspólny zaakceptowany niebieski styl Jednolity/Gradient. Przy braku miejsca szybki pasek ma overflow, bez trzeciego wiersza. Zachowano minimum 1180×748.
+Edytor ma dwa stałe wiersze nad całym obszarem pracy: **Plik / Edycja / Mapa / Widok / Biblioteka / Pomoc** oraz kompaktowe ikony Nowa/Otwórz/Zapisz, Cofnij/Ponów, zoom, dwa dopasowania i High/Low. Menu jest zintegrowane z hybrydowym obszarem tytułu: ikona i nazwa aplikacji, sześć menu, nazwa mapy oraz natywne przyciski Windows. Nazwa mapy jest centrowana względem całego okna, ograniczana bez kolizji i skracana; rzeczywisty systemowy tytuł zachowuje nazwę i gwiazdkę. Wolny obszar po menu i nazwa mapy służą do przeciągania. Drugi wiersz to dotychczasowy szybki pasek po lewej. Zapis z niezapisanymi zmianami i aktywny Low mają wspólny zaakceptowany niebieski styl Jednolity/Gradient. Przy braku miejsca szybki pasek ma overflow, bez trzeciego wiersza. Zachowano minimum 1180×748.
 
 **Edycja → Zmień nazwę pliku…** przenosi aktualny plik w tym samym folderze, bez kopii i zapisywania zmian z pamięci. Kolizja nie nadpisuje danych. Po sukcesie tytuł/MRU i przyszły autozapis używają nowej ścieżki; dirty pozostaje. Dokument bez pliku musi najpierw zostać zapisany. **Biblioteka** otwiera wyłącznie rzeczywiste foldery w Eksploratorze; selektory zasobów pozostały w odpowiednich edytorach.
 
@@ -28,7 +28,7 @@ Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz no
 
 **Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
 
-Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.8.1 • 14.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.8.2 • 14.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 
@@ -42,7 +42,7 @@ Pickery współdzielą **12 kolorów sesji** w dwóch rzędach po6. Zatwierdzeni
 
 Gumka przygotowuje dokładny wynik poza UI na odłączonej migawce. Puste trafienia, także wewnątrz otworu, odrzuca test powierzchni bez uruchamiania przetwarzania. Podczas pracy konfliktujące polecenia są blokowane logicznie z informacją, bez wygaszania całych drzew kontrolek. Pasek **Przetwarzanie…** pojawia się dopiero po180ms, bez przesuwania layoutu; można anulować lub zamknąć program. Podgląd wymazania pozostaje do przejęcia przez dokładny wynik. Wynik jest stosowany atomowo do zgodnego dokumentu jako jeden krok historii. Anulowanie/błąd przywraca oryginał. Pan mapy wykorzystuje poprzedni cache i dorysowuje odsłonięte pasy. Przy serii zoomu oddzielny ograniczony cache przejściowej klatki pomija powtarzane przeliczanie identycznego podglądu; po120ms od końca serii powstaje dokładny obraz. Nie zmienia zapisanych kolorów i powierzchni.
 
-[Plan wydań](docs/plan-wersji.md), [raport 0.8.1](docs/raport-0.8.1.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
+[Plan wydań](docs/plan-wersji.md), [raport 0.8.2](docs/raport-0.8.2.md). Testy były celowane; raport oddziela metody od zwykłego EXE i wskazuje niewykonane próby.
 
 Binarne opcje używają wspólnego kompaktowego switcha z czytelnym On/Off/Disabled. Stempel terenów, ikon i masek może mieć środek poza siatką; wynik jest przecięciem kształtu z istniejącymi heksami. Wiadro nadal wymaga heksa początkowego.
 
@@ -178,7 +178,7 @@ Tylko minimalne, selektywne próby. **Nie uruchamiaj Run-AllTests bez osobnego p
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Patch081Tests.ps1 -Case fields
 ```
 
-Bieżące Case0.8.1: fields, stamp i controls (Run-Patch081Tests.ps1). Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 44 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
+Bieżące Case0.8.2: geometry i caption (Run-Patch082Tests.ps1). Runner wymaga jednego jawnego Case, bez domyślnej kampanii. Nie wybieraj ich hurtowo ani nie ponawiaj zaliczonych prób bez wpływającej zmiany. Źródła i skrypty historyczne pozostają śledzone, a artefakty trafiają do osobnych podkatalogów ignorowanego tests/_work. Bieżące ustalenia opisuje sekcja 45 specyfikacji. Paczka programu nie zawiera tests ani prywatnej Library.
 
 Na później pozostają widok gracza, zakładki, eksport osadzonych zasobów do biblioteki, wagi wariantów, przebudowa opisów i drżenie nagłówka. Celowane próby: `tests/Run-Patch051Tests.ps1 -Case crop` (albo pool, library, fog, background, portable, controls). Brak Case daje błąd, nigdy pełny zestaw. Wyniki i ograniczenia: `docs/raport-0.5.1.md`. Historyczne testy zachowano; przypadki starych formatów wymagają jawnego dostosowania przy osobnym audycie. Nie uruchamiaj Run-AllTests bez osobnego polecenia.
 

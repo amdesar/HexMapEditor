@@ -7,6 +7,8 @@
 | 0.7.2 | Rozdzielone Nowa start/edytor, autozapis istniejącej mapy co5min, autor i jawna data wydania |
 | 0.8.0 | Menu i szybkie polecenia, wspólne pola liczbowe, ciemny motyw własnych kontrolek, rename pliku |
 | 0.8.1 | Poprawki odbiorcze pól/historii, switchy, stempla i góry; hybryda wycofana po regresji RestoreBounds |
+| 0.8.2 | Hybrydowy tytuł głównego edytora: istniejące menu i natywne przyciski Windows, stabilna geometria przywracania |
+| 0.8.3 | Odrębne poprawki: split-button zoomu, pionowe wyrównanie tekstu pól nazw, reguły przełączania zasobów na pędzel; niewdrożone w 0.8.2 |
 | 0.9.0 | Lewy panel, presety i ikony; niebieska ramka aktywnego narzędzia |
 | 0.10.0 | Prawy panel i opisy z obrazami |
 | 0.11.0 | Niezależne mapy w zakładkach; lokalizacja do ponownej oceny na tym etapie |
