@@ -24,7 +24,7 @@ namespace HexMapEditor
         void MenuFence(ToolStripDropDown menu){menu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};}
         void BuildCommandBars()
         {
-            shellToolbar=new Panel{Dock=DockStyle.Top,Height=66,BackColor=Color.FromArgb(34,38,48)};Controls.Add(shellToolbar);
+            shellToolbar=new CaptionToolbar{Dock=DockStyle.Top,Height=66,BackColor=Color.FromArgb(34,38,48)};Controls.Add(shellToolbar);InitializeCaption();
             mainMenu=new MenuStrip{Dock=DockStyle.None,AutoSize=false,Height=27,GripStyle=ToolStripGripStyle.Hidden,BackColor=shellToolbar.BackColor,ForeColor=Color.WhiteSmoke,Renderer=new ToolStripProfessionalRenderer(new FitMenuColors())};
             MainMenuStrip=mainMenu;shellToolbar.Controls.Add(mainMenu);
             mainMenu.MenuActivate+=(s,e)=>{commandFocus=commandTarget??FocusedEditorControl();UpdateCommandState();};
@@ -53,7 +53,7 @@ namespace HexMapEditor
         void StyleMenus(ToolStripMenuItem item){item.DropDown.BackColor=Color.FromArgb(34,38,48);item.DropDown.ForeColor=Color.WhiteSmoke;item.DropDown.Renderer=new ToolStripProfessionalRenderer(new FitMenuColors());MenuFence(item.DropDown);foreach(var child in item.DropDownItems.OfType<ToolStripMenuItem>())StyleMenus(child);}
         void Host(Button button){button.AutoSize=false;quickStrip.Items.Add(new ToolStripControlHost(button){AutoSize=false,Size=button.Size,Margin=new Padding(1,0,1,0),Overflow=ToolStripItemOverflow.AsNeeded});}
         void Quick(Button b,EditorCommand command,string icon,string help,int width){quickCommands[command]=b;ConfigureButton(b,"",icon??"labels",help,()=>ExecuteCommand(command),width);b.MouseDown+=(s,e)=>commandFocus=commandTarget??FocusedEditorControl();if(icon==null)b.Image=null;Host(b);}
-        void LayoutCommandBars(){if(mainMenu==null)return;int mh=Math.Max(27,mainMenu.Font.Height+10),qh=Math.Max(36,quickStrip.Font.Height+20);shellToolbar.Height=mh+qh;mainMenu.SetBounds(0,0,shellToolbar.ClientSize.Width,mh);quickStrip.SetBounds(0,mh,shellToolbar.ClientSize.Width,qh);}
+        void LayoutCommandBars(){if(mainMenu==null||quickStrip==null)return;LayoutCaptionBars();}
         void TrackCommandFocus(Control parent)
         {
             if(parent==shellToolbar||parent is RichNoteEditor)return;
