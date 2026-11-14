@@ -2,6 +2,15 @@
 using System.Windows.Forms;
 namespace HexMapEditor
 {
+    internal sealed class FitMenuRenderer : ToolStripProfessionalRenderer
+    {
+        internal FitMenuRenderer() : base(new FitMenuColors()) { }
+        protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
+        {
+            e.ArrowColor = e.Item.Enabled ? Color.WhiteSmoke : Color.FromArgb(145, 149, 158);
+            base.OnRenderArrow(e);
+        }
+    }
     internal sealed class FitButtonRenderer : ToolStripProfessionalRenderer
     {
         public FitButtonRenderer() : base(new FitMenuColors()) { }

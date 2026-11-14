@@ -78,7 +78,7 @@ namespace HexMapEditor
         void BuildViewMenu(Control parent)
         {
             var menu = new ContextMenuStrip { BackColor = Color.FromArgb(34, 38, 48), ForeColor = Color.WhiteSmoke,
-                Renderer = new ToolStripProfessionalRenderer(new FitMenuColors()) };
+                Renderer = new FitMenuRenderer() };
             layerItems = new ToolStripMenuItem[LayerNames.Length];
             foreach (int i in new[] { (int)MapLayer.Background, (int)MapLayer.Terrain, (int)MapLayer.Icons, (int)MapLayer.Objects, (int)MapLayer.Darkness, (int)MapLayer.Fog, (int)MapLayer.Ink })
             {

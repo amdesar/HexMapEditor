@@ -953,3 +953,7 @@ Okno zachowuje WS_CAPTION/WS_THICKFRAME i menu systemowe. DWM rozszerza obszar k
 Nazwa mapy celuje w środek całej szerokości, jest przesuwana minimalnie do wolnego miejsca, skracana wielokropkiem, a przy przestrzeni poniżej80px ukrywana. Rzeczywisty tytuł systemowy, dirty/needsFirstSave i niebieski stan Zapisz pozostają niezależne od tego napisu. Obszar od końca Pomoc do przycisków, również nazwa mapy, daje HTCAPTION. Menu jest interaktywne i nie przeciąga okna. Minimum1180×748 pozostaje.
 
 Map11/preset4, Library, limity i wszystkie operacje dokumentu bez zmian. Nie dodano runtime, globalnego WS_EX_COMPOSITED ani funkcji 0.8.3. [Raport 0.8.2](raport-0.8.2.md) oddziela komunikaty Win32, symulowane skalowanie oraz rzeczywistą obsługę zwykłego EXE; snapping i fizyczne przełączanie DPI pozostają niezaliczone.
+
+## 46. Wersja 0.8.3 — lokalne poprawki interfejsu
+
+Zoom: lewy przycisk ustawia100% zachowując środek, prawy przełącza dotychczasową listę; stan nie zmienia dokumentu. Pola nazwy pliku i obiektu zachowują naturalną wysokość jednoliniowego pola i są wyśrodkowane w wierszu. Wybór terenu, ikony lub obiektu przełącza na pędzel wyłącznie z FogBrush/FogBucket/DarkBrush/DarkBucket. Wspólny renderer własnych menu rysuje jasne strzałki i przygasza disabled. Zaakceptowana hybryda0.8.2, formaty i Library bez zmian. Szczegóły i ograniczenia: [raport 0.8.3](raport-0.8.3.md).

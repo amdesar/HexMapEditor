@@ -26,3 +26,6 @@ Na dole, niezależne mapy; obok krzyżyków do rozważenia menu zamykania wybran
 - Po1.0: konfiguracja skrótów, wiele alternatywnych kombinacji dla jednego polecenia oraz kontrola konfliktów. Bez narzucania Ctrl+Shift+Z; w0.8.1 ten skrót nadal nie uruchamia historii.
 
 Pozostałe backlogi i etapy planu zachowane, bez implementacji powyższych funkcji.
+# Obserwacja po odbiorze 0.8.2
+
+Bardzo długa wklejona nazwa wywołała ogólny komunikat o niedozwolonych znakach. Dokładne wejście i przyczyna nie są potwierdzone; ewentualną diagnostykę odłożyć. Nie zmieniano walidacji w 0.8.3.
