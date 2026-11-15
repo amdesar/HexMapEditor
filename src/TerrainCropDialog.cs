@@ -99,11 +99,11 @@ namespace HexMapEditor
         protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); if (CanFocus) Focus(); }
         protected override void OnPaint(PaintEventArgs e)
         {
-            var square = Square; var g = e.Graphics; CropMath.Draw(g, image, flat ? graphic.Flat : graphic.Pointy, square, true);
-            using (var region = new Region(square))
+            var square = Square; var g = e.Graphics; CropPreview.Checker(g,ClientRectangle);CropPreview.Surroundings(g,image,flat?graphic.Flat:graphic.Pointy,square,ClientRectangle);
+            using (var region = new Region(ClientRectangle))
             using (var mask = TerrainTextures.Mask(new PointF(Width / 2f, Height / 2f), Side / 2, flat))
             using (var shade = new SolidBrush(Color.FromArgb(180, BackColor)))
-            using (var pen = new Pen(Active ? Color.Gold : Color.WhiteSmoke, Active ? 2 : 1))
+            using (var pen = new Pen(Active ? ChoiceStyle.ActiveBorder : Color.WhiteSmoke, Active ? 2 : 1))
             { region.Exclude(mask); g.FillRegion(shade, region); g.DrawPath(pen, mask); }
         }
     }

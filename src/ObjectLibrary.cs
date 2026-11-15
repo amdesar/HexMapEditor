@@ -58,31 +58,35 @@ namespace HexMapEditor
         string ObjectsDirectory {get{return Path.Combine(LibraryPaths.Root,"Objects");}}
         void LoadObjects(){try{string warning;var items=ObjectLibrary.Load(ObjectsDirectory,out warning);libraryObjects.Clear();libraryObjects.AddRange(items);RefreshObjectPreview();if(warning.Length>0)ShowEditorMessage(warning,"Pominięte wzorce obiektów",MessageBoxButtons.OK,MessageBoxIcon.Warning);}catch(Exception ex){ShowEditorMessage(ex.Message,"Biblioteka obiektów",MessageBoxButtons.OK,MessageBoxIcon.Error);}}
         LibraryIcon PickObjectGraphic(IWin32Window owner)
-        {using(var dialog=new IconPickerDialog(libraryObjects.Select(o=>o.Graphic()),IconButton,BackColor)){dialog.Text="Biblioteka obiektów — wybierz";return RunModal(()=>dialog.ShowDialog(owner))==DialogResult.OK?dialog.Chosen:null;}}
+        {return PickAssetLibrary(owner,true);}
         void SelectObjectTemplate(string id){if(FindTemplate(id)==null)return;EndCanvasGesture(true);activeObject=id;objectMaterial=true;noMaterial=false;iconMaterial=false;MaterialChosen();UpdateMaterialIndicator();canvas.Invalidate();}
         void RefreshObjectPreview(){UpdateQuickTiles(objectPreview,true);RefreshObjectSelection();}
         void RefreshObjectSelection(){if(deleteObjectButton!=null)deleteObjectButton.Enabled=objectMaterial&&FindTemplate(activeObject)!=null;if(objectPreview==null)return;foreach(Button b in objectPreview.Controls){bool selected=objectMaterial&&(string)b.Tag==activeObject;b.FlatAppearance.BorderSize=selected?3:1;b.FlatAppearance.BorderColor=selected?ChoiceStyle.ActiveBorder:Color.Gray;}}
         void OpenObjectLibrary(){var o=PickObjectGraphic(this);if(o!=null){var template=libraryObjects.First(x=>x.Id==o.Id);CurrentQuick.ObjectRefs[o.Id]=template.Copy();SelectObjectTemplate(o.Id);}}
-        void AddObjectTemplate()
+        void AddObjectTemplate(){AddObjectTemplate(this);}
+        void AddObjectTemplate(IWin32Window owner)
         {
             using(var choice=new GraphicSourceDialog("Dodaj wzorzec obiektu","ikon")){
-                if(RunModal(()=>choice.ShowDialog(this))!=DialogResult.OK)return;
-                if(!choice.FromLibrary){ImportObjectFile();return;}
-                var graphic=PickLibraryIcon(this);if(graphic!=null)SaveObjectTemplate(null,new ObjectTemplate{Name=graphic.Name,Asset=graphic.Asset},false);
+                if(RunModal(()=>choice.ShowDialog(owner))!=DialogResult.OK)return;
+                if(!choice.FromLibrary){ImportObjectFile(owner);return;}
+                var graphic=PickLibraryIcon(owner);if(graphic!=null){string error;if(!TryImportCounterpart(graphic,true,out error))ShowLibraryMessage(owner,error,"Nie można dodać obiektu",MessageBoxButtons.OK,MessageBoxIcon.Error);}
             }
         }
-        void ImportObjectFile(){using(var d=new OpenFileDialog{Title="Dodaj wzorzec obiektu",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)try{var asset=CropImportedIcon(d.FileName);if(asset==null)return;SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false);}catch(Exception ex){ShowEditorMessage(ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
-        void EditObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial){ShowEditorMessage("Zaznacz wzorzec obiektu","Edytuj obiekt",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}using(var d=new IconEditDialog(before.Graphic(),PickObjectGraphic,PickLibraryIcon,"Edytuj wzorzec obiektu")){
+        void ImportObjectFile(){ImportObjectFile(this);}
+        void ImportObjectFile(IWin32Window owner){using(var d=new OpenFileDialog{Title="Dodaj wzorzec obiektu",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})if(RunModal(()=>d.ShowDialog(owner))==DialogResult.OK)try{var asset=CropImportedIcon(d.FileName,owner);if(asset==null)return;SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false,owner);}catch(Exception ex){ShowLibraryMessage(owner,ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
+        void EditObjectTemplate(){EditObjectTemplate(this);}
+        void EditObjectTemplate(IWin32Window owner){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial){ShowLibraryMessage(owner,"Zaznacz wzorzec obiektu","Edytuj obiekt",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}using(var d=new IconEditDialog(before.Graphic(),PickObjectGraphic,PickLibraryIcon,"Edytuj wzorzec obiektu")){
                 d.SetLightDefaults(before.LightEnabled,before.LightRadius);
                 d.CanAccept = () => !d.UpdateMap || !map.Objects.Any(obj => obj.TemplateId == before.Id) || GuardLayer(MapLayer.Objects, d);
-                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
+                if (RunModal(() => d.ShowDialog(owner)) != DialogResult.OK) return;
                 var next = before.Copy();
                 next.Name = d.IconName;
                 next.Asset = d.Asset; next.LightEnabled=d.DefaultLight; next.LightRadius=d.DefaultLightRadius;
-                SaveObjectTemplate(before, next, d.UpdateMap);
+                SaveObjectTemplate(before, next, d.UpdateMap,owner);
             }}
-        void DeleteObjectTemplate(){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial)return;if(ShowEditorMessage("Usunąć wzorzec „"+before.Name+"”? Instancje na mapie pozostaną.\nBez Kosza: kopia w pamięci Undo, do 300 wpisów. Nowa/Otwórz, wypadnięcie wpisu lub zamknięcie programu usuwa możliwość cofnięcia.","Usuń wzorzec",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)SaveObjectTemplate(before,null,false);}
-        void SaveObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update){string error;if(!TryChangeObjectTemplate(before,next,update,ObjectsDirectory,out error))ShowEditorMessage(error,"Nie można zmienić wzorca",MessageBoxButtons.OK,MessageBoxIcon.Error);}
+        void DeleteObjectTemplate(){DeleteObjectTemplate(this);}
+        void DeleteObjectTemplate(IWin32Window owner){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial)return;if(ShowLibraryMessage(owner,"Usunąć wzorzec „"+before.Name+"”? Instancje na mapie pozostaną.\nBez Kosza: kopia w pamięci Undo, do 300 wpisów. Nowa/Otwórz, wypadnięcie wpisu lub zamknięcie programu usuwa możliwość cofnięcia.","Usuń wzorzec",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)SaveObjectTemplate(before,null,false,owner);}
+        void SaveObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update,IWin32Window owner){string error;if(!TryChangeObjectTemplate(before,next,update,ObjectsDirectory,out error))ShowLibraryMessage(owner,error,"Nie można zmienić wzorca",MessageBoxButtons.OK,MessageBoxIcon.Error);}
         bool TryChangeObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update,string directory,out string error)
         {
             EndCanvasGesture(true);error=null;try{

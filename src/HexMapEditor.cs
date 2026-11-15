@@ -786,8 +786,11 @@ namespace HexMapEditor
 
         DialogResult ShowEditorMessage(string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton = MessageBoxDefaultButton.Button1)
         {
-            return RunModal(() => MessageBox.Show(this, text, title, buttons, icon, defaultButton));
+            return ShowLibraryMessage(this,text,title,buttons,icon,defaultButton);
         }
+
+        DialogResult ShowLibraryMessage(IWin32Window owner,string text,string title,MessageBoxButtons buttons,MessageBoxIcon icon,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1)
+        { return RunModal(()=>MessageBox.Show(owner,text,title,buttons,icon,defaultButton)); }
 
         void EndCanvasGesture(bool commitStroke)
         {

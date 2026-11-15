@@ -55,7 +55,7 @@ namespace HexMapEditor
             terrainPicker.SelectedIndexChanged += (s, e) => { if (!updating && terrainPicker.SelectedItem != null) SelectPreset(((TerrainPreset)terrainPicker.SelectedItem).Id); };
             refreshPresetsButton = IconAction(presetPickerRow, "refresh", "Odśwież presety", () => LoadLibraryPresets(false));
             presetActions = new FlowLayoutPanel { Height = 32, WrapContents = false }; presets.Controls.Add(presetActions);
-            IconAction(presetActions, "plus", "Nowy preset", CreatePreset); renamePresetButton = IconAction(presetActions, "pencil", "Edytuj nazwę", RenamePreset); IconAction(presetActions, "save", "Zapisz preset", SavePreset); deletePresetButton = IconAction(presetActions, "trash", "Usuń preset", RemovePreset);
+            IconAction(presetActions, "plus", "Nowy preset", CreatePreset); renamePresetButton = IconAction(presetActions, "pencil", "Edytuj nazwę", RenamePreset); savePresetButton=IconAction(presetActions, "save", "Zapisz preset", SavePreset); deletePresetButton = IconAction(presetActions, "trash", "Usuń preset", RemovePreset);
             var restorePreset=IconAction(presetActions,"restore","Przywróć zapisane dane wybranych sekcji",RestorePresetSections);presetStateLabel.AutoEllipsis = true; presets.Controls.Add(presetStateLabel);
             presets.Layout += (s,e)=>{int w=presets.ClientSize.Width;LayoutFunctions(presetActions);presetActions.SetBounds(0,0,w,28);presetPickerRow.SetBounds(0,28,w,28);terrainPicker.SetBounds(2,1,w-FunctionWidth-10,24);refreshPresetsButton.SetBounds(w-FunctionWidth-2,0,FunctionWidth,26);presetStateLabel.SetBounds(0,57,w,30);};
             var terrains = Section("Tereny", 2);

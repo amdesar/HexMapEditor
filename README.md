@@ -1,10 +1,10 @@
-# HexMapEditor 0.9.1
+# HexMapEditor 0.9.2
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.9.1** zapisuje mapy w **formacie 11**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.9.2** zapisuje mapy w **formacie 11**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -13,6 +13,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
 Ta wersja odczytuje mapy 11 i presety 4/5; brak sekcji ikon/obiektów w starym presecie 4 oznacza puste zestawy. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
+
+## Poprawki bibliotek i kadru 0.9.2
+
+Biblioteki ikon i obiektów mają Importuj / Edytuj / Usuń / Zamknij. Klik zaznacza do zarządzania, dwuklik lub Enter używa zasobu; Zamknij nie zatwierdza przypadkowego wyboru. Edycja zachowuje ID, pozwala zmienić nazwę i podmienić plik przez istniejące kadrowanie. Usuwanie korzysta ze wspólnej, konflikt-safe historii sesji, bez usuwania wystąpień mapy lub osadzonych kopii presetów.
+
+Ponowny import z przeciwnej biblioteki używa trwałego odpowiednika według ID źródła, również po restarcie. Nie nadpisuje ręcznej edycji odpowiednika; dawne duplikaty nie są scalane. Wiadro ikon zatrzymuje się na granicy terenu i innego stanu ikony: puste pola, obszar tej samej innej ikony albo usuwanie wybranej ikony. Przycisk zapisu presetu świeci wspólnym niebieskim stylem tylko dla niezapisanego bieżącego presetu, niezależnie od zapisu mapy.
+
+Kwadratowy import ikon/obiektów ma kompaktowy dialog i „Obrót 0°” zerujący wyłącznie kąt. Kadr terenu pokazuje szachownicę i pełne przyciemnione otoczenie z niebieskim obrysem heksa. Zmianę istniejącej grafiki terenu można nadpisać, zapisać jako nową z własną nazwą albo anulować; wynik pozostaje wybrany. Osobna operacja biblioteczna nie przemalowuje mapy. Edycja terenu nadal stosuje dotychczasowy switch aktualizacji mapy. Okno wariantów domyślnie mieści pełne5×2 kafelki. Scrollbary pozostają natywne.
+
+Wyniki i ograniczenia celowanych prób: [raport0.9.2](docs/raport-0.9.2.md). Bez multizaznaczania, zbiorczego usuwania, migracji ani zmiany struktury Library.
 
 ## Lewy panel i presety 0.9.1
 
@@ -47,7 +57,7 @@ Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz no
 
 **Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
 
-Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.9.1 • 14.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.9.2 • 15.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 

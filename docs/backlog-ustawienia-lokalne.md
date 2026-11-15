@@ -25,7 +25,7 @@ Istniejąca [kolejka importu z folderów](backlog-import-z-folderow.md) pozostaj
 ## Po 1.0 — osobny panel preferencji
 
 - Włączenie/wyłączenie oraz interwał autozapisu; w0.7.2 pozostaje stałe5min, bez konfiguratora.
-- Preferowane wartości narzędzi i kolory.
+- Preferowane wartości narzędzi i kolory, w tym domyślne kolory rysika i wskaźnika.
 - Użytkowy domyślny preset, bez odblokowywania chronionego wzorca Domyślny.
 - Ewentualne skróty klawiszowe, zakres do osobnego ustalenia.
 - Preferencja startu edytora w maksymalizacji.

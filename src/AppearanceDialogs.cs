@@ -30,7 +30,7 @@ namespace HexMapEditor
         internal AppearancePoolDialog(string title, string initialName, List<FillVariant> fills, bool existing, bool flat, string applyCaption)
         {
             Text = title; this.flat = flat; history = new AppearanceHistory(fills); Fills = history.Current;
-            ClientSize = new Size(470, 350); MinimumSize = new Size(440, 300);
+            ClientSize = new Size(540, 430); MinimumSize = new Size(554, 469);
             StartPosition = FormStartPosition.CenterParent; Font = new Font("Segoe UI", 9);
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke;
             var header = new Panel { Dock = DockStyle.Top, Width = ClientSize.Width, Height = initialName == null ? 64 : 100 };
@@ -48,8 +48,8 @@ namespace HexMapEditor
             var footer = new Panel { Dock = DockStyle.Bottom, Width = ClientSize.Width, Height = 110 };
             apply.Text = applyCaption; apply.Enabled = existing; apply.Location = new Point(12, 8);
             apply.AutoSize=preserve.AutoSize=false;apply.Size=new Size(446,24);preserve.SetBounds(12,33,446,24);footer.Layout+=(s,e)=>{apply.Width=preserve.Width=footer.ClientSize.Width-24;}; apply.CheckedChanged += (s,e) => preserve.Enabled = apply.Checked;
-            var accept = new EditorButton { Text = "Zatwierdź", Bounds = new Rectangle(240, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
-            var cancel = new EditorButton { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(352, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            var accept = new EditorButton { Text = "Zatwierdź", Bounds = new Rectangle(ClientSize.Width-230, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            var cancel = new EditorButton { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(ClientSize.Width-118, 72, 105, 28), Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
             foreach (var button in new[] { accept, cancel }) button.MouseDown += (s,e) =>
             { if (e.Button == MouseButtons.Left) { ClosingClick = ((Control)s).PointToScreen(e.Location); ClosingClickTime = MainWindow.GetMessageTime(); } };
             accept.Click += (s, e) =>

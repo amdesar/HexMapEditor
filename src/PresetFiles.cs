@@ -19,7 +19,7 @@ namespace HexMapEditor
         }
         static string Shorten(string value, int length)
         { if (value.Length <= length) return value; if (Char.IsHighSurrogate(value[length - 1])) length--; return value.Substring(0, length).TrimEnd('.', ' '); }
-        internal static string Destination(string directory, string name, string current)
+        internal static string Destination(string directory, string name, string current, bool allowSuffix = true)
         {
             directory = Path.GetFullPath(directory); if (current != null) current = Path.GetFullPath(current); string stem = Stem(name);
             // Reserve room for AtomicWrite's GUID temporary suffix on classic .NET/Windows.
@@ -31,6 +31,7 @@ namespace HexMapEditor
                 string suffix = n == 1 ? "" : " (" + n + ")";
                 string path = Path.Combine(directory, Shorten(stem, limit - suffix.Length) + suffix + Extension);
                 if (!occupied.Any(p => String.Equals(p, path, StringComparison.OrdinalIgnoreCase) && !String.Equals(p, current, StringComparison.OrdinalIgnoreCase))) return path;
+                if(!allowSuffix)throw new IOException("Nazwa pliku jest już używana. Podaj inną nazwę; nie nadpisano pliku.");
             }
             throw new IOException("Zbyt wiele kolizji nazw plików presetów. Nie nadpisano żadnego pliku.");
         }

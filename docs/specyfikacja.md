@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja 2.6. Stan decyzji 12 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.6.1. Pierwszeństwo mają ustalenia sekcji 36, pozostałe wcześniejsze sekcje opisują historię uzgodnień.
+Wersja 2.6. Stan decyzji 15 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.9.2. Pierwszeństwo mają ustalenia sekcji 49, pozostałe wcześniejsze sekcje opisują historię uzgodnień.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1004,4 +1004,23 @@ Dotykane formularze nazw korzystają z pionowo centrowanego natywnego pola jedno
 
 Import z pliku ikony/obiektu (również podmiana grafiki w ich edytorze): walidacja źródła→kwadratowy draft kadru→zatwierdzenie. Początek mieści cały obraz. Przeciąganie przesuwa, kółko skaluje, suwak obraca. Podgląd kadru560×560 przy100% jest większy od wyniku512×512 i pokazuje przyciemnione otoczenie. Używa niezmienionej transformacji/rysowania CropMath; kadrowanie heksagonalne nie jest przerobione. Wyjście PNG ARGB zachowuje alpha i tylko wnętrze kwadratu; źródło oryginalne nie jest zapisywane ani zmieniane. Anuluj nie tworzy wpisu. Pełny bitmap istnieje tylko podczas draftu i jest Dispose przy zamknięciu; w bibliotece pozostaje istniejący IconAsset. Limity wejścia8MiB/2048×2048 i istniejące budżety bibliotek/dokumentu bez zwiększania. Nie jest to funkcja ponownego kadrowania zapisanych zasobów ani kolejka importu.
 
-Wyniki, zakres zwykłego EXE i ograniczenia stanowiska: [raport0.9.1](raport-0.9.1.md). Zmieniona kolejność przyszłych etapów: [plan wydań](plan-wersji.md); zbiorcze usuwanie0.9.2, instalacja/aktualizator0.12, źródła/kolejka0.13. Bez implementacji tych backlogów.
+Wyniki, zakres zwykłego EXE i ograniczenia stanowiska: [raport0.9.1](raport-0.9.1.md). Zmieniona kolejność przyszłych etapów: [plan wydań](plan-wersji.md); zbiorcze usuwanie odłożone bez numeru, instalacja/aktualizator0.12, źródła/kolejka0.13. Bez implementacji tych backlogów.
+## 49. Wersja 0.9.2 — pojedyncze operacje bibliotek i kadrowanie
+
+Ta sekcja zastępuje sprzeczne wcześniejsze propozycje zbiorczego usuwania0.9.2. Biblioteki ikon/obiektów zachowują istniejące formaty i handlery. Cztery przyciski: Importuj, Edytuj, Usuń, Zamknij. Klik wybiera pozycję do zarządzania; dwuklik albo Enter na kafelku używa jej w rodzicu. Samo zamknięcie nie zatwierdza zaznaczenia. Edytuj/Usuń bez pozycji są disabled. Import zachowuje wybór plik/przeciwna biblioteka; podmiana pliku korzysta z istniejącej walidacji i kwadratowego kadru. Aktywny modalny picker jest właścicielem dialogów potomnych i ostrzeżeń.
+
+Konwersja obiekt→ikona otrzymuje ID `from-object-`+SHA256 pełnego ID źródła, odwrotna `from-icon-`+SHA256. To istniejące pole ID, bez nowego schematu/metadanych pochodzenia. Pierwszy import tworzy pozycję; kolejne używają zapisanego odpowiednika bez zmiany jego ręcznej nazwy/grafiki. Działa po restarcie; po faktycznym usunięciu możliwe ponowne utworzenie. Brak deduplikacji po nazwie, scalania dawnych losowych kopii i ogólnego porządkowania bibliotek. Quick nadal unikalne24/12.
+
+Usuwanie korzysta z istniejącego LibraryChange/LibraryFiles, kontroli bajtów pliku i globalnego Undo/Redo sesji. Dopiero sukces usuwa ID z roboczych szybkich list i rezerw. Mapa zachowuje źródła i wystąpienia, zapisane presety osadzone kopie; operacja nie przepisuje presetów ani nie oznacza ich dirty. Ostrzeżenie informuje o pominięciu Kosza i granicach odzyskania sesyjnego. PPM kafelka nadal tylko usuwa z quick.
+
+Wiadro ikon zachowuje dotychczasowe granice terenu/wariantu i sąsiedztwo, dodatkowo porównując zamrożony stan `IconEntryId` (awaryjnie `IconId`), null gdy brak ikony. Pusty start obejmuje tylko połączone puste pola; start na innej ikonie zastępuje tylko obszar tej tożsamości; start na wybranej usuwa połączony obszar tej ikony. Stan maluj/usuń i stan startowy są stałe w geście. Jeden gest pozostaje jednym krokiem historii. Inne wiadra bez zmiany.
+
+Przycisk Zapisz preset korzysta wyłącznie z istniejącego WorkingPresetDirty bieżącego presetu. Niebieski ChoiceStyle odpowiada statusowi po zmianie, zapisie częściowym/pełnym, restore i przełączeniu. Inny draft nie podświetla czystego bieżącego. Stan mapy/górnego zapisu pozostaje niezależny.
+
+Kwadratowe kadrowanie: klient640×660 przy100%, widoczny kadr520×520 i otoczenie, wynik512×512 ARGB. Obrót0° nie zmienia pan/zoom. Teren: dotychczasowy klient640×590 i heks, szachownica oraz pełne otoczenie zamiast przycięcia do kwadratu, niebieski obrys. Wspólny CropPreview przelicza tylko rysowanie otoczenia; CropMath i dane transformacji nie są zmieniane. Alpha, contain, budżety8MiB/2048² dla ikon/obiektów i dotychczasowe limity terenu pozostają.
+
+Zmieniony kadr istniejącej grafiki bibliotecznej: nadpisz wskazaną pozycję, nowa z wpisaną nazwą albo Anuluj. Tożsamość wyboru pamiętana słabo w sesji; dla osadzonego wyglądu dopasowanie dokładnych danych, bez podobieństwa/nazwy. W razie wielu identycznych pozycji użytkownik wskazuje cel nadpisania. Nowa pozycja nie otrzymuje automatycznego sufiksu; kolizja nazwy/ścieżki lub obca zmiana pliku pozostawia stary wpis. Zwracany kadr jest bieżącym wyborem formularza. Bezpośrednia edycja biblioteki nie propaguje do terenów/heksów. W edycji terenu aktualizacja mapy i zachowanie rozmieszczenia pozostają dotychczasową jawną transakcją. Zatwierdzony zapis biblioteczny jest osobną operacją sesyjnej historii; późniejsze Anuluj rodzica nie cofa wykonanej operacji plikowej, lecz odrzuca jego draft.
+
+Obszar wariantów terenu: klient540×430, pięć pełnych kolumn i dwa rzędy kafelków88px z marginesem4px (krok96), paddingiem i rezerwą na natywny scrollbar. Dalsze warianty przewijane. Cztery wskazane scrollbary pozostają systemowe: brak istniejącej prostej wspieranej kolorystyki, bez własnego przewijania i globalnego hooka.
+
+Aplikacja0.9.2, FileVersion/ProductVersion0.9.2.0. Map11/preset5, odczyt preset4 i formaty bibliotek bez zmian; brak migracji, zwiększenia limitów i zmian prywatnych danych. Zakres testów i ograniczenia: [raport0.9.2](raport-0.9.2.md). Zaakceptowane ramka, lewy panel, figury, WPF, gumka i autozapis nie są ponownie przebudowywane.

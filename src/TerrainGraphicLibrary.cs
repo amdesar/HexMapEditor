@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -123,12 +123,12 @@ namespace HexMapEditor
             return LibrarySequence.Sort(items, i => i.LibraryOrder, i => i.Id).ToList();
         }
 
-        internal static TerrainGraphic Prepare(string directory, TerrainGraphic before, string name, GraphicDefinition asset, IEnumerable<TerrainGraphic> entries)
+        internal static TerrainGraphic Prepare(string directory, TerrainGraphic before, string name, GraphicDefinition asset, IEnumerable<TerrainGraphic> entries, bool allowSuffix = true)
         {
             if (before == null && entries.Count() >= GraphicLimits.LibraryEntries) throw new InvalidDataException("Limit 128 aktywnych grafik biblioteki.");
             TerrainTextures.Validate(asset);
             GraphicSources.Collect(entries.Where(e => before == null || e.Id != before.Id).Select(e => e.Asset.Source).Concat(new[] { asset.Source }), true);
-            var path = PresetFiles.Destination(directory, "terrain-" + PresetFiles.Stem(name), before == null ? null : before.Path);
+            var path = PresetFiles.Destination(directory, "terrain-" + PresetFiles.Stem(name), before == null ? null : before.Path, allowSuffix);
             if (!Path.GetFileName(path).StartsWith("terrain-", StringComparison.Ordinal))
                 throw new IOException("Za długa ścieżka biblioteki grafik terenów.");
             var item = new TerrainGraphic
@@ -181,7 +181,7 @@ namespace HexMapEditor
                 if (import)
                 {
                     var entry = ImportTerrainGraphic(owner);
-                    return entry == null ? null : entry.Asset.DocumentCopy();
+                    return entry == null ? null : RememberGraphic(entry);
                 }
                 using (var picker = new TerrainGraphicPicker(() => terrainGraphics, map.Orientation == "FlatTop", manage))
                 {
@@ -193,7 +193,7 @@ namespace HexMapEditor
                             "Usuń grafikę terenu", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
                             ChangeTerrainGraphic(item, null);
                     };
-                    return picker.ShowDialog(owner) == DialogResult.OK ? picker.Selected.Asset.DocumentCopy() : null;
+                    return picker.ShowDialog(owner) == DialogResult.OK ? RememberGraphic(picker.Selected) : null;
                 }
             }
             catch (Exception ex)
@@ -249,7 +249,12 @@ namespace HexMapEditor
         }
 
         GraphicDefinition ShowTerrainCrop(IWin32Window owner, GraphicDefinition graphic)
-        { return OpenTerrainCrop(owner, graphic, false); }
+        {try{
+            if(terrainGraphics==null){string warning;terrainGraphics=TerrainGraphicLibrary.Load(LibraryPaths.TerrainGraphics,out warning);if(warning.Length>0)MessageBox.Show(owner,warning,"Pominięte grafiki terenów",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            var changed=OpenTerrainCrop(owner,graphic,false);if(changed==null||TerrainTextures.Same(changed,graphic))return changed;
+            GraphicOrigin origin;var targets=graphicOrigins.TryGetValue(graphic,out origin)?terrainGraphics.Where(t=>t.Id==origin.Id).ToArray():terrainGraphics.Where(t=>TerrainTextures.Same(t.Asset,graphic)).ToArray();
+            if(targets.Length==0)return changed;var saved=SaveCroppedGraphic(owner,targets,changed,targets[0].Name);return saved==null?null:RememberGraphic(saved);
+        }catch(Exception ex){MessageBox.Show(owner,ex.Message,"Nie można zapisać kadru",MessageBoxButtons.OK,MessageBoxIcon.Warning);return null;}}
         GraphicDefinition OpenTerrainCrop(IWin32Window owner, GraphicDefinition graphic, bool newImport)
         {
             using (var crop = new TerrainCropDialog(graphic, map.Orientation == "FlatTop", newImport))
@@ -263,10 +268,11 @@ namespace HexMapEditor
                 dialog.ChooseImage = useCrop =>
                 {
                     if (!useCrop) return CropTerrainFile(dialog);
-                    return ShowTerrainCrop(dialog, dialog.Asset);
+                    return OpenTerrainCrop(dialog, dialog.Asset, false);
                 };
                 if (dialog.ShowDialog(owner) != DialogResult.OK) return item;
                 if (dialog.GraphicName == item.Name && dialog.Asset.Id == item.Asset.Id) return item;
+                if(dialog.Asset.Id!=item.Asset.Id)return SaveCroppedGraphic(owner,new[]{item},dialog.Asset,dialog.GraphicName)??item;
                 var next = TerrainGraphicLibrary.Prepare(LibraryPaths.TerrainGraphics, item, dialog.GraphicName, dialog.Asset, terrainGraphics);
                 ChangeTerrainGraphic(item, next);
                 return next;

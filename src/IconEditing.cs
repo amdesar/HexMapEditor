@@ -15,7 +15,7 @@ namespace HexMapEditor
         readonly HashSet<int> strokeVisited = new HashSet<int>();
         readonly HashSet<int> bucketProcessed = new HashSet<int>();
         HashSet<int> protectedFogCells=new HashSet<int>();
-        RegionState[] bucketOrigin;
+        RegionState[] bucketOrigin;string bucketIcon;
         PointF? previousStrokePoint;
         bool strokeDark, strokeDarkValue;
         bool iconMaterial, strokeIcons, strokeFog, strokeRemoveIcon, strokeFogValue, strokeStarted;
@@ -44,51 +44,54 @@ namespace HexMapEditor
         {
             var source = AssetBitmap(asset.Asset, true); var thumbnail = new Bitmap(28, 28); float factor = Math.Min(28f / source.Width, 28f / source.Height);
             using (var g = Graphics.FromImage(thumbnail)) g.DrawImage(source, (28 - source.Width * factor) / 2, (28 - source.Height * factor) / 2, source.Width * factor, source.Height * factor);
-            var button = new Button { Width = 46, Height = 32, Image = thumbnail, FlatStyle = FlatStyle.Flat, Tag = asset.Id, AccessibleName = "Ikona: " + asset.Name, Margin = new Padding(1) };
+            var button = new ResourceTileButton { Width = 46, Height = 32, Image = thumbnail, FlatStyle = FlatStyle.Flat, Tag = asset.Id, AccessibleName = "Ikona: " + asset.Name, Margin = new Padding(1) };
             StyleButton(button); tips.SetToolTip(button, asset.Name); button.Click += (s, e) => choose(); button.Disposed += (s, e) => { if (button.Image != null) button.Image.Dispose(); }; return button;
         }
         void RefreshIconPreview(){UpdateQuickTiles(iconPreview,false);RefreshIconSelection();UpdateMaterialIndicator();}
         void RefreshIconSelection()
         { if (iconPreview == null) return; foreach (Button b in iconPreview.Controls) { bool chosen = iconMaterial && (string)b.Tag == activeIcon; b.FlatAppearance.BorderSize = chosen ? 3 : 1; b.FlatAppearance.BorderColor = chosen ? ChoiceStyle.ActiveBorder : Color.Gray; } if (deleteIconButton != null) deleteIconButton.Enabled = iconMaterial && activeIcon != null && FindIcon(activeIcon)!=null; }
-        void ImportIcon()
+        void ImportIcon(){ImportIcon(this);}
+        void ImportIcon(IWin32Window owner)
         {
             using(var choice=new GraphicSourceDialog("Dodaj ikonę","obiektów")){
-                if(RunModal(()=>choice.ShowDialog(this))!=DialogResult.OK)return;
-                if(choice.FromLibrary){var graphic=PickObjectGraphic(this);if(graphic!=null){string error;if(!TryChangeLibraryIcon(null,new LibraryIcon{Name=graphic.Name,Asset=graphic.Asset},false,Path.Combine(LibraryPaths.Root,"Icons"),out error))ShowEditorMessage(error,"Nie można dodać ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);}return;}
+                if(RunModal(()=>choice.ShowDialog(owner))!=DialogResult.OK)return;
+                if(choice.FromLibrary){var graphic=PickObjectGraphic(owner);if(graphic!=null){string error;if(!TryImportCounterpart(graphic,false,out error))ShowLibraryMessage(owner,error,"Nie można dodać ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);}return;}
             }
             using (var dialog = new OpenFileDialog { Title = "Dodaj ikonę", Filter = "Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif", RestoreDirectory = true })
             {
-                if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;
+                if (RunModal(() => dialog.ShowDialog(owner)) != DialogResult.OK) return;
                 try
                 {
-                    var asset = CropImportedIcon(dialog.FileName);if(asset==null)return; string error;
+                    var asset = CropImportedIcon(dialog.FileName,owner);if(asset==null)return; string error;
                     if (!TryChangeLibraryIcon(null, new LibraryIcon { Name = asset.Name, Asset = asset }, false, Path.Combine(LibraryPaths.Root,"Icons"), out error)) throw new IOException(error);
-                }                catch (Exception ex) { ShowEditorMessage("Import nie powiódł się; mapa nie została zmieniona.\n" + ex.Message, "Import ikony", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                }                catch (Exception ex) { ShowLibraryMessage(owner,"Import nie powiódł się; mapa nie została zmieniona.\n" + ex.Message, "Import ikony", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             }
         }
-        void DeleteLibraryIcon()
+        void DeleteLibraryIcon(){DeleteLibraryIcon(this);}
+        void DeleteLibraryIcon(IWin32Window owner)
         {
             var entry = iconMaterial ? libraryIcons.FirstOrDefault(a => a.Id == activeIcon) : null; if (entry == null) return;
-            if (ShowEditorMessage("Usunąć ikonę „" + entry.Name + "” z biblioteki?\nMapy zachowają swoje zasoby. Undo w tej sesji przywróci pozycję i plik z kopii w pamięci.\nPlik nie trafia do Kosza. Nowa/Otwórz lub zamknięcie programu usuwa tę historię.", "Usuń ikonę", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            string error; if (!TryChangeLibraryIcon(entry, null, false, Path.GetDirectoryName(entry.FilePath), out error)) ShowEditorMessage(error,"Nie można usunąć ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);
+            if (ShowLibraryMessage(owner,"Usunąć ikonę „" + entry.Name + "” z biblioteki?\nMapy zachowają swoje zasoby. Undo w tej sesji przywróci pozycję i plik z kopii w pamięci.\nPlik nie trafia do Kosza. Nowa/Otwórz lub zamknięcie programu usuwa tę historię.", "Usuń ikonę", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            string error; if (!TryChangeLibraryIcon(entry, null, false, Path.GetDirectoryName(entry.FilePath), out error)) ShowLibraryMessage(owner,error,"Nie można usunąć ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);
         }
-        void EditLibraryIcon()
+        void EditLibraryIcon(){EditLibraryIcon(this);}
+        void EditLibraryIcon(IWin32Window owner)
         {
             var entry = iconMaterial ? libraryIcons.FirstOrDefault(a => a.Id == activeIcon) : null;
-            if (entry == null) { ShowEditorMessage("Zaznacz ikonę", "Edytuj ikonę", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (entry == null) { ShowLibraryMessage(owner,"Zaznacz ikonę", "Edytuj ikonę", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             using (var d = new IconEditDialog(entry, PickLibraryIcon, PickObjectGraphic))
             {
                 d.CanAccept = () => !d.UpdateMap || !map.Cells.Any(c => c.IconId != null && (c.IconEntryId ?? c.IconId) == entry.Id) || GuardLayer(MapLayer.Icons, d);
-                if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
+                if (RunModal(() => d.ShowDialog(owner)) != DialogResult.OK) return;
                 var next = entry.Copy(); next.Name = d.IconName; next.Asset = d.Asset; string error;
                 clearAfterIconEdit=true;
-                try { if (!TryChangeLibraryIcon(entry,next,d.UpdateMap,Path.GetDirectoryName(entry.FilePath),out error)) ShowEditorMessage(error,"Nie można edytować ikony",MessageBoxButtons.OK,MessageBoxIcon.Error); else ClearIconMaterial(); }
+                try { if (!TryChangeLibraryIcon(entry,next,d.UpdateMap,Path.GetDirectoryName(entry.FilePath),out error)) ShowLibraryMessage(owner,error,"Nie można edytować ikony",MessageBoxButtons.OK,MessageBoxIcon.Error); else ClearIconMaterial(); }
                 finally { clearAfterIconEdit=false; }
             }
         }
         LibraryIcon PickLibraryIcon(IWin32Window owner)
         {
-            using (var dialog = new IconPickerDialog(libraryIcons, IconButton, BackColor)) return RunModal(() => dialog.ShowDialog(owner)) == DialogResult.OK ? dialog.Chosen : null;
+            return PickAssetLibrary(owner,false);
         }
         void OpenIconLibrary() { var chosen = PickLibraryIcon(this); if (chosen != null){CurrentQuick.IconRefs[chosen.Id]=chosen.Copy(); SelectIcon(chosen.Id);} }
         MapData MapForSave(){return MapForSave(map);}
@@ -106,7 +109,7 @@ namespace HexMapEditor
             strokeFog = tool == EditorTool.FogBrush || tool == EditorTool.FogBucket; strokeDark = tool==EditorTool.DarkBrush||tool==EditorTool.DarkBucket; strokeIcons = !strokeFog && !strokeDark && iconMaterial;
             protectedFogCells=strokeFog?EffectiveFogCoverage(map):new HashSet<int>();
             var entry = FindIcon(activeIcon); strokeAsset = entry == null ? null : entry.Asset; strokeIcon = strokeAsset == null ? null : strokeAsset.Id; strokeEntry = entry == null ? null : entry.Id; strokeName = entry == null ? null : entry.Name;
-            strokeRemoveIcon = strokeIcons && strokeIcon != null && (map.Cells[start].IconEntryId ?? map.Cells[start].IconId) == strokeEntry; strokeFogValue = !map.Cells[start].Fog; strokeDarkValue=!map.Cells[start].Darkness;
+            bucketIcon=map.Cells[start].IconId==null?null:(map.Cells[start].IconEntryId??map.Cells[start].IconId); strokeRemoveIcon = strokeIcons && strokeIcon != null && (map.Cells[start].IconEntryId ?? map.Cells[start].IconId) == strokeEntry; strokeFogValue = !map.Cells[start].Fog; strokeDarkValue=!map.Cells[start].Darkness;
         }
         void PaintMaterial(int index)
         {
@@ -136,8 +139,8 @@ namespace HexMapEditor
         void PaintStampAt(Point mouse){foreach(int i in StampAt(mouse))PaintMaterial(i);}
         void VisitBucketRegion(int start)
         {
-            if (bucketOrigin == null || bucketProcessed.Contains(start)) return;
-            var region = MapLogic.Flood(map, start, bucketOrigin, strokeFog, strokeDark);
+            if (bucketOrigin == null || bucketProcessed.Contains(start) || strokeIcons&&bucketOrigin[start].Icon!=bucketIcon) return;
+            var region = MapLogic.Flood(map, start, bucketOrigin, strokeFog, strokeDark, strokeIcons);
             foreach (int index in region) bucketProcessed.Add(index);
             // Passing over opposite fog does not reverse the mode fixed at gesture start.
             if (strokeFog && bucketOrigin[start].Fog == strokeFogValue || strokeDark && bucketOrigin[start].Darkness == strokeDarkValue) return;

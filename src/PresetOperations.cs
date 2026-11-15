@@ -10,7 +10,7 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         string pickerSignature, paletteSignature;
-        Button deletePresetButton;
+        Button deletePresetButton,savePresetButton;
         TerrainPreset ActivePreset() { return map.Presets.First(p => p.Id == map.ActivePresetId); }
         bool PresetReadOnly { get { return map.ActivePresetId == PresetCatalog.DefaultId; } }
         List<TerrainPreset> AvailablePresets()
@@ -81,7 +81,7 @@ namespace HexMapEditor
             var p = ActivePreset(); var stored = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
             if (renamePresetButton != null) renamePresetButton.Enabled = !PresetReadOnly;
             if (addTerrainButton != null) addTerrainButton.Enabled = !PresetReadOnly;
-            bool differs = WorkingPresetDirty(p);
+            bool differs = WorkingPresetDirty(p); if(savePresetButton!=null)ChoiceStyle.Apply(savePresetButton,differs);
             string status = p.Id == PresetCatalog.DefaultId ? (differs ? "Kopia robocza wzorca Domyślny *" : "Domyślny: chroniony wzorzec") : stored == null ? "Preset niezapisany w bibliotece" : differs ? "Paleta różni się od zapisanego presetu *" : "Paleta zgodna z zapisanym presetem";
             presetStateLabel.Text = status; presetStateLabel.ForeColor = differs ? Color.FromArgb(244,113,113) : ForeColor; tips.SetToolTip(presetStateLabel, status + "\nNazwa robocza: " + p.Name); presetStateLabel.AccessibleName = status;
             if (deletePresetButton != null) { deletePresetButton.Enabled = p.Id != PresetCatalog.DefaultId && stored != null; tips.SetToolTip(deletePresetButton, p.Id == PresetCatalog.DefaultId ? "Chronionego wzorca Domyślny nie można usunąć." : stored == null ? "Ten roboczy preset nie ma pliku w bibliotece." : "Usuń własny preset z biblioteki; dane mapy pozostaną."); }

@@ -234,14 +234,14 @@ namespace HexMapEditor
         }
         public static List<int> Flood(MapData map, int start, bool byColor = false)
         { return Flood(map, start, map.Cells.Select(c => new RegionState(c)).ToArray(), byColor); }
-        public static List<int> Flood(MapData map, int start, RegionState[] original, bool fog, bool dark = false)
+        public static List<int> Flood(MapData map, int start, RegionState[] original, bool fog, bool dark = false, bool icons = false)
         {
             var result = new List<int>(); if (start < 0 || start >= map.Cells.Count) return result;
             var seed = original[start]; var visited = new bool[map.Cells.Count]; var pending = new Queue<int>(); pending.Enqueue(start); visited[start] = true;
             while (pending.Count != 0)
             {
                 int current = pending.Dequeue(); result.Add(current);
-                foreach (int next in Neighbors(map, current)) if (!visited[next] && original[next].TerrainId == seed.TerrainId && original[next].Variant == seed.Variant && (!fog || original[next].Fog == seed.Fog) && (!dark || original[next].Darkness == seed.Darkness)) { visited[next] = true; pending.Enqueue(next); }
+                foreach (int next in Neighbors(map, current)) if (!visited[next] && original[next].TerrainId == seed.TerrainId && original[next].Variant == seed.Variant && (!fog || original[next].Fog == seed.Fog) && (!dark || original[next].Darkness == seed.Darkness) && (!icons || original[next].Icon == seed.Icon)) { visited[next] = true; pending.Enqueue(next); }
             }
             return result;
         }

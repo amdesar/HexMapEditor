@@ -11,7 +11,7 @@
 | 0.8.3 | Split zoomu, wyrównanie pól nazw, warunkowe przełączanie zasobów na pędzel i jasne strzałki podmenu |
 | 0.9.0 | Lewy panel 4×3 / 2×6, obracane figury, presety trzech sekcji, robocze wersje i szybki dostęp 24/12; niebieskie oznaczenia wyboru |
 | 0.9.1 | Poprawki kompaktowego lewego panelu, panel z aktualnego presetu biblioteki, częściowe zamykanie, kosz quick/biblioteka i kwadratowe kadrowanie importu ikon/obiektów |
-| 0.9.2 / kolejne 0.9.x | Zbiorcze usuwanie z bibliotek; dalszy zakres okien bibliotek do uzgodnienia |
+| 0.9.2 | Pojedyncze Importuj/Edytuj/Usuń w bibliotekach ikon i obiektów, trwały odpowiednik konwersji, wiadro ikon, sygnał zapisu presetu i kadrowanie; bez zbiorczego usuwania |
 | 0.10.0 | Prawy panel i opisy z obrazami |
 | 0.11.0 | Niezależne mapy w zakładkach; lokalizacja do ponownej oceny na tym etapie |
 | 0.12.0 | Instalacja / aktualizator; lokalny układ z resetem/fallback pozostaje osobnym uzgodnionym zakresem ustawień |
@@ -42,3 +42,7 @@ Do zaprojektowania w 0.12.0 po wykryciu dostępnej aktualizacji: A — link do k
 Oddzielny panel: interwał/włączenie autozapisu, preferowane wartości i kolory, użytkowy domyślny preset, konfigurowalne skróty z alternatywnymi kombinacjami i kontrolą konfliktów oraz preferencja uruchamiania w maksymalizacji. To inny zakres niż zapis układu/kolumn/paneli z resetem i fallback w 0.12.0. Przy reworku góry0.8 można przewidzieć przyszłe wejście; teraz bez aktywnego pustego okna i bez zmiany chronionego Domyślnego. Szczegóły: [backlog ustawień](backlog-ustawienia-lokalne.md). High/Low nadal wyłącznie sesyjny.
 
 Aktualizacja kolejności po odbiorze 0.9.0: 0.9.x poprawki/biblioteki → 0.10 prawy panel → 0.11 zakładki → 0.12 instalacja/aktualizator → 0.13 źródła/kolejka importu. Starsze numery w historycznych raportach opisują wcześniejszy plan. W 0.9.1 żaden późniejszy etap nie jest wdrożony.
+
+## Ustalenia po odbiorze 0.9.1 / zakres 0.9.2
+
+Zbiorcze usuwanie zostało odłożone **bez nowego numeru wersji**; nie jest funkcją0.9.2. Nie zmieniamy kolejności0.10→0.11→0.12→0.13. Dalsze szczegóły i kosmetyka: [backlogUI](backlog-ui-po-0.8.md). Oryginalne pliki grafik w oryginalnym formacie i późniejsze ponowne kadrowanie należą do0.13. Domyślne kolory rysika/wskaźnika pozostają przyszłymi preferencjami.
