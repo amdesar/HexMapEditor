@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja 2.6. Stan decyzji 20 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.9.3. Pierwszeństwo mają ustalenia sekcji 50, pozostałe wcześniejsze sekcje opisują historię uzgodnień.
+Wersja 2.7. Stan decyzji 20 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.10.0. Ustalenia sekcji 51 mają pierwszeństwo w zakresie prawego panelu, grup i formatu mapy.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1030,3 +1030,19 @@ Aplikacja0.9.2, FileVersion/ProductVersion0.9.2.0. Map11/preset5, odczyt preset4
 Jawna zmiana zawartości widocznej sekcji Ikony lub Obiekty zapisuje jej roboczą migawkę sesyjną. Dotyczy importu do zestawu i polecenia usunięcia z szybkiego dostępu. Samo używanie zasobu, przesunięcie bez zmiany zawartości, zapis wyłącznie do biblioteki i automatyczne czyszczenie po bibliotecznym usunięciu nie tworzą takiej zmiany. Status, styl przycisku i pytanie przed zamknięciem używają tego samego porównania bieżącego draftu z biblioteką. Zapis/restore rozlicza wybrane sekcje, stan zapisu mapy jest niezależny. Chroniony Domyślny pozwala zapisać roboczy zestaw jako kopię.
 
 Etykieta wersji wykonującej ostatni zapis mapy jest odłożona. Istniejące Map11 i historia ścieżek nie zawierają takiej metadanej. Map11, preset5 i formaty bibliotek zachowane. [Raport 0.9.3](raport-0.9.3.md).
+
+## 51. Wersja 0.10.0 — szczegóły heksa, obiektu i grupy
+
+Prawy panel ma trzy widoki. „Dostosuj” i „Zamknij” na pasku szybkich poleceń są dostępne również przy zwiniętym panelu. Zwijanie zachowuje zaznaczenie i wybraną szerokość. Zmiana zaznaczenia aktualizuje zawartość bez rozwijania. „Dostosuj” zapamiętuje domyślną szerokość 440, a „Zamknij” czyści zaznaczenie i stan zwinięcia. Ołówek edytuje nazwę w miejscu. Enter zatwierdza w jednym kroku historii. Escape i zmiana zaznaczenia odrzucają draft.
+
+Heks pokazuje współrzędne, własną nazwę, teren, ikonę oraz podgląd bez obiektów. Lista obiektów obejmuje punkty położenia wewnątrz heksa oraz obiekty, których widoczna grafika zajmuje co najmniej 20% jego powierzchni. Pomiar w układzie mapy bierze obszar przekształconych pikseli źródłowych o alfie od 96 i część ich powierzchni wspólną z heksagonem. Nadal obowiązują warstwy i maskowanie danych. Miniatury przechodzą do szczegółów obiektu.
+
+Opis heksa zachowuje swój edytor i ma zawijany pasek ikon. Powiększenie opisu ukrywa pozostałe sekcje w tym samym panelu. Wstawianie pliku PNG/JPEG i obsługiwane reprezentacje schowka osadzają grafiki w treści. RTF z wbudowanym PNG/JPEG oraz HTML z danymi obrazu mogą zachować kolejność tekst–obraz–tekst. „Wklej jako zwykły tekst” wstawia wyłącznie tekst. Zewnętrzne odwołania nie są pobierane. Szerokość obrazu zmienia się proporcjonalnie, w zakresie 24–900 jednostek logicznych.
+
+Widok obiektu pokazuje teren pod punktem położenia, stan „Brak terenu” dla niepomalowanego heksa albo „Poza mapą”. Linki między członkiem i grupą zmieniają zaznaczenie. Rozmiar indywidualny 8–1024 ma skróty ×2, ÷2 i reset do 30. Wiersze mgły i widzenia pokazują promień po włączeniu odpowiedniej funkcji. Wartości indywidualne są dostępne również przy aktywnej nakładce grupowej.
+
+Macierz grupy przechowuje osobne wybory członka dla stanu, rozmiaru, odkrywania mgły, pola widzenia i blokady ruchu. Off zachowuje indywidualną wartość, On stosuje grupową, także jeśli jest wyłączona. Nowe członkostwo zaczyna od Off. Klik nagłówka włącza kolumnę dla wszystkich, a przy wszystkich On wyłącza ją. Rozmiar Wspólny ustawia jedną wartość, Przesunięcie dodaje podpisaną różnicę do każdej wartości indywidualnej z limitem 8–1024. Reset ustawia odpowiednio 30 lub 0. Obliczenia mapy używają tych samych reguł co panel.
+
+Odłączenie i rozwiązanie zachowują obiekty na mapie. Można pozostawić wartości indywidualne, zachować bieżące wynikowe albo wybrać je właściwość po właściwości dla poszczególnych obiektów. Usunięcie grupy usuwa jej wystąpienia z mapy. Zatwierdzone operacje są pojedynczymi krokami historii.
+
+Map12 zapisuje i waliduje macierz grupy oraz obrazy opisu. Starsze formaty map są odrzucane z komunikatem. Zapis presetów nadal używa formatu 5, a formaty bibliotek pozostają dotychczasowe. [Raport 0.10.0](raport-0.10.0.md).

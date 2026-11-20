@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Forms.Integration;
 using Forms = System.Windows.Forms;
 
@@ -24,6 +25,8 @@ namespace HexMapEditor
         public bool Strike { get; set; }
         public string Alignment { get; set; }
         public string Marker { get; set; }
+        public string Png { get; set; }
+        public double DisplayWidth { get; set; }
         public int Start { get; set; }
         public List<RichNode> Children { get; set; }
         public RichNode() { Children = new List<RichNode>(); Size = 12; Start = 1; }
@@ -43,11 +46,17 @@ namespace HexMapEditor
             if (json == null || json.Length > MaxCharacters) throw new InvalidDataException("Opis przekracza limit 2 Mi znaków modelu dokumentu.");
             var doc = MapLogic.Serializer().Deserialize<RichDocument>(json);
             if (doc == null || doc.SchemaVersion != 1 || doc.Blocks == null) throw new InvalidDataException("Nieobsługiwany model opisu.");
-            int count = 0; foreach (var node in doc.Blocks) Validate(node, "block", 0, ref count); return doc;
+            int count = 0, images=0; foreach (var node in doc.Blocks) Validate(node, "block", 0, ref count,ref images); return doc;
         }
-        static void Validate(RichNode node, string context, int depth, ref int count)
+        static void Validate(RichNode node, string context, int depth, ref int count,ref int images)
         {
             if (node == null || node.Children == null || depth > 32 || ++count > 20000 || Double.IsNaN(node.Size) || Double.IsInfinity(node.Size) || node.Size < 1 || node.Size > 400) throw new InvalidDataException("Nieprawidłowy lub zbyt złożony opis.");
+            if(context=="inline"&&node.Kind=="image")
+            {
+                if(++images>NoteImages.MaxPerNote||node.Children.Count!=0)throw new InvalidDataException("Limit 12 obrazów w opisie.");
+                NoteImages.Validate(node);
+                return;
+            }
             string child;
             if (context == "inline" && (node.Kind == "run" || node.Kind == "break")) { if (node.Children.Count != 0) throw new InvalidDataException("Nieprawidłowy tekst."); return; }
             if (context == "block" && node.Kind == "paragraph") child = "inline";
@@ -58,7 +67,7 @@ namespace HexMapEditor
             else if (context == "cell" && node.Kind == "cell") child = "block";
             else throw new InvalidDataException("Niedozwolony element opisu: " + node.Kind);
             if (node.Alignment != null && !new[] { "Left", "Center", "Right", "Justify" }.Contains(node.Alignment)) throw new InvalidDataException("Nieprawidłowe wyrównanie.");
-            foreach (var n in node.Children) Validate(n, child, depth + 1, ref count);
+            foreach (var n in node.Children) Validate(n, child, depth + 1, ref count,ref images);
         }
         public static string Write(FlowDocument doc)
         {
@@ -119,6 +128,9 @@ namespace HexMapEditor
                     output.Add(new RichNode { Kind = "run", Text = run.Text, Size = Math.Max(1, Math.Min(400, run.FontSize)), Bold = run.FontWeight.ToOpenTypeWeight() >= 600, Italic = run.FontStyle == FontStyles.Italic || run.FontStyle == FontStyles.Oblique, Underline = run.TextDecorations.Any(d => d.Location == TextDecorationLocation.Underline), Strike = run.TextDecorations.Any(d => d.Location == TextDecorationLocation.Strikethrough) }); continue;
                 }
                 if (inline is LineBreak) { output.Add(new RichNode { Kind = "break" }); continue; }
+                var container=inline as InlineUIContainer;
+                var image=container==null?null:container.Child as Image;
+                if(image!=null){var node=NoteImages.Read(image);if(node!=null)output.Add(node);continue;}
                 var span = inline as Span;
                 if (span != null) { ReadInlines(span.Inlines, output); continue; }
                 string text = new TextRange(inline.ContentStart, inline.ContentEnd).Text;
@@ -144,6 +156,7 @@ namespace HexMapEditor
                 if (Enum.TryParse<TextAlignment>(n.Alignment, out alignment)) p.TextAlignment = alignment;
                 foreach (var item in n.Children)
                 {
+                    if(item.Kind=="image"){p.Inlines.Add(NoteImages.Create(item));continue;}
                     if (item.Kind == "break") { p.Inlines.Add(new LineBreak()); continue; }
                     var r = new Run(item.Text ?? "") { FontSize = item.Size, FontWeight = item.Bold ? FontWeights.Bold : FontWeights.Normal, FontStyle = item.Italic ? FontStyles.Italic : FontStyles.Normal };
                     var decorations = new TextDecorationCollection(); if (item.Underline) decorations.Add(TextDecorations.Underline[0]); if (item.Strike) decorations.Add(TextDecorations.Strikethrough[0]); r.TextDecorations = decorations; p.Inlines.Add(r);
@@ -189,33 +202,45 @@ namespace HexMapEditor
         public Action BreakHistoryGroup;
         public Action<string> Error;
         public Func<int[]> TableSizeRequested;
+        public Func<string> ImagePathRequested;
         public RichNoteEditor()
         {
             host.Dock = Forms.DockStyle.Fill; Controls.Add(host);
+            var numberBar=new Forms.FlowLayoutPanel{Dock=Forms.DockStyle.Top,Height=33,WrapContents=false};
+            numberBar.Controls.Add(new Forms.Label{Text="Rozmiar czcionki",AutoSize=true,Margin=new Forms.Padding(6,8,2,0)});
+            var size=new ScrubNumber{Minimum=1,Maximum=400,Value=12,Width=62,AccessibleName="Rozmiar czcionki opisu"};
+            numberBar.Controls.Add(size);Controls.Add(numberBar);
+            size.EditFinished+=(s,e)=>{if(!e.Cancelled&&e.Changed)Mutate("format",()=>Box.Selection.ApplyPropertyValue(TextElement.FontSizeProperty,(double)size.Value));};
+            Box.SelectionChanged+=(s,e)=>{
+                object current=Box.Selection.GetPropertyValue(TextElement.FontSizeProperty);
+                if(!size.IsEditing&&current is double)size.Value=(decimal)(double)current;
+            };
             var dock = new DockPanel { LastChildFill = true, Background = new SolidColorBrush(Color.FromRgb(36, 40, 50)) }; host.Child = dock;
             var tools = new WrapPanel { Margin = new Thickness(3) }; DockPanel.SetDock(tools, System.Windows.Controls.Dock.Top); dock.Children.Add(tools);
             Button(tools, "↶", "Cofnij opis", () => { if (HistoryRequested != null) HistoryRequested(false); });
             Button(tools, "↷", "Ponów opis", () => { if (HistoryRequested != null) HistoryRequested(true); });
-            var size = new ComboBox { Width = 55, Margin = new Thickness(2), ToolTip = "Rozmiar czcionki" }; foreach (int n in new[] { 8, 10, 12, 14, 16, 18, 24, 32, 48, 72 }) size.Items.Add(n); size.SelectedItem = 12; tools.Children.Add(size);
-            size.SelectionChanged += (s, e) => { if (!loading && size.SelectedItem != null) Mutate("format", () => Box.Selection.ApplyPropertyValue(TextElement.FontSizeProperty, Convert.ToDouble(size.SelectedItem))); };
             Button(tools, "B", "Pogrubienie", () => Execute(EditingCommands.ToggleBold));
             Button(tools, "I", "Kursywa", () => Execute(EditingCommands.ToggleItalic));
             Button(tools, "U", "Podkreślenie", () => ToggleDecoration(TextDecorationLocation.Underline));
             Button(tools, "S", "Przekreślenie", () => ToggleDecoration(TextDecorationLocation.Strikethrough));
-            Button(tools, "Do lewej", "Wyrównaj do lewej", () => Execute(EditingCommands.AlignLeft));
-            Button(tools, "Środek", "Wyśrodkuj", () => Execute(EditingCommands.AlignCenter));
-            Button(tools, "Do prawej", "Wyrównaj do prawej", () => Execute(EditingCommands.AlignRight));
-            Button(tools, "Wyjustuj", "Wyjustuj akapity", () => Execute(EditingCommands.AlignJustify));
-            Button(tools, "Lista •", "Lista punktowana", () => Execute(EditingCommands.ToggleBullets));
-            Button(tools, "Lista 1.", "Lista numerowana", () => Execute(EditingCommands.ToggleNumbering));
-            Button(tools, "Wklej", "Wklej obsługiwane formatowanie RTF", () => Paste(false));
-            Button(tools, "Sam tekst", "Wklej jako zwykły tekst", () => Paste(true));
-            Button(tools, "Tabela", "Wstaw edytowalną tabelę", () => { int[] dimensions = TableSizeRequested == null ? new[] { 2, 2 } : TableSizeRequested(); if (dimensions != null) InsertTable(dimensions[0], dimensions[1]); });
-            Button(tools, "+wiersz", "Dodaj wiersz poniżej bieżącego", () => ChangeTable("addRow"));
-            Button(tools, "−wiersz", "Usuń bieżący wiersz", () => ChangeTable("removeRow"));
-            Button(tools, "+kol.", "Dodaj kolumnę po bieżącej", () => ChangeTable("addColumn"));
-            Button(tools, "−kol.", "Usuń bieżącą kolumnę", () => ChangeTable("removeColumn"));
-            Button(tools, "Usuń tabelę", "Usuń całą bieżącą tabelę", () => ChangeTable("remove"));
+            Button(tools, "⇤", "Wyrównaj do lewej", () => Execute(EditingCommands.AlignLeft));
+            Button(tools, "↔", "Wyśrodkuj", () => Execute(EditingCommands.AlignCenter));
+            Button(tools, "⇥", "Wyrównaj do prawej", () => Execute(EditingCommands.AlignRight));
+            Button(tools, "≡", "Wyjustuj akapity", () => Execute(EditingCommands.AlignJustify));
+            Button(tools, "•≡", "Lista punktowana", () => Execute(EditingCommands.ToggleBullets));
+            Button(tools, "1≡", "Lista numerowana", () => Execute(EditingCommands.ToggleNumbering));
+            Button(tools, "▣", "Wklej tekst i obrazy", () => Paste(false));
+            Button(tools, "▣T", "Wklej jako zwykły tekst", () => Paste(true));
+            Button(tools, "▦", "Wstaw edytowalną tabelę", () => { int[] dimensions = TableSizeRequested == null ? new[] { 2, 2 } : TableSizeRequested(); if (dimensions != null) InsertTable(dimensions[0], dimensions[1]); });
+            Button(tools, "⊞↓", "Dodaj wiersz poniżej bieżącego", () => ChangeTable("addRow"));
+            Button(tools, "⊟↓", "Usuń bieżący wiersz", () => ChangeTable("removeRow"));
+            Button(tools, "⊞→", "Dodaj kolumnę po bieżącej", () => ChangeTable("addColumn"));
+            Button(tools, "⊟→", "Usuń bieżącą kolumnę", () => ChangeTable("removeColumn"));
+            Button(tools, "▦×", "Usuń całą bieżącą tabelę", () => ChangeTable("remove"));
+            Button(tools,"▧","Wstaw obraz z pliku",InsertImageFile);
+            Button(tools,"▧−","Zmniejsz zaznaczony obraz",()=>ResizeImage(.8));
+            Button(tools,"▧+","Powiększ zaznaczony obraz",()=>ResizeImage(1.25));
+            Box.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,new MouseButtonEventHandler(SelectImage));
             Box.AcceptsTab = true; Box.VerticalScrollBarVisibility = ScrollBarVisibility.Auto; Box.IsUndoEnabled = false; Box.Background = dock.Background; Box.Foreground = Brushes.WhiteSmoke; Box.BorderBrush = Brushes.Gray; Box.Document = NoteCodec.FromPlain("");
             lastValid = NoteCodec.Write(Box.Document);
             Box.TextChanged += (s, e) => { if (!loading) Notify("typing"); };
@@ -263,7 +288,7 @@ namespace HexMapEditor
         }
         static void Button(WrapPanel parent, string text, string tip, Action action)
         {
-            var b = new Button { Content = text, ToolTip = tip, Margin = new Thickness(2), Padding = new Thickness(5, 2, 5, 2), MinHeight = 25 };
+            var b = new Button { Content = text, ToolTip = tip, Margin = new Thickness(2), Padding = new Thickness(5, 2, 5, 2), MinHeight = 25, MinWidth = 27, Background=new SolidColorBrush(Color.FromRgb(49,54,67)), Foreground=Brushes.WhiteSmoke, BorderBrush=Brushes.SlateGray };
             System.Windows.Automation.AutomationProperties.SetName(b, tip); b.Click += (s, e) => action(); parent.Children.Add(b);
         }
         void Notify(string kind)
@@ -299,12 +324,10 @@ namespace HexMapEditor
             {
                 bool hasText = HasPlainClipboardText();
                 string text = Clipboard.ContainsText(TextDataFormat.UnicodeText) ? Clipboard.GetText(TextDataFormat.UnicodeText) : hasText ? Clipboard.GetText(TextDataFormat.Text) : "";
-                if (!plain && Clipboard.ContainsData(DataFormats.Rtf))
-                {
-                    string rtf = Clipboard.GetData(DataFormats.Rtf) as string;
-                    PasteRtf(rtf, text); return;
-                }
-                if (hasText) Mutate("paste", () => Box.Selection.Text = text);
+                if(plain){if(hasText)Mutate("paste",()=>Box.Selection.Text=text);return;}
+                var data=Clipboard.GetDataObject();
+                if(data==null)return;
+                PasteData(data,text);
             }
             catch (Exception ex) { if (Error != null) Error("Nie można wkleić formatowania: " + ex.Message + ". Użyj Wklej jako zwykły tekst."); }
         }
@@ -314,22 +337,195 @@ namespace HexMapEditor
             if (key != Key.V || modifiers != (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift) || !Box.IsKeyboardFocusWithin) return false;
             Paste(true); return true;
         }
-        public void PasteRtf(string rtf, string fallback)
+        internal void PasteData(IDataObject data,string fallback)
         {
-            // Reject active/embedded destinations BEFORE the framework RTF importer sees them.
-            // For such payloads the clipboard's Unicode text is the loss-minimizing safe fallback.
+            int count=0;
+            FlowDocument document=null;
+            if(data.GetDataPresent(DataFormats.Rtf,false))
+            {
+                try { document=ReadRtf(data.GetData(DataFormats.Rtf,false) as string,out count); }
+                catch(InvalidDataException) { }
+                catch(ArgumentException) { }
+                catch(System.Windows.Markup.XamlParseException) { }
+            }
+            if(count==0&&data.GetDataPresent(DataFormats.Html,false))
+            {
+                var html=NoteHtmlClipboard.Parse(data.GetData(DataFormats.Html,false) as string);
+                if(html!=null&&(document==null||Images(html.Blocks).Any()))document=html;
+            }
+            if(document!=null){PasteDocument(document);return;}
+            if(!String.IsNullOrEmpty(fallback)){Mutate("paste",()=>Box.Selection.Text=fallback);return;}
+            if(data.GetDataPresent("PNG",false))
+            {
+                var png=data.GetData("PNG",false);
+                var bytes=png as byte[];
+                var stream=png as MemoryStream;
+                if(bytes==null&&stream!=null&&stream.Length<=NoteImages.MaxSourceBytes)bytes=stream.ToArray();
+                if(bytes!=null){InsertImage(NoteImages.FromBytes(bytes));return;}
+            }
+            if(data.GetDataPresent(DataFormats.Bitmap,true))
+            {
+                var bitmap=data.GetData(DataFormats.Bitmap,true) as BitmapSource;
+                if(bitmap==null)bitmap=Clipboard.GetImage();
+                if(bitmap!=null)InsertImage(NoteImages.FromBitmap(bitmap));
+            }
+        }
+
+        public void PasteRtf(string rtf,string fallback)
+        {
+            try { int count;PasteDocument(ReadRtf(rtf,out count)); }
+            catch(Exception ex)
+            {
+                if(String.IsNullOrEmpty(fallback)){if(Error!=null)Error("Nie można odczytać RTF: "+ex.Message);return;}
+                Mutate("paste",()=>Box.Selection.Text=fallback);
+            }
+        }
+
+        static byte[] ReadPictureBytes(string group)
+        {
+            bool raster=false;
+            var pixels=new StringBuilder();
+            for(int i=1;i<group.Length-1;)
+            {
+                char c=group[i++];
+                if(Char.IsWhiteSpace(c))continue;
+                if(c=='\\'&&pixels.Length==0)
+                {
+                    int start=i;
+                    while(i<group.Length&&Char.IsLetter(group[i]))i++;
+                    string word=group.Substring(start,i-start).ToLowerInvariant();
+                    if(word=="pngblip"||word=="jpegblip")raster=true;
+                    if(i<group.Length&&group[i]=='-')i++;
+                    while(i<group.Length&&Char.IsDigit(group[i]))i++;
+                    continue;
+                }
+                if(c=='{'&&pixels.Length==0&&group.IndexOf(@"{\*\blipuid",i-1,StringComparison.OrdinalIgnoreCase)==i-1)
+                {
+                    int end=group.IndexOf('}',i);
+                    if(end<0)return null;
+                    i=end+1;continue;
+                }
+                if(!Uri.IsHexDigit(c)||pixels.Length>=2*NoteImages.MaxSourceBytes)return null;
+                pixels.Append(c);
+            }
+            if(!raster||pixels.Length<8||pixels.Length%2!=0)return null;
+            string hex=pixels.ToString();
+            var bytes=new byte[hex.Length/2];
+            for(int i=0;i<bytes.Length;i++)bytes[i]=(byte)(Uri.FromHex(hex[i*2])*16+Uri.FromHex(hex[i*2+1]));
+            return bytes;
+        }
+
+        static FlowDocument ReadRtf(string rtf,out int count)
+        {
+            string prefix="HME"+Guid.NewGuid().ToString("N");
+            var pictures=new Dictionary<string,RichNode>();
+            string filtered=RtfClipboard.Filter(rtf,group=>{
+                if(pictures.Count>=NoteImages.MaxPerNote)throw new InvalidDataException("Limit 12 obrazów w opisie.");
+                var bytes=ReadPictureBytes(group);
+                if(bytes==null)return "";
+                var marker=prefix+pictures.Count.ToString("D2")+"IMAGE";
+                try { pictures.Add(marker,NoteImages.FromBytes(bytes)); }
+                catch(IOException){return "";} catch(ArgumentException){return "";} catch(System.Runtime.InteropServices.ExternalException){return "";}
+                return "{"+marker+"}";
+            });
+            var document=new FlowDocument();
+            using(var stream=new MemoryStream(Encoding.UTF8.GetBytes(filtered)))
+                new TextRange(document.ContentStart,document.ContentEnd).Load(stream,DataFormats.Rtf);
+            var model=NoteCodec.Read(NoteCodec.Write(document));
+            foreach(var block in model.Blocks)ReplacePictureMarkers(block,pictures);
+            count=pictures.Count;
+            return NoteCodec.FromJson(MapLogic.Serializer().Serialize(model));
+        }
+
+        static void ReplacePictureMarkers(RichNode node,Dictionary<string,RichNode> pictures)
+        {
+            if(node.Kind=="paragraph")
+            {
+                var result=new List<RichNode>();
+                foreach(var child in node.Children)
+                {
+                    if(child.Kind!="run"||String.IsNullOrEmpty(child.Text)){result.Add(child);continue;}
+                    string rest=child.Text;
+                    foreach(var marker in pictures.Keys.OrderBy(key=>{int at=rest.IndexOf(key,StringComparison.Ordinal);return at<0?Int32.MaxValue:at;}).ToArray())
+                    {
+                        int at=rest.IndexOf(marker,StringComparison.Ordinal);
+                        if(at<0)continue;
+                        if(at>0)result.Add(CopyRun(child,rest.Substring(0,at)));
+                        result.Add(pictures[marker]);rest=rest.Substring(at+marker.Length);
+                    }
+                    if(rest.Length>0)result.Add(CopyRun(child,rest));
+                }
+                node.Children=result;
+            }
+            else foreach(var child in node.Children)ReplacePictureMarkers(child,pictures);
+        }
+
+        static RichNode CopyRun(RichNode source,string text)
+        {
+            return new RichNode{Kind="run",Text=text,Size=source.Size,Bold=source.Bold,Italic=source.Italic,Underline=source.Underline,Strike=source.Strike};
+        }
+        static IEnumerable<Image> Images(BlockCollection blocks)
+        {
+            foreach(var block in blocks)
+            {
+                var p=block as Paragraph;
+                if(p!=null)foreach(var item in p.Inlines.OfType<InlineUIContainer>())if(item.Child is Image)yield return (Image)item.Child;
+                var table=block as Table;
+                if(table!=null)foreach(var group in table.RowGroups)foreach(var row in group.Rows)foreach(var cell in row.Cells)foreach(var image in Images(cell.Blocks))yield return image;
+                var list=block as List;
+                if(list!=null)foreach(var item in list.ListItems)foreach(var image in Images(item.Blocks))yield return image;
+                var section=block as Section;
+                if(section!=null)foreach(var image in Images(section.Blocks))yield return image;
+            }
+        }
+        void PasteDocument(FlowDocument document)
+        {
+            // The package comes from the validated in-memory document, never directly from the clipboard.
+            Mutate("paste",()=>{
+                using(var stream=new MemoryStream())
+                {
+                    new TextRange(document.ContentStart,document.ContentEnd).Save(stream,DataFormats.XamlPackage,true);
+                    stream.Position=0;Box.Selection.Load(stream,DataFormats.XamlPackage);
+                }
+                FitTables();
+            });
+        }
+        void InsertImageFile()
+        {
             try
             {
-                var imported = new FlowDocument();
-                using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(RtfClipboard.Filter(rtf)))) new TextRange(imported.ContentStart, imported.ContentEnd).Load(stream, DataFormats.Rtf);
-                var clean = NoteCodec.FromJson(NoteCodec.Write(imported));
-                Mutate("paste", () => { using (var stream = new MemoryStream()) { new TextRange(clean.ContentStart, clean.ContentEnd).Save(stream, DataFormats.Rtf); stream.Position = 0; Box.Selection.Load(stream, DataFormats.Rtf); } FitTables(); });
+                var path=ImagePathRequested==null?null:ImagePathRequested();
+                if(path==null)return;
+                if(new FileInfo(path).Length>NoteImages.MaxSourceBytes)throw new InvalidDataException("Obraz może mieć najwyżej 2 MiB.");
+                InsertImage(NoteImages.FromBytes(File.ReadAllBytes(path)));
             }
-            catch
-            {
-                if (String.IsNullOrEmpty(fallback)) { if (Error != null) Error("Nie można bezpiecznie odczytać RTF, a schowek nie zawiera zwykłego tekstu. Opis pozostał bez zmian."); return; }
-                Mutate("paste", () => Box.Selection.Text = fallback);
-            }
+            catch(Exception ex){if(Error!=null)Error(ex.Message);}
+        }
+        internal void InsertImage(RichNode node)
+        {
+            var document=NoteCodec.FromPlain("");
+            ((Paragraph)document.Blocks.FirstBlock).Inlines.Add(NoteImages.Create(node));
+            PasteDocument(document);
+        }
+        void SelectImage(object sender,MouseButtonEventArgs e)
+        {
+            var image=e.OriginalSource as Image;
+            if(image==null)return;
+            var container=LogicalTreeHelper.GetParent(image) as InlineUIContainer;
+            if(container==null)return;
+            Box.Focus();
+            Box.Selection.Select(container.ElementStart,container.ElementEnd);
+            e.Handled=true;
+        }
+        void ResizeImage(double factor)
+        {
+            var start=Box.Selection.Start;
+            var end=Box.Selection.End;
+            var selected=Images(Box.Document.Blocks).FirstOrDefault(image=>{
+                var container=LogicalTreeHelper.GetParent(image) as InlineUIContainer;
+                return container!=null&&start.CompareTo(container.ElementStart)<=0&&end.CompareTo(container.ElementEnd)>=0;
+            });
+            if(selected!=null)Mutate("format",()=>selected.Width=Math.Max(24,Math.Min(900,selected.Width*factor)));
         }
         public void InsertTable(int rows, int columns)
         {

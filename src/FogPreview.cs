@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -20,7 +20,7 @@ namespace HexMapEditor
         }
         static void ValidateGroupFields(Dictionary<string,object> raw, int format)
         {
-            string[][] required={new[]{"ObjectStates","Id","Name","Color","CanReveal"},new[]{"Groups","Id","Name","Members","StateId","Locked","RevealsFog","RevealRadius","SizeMode","SizeValue","LightEnabled","LightRadius"}};
+            string[][] required={new[]{"ObjectStates","Id","Name","Color","CanReveal"},new[]{"Groups","Id","Name","Members","Overrides","StateId","Locked","RevealsFog","RevealRadius","SizeMode","SizeValue","LightEnabled","LightRadius"}};
             foreach(var fields in required){var items=raw.ContainsKey(fields[0])?raw[fields[0]] as object[]:null;if(items==null||items.Any(o=>!(o is Dictionary<string,object>)||fields.Skip(1).Any(k=>!((Dictionary<string,object>)o).ContainsKey(k))))throw new InvalidDataException("Brak jawnych danych stanów lub grup.");}
             if (format >= 6 && ((object[])raw["Groups"]).Cast<Dictionary<string, object>>().Any(g =>
                 !g.ContainsKey("FrameEnabled") || !(g["FrameEnabled"] is bool) ||

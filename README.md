@@ -1,10 +1,10 @@
-# HexMapEditor 0.9.3
+# HexMapEditor 0.10.0
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.9.3** zapisuje mapy w **formacie 11**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.10.0** zapisuje mapy w **formacie 12**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -12,7 +12,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
-Ta wersja odczytuje mapy 11 i presety 4/5; brak sekcji ikon/obiektów w starym presecie 4 oznacza puste zestawy. Nowe formaty zachowują pełne źródła, dwa kadry i pule wyglądu. Dawne mapy, presety i wycinki pozostają na dysku; nie konwertujemy ich ani nie zgadujemy utraconego źródła. Biblioteczne grafiki terenu mają format 2.
+Ta wersja odczytuje mapy 12 i presety 4/5. Starszą mapę odrzuca z komunikatem o wersji formatu, pozostawiając plik na dysku. Brak sekcji ikon/obiektów w presecie 4 oznacza puste zestawy. Biblioteczne grafiki terenu mają format 2.
+
+## Prawy panel w 0.10.0
+
+Trzy widoki pokazują heks, pojedynczy obiekt albo grupę. Pionowy uchwyt zwija szczegóły z zachowaniem zaznaczenia. „Dostosuj” na górnym pasku ustawia domyślną szerokość, a „Zamknij” czyści zaznaczenie. Ołówek otwiera edycję nazwy w miejscu.
+
+Opis heksa można powiększyć w panelu. Obrazy wstawione z pliku lub osadzone we wklejonej treści zapisują się razem z mapą. Obsługiwane reprezentacje schowka obejmują sam obraz, RTF z PNG/JPEG i HTML z danymi obrazu. Osobne polecenie wkleja sam tekst.
+
+W macierzy grupy każdy członek osobno wybiera wartość indywidualną albo grupową dla stanu, rozmiaru, mgły, widzenia i blokady. Przy odłączeniu lub rozwiązaniu grupy można zachować wybrane wartości wynikowe. [Raport 0.10.0](docs/raport-0.10.0.md).
 
 ## Szybkie zestawy presetów w 0.9.3
 
@@ -61,7 +69,7 @@ Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz no
 
 **Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
 
-Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.9.3 • 20.11.2026`. Duża nazwa zachowuje styl; autor ma styl dotychczasowej wersji. Data jest jawną metadaną w `src/ReleaseMetadata.cs`, nie zegarem uruchomienia ani datą modyfikacji EXE. Brak przycisku/linku GitHub i sprawdzania aktualizacji.
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.10.0 • 20.11.2026`. Duża nazwa zachowuje styl, autor ma styl napisu wersji. Data wydania pochodzi z jawnej metadanej w `src/ReleaseMetadata.cs`.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 

@@ -6,115 +6,164 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class GroupMemberChoice
-    {
-        public string Id,Name;
-        public override string ToString(){return Name;}
-    }
     public sealed partial class MainWindow
     {
         TableLayoutPanel groupLayout;
-        TextBox groupName;
-        ListBox groupMembers;
-        ComboBox groupState,groupLock,groupReveal,groupSizeMode,groupLight;
-        ScrubNumber groupLightRadius;CheckBox groupLightRadiusOverride;
-        ScrubNumber groupRadius,groupSize;
-        CheckBox groupRadiusOverride, groupFrame;
+        DetailNameHeader groupName;
+        ComboBox groupState, groupSizeMode;
+        ScrubNumber groupSize, groupRadius, groupLightRadius;
+        CheckBox groupFrame, groupReveal, groupLight, groupLock;
         Button groupFrameColor;
-        string groupStateSignature,groupMembersSignature;
-        ComboBox OverrideChoice(){var c=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};c.Items.AddRange(new object[]{"Indywidualnie","Tak","Nie"});c.SelectedIndex=0;return c;}
+        MemberMatrix groupMatrix;
+        string groupStateSignature, groupMembersSignature;
+
         void BuildGroupDetails(Control parent)
         {
-            groupLayout=PropertyTable(parent);groupLayout.Visible=false;groupName=new DarkTextBox{MaxLength=200};PropertyRow(groupLayout,0,"Nazwa grupy",groupName);
-            groupMembers=new ListBox{Height=108,IntegralHeight=false,AccessibleName="Członkowie trwałej grupy"};SpanRow(groupLayout,1,groupMembers);
-            SpanRow(groupLayout,2,PropertyButton("Wybierz pojedynczego członka",()=>{var chosen=groupMembers.SelectedItem as GroupMemberChoice;if(chosen!=null){EndCanvasGesture(true);selectedGroupId=null;selectedObjects.Clear();selectedObjects.Add(chosen.Id);UpdateUI();}}));
-            groupState=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};PropertyRow(groupLayout,3,"Stan",groupState);
-            groupLock=OverrideChoice();PropertyRow(groupLayout,4,"Blokada",groupLock);groupReveal=OverrideChoice();PropertyRow(groupLayout,5,"Odkrywanie",groupReveal);
-            groupRadiusOverride=new SwitchBox{Text="Nadpisz promień",AutoSize=true};SpanRow(groupLayout,6,groupRadiusOverride);groupRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,7,"Promień",groupRadius);
-            groupSizeMode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};groupSizeMode.Items.AddRange(new object[]{"Indywidualnie","Przesunięcie","Wspólny"});groupSizeMode.SelectedIndex=0;PropertyRow(groupLayout,8,"Rozmiar",groupSizeMode);
-            groupSize=new ScrubNumber{Minimum=-1016,Maximum=1024};PropertyRow(groupLayout,9,"Wartość",groupSize);
-            SpanRow(groupLayout,10,new Label{Text="Nakładka nie zmienia wartości indywidualnych. Przesunięcie jest liczone od ich rozmiaru i ograniczane do 8–1024. Stan bez uprawnienia zawsze blokuje skuteczne odkrywanie.",AutoSize=true,MaximumSize=new Size(340,0)});
-            SpanRow(groupLayout,17,PropertyButton("Rozwiąż grupę",()=>{var g=CurrentGroup();if(g!=null)UnlinkWithDialog(g,g.Members.ToArray());}));
-            groupFrame = new SwitchBox { Text = "Ramka członków", AutoSize = true };
-            SpanRow(groupLayout, 15, groupFrame);
-            groupFrameColor = PropertyButton("Wybierz kolor", ChooseFrameColor);
-            PropertyRow(groupLayout, 16, "Kolor ramki", groupFrameColor);
-            SpanRow(groupLayout,18,PropertyButton("Usuń instancje grupy",ConfirmDeleteSelectedObjects,true));
-            groupLight=OverrideChoice();PropertyRow(groupLayout,12,"Pole widzenia",groupLight);groupLightRadiusOverride=new SwitchBox{Text="Nadpisz promień widzenia",AutoSize=true};SpanRow(groupLayout,13,groupLightRadiusOverride);groupLightRadius=new ScrubNumber{Minimum=0,Maximum=20,Value=1};PropertyRow(groupLayout,14,"Promień widzenia",groupLightRadius);
-            groupLight.SelectedIndexChanged+=(s,e)=>EditGroup("light",g=>g.LightEnabled=ReadOverride(groupLight),false);groupLightRadiusOverride.CheckedChanged+=(s,e)=>EditGroup("light-radius-mode",g=>g.LightRadius=groupLightRadiusOverride.Checked?(int?)groupLightRadius.Value:null,false);groupLightRadius.ValueChanged+=(s,e)=>{if(groupLightRadiusOverride.Checked)EditGroup("light-radius",g=>g.LightRadius=(int)groupLightRadius.Value,true);};LiveNumber(groupLightRadius);groupLightRadius.LostFocus+=(s,e)=>EndObjectPropertyEdit();
-            groupFrame.CheckedChanged += (s, e) => EditGroup("frame", g => g.FrameEnabled = groupFrame.Checked, false);
-            groupName.TextChanged+=(s,e)=>{if(!String.IsNullOrWhiteSpace(groupName.Text))EditGroup("name",g=>g.Name=groupName.Text.Trim(),true);};
-            groupState.SelectedIndexChanged+=(s,e)=>EditGroup("state",g=>g.StateId=groupState.SelectedIndex<=0?null:((ObjectStateDefinition)groupState.SelectedItem).Id,false);
-            groupLock.SelectedIndexChanged+=(s,e)=>EditGroup("lock",g=>g.Locked=ReadOverride(groupLock),false);groupReveal.SelectedIndexChanged+=(s,e)=>EditGroup("reveal",g=>g.RevealsFog=ReadOverride(groupReveal),false);
-            groupRadiusOverride.CheckedChanged+=(s,e)=>EditGroup("radius-mode",g=>g.RevealRadius=groupRadiusOverride.Checked?(int?)groupRadius.Value:null,false);groupRadius.ValueChanged+=(s,e)=>{if(groupRadiusOverride.Checked)EditGroup("radius",g=>g.RevealRadius=(int)groupRadius.Value,true);};
-            groupSizeMode.SelectedIndexChanged+=(s,e)=>EditGroup("size-mode",g=>{g.SizeMode=new[]{"Individual","Offset","Common"}[groupSizeMode.SelectedIndex];if(g.SizeMode=="Common")g.SizeValue=Math.Max(8,Math.Min(1024,g.SizeValue));else if(g.SizeMode=="Offset")g.SizeValue=Math.Max(-1016,Math.Min(1016,g.SizeValue));},false);
-            groupSize.ValueChanged+=(s,e)=>EditGroup("size",g=>g.SizeValue=(float)groupSize.Value,true);
-            LiveNumber(groupSize);LiveNumber(groupRadius);
-            foreach(Control c in new Control[]{groupName,groupSize,groupRadius})c.LostFocus+=(s,e)=>{if(!updating){EndObjectPropertyEdit();UpdateUI();}};
+            groupLayout = PropertyTable(parent);
+            groupLayout.Hide();
+            groupName = new DetailNameHeader("Nazwa grupy", value => EditGroup("name", g => g.Name=value, false), tips);
+            SpanRow(groupLayout,0,groupName);
+            groupFrame = new SwitchBox { Text="Obramowanie członków", AutoSize=true };
+            groupFrameColor = PropertyButton("Kolor",ChooseFrameColor);
+            SpanRow(groupLayout,1,PropertyLine(groupFrame,groupFrameColor));
+            SpanRow(groupLayout,2,DetailSection("Ustawienia grupy"));
+
+            groupState = new ComboBox { DropDownStyle=ComboBoxStyle.DropDownList };
+            PropertyRow(groupLayout,3,"Stan",groupState);
+            groupSizeMode = new ComboBox { DropDownStyle=ComboBoxStyle.DropDownList, Width=105 };
+            groupSizeMode.Items.AddRange(new object[] { "Wspólny", "Przesunięcie" });
+            groupSize = new ScrubNumber { Minimum=-1016, Maximum=1024, Width=57 };
+            var reset = PropertyButton("Reset",()=>EditGroup("size",g=>g.SizeValue=g.SizeMode=="Common"?30:0,false));
+            PropertyRow(groupLayout,4,"Rozmiar",WrappingLine(groupSize,groupSizeMode,reset));
+
+            groupReveal = PropertySwitch("Odkrywanie mgły");
+            groupLight = PropertySwitch("Pole widzenia");
+            groupLock = PropertySwitch("Blokada ruchu");
+            groupRadius = new ScrubNumber { Minimum=0, Maximum=20, Width=57 };
+            groupLightRadius = new ScrubNumber { Minimum=0, Maximum=20, Width=57 };
+            PropertyRow(groupLayout,5,"Odkrywanie mgły",PropertyLine(WidthAlignedSwitch(groupReveal),RadiusControl(groupRadius)));
+            PropertyRow(groupLayout,6,"Pole widzenia",PropertyLine(WidthAlignedSwitch(groupLight),RadiusControl(groupLightRadius)));
+            PropertyRow(groupLayout,7,"Blokada ruchu",PropertyLine(WidthAlignedSwitch(groupLock)));
+            SpanRow(groupLayout,8,DetailSection("Ustawienia indywidualne"));
+            SpanRow(groupLayout,9,new Label { Text="Włącz, aby użyć wartości grupy.",AutoSize=true });
+            groupMatrix = new MemberMatrix("Użyj wartości grupy");
+            groupMatrix.ColumnClicked = property => EditGroup("column",g=>GroupRules.ToggleColumn(g,property),false);
+            groupMatrix.MemberClicked = SelectPanelMember;
+            groupMatrix.ValueChanged = (id,property,on) => EditGroup("member",g=>GroupRules.Set(g,id,property,on),false);
+            SpanRow(groupLayout,10,groupMatrix);
+
+            SpanRow(groupLayout,11,DetailSection("Działania"));
+            var dissolve = PropertyButton("Rozwiąż grupę",()=>{var g=CurrentGroup();if(g!=null)UnlinkWithDialog(g,g.Members.ToArray());});
+            Amber(dissolve);
+            SpanRow(groupLayout,12,dissolve);
+            SpanRow(groupLayout,13,PropertyButton("Usuń grupę i wszystkie obiekty",ConfirmDeleteSelectedObjects,true));
+
+            groupState.SelectedIndexChanged += (s,e) => { var state=groupState.SelectedItem as ObjectStateDefinition;if(state!=null)EditGroup("state",g=>g.StateId=state.Id,false); };
+            groupSizeMode.SelectedIndexChanged += (s,e) =>
+            {
+                if(groupSizeMode.SelectedIndex<0)return;
+                EditGroup("size-mode",g=>{
+                    g.SizeMode=groupSizeMode.SelectedIndex==0?"Common":"Offset";
+                    g.SizeValue=Math.Max(g.SizeMode=="Common"?8:-1016,Math.Min(g.SizeMode=="Common"?1024:1016,g.SizeValue));
+                },false);
+            };
+            groupSize.ValueChanged += (s,e)=>EditGroup("size",g=>g.SizeValue=(float)groupSize.Value,true);
+            groupFrame.CheckedChanged += (s,e)=>EditGroup("frame",g=>g.FrameEnabled=groupFrame.Checked,false);
+            groupReveal.CheckedChanged += (s,e)=>EditGroup("fog",g=>g.RevealsFog=groupReveal.Checked,false);
+            groupLight.CheckedChanged += (s,e)=>EditGroup("sight",g=>g.LightEnabled=groupLight.Checked,false);
+            groupLock.CheckedChanged += (s,e)=>EditGroup("lock",g=>g.Locked=groupLock.Checked,false);
+            groupRadius.ValueChanged += (s,e)=>EditGroup("fog-radius",g=>g.RevealRadius=(int)groupRadius.Value,true);
+            groupLightRadius.ValueChanged += (s,e)=>EditGroup("sight-radius",g=>g.LightRadius=(int)groupLightRadius.Value,true);
+            foreach(var number in new[] { groupSize,groupRadius,groupLightRadius }) LiveNumber(number);
         }
-        static bool? ReadOverride(ComboBox c){return c.SelectedIndex==0?(bool?)null:c.SelectedIndex==1;}
-        static int OverrideIndex(bool? b){return !b.HasValue?0:b.Value?1:2;}
         ObjectGroup CurrentGroup(){return map.Groups.FirstOrDefault(g=>g.Id==selectedGroupId);}
         bool GroupMasked(ObjectGroup group){return group.Members.All(id=>ObjectFogLevel(map.Objects.Single(o=>o.Id==id))>0);}
         void EditGroup(string field,Action<ObjectGroup> edit,bool merge)
         {
-            if(updating)return;var group=CurrentGroup();if(group==null||GroupMasked(group))return;if (!GuardLayer(MapLayer.Objects)) { UpdateUI(); return; } if(!merge)EndObjectPropertyEdit();var next=group.Copy();edit(next);try{ChangeObjectGroup(next,merge?group.Id+":"+field:null);}catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości grupy",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
+            if(updating)return;
+            var group=CurrentGroup();
+            if(group==null||GroupMasked(group))return;
+            if(!GuardLayer(MapLayer.Objects)){UpdateUI();return;}
+            if(!merge)EndObjectPropertyEdit();
+            var next=group.Copy();edit(next);
+            try { ChangeObjectGroup(next,merge?group.Id+":"+field:null); }
+            catch(Exception ex){ShowEditorMessage(ex.Message,"Właściwości grupy",MessageBoxButtons.OK,MessageBoxIcon.Warning);UpdateUI();}
         }
         void UpdateGroupDetails()
         {
-            var g=CurrentGroup();if(g==null)return;if(propertyEditKey==null||!groupName.ContainsFocus)groupName.Text=g.Name;
-            bool masked=GroupMasked(g);groupLayout.Enabled=!masked;
-            var available = AvailableStates();
-            string states = json.Serialize(available);
-            if (groupStateSignature != states)
-            {
-                groupState.BeginUpdate();
-                groupState.Items.Clear();
-                groupState.Items.Add("Indywidualnie");
-                foreach (var state in available) groupState.Items.Add(state);
-                groupState.EndUpdate();
-                groupStateSignature = states;
-            }
-            groupLight.SelectedIndex=OverrideIndex(g.LightEnabled);groupLightRadiusOverride.Checked=g.LightRadius.HasValue;groupLightRadius.Value=g.LightRadius??1;groupLightRadius.Enabled=groupLightRadiusOverride.Checked;
-            groupFrame.Checked = g.FrameEnabled;
-            groupFrameColor.BackColor = ColorTranslator.FromHtml(g.FrameColor);
-            groupFrameColor.ForeColor = groupFrameColor.BackColor.GetBrightness() > .55 ? Color.Black : Color.White;
-            groupState.SelectedIndex=g.StateId==null?0:available.FindIndex(s=>s.Id==g.StateId)+1;groupLock.SelectedIndex=OverrideIndex(g.Locked);groupReveal.SelectedIndex=OverrideIndex(g.RevealsFog);groupRadiusOverride.Checked=g.RevealRadius.HasValue;groupRadius.Value=g.RevealRadius??1;
-            bool allowed=g.StateId==null?g.Members.Any(id=>GroupRules.Allows(map,map.Objects.Single(o=>o.Id==id).Side)):GroupRules.Allows(map,g.StateId);groupReveal.Enabled=allowed;groupRadiusOverride.Enabled=allowed;groupRadius.Enabled=allowed&&groupRadiusOverride.Checked;
-            groupSizeMode.SelectedIndex=Array.IndexOf(new[]{"Individual","Offset","Common"},g.SizeMode);groupSize.Minimum=-1016;groupSize.Maximum=1024;groupSize.Value=(decimal)g.SizeValue;if(g.SizeMode=="Common")groupSize.Minimum=8;else if(g.SizeMode=="Offset")groupSize.Maximum=1016;groupSize.Enabled=g.SizeMode!="Individual";
-            var members=g.Members.Select(id=>{var obj=map.Objects.Single(o=>o.Id==id);return new GroupMemberChoice{Id=id,Name=ObjectFogLevel(obj)>0?"???":obj.Name};}).ToList();string signature=g.Id+":"+json.Serialize(members.Select(m=>new[]{m.Id,m.Name}).ToArray());
-            if (groupMembersSignature != signature)
-            {
-                detailStructureChanged = true;
-                var chosen = groupMembers.SelectedItem as GroupMemberChoice;
-                int oldTop = groupMembers.TopIndex;
-                groupMembers.BeginUpdate();
-                try
-                {
-                    groupMembers.Items.Clear();
-                    groupMembers.Items.AddRange(members.Cast<object>().ToArray());
-                    groupMembers.SelectedIndex = Math.Max(0, members.FindIndex(m => chosen != null && m.Id == chosen.Id));
-                    if (members.Count > 0) groupMembers.TopIndex = Math.Min(oldTop, members.Count - 1);
-                }
-                finally { groupMembers.EndUpdate(); }
-                groupMembersSignature = signature;
-            }
+            var group=CurrentGroup();
+            if(group==null)return;
+            bool masked=GroupMasked(group);
+            groupLayout.Enabled=!masked;
+            groupName.Display(group.Id,masked?"":group.Name,masked?"???":group.Name,null,
+                !masked&&group.FrameEnabled?ColorTranslator.FromHtml(group.FrameColor):ChoiceStyle.ActiveBorder,!masked);
             if(masked)
             {
-                groupName.Text="???";groupState.SelectedIndex=groupLock.SelectedIndex=groupReveal.SelectedIndex=groupLight.SelectedIndex=groupSizeMode.SelectedIndex=-1;
-                groupRadius.Value=groupLightRadius.Value=0;groupRadiusOverride.Checked=groupLightRadiusOverride.Checked=groupFrame.Checked=false;groupSize.Minimum=-1016;groupSize.Value=0;groupFrameColor.BackColor=Color.SlateGray;
+                groupFrame.Checked=groupReveal.Checked=groupLight.Checked=groupLock.Checked=false;
+                groupFrameColor.Visible=false;
+                groupState.SelectedIndex=groupSizeMode.SelectedIndex=-1;
+                groupSize.Minimum=-1016;groupSize.Value=0;
+                groupRadius.Parent.Visible=groupLightRadius.Parent.Visible=false;
+                groupMatrix.Hide();
+                return;
             }
+            var states=AvailableStates();
+            string signature=json.Serialize(states);
+            if(signature!=groupStateSignature)
+            {
+                groupState.BeginUpdate();groupState.Items.Clear();groupState.Items.AddRange(states.Cast<object>().ToArray());groupState.EndUpdate();
+                groupStateSignature=signature;
+            }
+            groupState.SelectedIndex=states.FindIndex(s=>s.Id==group.StateId);
+            groupFrame.Checked=group.FrameEnabled;
+            groupFrameColor.Visible=group.FrameEnabled;
+            groupFrameColor.BackColor=ColorTranslator.FromHtml(group.FrameColor);
+            groupFrameColor.ForeColor=groupFrameColor.BackColor.GetBrightness()>.55?Color.Black:Color.White;
+            bool offset=group.SizeMode=="Offset";
+            groupSizeMode.SelectedIndex=offset?1:0;
+            groupSize.Minimum=offset?-1016:8;groupSize.Maximum=offset?1016:1024;
+            groupSize.Value=(decimal)group.SizeValue;
+            groupReveal.Checked=group.RevealsFog.Value;
+            groupReveal.Enabled=GroupRules.Allows(map,group.StateId)
+                || map.Objects.Any(o=>group.Members.Contains(o.Id)&&GroupRules.Allows(map,o.Side));
+            groupRadius.Value=group.RevealRadius.Value;
+            groupRadius.Parent.Visible=groupReveal.Checked;
+            groupLight.Checked=group.LightEnabled.Value;
+            groupLightRadius.Value=group.LightRadius.Value;
+            groupLightRadius.Parent.Visible=groupLight.Checked;
+            groupLock.Checked=group.Locked.Value;
+            var members=group.Members.Select(id=>map.Objects.Single(o=>o.Id==id)).Select(o=>new MatrixMember {
+                Id=o.Id, Hidden=ObjectFogLevel(o)>0, Name=ObjectFogLevel(o)>0?"???":o.Name, Value=GroupRules.Used(group,o.Id)
+            }).ToArray();
+            signature=group.Id+json.Serialize(members.Select(m=>new {m.Id,m.Name,m.Hidden}));
+            if(signature!=groupMembersSignature){groupMatrix.SetMembers(members);groupMembersSignature=signature;}
+            groupMatrix.SetValues(members);
+            groupMatrix.Show();
+        }
+        void SelectPanelMember(string id)
+        {
+            var obj=map.Objects.FirstOrDefault(o=>o.Id==id);
+            if(obj==null||ObjectFogLevel(obj)>0)return;
+            EndCanvasGesture(true);ChooseObjectMember(obj,false,true);
         }
         void SelectGroup(ObjectGroup group){EndCanvasGesture(true);selectedObjects.Clear();selectedObjects.UnionWith(group.Members);groupSelectionOrder.Clear();groupSelectionOrder.Add(group.Id);selectedGroupId=group.Id;selected=-1;rightPanelOpen=true;UpdateUI();}
         void ChooseFrameColor()
         {
-            var group = CurrentGroup();
-            if (group == null || !GuardLayer(MapLayer.Objects)) return;
-            using (var dialog = new EditorColorDialog(ColorTranslator.FromHtml(group.FrameColor)))
-                if (RunModal(() => dialog.ShowDialog(this)) == DialogResult.OK)
-                    EditGroup("frame-color", g => g.FrameColor = dialog.Hex, false);
+            var group=CurrentGroup();
+            if(group==null||!GuardLayer(MapLayer.Objects))return;
+            using(var dialog=new EditorColorDialog(ColorTranslator.FromHtml(group.FrameColor)))
+                if(RunModal(()=>dialog.ShowDialog(this))==DialogResult.OK)
+                    EditGroup("frame-color",g=>g.FrameColor=dialog.Hex,false);
         }
         void UnlinkWithDialog(ObjectGroup group,IEnumerable<string> members)
-        {if (!GuardLayer(MapLayer.Objects)) return;var ids=members.ToArray();using(var d=new UngroupDialog(ids.Length==group.Members.Count))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)DetachObjects(group.Id,ids,d.Keep);}
+        {
+            if(!GuardLayer(MapLayer.Objects))return;
+            var ids=members.ToArray();
+            var rows=ids.Select(id=>map.Objects.Single(o=>o.Id==id)).Select(o=>new MatrixMember {
+                Id=o.Id, Name=ObjectFogLevel(o)>0?"???":o.Name, Value=GroupRules.Used(group,o.Id)
+            }).ToArray();
+            using(var dialog=new UngroupDialog(rows,ids.Length==group.Members.Count))
+                if(RunModal(()=>dialog.ShowDialog(this))==DialogResult.OK)DetachObjects(group.Id,dialog.Keep);
+        }
     }
 }

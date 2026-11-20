@@ -47,17 +47,37 @@ namespace HexMapEditor
         }
     }
 
-    internal sealed class UngroupDialog : EditorDialog
+    internal sealed class UngroupDialog : DarkForm
     {
-        readonly ComboBox mode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};
-        readonly CheckBox[] categories;
-        public bool[] Keep {get{return mode.SelectedIndex==0?Enumerable.Repeat(true,7).ToArray():mode.SelectedIndex==1?new bool[7]:categories.Select(c=>c.Checked).ToArray();}}
-        public UngroupDialog(bool dissolve):base(dissolve?"Rozwiąż grupę":"Odłącz od grupy",440)
+        readonly ComboBox mode = new ComboBox { DropDownStyle=ComboBoxStyle.DropDownList, Dock=DockStyle.Top };
+        readonly MemberMatrix matrix = new MemberMatrix("Zachowaj wartość wynikową");
+        readonly MatrixMember[] members;
+        public System.Collections.Generic.Dictionary<string,GroupProperty> Keep
         {
-            ClientSize=new Size(480,440);mode.Items.AddRange(new object[]{"Zachowaj wynikowe ustawienia","Przywróć indywidualne ustawienia","Wybierz dla każdej właściwości"});mode.SelectedIndex=1;Row(0,"Po odłączeniu",mode,true);
-            categories=new[]{"Stan","Rozmiar","Blokada ruchu","Odkrywanie","Promień mgły","Pole widzenia","Promień widzenia"}.Select(n=>new SwitchBox{Text="Zachowaj wynikowe: "+n,AutoSize=true,Enabled=false}).ToArray();
-            for(int i=0;i<categories.Length;i++){Layout.Controls.Add(categories[i],0,i+1);Layout.SetColumnSpan(categories[i],3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,34));}
-            mode.SelectedIndexChanged+=(s,e)=>{foreach(var c in categories)c.Enabled=mode.SelectedIndex==2;};var note=new Label{Text="Pozycje i nazwy pozostaną. Odkryta wcześniej mgła nie zostanie zasłonięta. Całość można cofnąć.",Dock=DockStyle.Fill};Layout.Controls.Add(note,0,8);Layout.SetColumnSpan(note,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,70));Buttons(9,()=>DialogResult=DialogResult.OK);
+            get
+            {
+                return members.ToDictionary(m=>m.Id,m=>mode.SelectedIndex==0?GroupProperty.None:
+                    mode.SelectedIndex==1?m.Value:matrix.Read(m.Id)&m.Value);
+            }
+        }
+        public UngroupDialog(MatrixMember[] members,bool dissolve)
+        {
+            this.members=members;
+            Text=dissolve?"Rozwiąż grupę":"Odłącz od grupy";
+            StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(565,370);MinimumSize=new Size(535,260);
+            var note=new Label { Dock=DockStyle.Top, Height=50, Text=(dissolve?"Wszystkie obiekty pozostaną na mapie. ":"Obiekt pozostanie na mapie. ")
+                +"W tabeli zaznacz wartości wynikowe, które mają pozostać po operacji. Zmianę można cofnąć." };
+            var footer=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=43,FlowDirection=FlowDirection.RightToLeft};
+            var ok=new EditorButton{Text=dissolve?"Rozwiąż":"Odłącz",Width=120,DialogResult=DialogResult.OK};
+            var cancel=new EditorButton{Text="Anuluj",Width=90,DialogResult=DialogResult.Cancel};
+            footer.Controls.AddRange(new Control[]{ok,cancel});
+            var scroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true};
+            matrix.Dock=DockStyle.Top;scroll.Controls.Add(matrix);
+            Controls.Add(scroll);Controls.Add(mode);Controls.Add(note);Controls.Add(footer);
+            matrix.SetMembers(members,true);
+            mode.Items.AddRange(new object[]{"Przywróć wartości indywidualne","Zachowaj wartości wynikowe","Wybierz indywidualnie"});
+            mode.SelectedIndexChanged+=(s,e)=>scroll.Visible=mode.SelectedIndex==2;
+            mode.SelectedIndex=0;AcceptButton=ok;CancelButton=cancel;
         }
     }
 }

@@ -70,7 +70,6 @@ namespace HexMapEditor
     {
         Panel shellToolbar;
 
-        readonly Label detailCoordinate = new Label(), detailTerrain = new Label();
         readonly FlowLayoutPanel paletteTiles = new BufferedFlowPanel();
         readonly Label presetStateLabel = new Label();
         readonly Dictionary<EditorTool, Button> toolButtons = new Dictionary<EditorTool, Button>();
@@ -114,32 +113,18 @@ namespace HexMapEditor
         void BuildDetailsPanel()
         {
             right.BackColor = Color.FromArgb(34, 38, 48); right.Visible = false;
-            var header = new Panel { Dock = DockStyle.Top, Height = 38 }; var title = detailTitle = new Label { Text = "Szczegóły heksu", Dock = DockStyle.Fill, Padding = new Padding(14, 10, 0, 0) }; header.Controls.Add(title);
-            rightClose.Text = "Zamknij"; rightClose.Dock = DockStyle.Right; rightClose.Width = 85; StyleButton(rightClose); rightClose.Click += (s, e) => CloseDetailsPanel(); header.Controls.Add(rightClose);
-            var scroll = new DetailsScrollPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14) }; var content = new Panel { Location = new Point(14, 14), Height = 770, Width = 375 };
-            scroll.Controls.Add(content); right.Controls.Add(scroll); right.Controls.Add(header);
-            hexDetailScroll=scroll;
-            InitializePanelResize(header);
-            detailCoordinate.SetBounds(0, 0, 360, 24); detailTerrain.SetBounds(0, 26, 360, 28); detailTerrain.AutoEllipsis = true; content.Controls.Add(detailCoordinate); content.Controls.Add(detailTerrain);
-            detailCoordinate.Anchor = detailTerrain.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            detailIcon.SetBounds(0,54,360,24);detailIcon.AutoEllipsis=true;detailIcon.Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right;content.Controls.Add(detailIcon);
-            content.Controls.Add(new Label { Text = "Własna nazwa heksu", Location = new Point(0, 86), AutoSize = true });
-            cellName.SetBounds(0, 110, 360, 26); cellName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; cellName.AccessibleName = "Własna nazwa heksu"; content.Controls.Add(cellName);
-            cellName.TextChanged += (s, e) => NameEdited(); cellName.LostFocus += (s, e) => textHistory.BreakGroups();
-            cellName.HistoryUndo = () => TextUndo("name", false);
-            cellName.MouseDown += (s, e) => textHistory.BreakGroups();
-            cellName.KeyDown += (s, e) => { if (e.Control || new[] { Keys.Left, Keys.Right, Keys.Up, Keys.Down, Keys.Home, Keys.End }.Contains(e.KeyCode)) textHistory.BreakGroups(); };
-            var history = new FlowLayoutPanel { Location = new Point(0, 138), Width = 360, Height = 34, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right }; SmallButton(history, "Cofnij nazwę", () => TextUndo("name", false), 116); SmallButton(history, "Ponów nazwę", () => TextUndo("name", true), 116); content.Controls.Add(history);
-            content.Controls.Add(new Label { Text = "Opis (tekst, listy i tabele)", Location = new Point(0, 178), AutoSize = true });
-            cellDescription.SetBounds(0, 204, 360, 570); cellDescription.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; content.Controls.Add(cellDescription);content.Height=800;
+            BuildHexDetails();
             cellDescription.Changed = DescriptionEdited; cellDescription.HistoryRequested = repeat => TextUndo("description", repeat);
             cellDescription.SaveRequested = asNew => { if (asNew) SaveAsProject(); else SaveProject(); };
             cellDescription.BreakHistoryGroup = () => textHistory.BreakGroups();
             cellDescription.Error = message => ShowEditorMessage(message, "Opis heksu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             cellDescription.TableSizeRequested = () => { using (var d = new TableSizeDialog()) return RunModal(() => d.ShowDialog(this)) == DialogResult.OK ? new[] { d.Rows, d.Columns } : null; };
-            // Establish anchors at the design width before responsive layout begins.
-            scroll.Content = content; scroll.PerformLayout();
+            cellDescription.ImagePathRequested=()=>{
+                using(var dialog=new OpenFileDialog{Title="Wstaw obraz do opisu",Filter="Obrazy PNG i JPEG|*.png;*.jpg;*.jpeg",RestoreDirectory=true})
+                    return RunModal(()=>dialog.ShowDialog(this))==DialogResult.OK?dialog.FileName:null;
+            };
             BuildObjectDetails();
+            InitializePanelResize();
         }
     }
 }

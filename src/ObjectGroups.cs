@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,6 +21,7 @@ namespace HexMapEditor
         public string Id {get;set;}
         public string Name {get;set;}
         public List<string> Members {get;set;}
+        public Dictionary<string,int> Overrides {get;set;}
         public string StateId {get;set;}
         public bool? Locked {get;set;}
         public bool? RevealsFog {get;set;}
@@ -31,21 +32,60 @@ namespace HexMapEditor
         public float SizeValue {get;set;}
         public bool FrameEnabled { get; set; }
         public string FrameColor { get; set; }
-        public ObjectGroup(){Id=Guid.NewGuid().ToString("N");Name="Grupa";Members=new List<string>();SizeMode="Individual";FrameColor="#4BBBCD";}
-        public ObjectGroup Copy(){var copy=(ObjectGroup)MemberwiseClone();copy.Members=new List<string>(Members);return copy;}
+        public ObjectGroup(){Id=Guid.NewGuid().ToString("N");Name="Grupa";Members=new List<string>();Overrides=new Dictionary<string,int>();StateId="Neutral";SizeMode="Common";SizeValue=30;Locked=false;RevealsFog=false;RevealRadius=1;LightEnabled=false;LightRadius=1;FrameColor="#4BBBCD";}
+        public ObjectGroup Copy(){var copy=(ObjectGroup)MemberwiseClone();copy.Members=new List<string>(Members);copy.Overrides=new Dictionary<string,int>(Overrides);return copy;}
     }
+    [Flags]
+    internal enum GroupProperty { None=0, State=1, Size=2, Fog=4, Sight=8, Lock=16, All=31 }
+
     internal static class GroupRules
     {
         public static ObjectGroup For(MapData map,string id){return map.Groups.FirstOrDefault(g=>g.Members.Contains(id));}
         public static bool Allows(MapData map,string state){var d=map.ObjectStates.FirstOrDefault(s=>s!=null&&s.Id==state);return d!=null&&d.CanReveal;}
-        public static MapObject Effective(MapData map,MapObject obj)
+        internal static readonly GroupProperty[] Columns =
+            { GroupProperty.State, GroupProperty.Size, GroupProperty.Fog, GroupProperty.Sight, GroupProperty.Lock };
+        internal static readonly string[] ColumnNames = { "Stan", "Rozmiar", "Mgła", "Widzenie", "Blokada" };
+
+        internal static GroupProperty Used(ObjectGroup group, string id)
         {
-            var effective=obj.Copy();var group=For(map,obj.Id);
-            if(group!=null){if(group.StateId!=null)effective.Side=group.StateId;if(group.Locked.HasValue)effective.Locked=group.Locked.Value;if(group.RevealsFog.HasValue)effective.RevealsFog=group.RevealsFog.Value;if(group.RevealRadius.HasValue)effective.RevealRadius=group.RevealRadius.Value;
-                if(group.LightEnabled.HasValue)effective.LightEnabled=group.LightEnabled.Value;if(group.LightRadius.HasValue)effective.LightRadius=group.LightRadius.Value;
-                if(group.SizeMode=="Offset")effective.Size=Math.Max(8,Math.Min(1024,obj.Size+group.SizeValue));else if(group.SizeMode=="Common")effective.Size=group.SizeValue;
+            int value;
+            return group != null && group.Overrides.TryGetValue(id, out value) ? (GroupProperty)value : GroupProperty.None;
+        }
+
+        internal static void Set(ObjectGroup group, string id, GroupProperty properties, bool enabled)
+        {
+            var value = enabled ? Used(group,id) | properties : Used(group,id) & ~properties;
+            if (value == GroupProperty.None) group.Overrides.Remove(id);
+            else group.Overrides[id] = (int)value;
+        }
+
+        internal static void ToggleColumn(ObjectGroup group, GroupProperty property)
+        {
+            bool enable = group.Members.Any(id => (Used(group,id) & property) == 0);
+            foreach (var id in group.Members) Set(group,id,property,enable);
+        }
+
+        public static MapObject Effective(MapData map, MapObject obj)
+        {
+            var effective = obj.Copy();
+            var group = For(map,obj.Id);
+            var use = Used(group,obj.Id);
+            if ((use & GroupProperty.State) != 0) effective.Side = group.StateId;
+            if ((use & GroupProperty.Size) != 0)
+                effective.Size = group.SizeMode == "Offset" ? Math.Max(8,Math.Min(1024,obj.Size+group.SizeValue)) : group.SizeValue;
+            if ((use & GroupProperty.Fog) != 0)
+            {
+                effective.RevealsFog = group.RevealsFog.Value;
+                effective.RevealRadius = group.RevealRadius.Value;
             }
-            if(!Allows(map,effective.Side))effective.RevealsFog=false;return effective;
+            if ((use & GroupProperty.Sight) != 0)
+            {
+                effective.LightEnabled = group.LightEnabled.Value;
+                effective.LightRadius = group.LightRadius.Value;
+            }
+            if ((use & GroupProperty.Lock) != 0) effective.Locked = group.Locked.Value;
+            if (!Allows(map,effective.Side)) effective.RevealsFog = false;
+            return effective;
         }
         public static void Validate(MapData map)
         {
@@ -58,7 +98,7 @@ namespace HexMapEditor
                 throw new InvalidDataException("Nieprawidłowa lista wyłączonych stanów.");
             var objects=new HashSet<string>(map.Objects.Select(o=>o.Id));var groups=new HashSet<string>();var assigned=new HashSet<string>();
             foreach(var group in map.Groups){
-                if(group==null||!MapLogic.ValidColor(group.FrameColor)||String.IsNullOrWhiteSpace(group.Id)||group.Id.Length>200||objects.Contains(group.Id)||!groups.Add(group.Id)||String.IsNullOrWhiteSpace(group.Name)||group.Name.Length>200||group.Members==null||group.Members.Count==0||group.Members.Any(id=>!objects.Contains(id)||!assigned.Add(id))||group.StateId!=null&&!states.Contains(group.StateId)||group.RevealRadius.HasValue&&(group.RevealRadius<0||group.RevealRadius>20)||group.LightRadius.HasValue&&(group.LightRadius<0||group.LightRadius>20)||!new[]{"Individual","Offset","Common"}.Contains(group.SizeMode)||!ObjectGeometry.Finite(group.SizeValue)||group.SizeValue< -1016||group.SizeValue>1024||group.SizeMode=="Offset"&&Math.Abs(group.SizeValue)>1016||group.SizeMode=="Common"&&(group.SizeValue<8||group.SizeValue>1024))throw new InvalidDataException("Nieprawidłowa grupa, członkostwo lub nadpisanie.");
+                if(group==null||!MapLogic.ValidColor(group.FrameColor)||String.IsNullOrWhiteSpace(group.Id)||group.Id.Length>200||objects.Contains(group.Id)||!groups.Add(group.Id)||String.IsNullOrWhiteSpace(group.Name)||group.Name.Length>200||group.Members==null||group.Members.Count==0||group.Members.Any(id=>!objects.Contains(id)||!assigned.Add(id))||group.StateId==null||!states.Contains(group.StateId)||!group.Locked.HasValue||!group.RevealsFog.HasValue||!group.RevealRadius.HasValue||!group.LightEnabled.HasValue||!group.LightRadius.HasValue||group.Overrides==null||group.Overrides.Any(pair=>!group.Members.Contains(pair.Key)||pair.Value<1||pair.Value>(int)GroupProperty.All)||group.RevealRadius.HasValue&&(group.RevealRadius<0||group.RevealRadius>20)||group.LightRadius.HasValue&&(group.LightRadius<0||group.LightRadius>20)||!new[]{"Offset","Common"}.Contains(group.SizeMode)||!ObjectGeometry.Finite(group.SizeValue)||group.SizeValue< -1016||group.SizeValue>1024||group.SizeMode=="Offset"&&Math.Abs(group.SizeValue)>1016||group.SizeMode=="Common"&&(group.SizeValue<8||group.SizeValue>1024))throw new InvalidDataException("Nieprawidłowa grupa, członkostwo lub nadpisanie.");
             }
         }
     }
@@ -113,7 +153,7 @@ namespace HexMapEditor
             var before=map.Groups.First(g=>g.Id==group.Id);if(json.Serialize(before)==json.Serialize(group))return false;
             var action=new EditAction{Label="Właściwości grupy",BeforeGroups=map.Groups.Select(g=>g.Copy()).ToList(),AfterGroups=map.Groups.Select(g=>g.Id==group.Id?group.Copy():g.Copy()).ToList()};
             IncludeLibraryState(action, group.StateId);
-            return CommitObjectTransaction(action,mergeKey,before.StateId!=group.StateId||before.RevealsFog!=group.RevealsFog||before.RevealRadius!=group.RevealRadius);
+            return CommitObjectTransaction(action,mergeKey,before.StateId!=group.StateId||before.RevealsFog!=group.RevealsFog||before.RevealRadius!=group.RevealRadius||!group.Members.All(id=>(GroupRules.Used(before,id)&(GroupProperty.State|GroupProperty.Fog))==(GroupRules.Used(group,id)&(GroupProperty.State|GroupProperty.Fog))));
         }
         string AddObjectState(string name,string color,bool allows)
         {
@@ -121,15 +161,44 @@ namespace HexMapEditor
             ChangeStateFile(definition, definition.Id, true, StatesDirectory);
             return definition.Id;
         }
-        bool DetachObjects(string groupId,IEnumerable<string> members,bool[] keep)
+        bool DetachObjects(string groupId, IDictionary<string, GroupProperty> keep)
         {
-            EndCanvasGesture(true);if(keep==null)return false;if(keep.Length!=7)throw new ArgumentException("Wybierz siedem kategorii.");
-            var group=map.Groups.Single(g=>g.Id==groupId);var ids=new HashSet<string>(members);if(!ids.IsSubsetOf(group.Members))throw new InvalidDataException("Nieprawidłowi członkowie grupy.");
-            var action=new EditAction{Label=ids.Count==group.Members.Count?"Rozwiązanie grupy":"Odłączenie członka",BeforeGroups=map.Groups.Select(g=>g.Copy()).ToList(),AfterGroups=map.Groups.Select(g=>g.Copy()).ToList()};
-            foreach(var obj in map.Objects.Where(o=>ids.Contains(o.Id))){var next=obj.Copy();var effective=GroupRules.Effective(map,obj);if(keep[0])next.Side=effective.Side;if(keep[1])next.Size=effective.Size;if(keep[2])next.Locked=effective.Locked;if(keep[3])next.RevealsFog=effective.RevealsFog;if(keep[4])next.RevealRadius=effective.RevealRadius;if(keep[5])next.LightEnabled=effective.LightEnabled;if(keep[6])next.LightRadius=effective.LightRadius;if(!GroupRules.Allows(map,next.Side))next.RevealsFog=false;
-                if(json.Serialize(next)!=json.Serialize(obj))action.Objects.Add(new ObjectChange{Before=obj.Copy(),After=next,Index=map.Objects.IndexOf(obj)});
+            EndCanvasGesture(true);
+            var group = map.Groups.Single(g => g.Id == groupId);
+            if (keep.Count == 0 || keep.Keys.Any(id => !group.Members.Contains(id))) return false;
+            var action = new EditAction
+            {
+                Label = keep.Count == group.Members.Count ? "Rozwiązanie grupy" : "Odłączenie członka",
+                BeforeGroups = map.Groups.Select(g => g.Copy()).ToList(),
+                AfterGroups = map.Groups.Select(g => g.Copy()).ToList()
+            };
+            foreach (var obj in map.Objects.Where(o => keep.ContainsKey(o.Id)))
+            {
+                var next = obj.Copy();
+                var effective = GroupRules.Effective(map,obj);
+                var chosen = keep[obj.Id] & GroupRules.Used(group,obj.Id);
+                if ((chosen & GroupProperty.State) != 0) next.Side = effective.Side;
+                if ((chosen & GroupProperty.Size) != 0) next.Size = effective.Size;
+                if ((chosen & GroupProperty.Lock) != 0) next.Locked = effective.Locked;
+                if ((chosen & GroupProperty.Fog) != 0)
+                {
+                    next.RevealsFog = effective.RevealsFog;
+                    next.RevealRadius = effective.RevealRadius;
+                }
+                if ((chosen & GroupProperty.Sight) != 0)
+                {
+                    next.LightEnabled = effective.LightEnabled;
+                    next.LightRadius = effective.LightRadius;
+                }
+                if (json.Serialize(next) != json.Serialize(obj))
+                    action.Objects.Add(new ObjectChange { Before=obj.Copy(), After=next, Index=map.Objects.IndexOf(obj) });
             }
-            var remaining=action.AfterGroups.Single(g=>g.Id==groupId);remaining.Members.RemoveAll(ids.Contains);if(remaining.Members.Count==0)action.AfterGroups.Remove(remaining);selectedGroupId=null;return CommitObjectTransaction(action);
+            var remaining = action.AfterGroups.Single(g => g.Id == groupId);
+            remaining.Members.RemoveAll(keep.ContainsKey);
+            foreach (var id in keep.Keys) remaining.Overrides.Remove(id);
+            if (remaining.Members.Count == 0) action.AfterGroups.Remove(remaining);
+            selectedGroupId = null;
+            return CommitObjectTransaction(action);
         }
         HashSet<string> ExpandedObjects(IEnumerable<string> ids)
         {var result=new HashSet<string>(ids);foreach(var group in map.Groups)if(group.Members.Any(result.Contains))result.UnionWith(group.Members);return result;}

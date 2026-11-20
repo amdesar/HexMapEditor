@@ -50,6 +50,7 @@ namespace HexMapEditor
             ConfigureButton(zoomArrow,"▾","fit","Powiększenie — presety i wartość niestandardowa",ShowZoomMenu,24);zoomArrow.Image=null;zoomArrow.MouseDown+=(s,e)=>{if(GetMessageTime()!=zoomClosingStamp)suppressZoomOpen=false;};zoomArrow.KeyDown+=(s,e)=>suppressZoomOpen=false;
             var zoomHost=new Panel{Size=new Size(zoomButton.Width+zoomArrow.Width,32),Margin=Padding.Empty};zoomButton.Location=Point.Empty;zoomArrow.Location=new Point(zoomButton.Width,0);zoomHost.Controls.Add(zoomButton);zoomHost.Controls.Add(zoomArrow);quickStrip.Items.Add(new ToolStripControlHost(zoomHost){AutoSize=false,Size=zoomHost.Size,Margin=new Padding(1,0,1,0),Overflow=ToolStripItemOverflow.AsNeeded});
             Quick(new Button(),EditorCommand.FitMap,"fit","Dopasuj mapę",32);Quick(new Button(),EditorCommand.FitAll,"fitall","Dopasuj wszystko — widoczne warstwy",32);quickStrip.Items.Add(new ToolStripSeparator());qualityButton=new Button();Quick(qualityButton,EditorCommand.Quality,null,"Wysoka / Niska jakość — tylko podgląd sesji",60);
+            AddDetailsCommands();
             MenuFence(quickStrip.OverflowButton.DropDown);UpdateQualityButton();UpdateCommandState();
         }
         void StyleMenus(ToolStripMenuItem item){item.DropDown.BackColor=Color.FromArgb(34,38,48);item.DropDown.ForeColor=Color.WhiteSmoke;item.DropDown.Renderer=new FitMenuRenderer();MenuFence(item.DropDown);foreach(var child in item.DropDownItems.OfType<ToolStripMenuItem>())StyleMenus(child);}
@@ -67,7 +68,8 @@ namespace HexMapEditor
         void CommandHistory(bool repeat)
         {
             var focus=commandFocus??commandTarget??FocusedEditorControl();commandFocus=null;
-            if(cellName==focus||cellName.ContainsFocus){TextUndo("name",repeat);return;}if(cellDescription.ContainsFocus||IsWithin(focus,cellDescription)){TextUndo("description",repeat);return;}
+            if(cellDescription.ContainsFocus||IsWithin(focus,cellDescription)){TextUndo("description",repeat);return;}
+            var draft=focus as DraftNameBox;if(draft!=null){draft.Step(repeat);return;}
             var text=focus as TextBoxBase;if(text!=null){var rich=text as RichTextBox;if(repeat&&rich!=null)rich.Redo();else if(text.CanUndo)text.Undo();return;}
             if(repeat)Redo();else Undo();
         }
@@ -94,7 +96,9 @@ namespace HexMapEditor
             foreach(var pair in commandMenus)pair.Value.Enabled=!busy||pair.Key==EditorCommand.Exit;
             commandMenus[EditorCommand.Rename].Enabled=!busy&&!String.IsNullOrEmpty(currentPath);
             Control focus=commandFocus??commandTarget??FocusedEditorControl();var text=focus as TextBoxBase;bool textContext=text!=null;
-            commandMenus[EditorCommand.Undo].Enabled=!busy&&(textContext?text.CanUndo:undo.Count>0);commandMenus[EditorCommand.Redo].Enabled=!busy&&(textContext?text.CanUndo:redo.Count>0);
+            var draft=focus as DraftNameBox;
+            commandMenus[EditorCommand.Undo].Enabled=!busy&&(draft!=null?draft.CanStep(false):textContext?text.CanUndo:undo.Count>0);
+            commandMenus[EditorCommand.Redo].Enabled=!busy&&(draft!=null?draft.CanStep(true):textContext?text.CanUndo:redo.Count>0);
             foreach(var pair in quickCommands)pair.Value.Enabled=commandMenus.ContainsKey(pair.Key)?commandMenus[pair.Key].Enabled:!busy;
             qualityHigh.Enabled=qualityLow.Enabled=pointyMenu.Enabled=flatMenu.Enabled=!busy;zoomButton.Enabled=zoomArrow.Enabled=!busy;
             pointyMenu.Checked=map.Orientation=="PointyTop";flatMenu.Checked=!pointyMenu.Checked;qualityHigh.Checked=!lowQuality;qualityLow.Checked=lowQuality;

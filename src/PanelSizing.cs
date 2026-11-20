@@ -4,46 +4,55 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
-    internal sealed class DetailsScrollPanel : Panel
-    {
-        internal Control Content;
-        protected override void OnLayout(LayoutEventArgs e)
-        {
-            // Resize before ScrollableControl measures its virtual extent. A Resize
-            // handler runs too late when shrinking and leaves the old horizontal extent.
-            if (Content != null) Content.Width = Math.Max(200, ClientSize.Width - 48);
-            base.OnLayout(e);
-        }
-    }
     public sealed partial class MainWindow
     {
         int requestedRightWidth = 440, rightResizeOrigin, rightResizeStart;
         bool rightResizing;
         readonly Panel rightResizeGrip = new Panel { Width = 7, Dock = DockStyle.Left, Cursor = Cursors.SizeWE, BackColor = Color.FromArgb(78, 89, 112), AccessibleName = "Zmień szerokość panelu szczegółów" };
         int ClampRightWidth(int width) { return Math.Max(340, Math.Min(Math.Max(340, Math.Min(ClientSize.Width - 280, (int)(ClientSize.Width * .72))), width)); }
-        void InitializePanelResize(Panel header)
+        bool rightCollapsed;
+        readonly Button rightToggle = new EditorButton { Width=18, Dock=DockStyle.Left, AccessibleName="Zwiń lub rozwiń szczegóły" };
+        ToolStripControlHost detailsCloseHost, detailsResetHost, detailsGroupHost;
+        void InitializePanelResize()
         {
-            var reset = new Button { Dock = DockStyle.Right, Width = 34, FlatStyle = FlatStyle.Flat, Image = EditorIcons.Small("fit"), AccessibleName = "Przywróć szerokość domyślną" };
-            StyleButton(reset); tips.SetToolTip(reset, reset.AccessibleName); reset.Click += (s, e) => { EndRightResize(); EndCanvasGesture(true); SetRightWidth(440); }; header.Controls.Add(reset);
-            tips.SetToolTip(rightResizeGrip, rightResizeGrip.AccessibleName); right.Controls.Add(rightResizeGrip);
+            StyleButton(rightToggle);
+            tips.SetToolTip(rightToggle,rightToggle.AccessibleName);
+            rightToggle.Click+=(s,e)=>{EndRightResize();EndCanvasGesture(true);rightCollapsed=!rightCollapsed;UpdateUI();};
+            tips.SetToolTip(rightResizeGrip,rightResizeGrip.AccessibleName);
+            right.Controls.Add(rightResizeGrip);right.Controls.Add(rightToggle);
             rightResizeGrip.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) BeginRightResize(rightResizeGrip.PointToScreen(e.Location).X); };
             rightResizeGrip.MouseMove += (s, e) => { if (rightResizing) MoveRightResize(rightResizeGrip.PointToScreen(e.Location).X); };
             rightResizeGrip.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) EndRightResize(); };
             rightResizeGrip.MouseCaptureChanged += (s, e) => { if (rightResizing && !rightResizeGrip.Capture) EndRightResize(); };
         }
+        void AddDetailsCommands()
+        {
+            detailsCloseHost=DetailsCommand("Zamknij",90,CloseDetailsPanel);
+            detailsResetHost=DetailsCommand("Dostosuj",90,()=>{EndRightResize();EndCanvasGesture(true);SetRightWidth(440);});
+            detailsGroupHost=DetailsCommand("Grupuj wybrane",132,JoinGroupsFromPanel);
+        }
+        ToolStripControlHost DetailsCommand(string label,int width,Action action)
+        {
+            var button=new EditorButton{Text=label,AccessibleName=label,Size=new Size(width,30)};
+            button.Click+=(s,e)=>action();
+            var host=new ToolStripControlHost(button){Size=button.Size,AutoSize=false,Alignment=ToolStripItemAlignment.Right,Available=false};
+            quickStrip.Items.Add(host);return host;
+        }
+        void UpdateDetailsCommands(bool active,bool multiple)
+        {
+            detailsCloseHost.Available=detailsResetHost.Available=active;
+            detailsGroupHost.Available=multiple;
+            if(multiple)
+            {
+                int groups=SelectedWholeGroups().Count;
+                detailsGroupHost.Control.Text=groups>1?"Połącz grupy":groups==1?"Dodaj do grupy":"Grupuj wybrane";
+                detailsGroupHost.Control.AccessibleName=detailsGroupHost.Control.Text;
+            }
+        }
         void SetRightWidth(int width)
         {
-            Rectangle previous = right.Bounds; requestedRightWidth = ClampRightWidth(width); PositionOverlays();
-            if (!right.Visible || previous == right.Bounds) return;
-            // Moving an overlay with an ElementHost does not repaint the buffered
-            // sibling canvas during a captured drag. Repaint just the revealed strip
-            // now, before another mouse move can copy stale child-window pixels.
-            if (right.Left > previous.Left)
-            {
-                var exposed = Rectangle.Intersect(canvas.ClientRectangle, new Rectangle(previous.Left - canvas.Left, 0, right.Left - previous.Left, canvas.Height));
-                if (!exposed.IsEmpty) { canvas.Invalidate(exposed); canvas.Update(); }
-            }
-            right.Update();
+            requestedRightWidth=ClampRightWidth(width);
+            PositionOverlays();
         }
         void BeginRightResize(int screenX)
         {

@@ -7,10 +7,13 @@ namespace HexMapEditor
 {
     public sealed partial class MainWindow
     {
-        void NameEdited()
+        void RenameSelectedHex(string name)
         {
-            if (updating || BlockInkCommit() || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
-            var history = textHistory.For(cell.Id, "name", cell.Name); history.Record(cellName.Text, cellName.EditKind); textHistory.Trim(); cell.Name = cellName.Text; MarkCellDirty(cell);
+            if(selected<0||CellMasked(selected)||BlockInkCommit())return;
+            var cell=map.Cells[selected];if(cell.Name==name)return;
+            var action=new EditAction{Label="Nazwa heksa",NamedCellId=cell.Id,BeforeCellName=cell.Name,AfterCellName=name};
+            cell.Name=name;
+            PushAction(action);MarkCellDirty(cell);UpdateUI();
         }
         void DescriptionEdited(string document, string plain, string kind)
         {
@@ -30,8 +33,11 @@ namespace HexMapEditor
             updating = true;
             try
             {
-                if (field == "name") { int caret = cellName.SelectionStart; cell.Name = value; cellName.Text = value; cellName.SelectionStart = Math.Min(caret, value.Length); }
-                else { bool rich = value.StartsWith("rich:", StringComparison.Ordinal); cell.RichDescription = rich ? value.Substring(5) : null; cell.Description = rich ? NoteCodec.Plain(cell.RichDescription) : value.Substring(6); cell.NotesFormat = rich ? "richDocument1" : "plainText"; cellDescription.SetContent(cell.RichDescription, cell.Description); }
+                bool rich = value.StartsWith("rich:", StringComparison.Ordinal);
+                cell.RichDescription = rich ? value.Substring(5) : null;
+                cell.Description = rich ? NoteCodec.Plain(cell.RichDescription) : value.Substring(6);
+                cell.NotesFormat = rich ? "richDocument1" : "plainText";
+                cellDescription.SetContent(cell.RichDescription, cell.Description);
             }
             finally { updating = false; }
             MarkCellDirty(cell);
@@ -76,6 +82,11 @@ namespace HexMapEditor
                 var cells = map.Cells.ToDictionary(c => c.Id);
                 foreach (var change in action.Changes) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) (after ? change.After : change.Before).ApplyTo(cell); }
                 foreach (var change in action.Layers) { CellData cell; if (cells.TryGetValue(change.CellId, out cell)) change.Apply(cell, after); }
+            }
+            if(action.NamedCellId!=null)
+            {
+                var named=map.Cells.FirstOrDefault(c=>c.Id==action.NamedCellId);
+                if(named!=null)named.Name=after?action.AfterCellName:action.BeforeCellName;
             }
             InvalidateLight();
             selected = selectedId == null ? -1 : map.Cells.FindIndex(c => c.Id == selectedId); editorCellId = null;

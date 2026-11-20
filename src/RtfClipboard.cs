@@ -10,10 +10,11 @@ namespace HexMapEditor
     {
         static readonly HashSet<string> excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "object", "objdata", "pict", "shp", "shppict", "nonshppict", "filetbl", "datastore", "themedata", "colorschememapping", "htmltag", "datafield", "fldinst" };
-        public static string Filter(string source)
+        public static string Filter(string source) { return Filter(source,null); }
+        internal static string Filter(string source, Func<string,string> picture)
         {
             if (String.IsNullOrEmpty(source) || source.Length > NoteCodec.MaxCharacters || !source.StartsWith(@"{\rtf", StringComparison.Ordinal)) throw new InvalidDataException("Nieobsługiwany lub zbyt duży RTF.");
-            int at = 0; string result = Group(source, ref at, 0); if (at != source.Length && !String.IsNullOrWhiteSpace(source.Substring(at))) throw new InvalidDataException("Nieprawidłowy RTF."); return result;
+            int at = 0; string result = Group(source, ref at, 0,picture); if (at != source.Length && !String.IsNullOrWhiteSpace(source.Substring(at))) throw new InvalidDataException("Nieprawidłowy RTF."); return result;
         }
         static string Destination(string source, int start)
         {
@@ -22,15 +23,17 @@ namespace HexMapEditor
             if (p >= source.Length || source[p] != '\\') return "";
             int begin = ++p; while (p < source.Length && Char.IsLetter(source[p])) p++; return source.Substring(begin, p - begin);
         }
-        static string Group(string source, ref int at, int depth)
+        static string Group(string source, ref int at, int depth,Func<string,string> picture)
         {
             if (depth > 64 || at >= source.Length || source[at] != '{') throw new InvalidDataException("Zbyt złożony RTF.");
-            string destination = Destination(source, at); bool discard = excluded.Contains(destination), objectGroup = destination.Equals("object", StringComparison.OrdinalIgnoreCase); at++; var output = new StringBuilder("{"); var objectResult = new StringBuilder();
+            int start=at;string destination = Destination(source, at); bool discard = excluded.Contains(destination), objectGroup = destination.Equals("object", StringComparison.OrdinalIgnoreCase); at++; var output = new StringBuilder("{"); var objectResult = new StringBuilder();
             while (at < source.Length)
             {
                 char c = source[at];
-                if (c == '}') { at++; output.Append('}'); return objectGroup ? "{" + objectResult + "}" : discard ? "" : output.ToString(); }
-                if (c == '{') { bool result = objectGroup && Destination(source, at).Equals("result", StringComparison.OrdinalIgnoreCase); string child = Group(source, ref at, depth + 1); if (result) objectResult.Append(child); if (!discard) output.Append(child); continue; }
+                if (c == '}') { at++; if(picture!=null&&destination=="pict")return picture(source.Substring(start,at-start)); output.Append('}'); return objectGroup ? "{" + objectResult + "}" : destination=="shppict"&&picture!=null?objectResult.ToString():discard ? "" : output.ToString(); }
+                if (c == '{') { bool result = objectGroup && Destination(source, at).Equals("result", StringComparison.OrdinalIgnoreCase); var nested = Destination(source,at);
+                    var allowPicture = !discard || result || destination=="shppict";
+                    string child = Group(source, ref at, depth + 1,allowPicture&&nested!="nonshppict"?picture:null); if (result || destination=="shppict"&&nested=="pict") objectResult.Append(child); if (!discard) output.Append(child); continue; }
                 if (c != '\\') { if (!discard) output.Append(c); at++; continue; }
                 int begin = at++; if (at >= source.Length) break;
                 if (!Char.IsLetter(source[at]))
