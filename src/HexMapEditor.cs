@@ -115,6 +115,7 @@ namespace HexMapEditor
     internal sealed class EditAction
     {
         public ToolNumbers BeforeTool,AfterTool;
+        internal PresetSections QuickSections;
         internal string QuickPresetId;internal QuickSnapshot BeforeQuick,AfterQuick;
         public List<CellChange> Changes = new List<CellChange>();
         public List<LayerChange> Layers = new List<LayerChange>();

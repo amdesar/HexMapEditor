@@ -8,6 +8,8 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         bool TryChangeLibraryIcon(LibraryIcon before, LibraryIcon next, bool updateMap, string directory, out string error)
+        { return TryChangeLibraryIcon(before,next,updateMap,directory,true,out error); }
+        bool TryChangeLibraryIcon(LibraryIcon before, LibraryIcon next, bool updateMap, string directory, bool addToQuick, out string error)
         {
             error = null; EndCanvasGesture(true);
             try
@@ -42,7 +44,7 @@ namespace HexMapEditor
                 bool fileChange = before == null || next == null || !String.Equals(before.FilePath,next.FilePath,StringComparison.Ordinal) || !before.DiskBytes.SequenceEqual(next.DiskBytes);
                 if (!fileChange && action.Layers.Count == 0) return true;
                 if (fileChange) action.LibraryChange = new IconLibraryChange { Before=before == null ? null : before.Copy(), After=next, BeforeBytes=before == null ? null : before.DiskBytes, AfterBytes=next == null ? null : next.DiskBytes, BeforeSelected=activeIcon, BeforeMaterial=iconMaterial, BeforeObjectMaterial=objectMaterial, BeforeNoMaterial=noMaterial, AfterSelected=next == null || clearAfterIconEdit ? null : next.Id, AfterMaterial=next != null && !clearAfterIconEdit, AfterNoMaterial=next==null || clearAfterIconEdit, Index=before == null ? libraryIcons.Count : libraryIcons.FindIndex(i=>i.Id==before.Id) };
-                ApplyAction(action,true); PushAction(action); MarkDirty(); return true;
+                ApplyAction(action,true); if(addToQuick && before==null)AddImportedToQuick(action,next.Id,false); PushAction(action); MarkDirty(); return true;
             }
             catch(Exception ex) { error=ex.Message; return false; }
         }
@@ -58,7 +60,7 @@ namespace HexMapEditor
             if(entry!=null)CurrentQuick.IconRefs[entry.Id]=entry.Copy();
             if(entry==null&&removed!=null){if(after&&change.After==null)change.RemovedLists=CaptureLibraryQuick();RemoveQuickEntry(removed.Id,false,true);}
             if(!after&&change.After==null)RestoreLibraryQuick(change.RemovedLists);
-            if(after&&change.Before==null&&entry!=null)UsedIcon(entry.Id,true);RefreshIconPreview();
+            RefreshIconPreview();
         }
     }
 }

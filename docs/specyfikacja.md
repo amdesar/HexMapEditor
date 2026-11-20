@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja 2.6. Stan decyzji 15 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.9.2. Pierwszeństwo mają ustalenia sekcji 49, pozostałe wcześniejsze sekcje opisują historię uzgodnień.
+Wersja 2.6. Stan decyzji 20 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.9.3. Pierwszeństwo mają ustalenia sekcji 50, pozostałe wcześniejsze sekcje opisują historię uzgodnień.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1024,3 +1024,9 @@ Zmieniony kadr istniejącej grafiki bibliotecznej: nadpisz wskazaną pozycję, n
 Obszar wariantów terenu: klient540×430, pięć pełnych kolumn i dwa rzędy kafelków88px z marginesem4px (krok96), paddingiem i rezerwą na natywny scrollbar. Dalsze warianty przewijane. Cztery wskazane scrollbary pozostają systemowe: brak istniejącej prostej wspieranej kolorystyki, bez własnego przewijania i globalnego hooka.
 
 Aplikacja0.9.2, FileVersion/ProductVersion0.9.2.0. Map11/preset5, odczyt preset4 i formaty bibliotek bez zmian; brak migracji, zwiększenia limitów i zmian prywatnych danych. Zakres testów i ograniczenia: [raport0.9.2](raport-0.9.2.md). Zaakceptowane ramka, lewy panel, figury, WPF, gumka i autozapis nie są ponownie przebudowywane.
+
+## 50. Wersja 0.9.3 — stan szybkich zestawów
+
+Jawna zmiana zawartości widocznej sekcji Ikony lub Obiekty zapisuje jej roboczą migawkę sesyjną. Dotyczy importu do zestawu i polecenia usunięcia z szybkiego dostępu. Samo używanie zasobu, przesunięcie bez zmiany zawartości, zapis wyłącznie do biblioteki i automatyczne czyszczenie po bibliotecznym usunięciu nie tworzą takiej zmiany. Status, styl przycisku i pytanie przed zamknięciem używają tego samego porównania bieżącego draftu z biblioteką. Zapis/restore rozlicza wybrane sekcje, stan zapisu mapy jest niezależny. Chroniony Domyślny pozwala zapisać roboczy zestaw jako kopię.
+
+Etykieta wersji wykonującej ostatni zapis mapy jest odłożona. Istniejące Map11 i historia ścieżek nie zawierają takiej metadanej. Map11, preset5 i formaty bibliotek zachowane. [Raport 0.9.3](raport-0.9.3.md).

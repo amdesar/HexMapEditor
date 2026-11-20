@@ -88,6 +88,8 @@ namespace HexMapEditor
         void DeleteObjectTemplate(IWin32Window owner){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial)return;if(ShowLibraryMessage(owner,"Usunąć wzorzec „"+before.Name+"”? Instancje na mapie pozostaną.\nBez Kosza: kopia w pamięci Undo, do 300 wpisów. Nowa/Otwórz, wypadnięcie wpisu lub zamknięcie programu usuwa możliwość cofnięcia.","Usuń wzorzec",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)SaveObjectTemplate(before,null,false,owner);}
         void SaveObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update,IWin32Window owner){string error;if(!TryChangeObjectTemplate(before,next,update,ObjectsDirectory,out error))ShowLibraryMessage(owner,error,"Nie można zmienić wzorca",MessageBoxButtons.OK,MessageBoxIcon.Error);}
         bool TryChangeObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update,string directory,out string error)
+        { return TryChangeObjectTemplate(before,next,update,directory,true,out error); }
+        bool TryChangeObjectTemplate(ObjectTemplate before,ObjectTemplate next,bool update,string directory,bool addToQuick, out string error)
         {
             EndCanvasGesture(true);error=null;try{
                 directory=Path.GetFullPath(directory);Directory.CreateDirectory(directory);
@@ -102,7 +104,7 @@ namespace HexMapEditor
                 bool file=before==null||next==null||before.FilePath!=next.FilePath||!before.DiskBytes.SequenceEqual(next.DiskBytes);
                 if(!file&&action.Objects.Count==0)return true;
                 if(file)action.ObjectLibraryChange=new ObjectLibraryChange{Before=before==null?null:before.Copy(),After=next,Index=before==null?libraryObjects.Count:libraryObjects.IndexOf(before)};
-                ApplyAction(action,true);PushAction(action);MarkDirty();return true;
+                ApplyAction(action,true);if(addToQuick && before==null)AddImportedToQuick(action,next.Id,true);PushAction(action);MarkDirty();return true;
             }catch(Exception ex){error=ex.Message;return false;}
         }
         void ApplyObjectLibrary(ObjectLibraryChange change,bool after)
@@ -113,7 +115,7 @@ namespace HexMapEditor
             if(added!=null)CurrentQuick.ObjectRefs[added.Id]=added.Copy();
             if(added==null&&removed!=null){if(after&&change.After==null)change.RemovedLists=CaptureLibraryQuick();RemoveQuickEntry(removed.Id,true,true);}
             if(!after&&change.After==null)RestoreLibraryQuick(change.RemovedLists);
-            if(after&&change.Before==null&&added!=null)UsedObject(added.Id,true);RefreshObjectPreview();
+            RefreshObjectPreview();
         }
     }
 }

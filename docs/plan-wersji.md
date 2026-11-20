@@ -12,6 +12,7 @@
 | 0.9.0 | Lewy panel 4×3 / 2×6, obracane figury, presety trzech sekcji, robocze wersje i szybki dostęp 24/12; niebieskie oznaczenia wyboru |
 | 0.9.1 | Poprawki kompaktowego lewego panelu, panel z aktualnego presetu biblioteki, częściowe zamykanie, kosz quick/biblioteka i kwadratowe kadrowanie importu ikon/obiektów |
 | 0.9.2 | Pojedyncze Importuj/Edytuj/Usuń w bibliotekach ikon i obiektów, trwały odpowiednik konwersji, wiadro ikon, sygnał zapisu presetu i kadrowanie; bez zbiorczego usuwania |
+| 0.9.3 | Stan niezapisanych zmian sekcji szybkiego zestawu presetu po imporcie i jawnej edycji |
 | 0.10.0 | Prawy panel i opisy z obrazami |
 | 0.11.0 | Niezależne mapy w zakładkach; lokalizacja do ponownej oceny na tym etapie |
 | 0.12.0 | Instalacja / aktualizator; lokalny układ z resetem/fallback pozostaje osobnym uzgodnionym zakresem ustawień |

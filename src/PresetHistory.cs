@@ -26,13 +26,24 @@ namespace HexMapEditor
     }
     public sealed partial class MainWindow
     {
-        bool CommitPresetFile(PresetFileChange file, PaletteState after, string label)
+        bool CommitPresetFile(PresetFileChange file, PaletteState after, string label, PresetSections savedSections = 0)
         {
             EndCanvasGesture(true); var before = PaletteState.Capture(map,brushIndex);
             bool paletteChanges = before.Signature != after.Signature;
-            if (file.IsEmpty && !paletteChanges) return false;
+            bool resetIcons = savedSections.HasFlag(PresetSections.Icons) && CurrentQuick.DraftIcons != null;
+            bool resetObjects = savedSections.HasFlag(PresetSections.Objects) && CurrentQuick.DraftObjects != null;
+            if (file.IsEmpty && !paletteChanges && !resetIcons && !resetObjects) return false;
             file.Index = file.Before == null ? libraryPresets.Count : libraryPresets.FindIndex(p=>p.Id==file.Before.Id);
             var action = new EditAction { Label=label, PresetChange=file.IsEmpty ? null : file, BeforePalette=paletteChanges ? before : null, AfterPalette=paletteChanges ? after : null };
+            if (resetIcons || resetObjects)
+            {
+                action.QuickPresetId = map.ActivePresetId;
+                action.QuickSections = (resetIcons ? PresetSections.Icons : 0) | (resetObjects ? PresetSections.Objects : 0);
+                action.BeforeQuick = CaptureQuick();
+                action.AfterQuick = CaptureQuick();
+                if (resetIcons) action.AfterQuick.DraftIcons = null;
+                if (resetObjects) action.AfterQuick.DraftObjects = null;
+            }
             ApplyAction(action,true); PushAction(action); MarkDirty(); return true;
         }
         void ApplyPresetLibrary(PresetFileChange change, bool after)

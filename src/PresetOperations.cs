@@ -75,7 +75,6 @@ namespace HexMapEditor
                 ShowEditorMessage(ex.Message, "Wybór presetu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-        string PresetContent(TerrainPreset preset) { return json.Serialize(new { preset.Name, preset.Terrains,preset.Icons,preset.Objects }); }
         void UpdatePresetStatus()
         {
             var p = ActivePreset(); var stored = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
@@ -197,7 +196,7 @@ namespace HexMapEditor
                     else after.Presets.Add(candidate);
                     after.ActivePresetId=candidate.Id;
                 }
-                CommitPresetFile(file,after,asNew ? "Zapis kopii presetu" : "Zapis presetu");RefreshPresetPicker();return true;
+                CommitPresetFile(file,after,asNew ? "Zapis kopii presetu" : "Zapis presetu",asNew ? 0 : sections);RefreshPresetPicker();return true;
             }            catch (Exception ex) { error = ex.Message; return false; }
         }
         void EditTerrainById(string id) { EditTerrainDialog(false, id); }

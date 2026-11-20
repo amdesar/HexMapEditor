@@ -22,7 +22,7 @@ namespace HexMapEditor
         {
             string id=objects?(objectMaterial?activeObject:null):(iconMaterial?activeIcon:null);if(id==null)return;
             bool exists=objects?libraryObjects.Any(o=>o.Id==id):libraryIcons.Any(i=>i.Id==id);
-            using(var d=new QuickRemovalDialog(exists))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK){if(!d.FromLibrary)RemoveQuickEntry(id,objects);else if(objects)DeleteObjectTemplate();else DeleteLibraryIcon();}
+            using(var d=new QuickRemovalDialog(exists))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK){if(!d.FromLibrary)EditVisibleSet(objects, () => RemoveQuickEntry(id,objects));else if(objects)DeleteObjectTemplate();else DeleteLibraryIcon();}
         }
     }
 }

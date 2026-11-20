@@ -60,9 +60,9 @@ namespace HexMapEditor
         bool TryImportCounterpart(LibraryIcon source,bool toObject,out string error)
         {
             error=null;string id=ConvertedAssetId(source.Id,toObject);
-            if(toObject){var found=libraryObjects.FirstOrDefault(o=>o.Id==id);if(found!=null){CurrentQuick.ObjectRefs[id]=found.Copy();UsedObject(id,true);SelectObjectTemplate(id);return true;}
+            if(toObject){var found=libraryObjects.FirstOrDefault(o=>o.Id==id);if(found!=null){EditVisibleSet(true,()=>{CurrentQuick.ObjectRefs[id]=found.Copy();UsedObject(id,true);});SelectObjectTemplate(id);return true;}
                 if(!TryChangeObjectTemplate(null,new ObjectTemplate{Id=id,Name=source.Name,Asset=source.Asset},false,ObjectsDirectory,out error))return false;SelectObjectTemplate(id);
-            }else{var found=libraryIcons.FirstOrDefault(i=>i.Id==id);if(found!=null){CurrentQuick.IconRefs[id]=found.Copy();UsedIcon(id,true);SelectIcon(id);return true;}
+            }else{var found=libraryIcons.FirstOrDefault(i=>i.Id==id);if(found!=null){EditVisibleSet(false,()=>{CurrentQuick.IconRefs[id]=found.Copy();UsedIcon(id,true);});SelectIcon(id);return true;}
                 if(!TryChangeLibraryIcon(null,new LibraryIcon{Id=id,Name=source.Name,Asset=source.Asset},false,System.IO.Path.Combine(LibraryPaths.Root,"Icons"),out error))return false;SelectIcon(id);
             }return true;
         }

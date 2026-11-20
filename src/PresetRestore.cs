@@ -27,12 +27,22 @@ namespace HexMapEditor
                 var p=ActivePreset();var known=libraryPresets.FirstOrDefault(s=>s.Id==p.Id);var saved=p.Id==PresetCatalog.DefaultId?PresetCatalog.Default():PresetCatalog.ReadFile(known!=null&&known.FilePath!=null?known.FilePath:PresetCatalog.FindFile(directory,p.Id));
                 CheckTextureBudget(saved.Terrains.SelectMany(t=>t.Variants).Select(f=>f.Graphic));
                 // Read and validate everything before touching either the palette or quick lists.
-                var beforeQuick=CaptureQuick();bool changed=ChangePalette("Przywrócenie sekcji presetu",()=>{if(sections.HasFlag(PresetSections.Terrains))p.Terrains=saved.Terrains.Select(t=>t.Copy()).ToList();if(sections.HasFlag(PresetSections.Icons))p.Icons=saved.Icons.Select(i=>i.Copy()).ToList();if(sections.HasFlag(PresetSections.Objects))p.Objects=saved.Objects.Select(o=>o.Copy()).ToList();},action=>{action.QuickPresetId=p.Id;action.BeforeQuick=beforeQuick;RestoreQuickSections(p,sections);action.AfterQuick=CaptureQuick();});
+                var beforeQuick=CaptureQuick();bool changed=ChangePalette("Przywrócenie sekcji presetu",()=>{if(sections.HasFlag(PresetSections.Terrains))p.Terrains=saved.Terrains.Select(t=>t.Copy()).ToList();if(sections.HasFlag(PresetSections.Icons))p.Icons=saved.Icons.Select(i=>i.Copy()).ToList();if(sections.HasFlag(PresetSections.Objects))p.Objects=saved.Objects.Select(o=>o.Copy()).ToList();},action=>{action.QuickPresetId=p.Id;action.QuickSections=sections;action.BeforeQuick=beforeQuick;RestoreQuickSections(p,sections);action.AfterQuick=CaptureQuick();});
                 if(!changed)RestoreQuickSections(p,sections);UpdatePresetStatus();return true;
             }catch(Exception ex){error=ex.Message;return false;}
         }
         bool WorkingPresetDirty(TerrainPreset p)
-        {if(p.Id==PresetCatalog.DefaultId)return false;var stored=libraryPresets.FirstOrDefault(s=>s.Id==p.Id);return stored==null||PresetContent(p)!=PresetContent(stored);}
+        {
+            var stored = libraryPresets.FirstOrDefault(s => s.Id == p.Id);
+            if (stored == null) return p.Id != PresetCatalog.DefaultId;
+            QuickPair quick;
+            quickSets.TryGetValue(p.Id, out quick);
+            var icons = quick != null && quick.DraftIcons != null ? quick.DraftIcons : p.Icons;
+            var objects = quick != null && quick.DraftObjects != null ? quick.DraftObjects : p.Objects;
+            return p.Name != stored.Name || SectionContent(p.Terrains) != SectionContent(stored.Terrains)
+                || SectionContent(icons) != SectionContent(stored.Icons)
+                || SectionContent(objects) != SectionContent(stored.Objects);
+        }
         internal Func<TerrainPreset,DialogResult> ConfirmPresetForTest;
         internal Func<TerrainPreset,bool> SavePresetAllForTest;
         bool ConfirmPresetsBeforeClose()

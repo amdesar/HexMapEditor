@@ -7,6 +7,8 @@ namespace HexMapEditor
 {
     internal sealed class QuickSnapshot
     {
+        internal List<PresetIcon> DraftIcons;
+        internal List<PresetObject> DraftObjects;
         internal string[] Icons,Objects;internal Dictionary<string,LibraryIcon> IconRefs;internal Dictionary<string,ObjectTemplate> ObjectRefs;
     }
     internal sealed class QuickLibraryState
@@ -15,7 +17,10 @@ namespace HexMapEditor
     }
     public sealed partial class MainWindow
     {
-        sealed class QuickPair{internal readonly QuickAccess Icons=new QuickAccess(),Objects=new QuickAccess();internal readonly Dictionary<string,LibraryIcon> IconRefs=new Dictionary<string,LibraryIcon>();internal readonly Dictionary<string,ObjectTemplate> ObjectRefs=new Dictionary<string,ObjectTemplate>();}
+        sealed class QuickPair{
+            internal List<PresetIcon> DraftIcons;
+            internal List<PresetObject> DraftObjects;
+            internal readonly QuickAccess Icons=new QuickAccess(),Objects=new QuickAccess();internal readonly Dictionary<string,LibraryIcon> IconRefs=new Dictionary<string,LibraryIcon>();internal readonly Dictionary<string,ObjectTemplate> ObjectRefs=new Dictionary<string,ObjectTemplate>();}
         readonly Dictionary<string,QuickPair> quickSets=new Dictionary<string,QuickPair>();
 
 
@@ -30,13 +35,58 @@ namespace HexMapEditor
         }
         TerrainPreset WithVisibleSets(TerrainPreset p)
         {
-            var c=p.Copy();c.Icons=CurrentQuick.Icons.Visible.Select(FindIcon).Where(i=>i!=null).Select(i=>new PresetIcon{Id=i.Id,Name=i.Name,AssetId=i.Asset.Id,Asset=i.Asset}).ToList();
-            c.Objects=CurrentQuick.Objects.Visible.Select(FindTemplate).Where(o=>o!=null).Select(o=>new PresetObject{Id=o.Id,Name=o.Name,AssetId=o.Asset.Id,Asset=o.Asset,LightEnabled=o.LightEnabled,LightRadius=o.LightRadius}).ToList();return c;
+            var c = p.Copy();
+            c.Icons = VisibleIcons();
+            c.Objects = VisibleObjects();
+            return c;
         }
+        List<PresetIcon> VisibleIcons()
+        {
+            return CurrentQuick.Icons.Visible.Select(FindIcon).Where(i => i != null)
+                .Select(i => new PresetIcon { Id=i.Id, Name=i.Name, AssetId=i.Asset.Id, Asset=i.Asset }).ToList();
+        }
+        List<PresetObject> VisibleObjects()
+        {
+            return CurrentQuick.Objects.Visible.Select(FindTemplate).Where(o => o != null)
+                .Select(o => new PresetObject { Id=o.Id, Name=o.Name, AssetId=o.Asset.Id, Asset=o.Asset, LightEnabled=o.LightEnabled, LightRadius=o.LightRadius }).ToList();
+        }
+
+        // Only deliberate edits arm the section draft. Using a resource and
+        // automatic library cleanup may change the display without editing it.
+        void EditVisibleSet(bool objects, Action change)
+        {
+            var q = CurrentQuick;
+            if (objects)
+            {
+                var before = VisibleObjects();
+                change();
+                var after = VisibleObjects();
+                if (SectionContent(before.OrderBy(o => o.Id, StringComparer.Ordinal)) != SectionContent(after.OrderBy(o => o.Id, StringComparer.Ordinal)))
+                    q.DraftObjects = after;
+            }
+            else
+            {
+                var before = VisibleIcons();
+                change();
+                var after = VisibleIcons();
+                if (SectionContent(before.OrderBy(i => i.Id, StringComparer.Ordinal)) != SectionContent(after.OrderBy(i => i.Id, StringComparer.Ordinal)))
+                    q.DraftIcons = after;
+            }
+            UpdatePresetStatus();
+        }
+        void AddImportedToQuick(EditAction action, string id, bool objects)
+        {
+            action.QuickPresetId = map.ActivePresetId;
+            action.QuickSections = objects ? PresetSections.Objects : PresetSections.Icons;
+            action.BeforeQuick = CaptureQuick();
+            EditVisibleSet(objects, () => { if (objects) UsedObject(id, true); else UsedIcon(id, true); });
+            action.AfterQuick = CaptureQuick();
+        }
+        string SectionContent<T>(IEnumerable<T> items) { return json.Serialize(items); }
         void RestoreQuickSections(TerrainPreset p,PresetSections sections)
         {
-            var q=CurrentQuick;if(sections.HasFlag(PresetSections.Icons)){q.IconRefs.Clear();foreach(var i in p.Icons)q.IconRefs[i.Id]=i.Icon();q.Icons.Restore(p.Icons.Select(i=>i.Id));}
-            if(sections.HasFlag(PresetSections.Objects)){q.ObjectRefs.Clear();foreach(var o in p.Objects)q.ObjectRefs[o.Id]=o.Template();q.Objects.Restore(p.Objects.Select(o=>o.Id));}
+            var q=CurrentQuick;if(sections.HasFlag(PresetSections.Icons)){q.DraftIcons=null;q.IconRefs.Clear();foreach(var i in p.Icons)q.IconRefs[i.Id]=i.Icon();q.Icons.Restore(p.Icons.Select(i=>i.Id));}
+            if(sections.HasFlag(PresetSections.Objects)){q.DraftObjects=null;q.ObjectRefs.Clear();foreach(var o in p.Objects)q.ObjectRefs[o.Id]=o.Template();q.Objects.Restore(p.Objects.Select(o=>o.Id));}
             if(sections.HasFlag(PresetSections.Icons))RefreshIconPreview();if(sections.HasFlag(PresetSections.Objects))RefreshObjectPreview();
         }
         void UsedIcon(string id,bool added=false){var q=CurrentQuick;var entry=FindIcon(id);if(entry==null)return;string before=String.Join("|",q.Icons.Visible);q.IconRefs[id]=entry.Copy();if(added)q.Icons.Added(id);else q.Icons.Used(id);if(before!=String.Join("|",q.Icons.Visible))RefreshIconPreview();}
@@ -45,7 +95,7 @@ namespace HexMapEditor
         {
             b.Size=new Size(40,28);b.Margin=new Padding(2);if(b.Image!=null){var image=b.Image;b.Image=new Bitmap(image,24,24);image.Dispose();}
             var menu=new ContextMenuStrip{Renderer=new FitMenuRenderer(),BackColor=Color.FromArgb(34,38,48),ForeColor=Color.WhiteSmoke};
-            menu.Items.Add("Usuń z szybkiego dostępu",null,(s,e)=>{RemoveQuickEntry(id,objects);});b.ContextMenuStrip=menu;b.Disposed+=(s,e)=>menu.Dispose();
+            menu.Items.Add("Usuń z szybkiego dostępu",null,(s,e)=>{EditVisibleSet(objects, () => RemoveQuickEntry(id,objects));});b.ContextMenuStrip=menu;b.Disposed+=(s,e)=>menu.Dispose();
         }
         void QuickPlaceholders(FlowLayoutPanel panel){} // Empty positions are deliberately just the panel background.
         void UpdateQuickTiles(FlowLayoutPanel panel,bool objects)
@@ -68,10 +118,31 @@ namespace HexMapEditor
             if(objects){if(activeObject==id){activeObject=null;objectMaterial=false;noMaterial=true;}RefreshObjectPreview();}
             else{if(activeIcon==id){activeIcon=null;iconMaterial=false;noMaterial=true;}RefreshIconPreview();}
         }
-        static QuickSnapshot SnapshotQuick(QuickPair q){return new QuickSnapshot{Icons=q.Icons.All,Objects=q.Objects.All,IconRefs=q.IconRefs.ToDictionary(x=>x.Key,x=>x.Value.Copy()),ObjectRefs=q.ObjectRefs.ToDictionary(x=>x.Key,x=>x.Value.Copy())};}
+        static QuickSnapshot SnapshotQuick(QuickPair q){return new QuickSnapshot{DraftIcons=q.DraftIcons,DraftObjects=q.DraftObjects,Icons=q.Icons.All,Objects=q.Objects.All,IconRefs=q.IconRefs.ToDictionary(x=>x.Key,x=>x.Value.Copy()),ObjectRefs=q.ObjectRefs.ToDictionary(x=>x.Key,x=>x.Value.Copy())};}
         QuickSnapshot CaptureQuick(){return SnapshotQuick(CurrentQuick);}
         QuickLibraryState CaptureLibraryQuick(){EnsureQuickPreset();return new QuickLibraryState{Sets=quickSets.ToDictionary(x=>x.Key,x=>SnapshotQuick(x.Value))};}
         void RestoreLibraryQuick(QuickLibraryState state){if(state==null)return;foreach(var pair in state.Sets)if(map.Presets.Any(p=>p.Id==pair.Key))ApplyQuick(pair.Key,pair.Value);}
-        void ApplyQuick(string id,QuickSnapshot snapshot){QuickPair q;if(!quickSets.TryGetValue(id,out q))quickSets[id]=q=new QuickPair();q.Icons.RestoreHistory(snapshot.Icons);q.Objects.RestoreHistory(snapshot.Objects);q.IconRefs.Clear();q.ObjectRefs.Clear();foreach(var i in snapshot.IconRefs)q.IconRefs[i.Key]=i.Value.Copy();foreach(var o in snapshot.ObjectRefs)q.ObjectRefs[o.Key]=o.Value.Copy();if(id==map.ActivePresetId){RefreshIconPreview();RefreshObjectPreview();}}
+        void ApplyQuick(string id, QuickSnapshot snapshot, PresetSections sections = PresetSections.All)
+        {
+            QuickPair q;
+            if (!quickSets.TryGetValue(id, out q)) quickSets[id] = q = new QuickPair();
+            if (sections.HasFlag(PresetSections.Icons))
+            {
+                q.DraftIcons = snapshot.DraftIcons;
+                q.Icons.RestoreHistory(snapshot.Icons);
+                q.IconRefs.Clear();
+                foreach (var i in snapshot.IconRefs) q.IconRefs[i.Key] = i.Value.Copy();
+                if (id == map.ActivePresetId) RefreshIconPreview();
+            }
+            if (sections.HasFlag(PresetSections.Objects))
+            {
+                q.DraftObjects = snapshot.DraftObjects;
+                q.Objects.RestoreHistory(snapshot.Objects);
+                q.ObjectRefs.Clear();
+                foreach (var o in snapshot.ObjectRefs) q.ObjectRefs[o.Key] = o.Value.Copy();
+                if (id == map.ActivePresetId) RefreshObjectPreview();
+            }
+            if (id == map.ActivePresetId) UpdatePresetStatus();
+        }
     }
 }
