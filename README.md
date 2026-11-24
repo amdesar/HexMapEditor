@@ -1,12 +1,14 @@
-# HexMapEditor 0.12.0
+# HexMapEditor 0.12.1
 
 Samodzielny edytor map heksagonalnych Windows, napisany w C# z Windows Forms, GDI+ i osadzonym edytorem WPF. Edycja i zapis map działają offline. Po skonfigurowaniu kanału program może sprawdzać aktualizacje w tle.
 
 ## Uruchamianie
 
-Wymagany Windows 10 lub 11 z pełnym .NET Framework 4.8 albo 4.8.1 z WPF. Aplikacja **0.12.0** zapisuje mapy w **formacie 12**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Wymagany Windows 10 lub 11 z pełnym .NET Framework 4.8 albo 4.8.1 z WPF. Aplikacja **0.12.1** zapisuje mapy w **formacie 12**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
-- **Setup** instaluje dla bieżącego użytkownika i dodaje skrót do menu Start. Zaznaczona domyślnie opcja skojarzenia udostępnia edytor w „Otwórz za pomocą”. Wybór domyślnego programu należy do użytkownika w ustawieniach Windows. Dane, w tym `Library` i `recent-projects.json`, są w `%LOCALAPPDATA%\amdesar\HexMapEditor`.
+- **Setup** proponuje katalog `Program Files\HexMapEditor` i osobno pyta o **Library**. Możesz wybrać bibliotekę obok programu, w Dokumentach lub we własnym katalogu. Instalacja może wymagać zgody administratora. Edytor uruchamiaj zwyczajnie. Lista ostatnich projektów trafia do `Data` pod katalogiem programu, a nowe mapy tworzone z powitania do `Data\Hexmaps`. Istniejące mapy pozostają w swoich lokalizacjach.
+- Skrót w menu Start jest standardowy. Skrót na pulpicie jest opcjonalny. Domyślnie zaznaczone skojarzenie udostępnia edytor w „Otwórz za pomocą”. Domyślną aplikację wybierasz w Windows.
+- Przed przejściem z zainstalowanej 0.12.0 zamknij i odinstaluj starszy program. Setup może na życzenie skopiować jego Library, listę ostatnich projektów i ustawienia do nowych katalogów. Oryginały i mapy pozostają na miejscu. [Raport 0.12.1](docs/raport-0.12.1.md).
 - **Portable** uruchamia się z `HexMapEditor.exe` po rozpakowaniu całego ZIP do zapisywalnego folderu. Dane są obok EXE. Do aktualizacji zamknij edytor, rozpakuj nowy ZIP osobno i skopiuj tylko pliki z paczki do istniejącego folderu. Zachowaj swoje mapy, bibliotekę i ustawienia.
 - **Sprawdź aktualizacje** jest dostępne na powitaniu i w menu Pomoc. W dostarczonej konfiguracji kanał jest pusty. [Raport 0.12.0 i instrukcja publikacji](docs/raport-0.12.0.md).
 

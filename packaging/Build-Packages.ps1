@@ -20,13 +20,20 @@ if ($numbers.FileVersion -notmatch '^\d+\.\d+\.\d+\.0$' -or $numbers.ProductVers
 }
 $version = ([version]$numbers.FileVersion).ToString(3)
 [IO.Directory]::CreateDirectory($destination) | Out-Null
-$argsForCompiler = @("/DVersion=$version", "/DPayload=$exe", "/O$destination")
+$toolDir = Join-Path $destination ('setup-tool-' + [Guid]::NewGuid().ToString('N'))
+[IO.Directory]::CreateDirectory($toolDir) | Out-Null
+$storageTool = Join-Path $toolDir 'SetupStorageTool.exe'
+$csc = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+& $csc /nologo /target:winexe /optimize+ "/out:$storageTool" (Join-Path $PSScriptRoot 'SetupStorageTool.cs')
+if ($LASTEXITCODE -ne 0) { throw "Kompilacja pomocnika Setup zakończyła się kodem $LASTEXITCODE." }
+$argsForCompiler = @("/DVersion=$version", "/DPayload=$exe", "/DStorageTool=$storageTool", "/O$destination")
 if ($Fixture) {
     $install = [IO.Path]::GetFullPath($FixtureInstallDir)
     if (-not $install.StartsWith($work, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Wariant testowy można zainstalować wyłącznie w tests/_work.'
     }
-    $argsForCompiler += "/DFixture=$Fixture", "/DFixtureInstallDir=$install"
+    $legacyId = $Fixture.Substring(0, [Math]::Min(12, $Fixture.Length))
+    $argsForCompiler += "/DFixture=$Fixture", "/DFixtureLegacyId=$legacyId", "/DFixtureInstallDir=$install"
 }
 & $compiler @argsForCompiler (Join-Path $PSScriptRoot 'HexMapEditor.iss')
 if ($LASTEXITCODE -ne 0) { throw "ISCC zakończył się kodem $LASTEXITCODE." }

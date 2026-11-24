@@ -19,7 +19,8 @@
 | 0.11.0 | Niezależne mapy w dolnych kartach, wspólne robocze presety według ścieżki, autozapis zapisanych kart i przekazywanie projektu do działającego EXE |
 | 0.11.1 | Jednolite kafelki kart, wspólny termin autozapisu, podgląd mapy i presetu przy zamykaniu oraz dopasowania pod nakładką prawego panelu |
 | 0.12.0 | Instalator dla bieżącego użytkownika, Portable ZIP, opcjonalna rejestracja skojarzenia, aktualizator z decyzją użytkownika i zachowaniem danych |
-| 0.12.1 | Odbiór właściwego publicznego kanału po decyzji o źródle, nagłówek Zakładki, standardowy lewy panel przy pytaniu o preset i stabilny dolny status |
+| 0.12.1 | Instalacja w Program Files, osobny wybór Library, opcjonalny skrót pulpitu, rozpoznanie instalacji i danych 0.12.0, link do Runtime oraz korekta powitania |
+| 0.12.2 | Nagłówek Zakładki, zwykły lewy panel przed pytaniem o zapis presetu i nieruchome pola dolnego statusu |
 | 0.13.0 | Rzeczywiste źródła grafik i [kolejka importu](backlog-import-z-folderow.md), docelowe foldery Library |
 | 0.13.x | Końcowa stabilizacja i uzgodnione testy |
 | 1.0.0 | Wyłącznie oznaczenia wersji, bez nowych zmian funkcjonalnych/stylistycznych |
@@ -38,7 +39,7 @@ Merge heksów i import osadzonych zasobów mapy do Library dopiero po1.0. Pozost
 - Uruchomienie z mapą nie wymusza ekranu powitalnego.
 - Zachowanie Library, map, lokalnych ustawień i `recent-projects.json` podczas przyszłej aktualizacji.
 
-Wdrożono link do opisu konkretnego wydania i konfigurację publicznego kanału z pustymi wartościami domyślnymi. Szersze ustawienia, w tym zapis lokalnego układu i reset, pozostają w osobnym zakresie. [Raport 0.12.0](raport-0.12.0.md).
+Wdrożono link do opisu konkretnego wydania i konfigurację publicznego kanału z pustymi wartościami domyślnymi. Odbiór publicznego kanału pozostaje zależny od decyzji o źródle i publikacji przez właściciela. Szersze ustawienia, w tym zapis lokalnego układu i reset, pozostają w osobnym zakresie. [Raport 0.12.0](raport-0.12.0.md).
 
 ## Po 1.0 — szersze preferencje użytkownika
 

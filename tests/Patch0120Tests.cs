@@ -108,16 +108,17 @@ namespace HexMapEditor.Tests
         {
             string app = Directory.CreateDirectory(Path.Combine(Root,"Portable")).FullName;
             string profile = Directory.CreateDirectory(Path.Combine(Root,"Profile")).FullName;
-            var absent = new AppStorage(app,profile);
+            var absent = new AppStorage(app);
             Check(!absent.Installed && absent.DataRoot==app, "Loose executable must be portable");
             string marker = Path.Combine(app,AppStorage.ModeFile);
             File.WriteAllText(marker,AppStorage.PortableMode);
-            Check(new AppStorage(app,profile).DataRoot==app, "Portable path");
+            Check(new AppStorage(app).DataRoot==app, "Portable path");
             File.WriteAllText(marker,AppStorage.InstalledMode);
-            var installed = new AppStorage(app,profile);
-            Check(installed.Installed && installed.DataRoot.StartsWith(profile+"\\") && installed.RecentProjectsPath.StartsWith(profile+"\\"), "Split installed paths");
+            File.WriteAllText(Path.Combine(app,AppStorage.LibraryLocationFile),profile);
+            var installed = new AppStorage(app);
+            Check(installed.Installed && installed.LibraryRoot==profile && installed.DataRoot==Path.Combine(app,"Data"), "Split installed paths");
             File.WriteAllText(marker,"invalid");
-            Refuses<InvalidDataException>(()=>new AppStorage(app,profile),"Invalid marker silently used wrong root");
+            Refuses<InvalidDataException>(()=>new AppStorage(app),"Invalid marker silently used wrong root");
             Check(RecentProjects.Shared.Entries.Length==0, "Fixture acquired MRU entries");
             LibraryPaths.EnsureDirectories();
             string warning;

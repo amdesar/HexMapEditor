@@ -19,7 +19,8 @@ namespace HexMapEditor
         }
         void OpenLibraryFolder(string relative)
         {
-            try{LibraryPaths.EnsureDirectories();using(var opened=Process.Start(new ProcessStartInfo(relative==null?LibraryPaths.Root:Path.Combine(LibraryPaths.Root,relative)){UseShellExecute=true,Verb="open"})){} }
+            string folder=relative==null?LibraryPaths.Root:relative=="Hexmaps"?LibraryPaths.Hexmaps:Path.Combine(LibraryPaths.Root,relative);
+            try{LibraryPaths.EnsureDirectories();using(var opened=Process.Start(new ProcessStartInfo(folder){UseShellExecute=true,Verb="open"})){} }
             catch(Exception ex){ShowEditorMessage("Nie można otworzyć folderu biblioteki:\n"+LibraryPaths.Root+"\n\n"+ex.Message,"Biblioteka",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
         }
     }

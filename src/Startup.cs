@@ -149,8 +149,8 @@ namespace HexMapEditor
             Controls.Add(new Label{Name="appVersion",Text="Wersja "+MainWindow.Version+" • "+ReleaseMetadata.Date,ForeColor=Color.Silver,AutoSize=true,Location=new Point(124,83)});
             var load=ButtonAt("Otwórz projekt",36,132);var create=ButtonAt("Stwórz nowy projekt",334,132);load.Click+=(s,e)=>ChooseOpen();create.Click+=(s,e)=>ChooseNew();
             Controls.Add(new Label{Text="Ostatnie projekty",AutoSize=true,Font=new Font(Font,FontStyle.Bold),Location=new Point(36,198)});
-            projects.Bounds=new Rectangle(163,232,324,280);Controls.Add(projects);Shown+=(s,e)=>{StartupTrace.Write("start.visible",this);RefreshProjects();};
-            var update=new EditorButton{Text="Sprawdź aktualizacje",Bounds=new Rectangle(36,516,180,30)};
+            projects.Bounds=new Rectangle(163,232,324,264);Controls.Add(projects);Shown+=(s,e)=>{StartupTrace.Write("start.visible",this);RefreshProjects();};
+            var update=new EditorButton{Text="Sprawdź aktualizacje",Bounds=new Rectangle(434,500,180,30),Anchor=AnchorStyles.Bottom|AnchorStyles.Right};
             update.Click+=(s,e)=>{if(UpdateRequested!=null)UpdateRequested();};Controls.Add(update);
             Load+=(s,e)=>{var area=Screen.FromControl(this).WorkingArea;Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);};Disposed+=(s,e)=>tips.Dispose();
         }

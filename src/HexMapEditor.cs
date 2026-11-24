@@ -16,17 +16,22 @@ namespace HexMapEditor
 
     internal static class LibraryPaths
     {
-        public static string Root { get { return Path.Combine(AppStorage.Current.DataRoot, "Library"); } }
-        public static string Hexmaps { get { return Path.Combine(Root, "Hexmaps"); } }
+        public static string Root { get { return AppStorage.Current.LibraryRoot; } }
+        public static string Hexmaps { get { return AppStorage.Current.MapRoot; } }
         public static string Presets { get { return Path.Combine(Root, "Terrains", "Presets"); } }
         public static string Backgrounds { get { return Path.Combine(Root, "Backgrounds"); } }
         public static string TerrainGraphics { get { return Path.Combine(Root, "Terrains", "Graphics"); } }
-        public static void EnsureDirectories() { EnsureDirectories(AppStorage.Current.DataRoot); }
+        public static void EnsureDirectories() { EnsureDirectories(Root, Hexmaps); }
         public static void EnsureDirectories(string dataDirectory)
         {
             string root = Path.Combine(dataDirectory, "Library");
-            foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), Path.Combine("Terrains", "Graphics"), "Icons", "Objects", Path.Combine("Objects", "States"), "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
+            EnsureDirectories(root, Path.Combine(root, "Hexmaps"));
+        }
+        static void EnsureDirectories(string root, string maps)
+        {
+            foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), Path.Combine("Terrains", "Graphics"), "Icons", "Objects", Path.Combine("Objects", "States"), Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
                 Directory.CreateDirectory(Path.Combine(root, folder));
+            Directory.CreateDirectory(maps);
         }
     }
 

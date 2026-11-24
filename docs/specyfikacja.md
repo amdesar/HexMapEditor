@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja 2.8. Stan decyzji 24 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.12.0. Karty i robocze presety opisuje sekcja 54, reguły zapisu i zamykania sekcja 55, a dystrybucję sekcja 56.
+Wersja 2.9. Stan decyzji 24 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.12.1. Karty i robocze presety opisuje sekcja 54, reguły zapisu i zamykania sekcja 55, a instalację i dystrybucję sekcje 56–57.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1087,3 +1087,10 @@ Schowek jest źródłem importu grafiki terenu, ikony i obiektu. Źródło przec
 - Windows 10/11 z pełnym .NET Framework 4.8 lub 4.8.1. Setup działa dla bieżącego użytkownika, tworzy skrót Start i może udostępnić własny ProgID dla `.hexmap`. Instalator pozostawia wybór domyślny w gestii Windows i użytkownika. Aktualizacja dziedziczy zaznaczenie zadania skojarzenia.
 - Plik `deployment.mode` określa tryb. Instalacja zapisuje dane w `%LOCALAPPDATA%\amdesar\HexMapEditor`. Portable używa katalogu EXE i nie rejestruje skojarzeń. Inicjalizacja fabryczna korzysta z generowania w aplikacji. Setup operuje na plikach programu, skrócie i własnych wpisach rejestru. Dane użytkownika są poza zakresem Setup.
 - Aktualizator używa jawnie skonfigurowanego publicznego repozytorium wydań GitHub. Pusta konfiguracja wyłącza połączenia. Aktualizator porównuje numery wersji stabilnych i pyta o decyzję. W instalacji weryfikuje oczekiwany EXE według typu, źródła, rozmiaru i SHA-256 z metadanych i przeprowadza zwykłe zamknięcie. Portable otwiera link do ZIP na polecenie użytkownika. Format Map12, preset 5 i formaty bibliotek zachowane. [Raport 0.12.0](raport-0.12.0.md).
+
+## 57. Wersja 0.12.1 — kreator i położenie danych
+
+- Instalacja dla komputera pokazuje kolejno folder programu, Library, zadania i podsumowanie. Domyślny katalog programu to systemowy `Program Files\HexMapEditor`. Library może być przy programie, w systemowych Dokumentach pierwotnego użytkownika Setup lub we wskazanym katalogu. Kolejny Setup zachowuje wybory. Zmiana Library wskazuje inny katalog i pozostawia wcześniejsze dane na miejscu.
+- `deployment.mode` rozpoznaje instalację. Chroniona konfiguracja `library-location.txt` zawiera pełną ścieżkę Library. `Data` mieści listę ostatnich projektów oraz podfolder `Hexmaps` dla nowych map zapisywanych z powitania. Portable i uruchomienie samodzielnego EXE trzymają dane obok swojej kopii.
+- Skrót Start jest standardowy, a własny skrót instalatora na pulpicie opcjonalny. Skojarzenie udostępnia program dla plików .hexmap bez zmiany UserChoice. Deinstalacja usuwa pliki programu, własną rejestrację i własne skróty. Library, Data i mapy zostają.
+- Setup wykrywa jeszcze zainstalowaną kopię 0.12.0 dla bieżącego użytkownika i wyjaśnia, jak ją odinstalować. Jeśli po niej zostały dane, proponuje dobrowolną kopię do pustego celu z zachowaniem oryginałów oraz ścieżek map. Bez odpowiedniego Runtime instalacja jest wstrzymana i pokazuje oficjalną stronę pobrania. [Raport 0.12.1](raport-0.12.1.md).
