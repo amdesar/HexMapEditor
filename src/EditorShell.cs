@@ -93,7 +93,7 @@ namespace HexMapEditor
             canvas.Paint += PaintMap; canvas.MouseDown += CanvasMouseDown; canvas.MouseMove += CanvasMouseMove; canvas.MouseUp += CanvasMouseUp; canvas.MouseWheel += CanvasMouseWheel;
             canvas.MouseCaptureChanged += (s, e) => { if (!canvas.Capture && gestureButton != MouseButtons.None){if(pointerActive)ClearPointerContext();EndCanvasGesture(true);} };
             left.BackColor = shellToolbar.BackColor; left.AutoScroll = false; Controls.Add(left);
-            leftToggle.FlatStyle = FlatStyle.Flat; StyleButton(leftToggle); leftToggle.AccessibleName = "Zwiń lub rozwiń paletę"; tips.SetToolTip(leftToggle, leftToggle.AccessibleName); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; PositionOverlays(); canvas.Invalidate(); }; Controls.Add(leftToggle);
+            leftToggle.FlatStyle = FlatStyle.Flat; StyleButton(leftToggle); leftToggle.AccessibleName = "Zwiń lub rozwiń paletę"; tips.SetToolTip(leftToggle, leftToggle.AccessibleName); leftToggle.Click += (s, e) => { leftCollapsed = !leftCollapsed; PositionOverlays(); canvas.Invalidate();tabBar.Invalidate(); }; Controls.Add(leftToggle);
             BuildPalettePanel(); BuildDetailsPanel(); Controls.Add(right);
             left.BringToFront(); right.BringToFront(); leftToggle.BringToFront();
         }

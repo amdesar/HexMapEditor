@@ -10,15 +10,21 @@ namespace HexMapEditor
     {
         internal const long Interval=5*60*1000;
         internal Func<long> Clock=()=>Stopwatch.GetTimestamp()*1000/Stopwatch.Frequency;
-        internal long Due;internal bool Pending,Suspended;
-        internal void Reset(){Due=Clock()+Interval;Pending=false;Suspended=false;}
-        internal bool Ready(bool path,bool dirty,bool safe){if(Suspended)return false;if(!path){Pending=false;return false;}if(Clock()>=Due)Pending=true;return Pending&&dirty&&safe;}
-        internal void Failed(bool conflict){Due=Clock()+Interval;Pending=false;Suspended=conflict;}
+        internal long Due;
+        internal void Reset(){Due=Clock()+Interval;}
+        internal bool BeginCycle()
+        {
+            long now=Clock();
+            if(now<Due)return false;
+            Due+=((now-Due)/Interval+1)*Interval;
+            return true;
+        }
     }
     public sealed partial class MainWindow
     {
         const string AutoSaveBusyMessage="Trwa autozapis. Poczekaj na zakończenie; zamknięcie okna anuluje oczekujące przygotowanie.";
         readonly System.Windows.Forms.Timer autoTimer=new System.Windows.Forms.Timer{Interval=1000};
+        readonly AutoSaveSchedule autoSchedule=new AutoSaveSchedule();
         bool autoSaving { get { return autoJob!=null; } }
         readonly Queue<DocumentSession> autoBatch=new Queue<DocumentSession>();
         readonly List<string> autoFailures=new List<string>();
@@ -35,26 +41,28 @@ namespace HexMapEditor
         static bool SameProjectPath(string a,string b){return !String.IsNullOrEmpty(a)&&!String.IsNullOrEmpty(b)&&String.Equals(System.IO.Path.GetFullPath(a),System.IO.Path.GetFullPath(b),StringComparison.OrdinalIgnoreCase);}
         void InitAutoSave()
         {
-            autoTimer.Tick+=(s,e)=>PollAutoSave();autoTimer.Start();
+            autoSchedule.Reset();autoTimer.Tick+=(s,e)=>PollAutoSave();autoTimer.Start();
             Disposed+=(s,e)=>{autoTimer.Dispose();if(autoJob!=null)autoJob.Cancel.Cancel();};
         }
-        void ResetSaveClock(ProjectFileVersion version){activeDocument.Version=version;autoSchedule.Reset();AutoSaveError=null;}
         bool IsAutoSaving(DocumentSession document){return autoJob!=null&&ReferenceEquals(autoJob.Document,document);}
         bool AutoSafe(){return !autoSaving&&!reviewingExit&&!returningToWelcome&&!InkCommitBusy&&modalDepth==0&&gestureButton==MouseButtons.None&&inkBefore==null&&!rightResizing&&propertyEditKey==null&&!TextInputFocused(this);}
+        static bool CanAutoSave(DocumentSession document)
+        {return document.Path!=null&&document.Unsaved&&!document.AutoSaveConflict;}
         void PollAutoSave()
         {
-            if(IsDisposed||!IsHandleCreated||!AutoSafe())return;
+            if(IsDisposed||!IsHandleCreated||documents.Count==0||!AutoSafe())return;
             if(!autoCycle)
             {
+                if(!autoSchedule.BeginCycle())return;
                 foreach(var document in documents)
-                    if(document.Schedule.Ready(document.Path!=null,document.Unsaved,true))autoBatch.Enqueue(document);
+                    if(CanAutoSave(document))autoBatch.Enqueue(document);
                 if(autoBatch.Count==0)return;
                 autoCycle=true;autoWritten=0;autoFailures.Clear();
             }
             while(autoBatch.Count>0)
             {
                 var document=autoBatch.Dequeue();
-                if(!documents.Contains(document)||!document.Schedule.Ready(document.Path!=null,document.Unsaved,true))continue;
+                if(!documents.Contains(document)||!CanAutoSave(document))continue;
                 if(document.Version==null)
                 {
                     RecordAutoFailure(document,new ProjectConflictException("Brak potwierdzonej wersji pliku. Użyj Zapisz jako."));
@@ -94,9 +102,11 @@ namespace HexMapEditor
             if(!ReferenceEquals(autoJob,job))return;
             bool matches=AutoMatches(job);autoJob=null;var document=job.Document;
             if(version!=null&&SameProjectPath(document.Path,job.Path))document.Version=version;
-            if(version!=null&&matches)
+            if(version!=null)
             {
-                document.Saved=saved;document.Dirty=false;document.FirstSave=false;document.Schedule.Reset();
+                document.Saved=saved;
+                document.Dirty=!matches&&saved.CheckAll(document.Map);
+                document.FirstSave=false;document.AutoSaveConflict=false;
                 autoWritten++;AutoSaveCount++;RecentProjects.Shared.Touch(document.Path);
             }
             else RecordAutoFailure(document,error);
@@ -106,7 +116,7 @@ namespace HexMapEditor
         }
         void RecordAutoFailure(DocumentSession document,Exception error)
         {
-            document.Schedule.Failed(error is ProjectConflictException);
+            if(error is ProjectConflictException)document.AutoSaveConflict=true;
             autoFailures.Add(ProjectTitle(document.Path,document.Map.Name)+": "+(error==null?"Stan dokumentu zmienił się.":error.Message));
         }
         void ReportAutoCycle()

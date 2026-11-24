@@ -176,7 +176,7 @@ namespace HexMapEditor
             try
             {
                 var current=ActivePreset();bool replaceDraft;
-                var file=PrepareWorkingPresetWrite(activeDocument,current,WithVisibleSets(current),directory,asNew,name,sections,out replaceDraft);
+                var file=PrepareWorkingPresetWrite(activeDocument.Panel,current,WithVisibleSets(current),directory,asNew,name,sections,out replaceDraft);
                 var candidate=file.After;
                 var after=PaletteState.Capture(map,brushIndex,workingPresets);
                 if(!asNew)ApplySavedSections(after.Presets.First(p=>p.Id==current.Id),candidate,sections);

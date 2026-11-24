@@ -40,8 +40,10 @@ namespace HexMapEditor
             }).ToList();
         }
         IEnumerable<TerrainPreset> PresetsForSave(DocumentSession document)
+        {return PresetsForSave(document.Panel);}
+        IEnumerable<TerrainPreset> PresetsForSave(PresetWorkspace workspace)
         {
-            return document.Presets.Select(p=>{
+            return workspace.Presets.Select(p=>{
                 var shared=SharedFor(p);
                 return shared==null?p:shared.Palette;
             });
@@ -100,7 +102,7 @@ namespace HexMapEditor
                 (working.Id==PresetCatalog.DefaultId||SameProjectPath(p.FilePath,working.FilePath)||
                     p.FilePath!=null&&SharedFor(p)!=null&&ReferenceEquals(SharedFor(p),SharedFor(working))));
         }
-        PresetFileChange PrepareWorkingPresetWrite(DocumentSession document,TerrainPreset current,TerrainPreset candidate,
+        PresetFileChange PrepareWorkingPresetWrite(PresetWorkspace workspace,TerrainPreset current,TerrainPreset candidate,
             string directory,bool asNew,string name,PresetSections sections,out bool replaceDraft)
         {
             if(sections==0)throw new InvalidDataException("Wybierz sekcję presetu.");
@@ -108,10 +110,10 @@ namespace HexMapEditor
             replaceDraft=asNew&&current.Id!=PresetCatalog.DefaultId&&stored==null&&sections==PresetSections.All;
             if(asNew)
             {
-                if(!replaceDraft&&document.Presets.Count>=100)throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
+                if(!replaceDraft&&workspace.Presets.Count>=100)throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
                 if(!replaceDraft)candidate.Id=Guid.NewGuid().ToString("N");
                 candidate.Name=(name??"").Trim();
-                if(document.Presets.Any(p=>p.Id!=current.Id&&PresetCatalog.SameName(p.Name,candidate.Name)))
+                if(workspace.Presets.Any(p=>p.Id!=current.Id&&PresetCatalog.SameName(p.Name,candidate.Name)))
                     throw new InvalidDataException("Nazwa jest już używana przez inny preset projektu.");
             }
             else if(stored==null)throw new IOException("Preset nie ma zapisanego pliku. Zapisz jako nowy.");

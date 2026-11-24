@@ -214,7 +214,7 @@ namespace HexMapEditor
             if(prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();if(path!=null){AdoptLibraryPanel(activeDocument);RefreshPresetPicker();}}
             StartupTrace.Write("editor.construct.libraries",this);
             ConfigureLeftMinimum();PositionOverlays();FitMap();CaptureSavedState(); UpdateUI();
-            InitAutoSave();ResetSaveClock(initial.LoadedFileVersion);
+            InitAutoSave();
             StartupTrace.Write("editor.construct.ready",this);
         }
 
@@ -277,7 +277,7 @@ namespace HexMapEditor
         }
         void UpdateCaption()
         {
-            Text = "HexMapEditor — " + ProjectTitle(currentPath,map.Name) + (HasUnsavedChanges ? " *" : "");
+            Text = HasDocuments?"HexMapEditor — " + ProjectTitle(currentPath,map.Name) + (HasUnsavedChanges ? " *" : ""):"HexMapEditor";
             UpdateSaveAccent();UpdateCommandState();UpdateTabTitle(activeDocument);
         }
 
@@ -291,7 +291,7 @@ namespace HexMapEditor
             {
                 UpdateCaption();
                 UpdateZoomCaption();
-                statusLabel.Text = "Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
+                statusLabel.Text = HasDocuments?"Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count:"Brak otwartej mapy";
                 dimensionsLabel.Text = map.Columns + " × " + map.Rows;
                 orientationToggle.Text = OrientationNames.Display(map.Orientation); orientationToggle.Image = EditorIcons.Small(map.Orientation == "FlatTop" ? "flat" : "pointy");
                 tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze" : "Pointy Top: wierzchołek na górze");
@@ -330,6 +330,7 @@ namespace HexMapEditor
         bool ConfirmDiscard(DocumentSession document)
         {
             if (!document.Unsaved) return true;
+            PaintBeforeClosePrompt();
             var result=ConfirmUnsavedForTest!=null?ConfirmUnsavedForTest():ShowEditorMessage("Mapa „"+ProjectTitle(document.Path,document.Map.Name)+"” zawiera niezapisane zmiany. Czy chcesz je zapisać przed kontynuowaniem?", "Niezapisana mapa", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
             return result==DialogResult.No||result==DialogResult.Yes&&SaveDocument(document,false);
         }
@@ -500,7 +501,7 @@ namespace HexMapEditor
                 if(opened!=null&&!ReferenceEquals(opened,document))throw new IOException("Ten plik jest już otwarty w innej karcie.");
                 var expected=!explicitOverwrite&&SameProjectPath(path,document.Path)?document.Version:null;
                 var version=WritePreparedProject(PrepareProjectBytes(document.Map,PresetsForSave(document)),path,allowOverwrite,expected);
-                document.Path=path;document.FirstSave=false;document.Version=version;document.Schedule.Reset();
+                document.Path=path;document.FirstSave=false;document.Version=version;document.AutoSaveConflict=false;
                 document.Saved.Capture(document.Map);document.Dirty=false;
                 UpdateTabTitle(document);if(ReferenceEquals(document,activeDocument))UpdateCaption();
                 RecentProjects.Shared.Touch(path);return true;
@@ -603,11 +604,12 @@ namespace HexMapEditor
             if(autoSaving){CancelAutoSave();e.Cancel=true;return;}
             if(!FinishDocumentInteraction()){e.Cancel=true;return;}
             reviewingExit=true;
-            try { e.Cancel=!documents.All(ConfirmDiscard)||!ReviewPresetDrafts(documents,false); }
-            finally { reviewingExit=false; }
+            try { e.Cancel=!ReviewWindowExit(); }
+            finally { reviewingExit=false;if(e.Cancel&&HasDocuments)HidePresetReview(); }
         }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
+            if(!HasDocuments)return;
             if(InkCommitBusy&&!(e.Alt&&e.KeyCode==Keys.F4)){if(e.KeyCode==Keys.Escape)CancelInkCommit();else BlockInkCommit();e.Handled=true;e.SuppressKeyPress=true;return;}
             if ((e.KeyCode==Keys.Escape || e.KeyCode==Keys.Delete && selectedObjects.Count>0 && !left.ContainsFocus) && !TextInputFocused(this)) { if(e.KeyCode==Keys.Delete)ConfirmDeleteSelectedObjects();else {EndCanvasGesture(true);selectedObjects.Clear();UpdateUI();} e.Handled=true;e.SuppressKeyPress=true;return; }
             if (e.KeyData == (Keys.Control|Keys.Shift|Keys.S)) { ExecuteCommand(EditorCommand.SaveAs); e.Handled = true; e.SuppressKeyPress = true; }
@@ -622,6 +624,7 @@ namespace HexMapEditor
 
         bool HandleHistoryShortcut(Keys keyData)
         {
+            if(!HasDocuments)return false;
             var key = keyData & Keys.KeyCode;
             if ((key != Keys.Z && key != Keys.Y) || (keyData & Keys.Control) == 0) return false;
             if ((keyData & Keys.Modifiers) != Keys.Control) return true;
@@ -669,8 +672,7 @@ namespace HexMapEditor
         {
             if(inkBefore!=null)EndCanvasGesture(true);
             bool axes = map.LabelMode == "Axes" && map.Cells.Count <= 1400;
-            int width=rightPanelOpen&&right.Visible?Math.Min(canvas.ClientSize.Width,right.Left-canvas.Left):canvas.ClientSize.Width;
-            var viewport = RectangleF.FromLTRB(32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), width - 32, canvas.ClientSize.Height - 32);
+            var viewport = RectangleF.FromLTRB(32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), canvas.ClientSize.Width - 32, canvas.ClientSize.Height - 32);
             scale = Math.Max(.000001f, Math.Min(Math.Max(1, viewport.Width) / Math.Max(bounds.Width, 1), Math.Max(1, viewport.Height) / Math.Max(bounds.Height, 1)));
             pan = new PointF(viewport.Left + viewport.Width / 2f - (bounds.Left + bounds.Width / 2f) * scale, viewport.Top + viewport.Height / 2f - (bounds.Top + bounds.Height / 2f) * scale);
             return true;

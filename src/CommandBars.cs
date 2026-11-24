@@ -12,7 +12,7 @@ namespace HexMapEditor
     {
         MenuStrip mainMenu;ToolStrip quickStrip;ContextMenuStrip zoomPopup; readonly Button zoomArrow=new Button();
         readonly Dictionary<EditorCommand,ToolStripMenuItem> commandMenus=new Dictionary<EditorCommand,ToolStripMenuItem>();
-        ToolStripMenuItem recentMenu,axesMenu,qualityHigh,qualityLow,pointyMenu,flatMenu;
+        ToolStripMenuItem recentMenu,axesMenu,qualityHigh,qualityLow,pointyMenu,flatMenu,mapMenu,viewMenu;
         Control commandFocus,commandTarget;
         readonly Dictionary<EditorCommand,Button> quickCommands=new Dictionary<EditorCommand,Button>();
         internal readonly Dictionary<EditorCommand,int> CommandExecutions=new Dictionary<EditorCommand,int>();
@@ -31,8 +31,8 @@ namespace HexMapEditor
             var file=Category("&Plik");AddCommand(file,"Nowa…",EditorCommand.New);AddCommand(file,"Otwórz…",EditorCommand.Open);recentMenu=new ToolStripMenuItem("Ostatnie projekty");file.DropDownItems.Add(recentMenu);file.DropDownOpening+=(s,e)=>RefreshRecentMenu();
             Sep(file);AddCommand(file,"Zapisz",EditorCommand.Save,"Ctrl+S");AddCommand(file,"Zapisz jako…",EditorCommand.SaveAs,"Ctrl+Shift+S");Sep(file);AddCommand(file,"Zakończ",EditorCommand.Exit,"Alt+F4");
             var edit=Category("&Edycja");AddCommand(edit,"Cofnij",EditorCommand.Undo,"Ctrl+Z");AddCommand(edit,"Ponów",EditorCommand.Redo,"Ctrl+Y");Sep(edit);var rename=AddCommand(edit,"Zmień nazwę pliku…",EditorCommand.Rename);rename.ToolTipText="Dostępne po pierwszym zapisie mapy. Zmienia nazwę pliku, bez zapisu niezapisanych zmian.";
-            var mapMenu=Category("&Mapa");AddCommand(mapMenu,"Rozmiar mapy…",EditorCommand.Resize);var orientation=new ToolStripMenuItem("Orientacja");mapMenu.DropDownItems.Add(orientation);pointyMenu=new ToolStripMenuItem("Pointy Top",null,(s,e)=>ChangeOrientation("PointyTop"));flatMenu=new ToolStripMenuItem("Flat Top",null,(s,e)=>ChangeOrientation("FlatTop"));orientation.DropDownItems.AddRange(new ToolStripItem[]{pointyMenu,flatMenu});AddCommand(mapMenu,"Tło mapy…",EditorCommand.Background);
-            var view=Category("&Widok");var layers=new ToolStripMenuItem("Warstwy");view.DropDownItems.Add(layers);layerItems=new ToolStripMenuItem[LayerNames.Length];
+            mapMenu=Category("&Mapa");AddCommand(mapMenu,"Rozmiar mapy…",EditorCommand.Resize);var orientation=new ToolStripMenuItem("Orientacja");mapMenu.DropDownItems.Add(orientation);pointyMenu=new ToolStripMenuItem("Pointy Top",null,(s,e)=>ChangeOrientation("PointyTop"));flatMenu=new ToolStripMenuItem("Flat Top",null,(s,e)=>ChangeOrientation("FlatTop"));orientation.DropDownItems.AddRange(new ToolStripItem[]{pointyMenu,flatMenu});AddCommand(mapMenu,"Tło mapy…",EditorCommand.Background);
+            var view= viewMenu=Category("&Widok");var layers=new ToolStripMenuItem("Warstwy");view.DropDownItems.Add(layers);layerItems=new ToolStripMenuItem[LayerNames.Length];
             foreach(int i in new[]{4,0,1,2,5,3,6}){var layer=(MapLayer)i;var item=new ToolStripMenuItem(LayerNames[i]);item.Click+=(s,e)=>{if(!BlockInkCommit())SetLayerVisible(layer,!LayerVisible(layer));};layerItems[i]=item;layers.DropDownItems.Add(item);}
             layers.DropDown.Closing+=(s,e)=>{if(e.CloseReason==ToolStripDropDownCloseReason.ItemClicked)e.Cancel=true;};
             axesMenu=new ToolStripMenuItem("Osie");view.DropDownItems.Add(axesMenu);foreach(string mode in new[]{"Axes","InCells","None"}){string value=mode;var item=new ToolStripMenuItem(mode=="Axes"?"Osie":mode=="InCells"?"Współrzędne w heksach":"Brak współrzędnych"){Tag=mode};item.Click+=(s,e)=>{if(BlockInkCommit()||map.LabelMode==value)return;EndCanvasGesture(true);map.LabelMode=value;MarkDirty();};axesMenu.DropDownItems.Add(item);}
@@ -74,8 +74,11 @@ namespace HexMapEditor
             if(repeat)Redo();else Undo();
         }
         static bool IsWithin(Control child,Control parent){for(var c=child;c!=null;c=c.Parent)if(c==parent)return true;return false;}
+        static bool NeedsDocument(EditorCommand command)
+        {return command!=EditorCommand.New&&command!=EditorCommand.Open&&command!=EditorCommand.Exit&&command!=EditorCommand.About;}
         void ExecuteCommand(EditorCommand command)
         {
+            if(!HasDocuments&&NeedsDocument(command))return;
             if(command!=EditorCommand.Exit&&BlockInkCommit())return;CommandExecutions[command]=CommandExecutions.ContainsKey(command)?CommandExecutions[command]+1:1;
             switch(command){case EditorCommand.New:NewProject();break;case EditorCommand.Open:OpenProject();break;case EditorCommand.Save:SaveProject();break;case EditorCommand.SaveAs:SaveAsProject();break;case EditorCommand.Exit:Close();break;case EditorCommand.Undo:CommandHistory(false);break;case EditorCommand.Redo:CommandHistory(true);break;case EditorCommand.Rename:RenameProject();break;case EditorCommand.Resize:ResizeProject();break;case EditorCommand.Background:EditBackground();break;case EditorCommand.FitMap:EndCanvasGesture(true);FitMap();break;case EditorCommand.FitAll:EndCanvasGesture(true);FitEverything();break;case EditorCommand.Quality:SetLowQuality(!lowQuality);break;case EditorCommand.About:using(var d=new AboutDialog(Icon))RunModal(()=>d.ShowDialog(this));break;}commandFocus=null;
         }
@@ -93,14 +96,16 @@ namespace HexMapEditor
         void UpdateCommandState()
         {
             if(mainMenu==null)return;bool busy=IsAutoSaving(activeDocument)||InkCommitBusy;
-            foreach(var pair in commandMenus)pair.Value.Enabled=!busy||pair.Key==EditorCommand.Exit;
+            bool documentReady=HasDocuments&&!busy;
+            foreach(var pair in commandMenus)pair.Value.Enabled=NeedsDocument(pair.Key)?documentReady:!busy||pair.Key==EditorCommand.Exit;
             commandMenus[EditorCommand.Rename].Enabled=!busy&&!String.IsNullOrEmpty(currentPath);
             Control focus=commandFocus??commandTarget??FocusedEditorControl();var text=focus as TextBoxBase;bool textContext=text!=null;
             var draft=focus as DraftNameBox;
-            commandMenus[EditorCommand.Undo].Enabled=!busy&&(draft!=null?draft.CanStep(false):textContext?text.CanUndo:undo.Count>0);
-            commandMenus[EditorCommand.Redo].Enabled=!busy&&(draft!=null?draft.CanStep(true):textContext?text.CanUndo:redo.Count>0);
-            foreach(var pair in quickCommands)pair.Value.Enabled=commandMenus.ContainsKey(pair.Key)?commandMenus[pair.Key].Enabled:!busy;
-            qualityHigh.Enabled=qualityLow.Enabled=pointyMenu.Enabled=flatMenu.Enabled=!busy;zoomButton.Enabled=zoomArrow.Enabled=!busy;
+            commandMenus[EditorCommand.Undo].Enabled=documentReady&&(draft!=null?draft.CanStep(false):textContext?text.CanUndo:undo.Count>0);
+            commandMenus[EditorCommand.Redo].Enabled=documentReady&&(draft!=null?draft.CanStep(true):textContext?text.CanUndo:redo.Count>0);
+            foreach(var pair in quickCommands)pair.Value.Enabled=commandMenus.ContainsKey(pair.Key)?commandMenus[pair.Key].Enabled:documentReady;
+            mapMenu.Enabled=viewMenu.Enabled=HasDocuments;
+            qualityHigh.Enabled=qualityLow.Enabled=pointyMenu.Enabled=flatMenu.Enabled=documentReady;zoomButton.Enabled=zoomArrow.Enabled=documentReady;
             pointyMenu.Checked=map.Orientation=="PointyTop";flatMenu.Checked=!pointyMenu.Checked;qualityHigh.Checked=!lowQuality;qualityLow.Checked=lowQuality;
             foreach(ToolStripMenuItem item in axesMenu.DropDownItems)item.Checked=(string)item.Tag==map.LabelMode;UpdateLayerChecks();
         }

@@ -125,23 +125,24 @@ namespace HexMapEditor.Tests
                     Get<QuickAccess>(Get(w,"CurrentQuick"),"Icons").Visible.Contains(removed),"Distinct preset files were merged");
                 Check(!Open(w,Path.Combine(Root,"Nie istnieje.hexmap"))&&ReferenceEquals(Active(w),c)&&Cards(w).Count==3,"Bad open changed view");
                 Call(w,"CloseDocument",a);
-                Check(Cards(w).Count==3&&ReferenceEquals(Active(w),c),"Cancel close failed");
+                Check(Cards(w).Count==3&&ReferenceEquals(Active(w),a),"Cancel close did not leave the prompted card active");
+                Move(w,c);
                 w.ConfirmUnsavedForTest=()=>DialogResult.No;
                 Call(w,"CloseDocument",b);
                 Check(Cards(w).Count==2&&ReferenceEquals(Active(w),c),"Closing an inactive card changed selection");
                 Edit(w,"Zmiana C");int review=0;
                 w.ConfirmUnsavedForTest=()=>++review==1?DialogResult.Yes:DialogResult.Cancel;
                 w.Close();
-                Check(!w.IsDisposed&&Cards(w).Count==2&&MainWindow.ReadProjectData(paths[0]).Cells[0].Name=="Zmiana A"&&Get<bool>(c,"Unsaved"),"Cancel exit rolled back A or lost C");
+                Check(!w.IsDisposed&&Cards(w).Count==1&&MainWindow.ReadProjectData(paths[0]).Cells[0].Name=="Zmiana A"&&Get<bool>(c,"Unsaved"),"Cancel exit rolled back A or lost C");
 
                 int min=w.MinimumSize.Width;w.Width=min;
                 int height=Get<Panel>(w,"canvas").Height;
-                Move(w,a);Call(w,"FitMap");
-                Check(Get<Panel>(w,"tabViewport").Width>=414&&!Get<Button>(w,"tabsBack").Enabled,"Minimum or initial tab viewport");
+                Call(w,"FitMap");
+                Check(Get<Panel>(w,"tabViewport").Width==207&&!Get<Button>(w,"tabsBack").Enabled,"Single complete tab");
                 for(int i=0;i<5;i++)Call(w,"StartNewProject",4,4,"PointyTop","Karta "+(i+1),PresetCatalog.Default());
                 Check(Get<Button>(w,"tabsBack").Enabled&&!Get<Button>(w,"tabsForward").Enabled,"Reveal or arrow state");
                 Call(w,"FitMap");Check(Get<Panel>(w,"canvas").Height==height,"Tab count changed canvas height");
-                Move(w,a);Call(w,"FitMap");Check(Get<Button>(w,"tabsForward").Enabled,"Forward not available at left side");
+                Move(w,c);Call(w,"FitMap");Check(Get<Button>(w,"tabsForward").Enabled,"Forward not available at left side");
                 Console.WriteLine("Minimum {0}, viewport {1} px, bottom {2} px, canvas height {3} px",min,
                     Get<Panel>(w,"tabViewport").Width,Get<Panel>(w,"tabBar").Height,height);
             }
@@ -159,7 +160,7 @@ namespace HexMapEditor.Tests
                         Call(w,"StartNewProject",4,4,"PointyTop","Bez ścieżki",PresetCatalog.Default());unnamed=Active(w);
                         Edit(w,"Bez pliku");Move(w,a);
                         File.AppendAllText(paths[0]," ");
-                        foreach(var doc in Cards(w))Get<AutoSaveSchedule>(doc,"Schedule").Due=0;
+                        Get<AutoSaveSchedule>(w,"autoSchedule").Due=0;
                         w.AutoPreparedForTest=()=>Move(w,unnamed);
                         w.ActiveControl=null;Call(w,"PollAutoSave");timer.Start();
                     }
