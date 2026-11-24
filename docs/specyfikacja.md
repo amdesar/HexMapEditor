@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
 Wersja 2.8. Stan decyzji 24 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.10.1. Sekcja 52 aktualizuje szczegóły zapisu, prawego panelu, grup i schowka.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.10.2. Sekcja 53 opisuje poprawki prawego panelu, opisu i ostatnich projektów.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1058,3 +1058,11 @@ W grupie wspólny stan ma kolorowe pozycje, a tryb rozmiaru wybierają ikony „
 Obraz w opisie ma do 2048 px na dłuższym boku przy zachowaniu proporcji i alfy. PNG/JPEG z pliku lub schowka ma do 8 MiB przed dekodowaniem, do 8192 px na bok i do 24 Mi pikseli. Ten sam limit wymiarów obowiązuje bitmapę ze schowka. Pojedyncze osadzenie ma do 17 MiB PNG, opis do 12 obrazów i 24 Mi znaków modelu, a suma opisów mapy do 64 Mi znaków. Zapis mapy pozostaje ograniczony do 256 MiB. RTF z osadzonym rastrem zachowuje kolejność treści, w tym dane Worda z właściwościami obrazu. Zewnętrzne obrazy pozostają niewczytane.
 
 Schowek jest źródłem importu grafiki terenu, ikony i obiektu. Źródło przechodzi tę samą walidację i to samo kadrowanie co plik. Teren zachowuje maskę heksagonalną, a ikony i obiekty kadr kwadratowy. Zapis i historia zasobów zaczynają się po akceptacji kadru. [Raport 0.10.1](raport-0.10.1.md).
+
+## 53. Wersja 0.10.2
+
+- Zmiana szerokości prawego panelu podczas przeciągania pozycjonuje tylko ten panel. Uchwyt i odsłonięty fragment płótna są odrysowywane w trakcie gestu.
+- Obraz w opisie zajmuje własny blok pomiędzy fragmentami tekstu. Zachowuje proporcje i mieści się w bieżącej szerokości. Rozmiar ustawiony przez użytkownika jest zapisywany niezależnie od ograniczenia szerokością panelu. Przy odczycie starszego opisu Map12 edytor stosuje tę samą regułę układu. Model opisu, formaty plików i budżety pozostają dotychczasowe.
+- Formatowanie znakowe z kursorem wewnątrz słowa obejmuje znaki słowa. Jawne zaznaczenie zachowuje swój zakres, także świadomie zaznaczone spacje.
+- Ostatnie projekty pokazują `LastSavedAppVersion` w nawiasie po prawej, w wierszu nazwy. Przy braku wersji nazwa dostaje całą szerokość. Wielokropek skraca wyłącznie nazwę.
+- Nagłówek heksa zaczyna się na wysokości pozostałych widoków i ma wspólną lewą linię z metadanymi. Pole edycji nazwy używa rozmiaru nagłówka. Wiersze promieni mieszczą obramowanie pola przy stałej wysokości. Plus dodawania stanu jest rysowany na środku, a „Ze schowka” w wyborze źródła ikony i obiektu ma styl pozostałych przycisków. [Raport 0.10.2](raport-0.10.2.md).

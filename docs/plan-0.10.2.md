@@ -1,0 +1,11 @@
+# Plan 0.10.2
+
+- Baza `c8a85f8`, początkowy status i oba diffy czyste. Raport 0.10.1 przeczytany.
+- Prace: prawy panel podczas gestu, układ obrazów i zakres formatowania w opisie, jeden wiersz MRU, lokalne korekty kontrolek.
+- Próby ograniczone do zmienianych ścieżek, na samodzielnych kopiach w `tests/_work`. Dane bazowe przygotowane przez `Run-Patch0101Tests.ps1 -Case fixture`.
+- Baza EXE: panel obiektu i heksa przesunięty w obie strony. Gest narzędzia trwał około 65–79 ms i zrzut wracał dopiero po puszczeniu, około 470–504 ms od początku. Z Worda wklejono długą treść z PNG 700×900. Po poszerzeniu końcówka tekstu i dalszy tekst dzieliły wiersz z obrazem. Plik testowy zachował oba fragmenty i obraz w jednym akapicie.
+- Implementacja: lokalne pozycjonowanie prawego panelu i synchroniczne odrysowanie odsłanianej części płótna przed obsługą kolejnego ruchu. Grafika otrzymuje osobny blok WPF skalowany do szerokości, z dotychczasową reprezentacją Map12. Autoformatowanie ograniczone do znaków słowa. MRU i korekty kontrolek w kodzie.
+- Testy: historyczny przypadek `notes` PASS uruchomiony tylko dla zależnej ścieżki zapisu i wklejania. Nowy `notes` PASS, obrazy 600×771 i 361×464 przy dwóch szerokościach, 600 zapisywane po zwężeniu. Próby powtórzone po stwierdzeniu, że XamlPackage odrzuca pośredni Viewbox, i po dostosowaniu zakresu wyboru całego bloku. `panel` PASS po ograniczeniu wysokości pola nazwy i korekcie ścieżki presetu w danych. W dodatkowej próbie z kodem bazowym nie pojawiło się żadne zdarzenie Paint przy czterech odsłonięciach w każdym widoku przed powrotem z obsługi ruchu. Kandydat odmalował wszystkie cztery.
+- Kandydat: próba MRU, obu kierunków panelu, nazw, plusa, promieni, przycisków źródła, mieszanego wklejenia i samego obrazu z Worda, zwykłego tekstu, Ctrl+U i odczytu przeniesionej mapy wykonana. Ograniczenia obserwacji ruchu i wyboru pliku opisano w raporcie.
+- Główny EXE podmieniony na sprawdzony artefakt. `fc /b` potwierdził identyczność z kopią testową. Nie pozostały otwarte okna własnych kopii ani własny dokument Worda.
+- Ostatnia operacja kontrolna przed commitem: porównanie głównego EXE ze sprawdzoną kopią. Żadnej niepewnej operacji w buildzie ani w podmianie EXE. Identyfikator pojedynczego lokalnego commita i stan Git są w podsumowaniu.

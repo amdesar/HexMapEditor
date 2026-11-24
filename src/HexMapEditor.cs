@@ -261,15 +261,7 @@ namespace HexMapEditor
             left.Bounds = new Rectangle(0, top, LeftPanelWidth, height);
             leftToggle.Bounds = new Rectangle(leftCollapsed ? 0 : LeftPanelWidth, top, 18, height);
             leftToggle.Text = leftCollapsed ? "›" : "‹"; left.Visible = !leftCollapsed;
-            int width = rightCollapsed ? 18 : ClampRightWidth(requestedRightWidth);
-            var previous = right.Bounds;
-            right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
-            if (right.Visible && previous != right.Bounds)
-            {
-                right.Invalidate(true);
-                if(previous.Left<right.Left)
-                    canvas.Invalidate(new Rectangle(previous.Left-inset,0,right.Left-previous.Left,canvas.Height));
-            }
+            PositionRightPanel(top,height,false);
             }
         }
 

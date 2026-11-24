@@ -105,7 +105,8 @@ namespace HexMapEditor
             hexDetailScroll=scroll;
             hexBody=new Panel{Dock=DockStyle.Top};
             scroll.Controls.Add(hexBody);right.Controls.Add(scroll);
-            hexSummary=new TableLayoutPanel {Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=1};
+            hexSummary=new TableLayoutPanel {Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=1,
+                Padding=new Padding(6,7,0,0)};
             hexDetailName=new DetailNameHeader("Własna nazwa heksa",RenameSelectedHex,tips,true);
             hexDetailName.Margin=Padding.Empty;
             hexSummary.Controls.Add(hexDetailName);

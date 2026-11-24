@@ -48,8 +48,8 @@ namespace HexMapEditor
             tips.SetToolTip(rightResizeGrip,rightResizeGrip.AccessibleName);
             right.Controls.Add(rightResizeGrip);right.Controls.Add(rightToggle);
             rightResizeGrip.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) BeginRightResize(rightResizeGrip.PointToScreen(e.Location).X); };
-            rightResizeGrip.MouseMove += (s, e) => { if (rightResizing) MoveRightResize(rightResizeGrip.PointToScreen(e.Location).X); };
-            rightResizeGrip.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) EndRightResize(); };
+            rightResizeGrip.MouseMove += (s, e) => { if (rightResizing) MoveRightResize(MousePosition.X); };
+            rightResizeGrip.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) { MoveRightResize(MousePosition.X); EndRightResize(); } };
             rightResizeGrip.MouseCaptureChanged += (s, e) => { if (rightResizing && !rightResizeGrip.Capture) EndRightResize(); };
         }
         void AddDetailsCommands()
@@ -79,7 +79,36 @@ namespace HexMapEditor
         void SetRightWidth(int width)
         {
             requestedRightWidth=ClampRightWidth(width);
-            PositionOverlays();
+            PositionRightPanel(canvas.Top,canvas.Height,rightResizing);
+        }
+        void PositionRightPanel(int top,int height,bool live)
+        {
+            int width=rightCollapsed?18:ClampRightWidth(requestedRightWidth);
+            var next=new Rectangle(Math.Max(0,ClientSize.Width-width),top,width,height);
+            var previous=right.Bounds;
+            if(previous==next)return;
+            right.Bounds=next;
+            if(!right.Visible)return;
+
+            if(previous.Left<next.Left)
+            {
+                var exposed=new Rectangle(previous.Left-canvas.Left,top-canvas.Top,next.Left-previous.Left,height);
+                exposed.Intersect(canvas.ClientRectangle);
+                if(!exposed.IsEmpty)
+                {
+                    canvas.Invalidate(exposed);
+                    // Complete the exposed strip before handling the next mouse move.
+                    if(live)canvas.Update();
+                }
+            }
+            if(live)
+            {
+                // The moving edge is a pair of native child windows. Repaint them
+                // now, leaving the rest of the details to the normal paint queue.
+                rightToggle.Invalidate();rightToggle.Update();
+                rightResizeGrip.Invalidate();rightResizeGrip.Update();
+            }
+            else right.Invalidate(true);
         }
         void BeginRightResize(int screenX)
         {

@@ -63,7 +63,9 @@ namespace HexMapEditor
         static Control RadiusControl(ScrubNumber number)
         {
             number.AccessibleName="Promień";
-            return PropertyLine(new Label{Text="Promień",AutoSize=true,Margin=new Padding(2,7,2,0)},number);
+            var row=PropertyLine(new Label{Text="Promień",AutoSize=true,Margin=new Padding(2,7,2,0)},number);
+            row.Margin=new Padding(3,0,3,0);
+            return row;
         }
         static Label DetailSection(string title)
         {
@@ -107,10 +109,13 @@ namespace HexMapEditor
             SpanRow(instanceLayout,2,DetailSection("Stany"));
             stateTiles=new BufferedFlowPanel{WrapContents=true,Padding=Padding.Empty,Margin=Padding.Empty};
             SpanRow(instanceLayout,3,stateTiles);
-            addStateTile=PropertyButton("+",()=>ChangeStateFromMenu(null,false));
+            addStateTile=PropertyButton("",()=>ChangeStateFromMenu(null,false));
             addStateTile.Size=new Size(30,30);addStateTile.AutoSize=false;addStateTile.AccessibleName="Dodaj stan do biblioteki";
-            addStateTile.Font=new Font("Segoe UI",15,FontStyle.Bold);
-            addStateTile.Disposed+=(s,e)=>addStateTile.Font.Dispose();
+            addStateTile.Paint+=(s,e)=>{
+                int x=addStateTile.ClientSize.Width/2,y=addStateTile.ClientSize.Height/2;
+                using(var pen=new Pen(addStateTile.Enabled?addStateTile.ForeColor:Color.Silver,2))
+                {e.Graphics.DrawLine(pen,x-6,y,x+6,y);e.Graphics.DrawLine(pen,x,y-6,x,y+6);}
+            };
             tips.SetToolTip(addStateTile,"Kliknij, aby utworzyć stan. Prawy przycisk: Dodaj stan z biblioteki.");
             AttachStateRestoreMenu(addStateTile);stateTiles.Controls.Add(addStateTile);
 

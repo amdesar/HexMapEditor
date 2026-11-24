@@ -97,7 +97,7 @@ namespace HexMapEditor
             Height=54;MinimumSize=new Size(0,54);Dock=DockStyle.Fill;
             title.Font=new Font("Segoe UI",29,FontStyle.Bold);
             Disposed+=(s,e)=>title.Font.Dispose();
-            input.AccessibleName=label;
+            input.Font=title.Font;input.ForeColor=ChoiceStyle.ActiveBorder;input.AccessibleName=label;input.AutoSize=false;
             pencil=ActionButton("",label+" — edytuj",ChoiceStyle.ActiveBorder,Begin,tips);
             pencil.Image=EditorIcons.Small("pencil");
             accept=ActionButton("✓","Zatwierdź nazwę",Color.LightGreen,Accept,tips);
@@ -137,7 +137,8 @@ namespace HexMapEditor
             {
                 cancel.SetBounds(Math.Max(0,right-28),buttonY,28,27);
                 accept.SetBounds(Math.Max(0,right-58),buttonY,28,27);
-                input.SetBounds(1,Math.Max(0,(height-input.PreferredHeight)/2),Math.Max(1,right-62),input.PreferredHeight);
+                int inputHeight=Math.Max(0,Math.Min(height,input.PreferredHeight));
+                input.SetBounds(0,(height-inputHeight)/2,Math.Max(1,right-62),inputHeight);
             }
             else
             {

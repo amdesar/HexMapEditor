@@ -82,7 +82,18 @@ namespace HexMapEditor
             return bytes;
         }
 
-        internal static InlineUIContainer Create(RichNode node)
+        internal static BlockUIContainer CreateBlock(RichNode node)
+        {
+            return new BlockUIContainer(CreateImage(node)) { Margin=new Thickness(0,0,0,6) };
+        }
+
+        internal static Image BlockImage(Block block)
+        {
+            var container=block as BlockUIContainer;
+            return container==null?null:container.Child as Image;
+        }
+
+        static Image CreateImage(RichNode node)
         {
             var bytes=Validate(node);
             var bitmap=new BitmapImage();
@@ -91,24 +102,26 @@ namespace HexMapEditor
                 bitmap.BeginInit();bitmap.CacheOption=BitmapCacheOption.OnLoad;bitmap.StreamSource=stream;bitmap.EndInit();
                 bitmap.Freeze();
             }
-            var image=new Image{Source=bitmap,Width=node.DisplayWidth,Stretch=System.Windows.Media.Stretch.Uniform,Tag=node.Png};
+            var image=new Image{Source=bitmap,MaxWidth=node.DisplayWidth,HorizontalAlignment=HorizontalAlignment.Left,
+                Stretch=System.Windows.Media.Stretch.Uniform,Tag=node.Png};
             System.Windows.Automation.AutomationProperties.SetName(image,"Obraz opisu");
-            return new InlineUIContainer(image){BaselineAlignment=BaselineAlignment.Center};
+            return image;
         }
 
         internal static RichNode Read(Image image)
         {
             // XamlPackage round-trip and WPF clipboard can recreate Image without its Tag.
             var encoded=image.Tag as string;
+            double width=Double.IsInfinity(image.MaxWidth)?image.Width:image.MaxWidth;
             if(encoded==null)
             {
                 var bitmap=image.Source as BitmapSource;
                 if(bitmap==null)return null;
                 var node=FromBitmap(bitmap);
-                if(!Double.IsNaN(image.Width))node.DisplayWidth=Math.Max(24,Math.Min(900,image.Width));
+                if(!Double.IsNaN(width))node.DisplayWidth=Math.Max(24,Math.Min(900,width));
                 return node;
             }
-            return new RichNode{Kind="image",Png=encoded,DisplayWidth=image.Width};
+            return new RichNode{Kind="image",Png=encoded,DisplayWidth=width};
         }
     }
 
@@ -167,7 +180,10 @@ namespace HexMapEditor
                                     var node=NoteImages.FromBytes(Convert.FromBase64String(data.Substring(comma+1)));
                                     imageCharacters+=node.Png.Length;
                                     if(imageCharacters>NoteCodec.MaxCharacters)throw new ImageBudgetException("Obrazy przekraczają limit 24 Mi znaków opisu.");
-                                    paragraph.Inlines.Add(NoteImages.Create(node));images++;
+                                    if(paragraph.Inlines.Count==0)doc.Blocks.Remove(paragraph);
+                                    doc.Blocks.Add(NoteImages.CreateBlock(node));images++;
+                                    paragraph=new Paragraph();
+                                    doc.Blocks.Add(paragraph);
                                 }
                                 catch(ImageBudgetException) { throw; }
                                 catch(FormatException) { } catch(IOException) { } catch(ArgumentException) { } catch(System.Runtime.InteropServices.ExternalException) { }

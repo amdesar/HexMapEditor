@@ -119,7 +119,7 @@ namespace HexMapEditor
                     var name=Path.GetFileNameWithoutExtension(path);
                     var version=RecentAvailability.SavedWith(path);
                     var b=new RecentProjectButton(name,version){Width=projects.Width-8};
-                    tips.SetToolTip(b,version==null?path:path+"\nOstatni zapis: "+version);
+                    tips.SetToolTip(b,version==null?path:path+" ("+version+")");
                     b.Click+=(s,e)=>OpenPath(path);projects.Controls.Add(b);
                 }
             }finally{projects.ResumeLayout(true);}
@@ -145,20 +145,23 @@ namespace HexMapEditor
         internal RecentProjectButton(string name,string version)
         {
             projectName=name;
-            versionLabel=version==null?null:"Ostatni zapis: "+version;
+            versionLabel=version==null?null:"("+version+")";
             AccessibleName=versionLabel==null?name:name+", "+versionLabel;
             Height=43;Margin=new Padding(0,0,0,8);FlatStyle=FlatStyle.Flat;BackColor=Color.FromArgb(34,38,48);
         }
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            var flags=TextFormatFlags.SingleLine|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix;
+            const TextFormatFlags flags=TextFormatFlags.SingleLine|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPrefix|TextFormatFlags.NoPadding;
             var row=Rectangle.Inflate(ClientRectangle,-8,-2);
-            if(versionLabel!=null)row.Height/=2;
-            TextRenderer.DrawText(e.Graphics,projectName,Font,row,ForeColor,flags);
-            if(versionLabel==null)return;
-            row.Offset(0,row.Height);
-            TextRenderer.DrawText(e.Graphics,versionLabel,Font,row,Color.Silver,flags);
+            if(versionLabel!=null)
+            {
+                int width=TextRenderer.MeasureText(e.Graphics,versionLabel,Font,Size.Empty,flags).Width;
+                var reserved=new Rectangle(row.Right-width,row.Top,width,row.Height);
+                TextRenderer.DrawText(e.Graphics,versionLabel,Font,reserved,Color.Silver,flags|TextFormatFlags.Right);
+                row.Width=Math.Max(0,row.Width-width-8);
+            }
+            if(row.Width>0)TextRenderer.DrawText(e.Graphics,projectName,Font,row,ForeColor,flags|TextFormatFlags.EndEllipsis);
         }
     }
 }

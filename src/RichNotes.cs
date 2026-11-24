@@ -87,6 +87,13 @@ namespace HexMapEditor
             var result = new List<RichNode>();
             foreach (Block block in blocks)
             {
+                var image=NoteImages.BlockImage(block);
+                if(image!=null)
+                {
+                    var saved=NoteImages.Read(image);
+                    if(saved!=null)result.Add(new RichNode { Kind="paragraph", Children=new List<RichNode>{saved} });
+                    continue;
+                }
                 var paragraph = block as Paragraph;
                 if (paragraph != null)
                 {
@@ -154,7 +161,26 @@ namespace HexMapEditor
         }
         public static FlowDocument FromJson(string json)
         {
-            var model = Read(json); var doc = NewFlow(); foreach (var node in model.Blocks) doc.Blocks.Add(CreateBlock(node)); if (doc.Blocks.Count == 0) doc.Blocks.Add(new Paragraph()); return doc;
+            var model = Read(json); var doc = NewFlow(); AddBlocks(doc.Blocks,model.Blocks); return doc;
+        }
+        static void AddBlocks(BlockCollection blocks,IEnumerable<RichNode> nodes)
+        {
+            foreach(var node in nodes)
+            {
+                if(node.Kind!="paragraph"||!node.Children.Any(child=>child.Kind=="image"))
+                {blocks.Add(CreateBlock(node));continue;}
+                // Map12 stores pictures in paragraphs. Give each picture its own
+                // layout block without losing the runs on either side.
+                var text=new RichNode { Kind="paragraph",Alignment=node.Alignment };
+                foreach(var child in node.Children)
+                {
+                    if(child.Kind!="image"){text.Children.Add(child);continue;}
+                    if(text.Children.Count!=0){blocks.Add(CreateBlock(text));text.Children.Clear();}
+                    blocks.Add(NoteImages.CreateBlock(child));
+                }
+                if(text.Children.Count!=0)blocks.Add(CreateBlock(text));
+            }
+            if(blocks.Count==0)blocks.Add(new Paragraph());
         }
         static FlowDocument NewFlow() { return new FlowDocument { FontFamily = new FontFamily("Segoe UI"), FontSize = 12, PagePadding = new Thickness(10), Foreground = Brushes.WhiteSmoke, Background = new SolidColorBrush(Color.FromRgb(36, 40, 50)) }; }
         static Block CreateBlock(RichNode n)
@@ -165,7 +191,6 @@ namespace HexMapEditor
                 if (Enum.TryParse<TextAlignment>(n.Alignment, out alignment)) p.TextAlignment = alignment;
                 foreach (var item in n.Children)
                 {
-                    if(item.Kind=="image"){p.Inlines.Add(NoteImages.Create(item));continue;}
                     if (item.Kind == "break") { p.Inlines.Add(new LineBreak()); continue; }
                     var r = new Run(item.Text ?? "") { FontSize = item.Size, FontWeight = item.Bold ? FontWeights.Bold : FontWeights.Normal, FontStyle = item.Italic ? FontStyles.Italic : FontStyles.Normal };
                     var decorations = new TextDecorationCollection(); if (item.Underline) decorations.Add(TextDecorations.Underline[0]); if (item.Strike) decorations.Add(TextDecorations.Strikethrough[0]); r.TextDecorations = decorations; p.Inlines.Add(r);
@@ -175,13 +200,13 @@ namespace HexMapEditor
             if (n.Kind == "list")
             {
                 var list = new List { MarkerStyle = n.Marker == "decimal" ? TextMarkerStyle.Decimal : TextMarkerStyle.Disc, StartIndex = Math.Max(1, n.Start), Margin = new Thickness(18, 0, 0, 6) };
-                foreach (var item in n.Children) { var li = new ListItem(); foreach (var child in item.Children) li.Blocks.Add(CreateBlock(child)); if (li.Blocks.Count == 0) li.Blocks.Add(new Paragraph()); list.ListItems.Add(li); } return list;
+                foreach (var item in n.Children) { var li = new ListItem(); AddBlocks(li.Blocks,item.Children); list.ListItems.Add(li); } return list;
             }
             var table = new Table { CellSpacing = 0, Margin = new Thickness(0, 4, 0, 8) }; var group = new TableRowGroup(); table.RowGroups.Add(group);
             int columns = n.Children.Max(r => r.Children.Count); for (int c = 0; c < columns; c++) table.Columns.Add(new TableColumn());
             foreach (var row in n.Children)
             {
-                var tr = new TableRow(); foreach (var cell in row.Children) { var tc = NewCell(); tc.Blocks.Clear(); foreach (var child in cell.Children) tc.Blocks.Add(CreateBlock(child)); if (tc.Blocks.Count == 0) tc.Blocks.Add(new Paragraph()); tr.Cells.Add(tc); } group.Rows.Add(tr);
+                var tr = new TableRow(); foreach (var cell in row.Children) { var tc = NewCell(); tc.Blocks.Clear(); AddBlocks(tc.Blocks,cell.Children); tr.Cells.Add(tc); } group.Rows.Add(tr);
             }
             return table;
         }
@@ -228,7 +253,7 @@ namespace HexMapEditor
             var size=new ScrubNumber{Minimum=1,Maximum=400,Value=12,Width=62,AccessibleName="Rozmiar czcionki opisu"};
             size.Location=new System.Drawing.Point(111,4);
             numberBar.Controls.Add(size);Controls.Add(numberBar);
-            size.EditFinished+=(s,e)=>{if(!e.Cancelled&&e.Changed)Mutate("format",()=>Box.Selection.ApplyPropertyValue(TextElement.FontSizeProperty,(double)size.Value));};
+            size.EditFinished+=(s,e)=>{if(!e.Cancelled&&e.Changed)FormatText(()=>Box.Selection.ApplyPropertyValue(TextElement.FontSizeProperty,(double)size.Value));};
             Box.SelectionChanged+=(s,e)=>{
                 object current=Box.Selection.GetPropertyValue(TextElement.FontSizeProperty);
                 if(!size.IsEditing&&current is double)size.Value=(decimal)(double)current;
@@ -393,10 +418,62 @@ namespace HexMapEditor
             catch (Exception ex) { Box.Document = NoteCodec.FromJson(before); if (Error != null) Error(ex.Message); }
             finally { loading = false; } Notify(kind);
         }
-        void Execute(RoutedUICommand command) { Mutate("format", () => command.Execute(null, Box)); }
+        void Execute(RoutedUICommand command)
+        {
+            if(command==EditingCommands.ToggleBold||command==EditingCommands.ToggleItalic||command==EditingCommands.ToggleUnderline)
+                FormatText(()=>command.Execute(null,Box));
+            else Mutate("format",()=>command.Execute(null,Box));
+        }
+        void FormatText(Action change)
+        {
+            Mutate("format",()=>{
+                var caret=Box.CaretPosition;
+                var start=Box.Selection.IsEmpty?WordEdge(caret,LogicalDirection.Backward):caret;
+                var end=Box.Selection.IsEmpty?WordEdge(caret,LogicalDirection.Forward):caret;
+                bool insideWord=start.CompareTo(caret)<0&&end.CompareTo(caret)>0;
+                if(!insideWord){change();return;}
+                // Anchor inside the word so a Run split during formatting does
+                // not move the restored caret to an adjacent space.
+                var restore=caret.GetPositionAtOffset(0,LogicalDirection.Forward);
+                Box.Selection.Select(start,end);
+                try { change(); }
+                finally { Box.CaretPosition=restore; }
+            });
+        }
+        static TextPointer WordEdge(TextPointer caret,LogicalDirection direction)
+        {
+            var edge=caret;
+            var position=caret;
+            int step=direction==LogicalDirection.Forward?1:-1;
+            while(position!=null)
+            {
+                if(position.GetPointerContext(direction)==TextPointerContext.Text)
+                {
+                    var text=position.GetTextInRun(direction);
+                    int count=0;
+                    while(count<text.Length&&WordCharacter(text[step>0?count:text.Length-1-count]))count++;
+                    if(count>0)edge=position.GetPositionAtOffset(step*count,direction);
+                    if(count<text.Length)return edge;
+                    position=edge;
+                }
+                else
+                {
+                    var inline=position.GetAdjacentElement(direction);
+                    if(!(inline is Run)&&!(inline is Span))break;
+                    position=position.GetNextContextPosition(direction);
+                }
+            }
+            return edge;
+        }
+        static bool WordCharacter(char value)
+        {
+            var category=Char.GetUnicodeCategory(value);
+            return Char.IsLetterOrDigit(value)||category==System.Globalization.UnicodeCategory.NonSpacingMark||
+                category==System.Globalization.UnicodeCategory.SpacingCombiningMark||category==System.Globalization.UnicodeCategory.ConnectorPunctuation;
+        }
         void ToggleDecoration(TextDecorationLocation location)
         {
-            Mutate("format", () =>
+            FormatText(() =>
             {
                 var current = Box.Selection.GetPropertyValue(Inline.TextDecorationsProperty) as TextDecorationCollection; var result = current == null ? new TextDecorationCollection() : current.Clone();
                 bool exists = result.Any(d => d.Location == location); foreach (var d in result.Where(d => d.Location == location).ToList()) result.Remove(d);
@@ -571,6 +648,8 @@ namespace HexMapEditor
         {
             foreach(var block in blocks)
             {
+                var blockImage=NoteImages.BlockImage(block);
+                if(blockImage!=null)yield return blockImage;
                 var p=block as Paragraph;
                 if(p!=null)foreach(var item in p.Inlines.OfType<InlineUIContainer>())if(item.Child is Image)yield return (Image)item.Child;
                 var table=block as Table;
@@ -607,14 +686,18 @@ namespace HexMapEditor
         internal void InsertImage(RichNode node)
         {
             var document=NoteCodec.FromPlain("");
-            ((Paragraph)document.Blocks.FirstBlock).Inlines.Add(NoteImages.Create(node));
+            document.Blocks.Clear();document.Blocks.Add(NoteImages.CreateBlock(node));
             PasteDocument(document);
+        }
+        static TextElement ImageContainer(Image image)
+        {
+            return LogicalTreeHelper.GetParent(image) as TextElement;
         }
         void SelectImage(object sender,MouseButtonEventArgs e)
         {
             var image=e.OriginalSource as Image;
             if(image==null)return;
-            var container=LogicalTreeHelper.GetParent(image) as InlineUIContainer;
+            var container=ImageContainer(image);
             if(container==null)return;
             Box.Focus();
             Box.Selection.Select(container.ElementStart,container.ElementEnd);
@@ -622,13 +705,16 @@ namespace HexMapEditor
         }
         void ResizeImage(double factor)
         {
+            if(Box.Selection.IsEmpty)return;
             var start=Box.Selection.Start;
             var end=Box.Selection.End;
             var selected=Images(Box.Document.Blocks).FirstOrDefault(image=>{
-                var container=LogicalTreeHelper.GetParent(image) as InlineUIContainer;
-                return container!=null&&start.CompareTo(container.ElementStart)<=0&&end.CompareTo(container.ElementEnd)>=0;
+                var container=ImageContainer(image);
+                // WPF moves the endpoints inside a BlockUIContainer when the
+                // selected range consists of that block.
+                return container!=null&&start.CompareTo(container.ContentStart)<=0&&end.CompareTo(container.ContentEnd)>=0;
             });
-            if(selected!=null)Mutate("format",()=>selected.Width=Math.Max(24,Math.Min(900,selected.Width*factor)));
+            if(selected!=null)Mutate("format",()=>selected.MaxWidth=Math.Max(24,Math.Min(900,selected.MaxWidth*factor)));
         }
         public void InsertTable(int rows, int columns)
         {

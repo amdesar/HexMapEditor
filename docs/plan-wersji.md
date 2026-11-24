@@ -15,6 +15,7 @@
 | 0.9.3 | Stan niezapisanych zmian sekcji szybkiego zestawu presetu po imporcie i jawnej edycji |
 | 0.10.0 | Trzy widoki prawego panelu, obrazy w opisie heksa i indywidualne nakładki ustawień grupy |
 | 0.10.1 | Wersja ostatniego zapisu, poprawki prawego panelu, macierz rozwiązania grupy oraz obrazy i import ze schowka |
+| 0.10.2 | Odrysowanie prawego panelu podczas przeciągania, obrazy między akapitami, formatowanie słowa, jeden wiersz projektów i korekty kontrolek |
 | 0.11.0 | Niezależne mapy w zakładkach; lokalizacja do ponownej oceny na tym etapie |
 | 0.12.0 | Instalacja / aktualizator; lokalny układ z resetem/fallback pozostaje osobnym uzgodnionym zakresem ustawień |
 | 0.13.0 | Rzeczywiste źródła grafik i [kolejka importu](backlog-import-z-folderow.md), docelowe foldery Library |
