@@ -41,7 +41,7 @@ namespace HexMapEditor
             var fit=new ToolStripMenuItem("Dopasuj widok");view.DropDownItems.Add(fit);AddCommand(fit,"Dopasuj mapę",EditorCommand.FitMap);AddCommand(fit,"Dopasuj wszystko",EditorCommand.FitAll);
             var library=Category("&Biblioteka");var root=new ToolStripMenuItem("Otwórz główny folder biblioteki",null,(s,e)=>OpenLibraryFolder());library.DropDownItems.Add(root);Sep(library);
             foreach(var folder in LibraryFolders()){string relative=folder.Value;library.DropDownItems.Add(new ToolStripMenuItem(folder.Key,null,(s,e)=>OpenLibraryFolder(relative)));}
-            var help=Category("&Pomoc");AddCommand(help,"O programie…",EditorCommand.About);
+            var help=Category("&Pomoc");help.DropDownItems.Add(new ToolStripMenuItem("Sprawdź aktualizacje",null,(s,e)=>{if(UpdateRequested!=null)UpdateRequested();}));AddCommand(help,"O programie…",EditorCommand.About);
             foreach(ToolStripMenuItem category in mainMenu.Items){category.DropDownOpening+=(s,e)=>UpdateCommandState();StyleMenus(category);}
             quickStrip=new ToolStrip{Dock=DockStyle.None,AutoSize=false,Height=36,GripStyle=ToolStripGripStyle.Hidden,CanOverflow=true,LayoutStyle=ToolStripLayoutStyle.HorizontalStackWithOverflow,BackColor=shellToolbar.BackColor,ForeColor=Color.WhiteSmoke,Renderer=new FitButtonRenderer(),Padding=new Padding(4,1,4,1)};shellToolbar.Controls.Add(quickStrip);
             Quick(new Button(),EditorCommand.New,"new","Nowa mapa",32);Quick(new Button(),EditorCommand.Open,"open","Otwórz mapę",32);Quick(saveButton,EditorCommand.Save,"save","Zapisz (Ctrl+S)",32);quickStrip.Items.Add(new ToolStripSeparator());

@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
 Wersja 2.8. Stan decyzji 24 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.11.1. Karty i robocze presety opisuje sekcja 54, a aktualne reguły zapisu i zamykania sekcja 55.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.12.0. Karty i robocze presety opisuje sekcja 54, reguły zapisu i zamykania sekcja 55, a dystrybucję sekcja 56.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1081,3 +1081,9 @@ Schowek jest źródłem importu grafiki terenu, ikony i obiektu. Źródło przec
 - Wspólny termin autozapisu przypada co 5 minut od pierwszej mapy. Zmiany kart i ręczne zapisy nie resetują terminu. Bezpieczny cykl kolejno sprawdza wszystkie karty, zachowując osobne odciski i rewizje. Opóźnione tyknięcia łączą się w jeden cykl. Każdy cykl z próbami zapisu pokazuje jeden wynik sukcesów i błędów.
 - Zamknięcie zmienionej karty pokazuje ją przed pytaniem. Anulowanie zostawia ją aktywną. Wyjście zamyka zmienione mapy po ich zapisaniu lub decyzji o odrzuceniu. Anulowanie pozostawia pozostałe karty. Później przeglądane są presety, wspólny draft raz, w podglądzie lewego panelu, także gdy mapy z tym stanem są już zamknięte.
 - Dopasuj mapę i Dopasuj wszystko używają szerokości całego płótna za lewym panelem. Prawy panel i uchwyt pozostają na wierzchu. Formaty Map12, preset 5 i biblioteki pozostają dotychczasowe. [Raport 0.11.1](raport-0.11.1.md).
+
+## 56. Wersja 0.12.0 — instalacja, Portable i aktualizacje
+
+- Windows 10/11 z pełnym .NET Framework 4.8 lub 4.8.1. Setup działa dla bieżącego użytkownika, tworzy skrót Start i może udostępnić własny ProgID dla `.hexmap`. Instalator pozostawia wybór domyślny w gestii Windows i użytkownika. Aktualizacja dziedziczy zaznaczenie zadania skojarzenia.
+- Plik `deployment.mode` określa tryb. Instalacja zapisuje dane w `%LOCALAPPDATA%\amdesar\HexMapEditor`. Portable używa katalogu EXE i nie rejestruje skojarzeń. Inicjalizacja fabryczna korzysta z generowania w aplikacji. Setup operuje na plikach programu, skrócie i własnych wpisach rejestru. Dane użytkownika są poza zakresem Setup.
+- Aktualizator używa jawnie skonfigurowanego publicznego repozytorium wydań GitHub. Pusta konfiguracja wyłącza połączenia. Aktualizator porównuje numery wersji stabilnych i pyta o decyzję. W instalacji weryfikuje oczekiwany EXE według typu, źródła, rozmiaru i SHA-256 z metadanych i przeprowadza zwykłe zamknięcie. Portable otwiera link do ZIP na polecenie użytkownika. Format Map12, preset 5 i formaty bibliotek zachowane. [Raport 0.12.0](raport-0.12.0.md).

@@ -8,7 +8,7 @@ namespace HexMapEditor
 {
     internal sealed class RecentProjects
     {
-        internal static readonly RecentProjects Shared=new RecentProjects(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"recent-projects.json"));
+        internal static readonly RecentProjects Shared=new RecentProjects(AppStorage.Current.RecentProjectsPath);
         readonly string path;
         List<string> entries=new List<string>();
         internal string Warning {get;private set;}
@@ -24,7 +24,9 @@ namespace HexMapEditor
             string temp=null;
             try
             {
-                temp=Path.Combine(Path.GetDirectoryName(path),".recent-"+Guid.NewGuid().ToString("N")+".tmp");var bytes=new UTF8Encoding(false).GetBytes(MapLogic.Serializer().Serialize(next));
+                string directory=Path.GetDirectoryName(path);
+                Directory.CreateDirectory(directory);
+                temp=Path.Combine(directory,".recent-"+Guid.NewGuid().ToString("N")+".tmp");var bytes=new UTF8Encoding(false).GetBytes(MapLogic.Serializer().Serialize(next));
                 if(bytes.Length>262144)throw new InvalidDataException("Historia ścieżek przekracza 256 KiB; poprzedni plik pozostawiono bez zmian.");
                 using(var stream=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){stream.Write(bytes,0,bytes.Length);stream.Flush(true);}
                 if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);temp=null;entries=next;Warning=null;

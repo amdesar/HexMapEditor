@@ -1,16 +1,20 @@
-# HexMapEditor 0.11.1
+# HexMapEditor 0.12.0
 
-Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
+Samodzielny edytor map heksagonalnych Windows, napisany w C# z Windows Forms, GDI+ i osadzonym edytorem WPF. Edycja i zapis map działają offline. Po skonfigurowaniu kanału program może sprawdzać aktualizacje w tle.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.11.1** zapisuje mapy w **formacie 12**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Wymagany Windows 10 lub 11 z pełnym .NET Framework 4.8 albo 4.8.1 z WPF. Aplikacja **0.12.0** zapisuje mapy w **formacie 12**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+
+- **Setup** instaluje dla bieżącego użytkownika i dodaje skrót do menu Start. Zaznaczona domyślnie opcja skojarzenia udostępnia edytor w „Otwórz za pomocą”. Wybór domyślnego programu należy do użytkownika w ustawieniach Windows. Dane, w tym `Library` i `recent-projects.json`, są w `%LOCALAPPDATA%\amdesar\HexMapEditor`.
+- **Portable** uruchamia się z `HexMapEditor.exe` po rozpakowaniu całego ZIP do zapisywalnego folderu. Dane są obok EXE. Do aktualizacji zamknij edytor, rozpakuj nowy ZIP osobno i skopiuj tylko pliki z paczki do istniejącego folderu. Zachowaj swoje mapy, bibliotekę i ustawienia.
+- **Sprawdź aktualizacje** jest dostępne na powitaniu i w menu Pomoc. W dostarczonej konfiguracji kanał jest pusty. [Raport 0.12.0 i instrukcja publikacji](docs/raport-0.12.0.md).
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 ```
 
-Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
+Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Główny śledzony EXE uruchomiony samodzielnie działa w trybie portable. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów. `packaging/Build-Packages.ps1` buduje oba formaty dystrybucyjne z podanej kompilacji i zapisuje je w `tests/_work`.
 
 Ta wersja odczytuje mapy 12 i presety 4/5. Starszą mapę odrzuca z komunikatem o wersji formatu, pozostawiając plik na dysku. Brak sekcji ikon/obiektów w presecie 4 oznacza puste zestawy. Biblioteczne grafiki terenu mają format 2.
 
@@ -87,7 +91,7 @@ Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz no
 
 **Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
 
-Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.11.1 • 24.11.2026`. Duża nazwa zachowuje styl, autor ma styl napisu wersji. Data wydania pochodzi z jawnej metadanej w `src/ReleaseMetadata.cs`.
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.12.0 • 24.11.2026`. Duża nazwa zachowuje styl, autor ma styl napisu wersji. Data wydania pochodzi z jawnej metadanej w `src/ReleaseMetadata.cs`.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 

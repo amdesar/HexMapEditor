@@ -18,7 +18,8 @@
 | 0.10.2 | Odrysowanie prawego panelu podczas przeciągania, obrazy między akapitami, formatowanie słowa, jeden wiersz projektów i korekty kontrolek |
 | 0.11.0 | Niezależne mapy w dolnych kartach, wspólne robocze presety według ścieżki, autozapis zapisanych kart i przekazywanie projektu do działającego EXE |
 | 0.11.1 | Jednolite kafelki kart, wspólny termin autozapisu, podgląd mapy i presetu przy zamykaniu oraz dopasowania pod nakładką prawego panelu |
-| 0.12.0 | Instalacja / aktualizator; lokalny układ z resetem/fallback pozostaje osobnym uzgodnionym zakresem ustawień |
+| 0.12.0 | Instalator dla bieżącego użytkownika, Portable ZIP, opcjonalna rejestracja skojarzenia, aktualizator z decyzją użytkownika i zachowaniem danych |
+| 0.12.1 | Odbiór właściwego publicznego kanału po decyzji o źródle, nagłówek Zakładki, standardowy lewy panel przy pytaniu o preset i stabilny dolny status |
 | 0.13.0 | Rzeczywiste źródła grafik i [kolejka importu](backlog-import-z-folderow.md), docelowe foldery Library |
 | 0.13.x | Końcowa stabilizacja i uzgodnione testy |
 | 1.0.0 | Wyłącznie oznaczenia wersji, bez nowych zmian funkcjonalnych/stylistycznych |
@@ -29,7 +30,7 @@ Merge heksów i import osadzonych zasobów mapy do Library dopiero po1.0. Pozost
 
 [Uzupełnienia UI po 0.8](backlog-ui-po-0.8.md): toasty po zakładkach (patch nieustalony), kopiowanie/wklejanie po1.0 po rozmowie z GM, widoczne źródła z metadanymi obok/kolejką w0.13 oraz ewentualne menu zamykania kart w0.11. Wyłącznie zapis pomysłów, bez wdrożenia w0.8.
 
-## Aktualizator 0.12.0 — uzgodniony backlog
+## Aktualizator 0.12.0
 
 - Automatyczna kontrola aktualizacji w tle przy zwykłym starcie na ekranie powitalnym; brak internetu nie blokuje pracy.
 - Bez automatycznej instalacji: tylko informacja o dostępnej wersji i możliwość pominięcia.
@@ -37,9 +38,7 @@ Merge heksów i import osadzonych zasobów mapy do Library dopiero po1.0. Pozost
 - Uruchomienie z mapą nie wymusza ekranu powitalnego.
 - Zachowanie Library, map, lokalnych ustawień i `recent-projects.json` podczas przyszłej aktualizacji.
 
-W 0.7.1 nie ma połączenia z GitHubem ani implementacji aktualizatora.
-
-Do zaprojektowania w 0.12.0 po wykryciu dostępnej aktualizacji: A — link do konkretnego GitHub Release albo B — osobne okno z pobranym opisem wydania. Wybór A/B nie został zatwierdzony. Brak stałego przycisku GitHub w 0.7.2 nie blokuje przyszłego aktualizatora; w 0.7.2 nie implementujemy żadnego wariantu ani połączeń aktualizacyjnych.
+Wdrożono link do opisu konkretnego wydania i konfigurację publicznego kanału z pustymi wartościami domyślnymi. Szersze ustawienia, w tym zapis lokalnego układu i reset, pozostają w osobnym zakresie. [Raport 0.12.0](raport-0.12.0.md).
 
 ## Po 1.0 — szersze preferencje użytkownika
 

@@ -16,11 +16,14 @@ namespace HexMapEditor
         Exception transitionError;
         readonly ProjectLaunch launch;
         readonly Timer openTimer;
+        readonly UpdateController updates;
+        internal VerifiedInstaller PendingInstaller { get; private set; }
         void TransitionException(object sender,System.Threading.ThreadExceptionEventArgs e){transitionError=e.Exception;StartupTrace.Write("transition.nativeCallback.failed",candidate,e.Exception);if(candidate!=null)candidate.InitialDisplayError=e.Exception;}
         void DetachException(){Application.ThreadException-=TransitionException;}
         internal StartupContext(string path,ProjectLaunch launch=null)
         {
             this.launch=launch;
+            updates = new UpdateController(window => !opening && !exiting && MainForm == window, FinishForUpdate);
             // Initialize the one WPF text host before the native WinForms message loop.
             // Constructing it for the first time from a post-dialog callback can reenter
             // a WPF DisableProcessing scope. No libraries, images or document are preloaded.
@@ -33,13 +36,23 @@ namespace HexMapEditor
                 openTimer.Tick+=(s,e)=>ForwardOpen();openTimer.Start();
             }
             if(!String.IsNullOrEmpty(path))try{MainForm=null;var data=MainWindow.ReadProjectData(path);Open(data,Path.GetFullPath(path));RecentProjects.Shared.Touch(path);return;}catch(Exception ex){ReportFailure(ex);}
+            if(String.IsNullOrEmpty(path))start.Shown+=(s,e)=>updates.Check((StartWindow)s,false);
             MainForm=start;start.Show();StartupTrace.Write("start.shown",start);
         }
         void CreateWelcome()
         {
             start=new StartWindow(Open);MainForm=start;
+            start.UpdateRequested=()=>updates.Check(start,true);
             start.FormClosed+=(s,e)=>StartupTrace.Write("start.closed",s as Form);
             start.HandleDestroyed+=(s,e)=>StartupTrace.Write("start.handleDestroyed",s as Form);
+        }
+        internal bool FinishForUpdate(Form window, VerifiedInstaller installer)
+        {
+            if(opening||exiting||window!=MainForm)return false;
+            window.Close(); // Includes the existing map and preset decisions.
+            if(!window.IsDisposed)return false;
+            PendingInstaller=installer;
+            return true;
         }
         protected override void OnMainFormClosed(object sender,EventArgs e)
         {
@@ -81,6 +94,7 @@ namespace HexMapEditor
             try
             {
                 editor=EditorFactory(data,path);candidate=editor;if(transitionError!=null)throw transitionError;editor.Owner=null;
+                editor.UpdateRequested=()=>updates.Check(editor,true);
                 editor.FormClosed+=(s,e)=>{StartupTrace.Write("editor.closed",editor);if(!exiting&&ReferenceEquals(candidate,editor))Rollback(editor,new InvalidOperationException("Edytor zamknięto przed zakończeniem otwierania."));};
                 editor.HandleDestroyed+=(s,e)=>StartupTrace.Write("editor.handleDestroyed",editor);
                 editor.InitialDisplayComplete=error=>
@@ -118,6 +132,7 @@ namespace HexMapEditor
         string[] paths;
         int refreshQueued;
         bool choosing,transition;
+        internal Action UpdateRequested;
         internal bool Transition {get{return transition;}set{transition=value;}}
         internal bool ReadyForExternalOpen { get { return !choosing&&!transition&&Visible; } }
         internal StartWindow(Action<MapData,string> open)
@@ -135,9 +150,17 @@ namespace HexMapEditor
             var load=ButtonAt("Otwórz projekt",36,132);var create=ButtonAt("Stwórz nowy projekt",334,132);load.Click+=(s,e)=>ChooseOpen();create.Click+=(s,e)=>ChooseNew();
             Controls.Add(new Label{Text="Ostatnie projekty",AutoSize=true,Font=new Font(Font,FontStyle.Bold),Location=new Point(36,198)});
             projects.Bounds=new Rectangle(163,232,324,280);Controls.Add(projects);Shown+=(s,e)=>{StartupTrace.Write("start.visible",this);RefreshProjects();};
+            var update=new EditorButton{Text="Sprawdź aktualizacje",Bounds=new Rectangle(36,516,180,30)};
+            update.Click+=(s,e)=>{if(UpdateRequested!=null)UpdateRequested();};Controls.Add(update);
             Load+=(s,e)=>{var area=Screen.FromControl(this).WorkingArea;Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);};Disposed+=(s,e)=>tips.Dispose();
         }
         Button ButtonAt(string text,int x,int y){var b=new Button{Text=text,Bounds=new Rectangle(x,y,280,44),FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(38,65,96)};b.FlatAppearance.BorderColor=Color.FromArgb(90,145,205);Controls.Add(b);return b;}
+        internal DialogResult ShowUpdateDialog(Func<DialogResult> show)
+        {
+            choosing=true;
+            try{return show();}
+            finally{choosing=false;}
+        }
         internal void RefreshProjects()
         {
             paths=RecentProjects.Shared.Entries;RenderProjects();

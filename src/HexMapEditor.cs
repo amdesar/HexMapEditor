@@ -16,14 +16,15 @@ namespace HexMapEditor
 
     internal static class LibraryPaths
     {
-        public static string Root { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Library"); } }
+        public static string Root { get { return Path.Combine(AppStorage.Current.DataRoot, "Library"); } }
         public static string Hexmaps { get { return Path.Combine(Root, "Hexmaps"); } }
         public static string Presets { get { return Path.Combine(Root, "Terrains", "Presets"); } }
         public static string Backgrounds { get { return Path.Combine(Root, "Backgrounds"); } }
         public static string TerrainGraphics { get { return Path.Combine(Root, "Terrains", "Graphics"); } }
-        public static void EnsureDirectories(string applicationDirectory)
+        public static void EnsureDirectories() { EnsureDirectories(AppStorage.Current.DataRoot); }
+        public static void EnsureDirectories(string dataDirectory)
         {
-            string root = Path.Combine(applicationDirectory, "Library");
+            string root = Path.Combine(dataDirectory, "Library");
             foreach (string folder in new[] { "Backgrounds", "Terrains", Path.Combine("Terrains", "Presets"), Path.Combine("Terrains", "Graphics"), "Icons", "Objects", Path.Combine("Objects", "States"), "Hexmaps", Path.Combine("Exports", "Images"), Path.Combine("Exports", "Text") })
                 Directory.CreateDirectory(Path.Combine(root, folder));
         }
@@ -466,7 +467,7 @@ namespace HexMapEditor
 
         bool EnsureLibrary()
         {
-            try { LibraryPaths.EnsureDirectories(AppDomain.CurrentDomain.BaseDirectory); return true; }
+            try { LibraryPaths.EnsureDirectories(); return true; }
             catch (Exception ex) { ShowEditorMessage("Nie można przygotować lokalnej biblioteki:\n\n" + LibraryPaths.Root + "\n\n" + ex.Message + "\n\nDane nie zostały przeniesione do innego katalogu.", "Błąd biblioteki", MessageBoxButtons.OK, MessageBoxIcon.Error); return false; }
         }
 
@@ -972,10 +973,31 @@ namespace HexMapEditor
             try
             {
                 string path=args.Length>0?args[0]:null;
+                VerifiedInstaller pending = null;
+                using(var installGuard=AppStorage.Current.Installed?new System.Threading.Mutex(false,AppStorage.InstallMutex):null)
+                using(var executableGuard=AppStorage.Current.Installed?File.Open(Application.ExecutablePath,FileMode.Open,FileAccess.Read,FileShare.Read):null)
                 using(var launch=new ProjectLaunch())
                 {
-                    if(launch.Primary)Application.Run(new StartupContext(path,launch));
+                    if(launch.Primary)
+                    {
+                        using(var context = new StartupContext(path,launch))
+                        {
+                            Application.Run(context);
+                            pending = context.PendingInstaller;
+                        }
+                    }
                     else launch.Forward(path);
+                }
+                if(pending!=null)
+                {
+                    using(pending)
+                    {
+                        try { pending.Launch(); }
+                        catch(Exception error) {
+                            MessageBox.Show("Nie udało się uruchomić aktualizacji. Możesz ponownie uruchomić edytor lub pobrać właściwy instalator ze strony wydania.\n\n"+error.Message,
+                                "Aktualizacja HexMapEditor",MessageBoxButtons.OK,MessageBoxIcon.Error);
+                        }
+                    }
                 }
             }
             catch (Exception ex) { StartupTrace.Write("program.exception",null,ex);MessageBox.Show("Aplikacja napotkała błąd:\n\n" + ex.ToString(), "HexMapEditor — błąd", MessageBoxButtons.OK, MessageBoxIcon.Error); }

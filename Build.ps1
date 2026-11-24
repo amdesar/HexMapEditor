@@ -1,11 +1,19 @@
-﻿param([string]$Output = (Join-Path $PSScriptRoot 'HexMapEditor.exe'), [string]$TestSource, [string]$EntryPoint = 'HexMapEditor.Program')
+﻿param([string]$Output = (Join-Path $PSScriptRoot 'HexMapEditor.exe'), [string]$TestSource, [string]$EntryPoint = 'HexMapEditor.Program',
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')][string]$FixtureVersion)
 $ErrorActionPreference = 'Stop'
 $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 $compiler = Join-Path $framework 'csc.exe'
 $icon = Join-Path $PSScriptRoot 'assets\app\icon.ico'
 $target = [IO.Path]::GetFullPath($Output)
 try {
+if ($FixtureVersion) {
+    $fixtureRoot = (Join-Path $PSScriptRoot 'tests\_work').TrimEnd('\') + '\'
+    if (-not $target.StartsWith($fixtureRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Kompilacja pomocnicza jest dozwolona wyłącznie w tests/_work.'
+    }
+}
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' -ErrorAction SilentlyContinue)
+if ($FixtureVersion) { $sources = @($sources | Where-Object Name -NotIn @('AssemblyInfo.cs', 'ReleaseMetadata.cs')) }
 if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw 'Brak kompilatora .NET Framework 4.x (csc.exe).' }
 if ($sources.Count -eq 0) { throw 'Brak źródeł C# w katalogu src.' }
 if (-not (Test-Path -LiteralPath $icon -PathType Leaf)) {
@@ -47,6 +55,16 @@ $arguments += $sources | ForEach-Object FullName
 if ($TestSource) { $arguments += $TestSource }
 [IO.Directory]::CreateDirectory($tempDir) | Out-Null
 try {
+    if ($FixtureVersion) {
+        foreach ($metadata in @('AssemblyInfo.cs', 'ReleaseMetadata.cs')) {
+            $file = Join-Path $tempDir $metadata
+            $content = [IO.File]::ReadAllText((Join-Path (Join-Path $PSScriptRoot 'src') $metadata))
+            $content = [regex]::Replace($content, '(?<=")\d+\.\d+\.\d+(?=(?:\.0)?")', $FixtureVersion)
+            [IO.File]::WriteAllText($file, $content)
+            $arguments += $file
+        }
+        $arguments += '/define:PACKAGE_FIXTURE'
+    }
     & $compiler @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Kompilacja nie powiodła się.' }
     if ([IO.File]::Exists($target)) {
@@ -55,6 +73,11 @@ try {
     } else { [IO.File]::Move($temp, $target) }
 } finally {
     if ([IO.File]::Exists($temp)) { [IO.File]::Delete($temp) }
+    if ($FixtureVersion) {
+        foreach ($metadata in @('AssemblyInfo.cs', 'ReleaseMetadata.cs')) {
+            [IO.File]::Delete((Join-Path $tempDir $metadata))
+        }
+    }
     try { [IO.Directory]::Delete($tempDir) } catch { Write-Warning "Pozostał katalog tymczasowy: $tempDir" }
 }
 } catch {

@@ -25,7 +25,7 @@ namespace HexMapEditor
         }
         internal static CreatedProject CreateInHexmaps(MapData data)
         {
-            string path=StartPath(data.Name);LibraryPaths.EnsureDirectories(AppDomain.CurrentDomain.BaseDirectory);
+            string path=StartPath(data.Name);LibraryPaths.EnsureDirectories();
             if(Directory.EnumerateFileSystemEntries(LibraryPaths.Hexmaps).Any(p=>String.Equals(Path.GetFileName(p),Path.GetFileName(path),StringComparison.OrdinalIgnoreCase)))
                 throw new IOException("Projekt o tej nazwie już istnieje. Zmień nazwę.");
             data.LoadedFileVersion=MainWindow.WriteProjectData(data,path,false);RecentProjects.Shared.Touch(path);
@@ -47,7 +47,7 @@ namespace HexMapEditor
         {
             try
             {
-            LibraryPaths.EnsureDirectories(AppDomain.CurrentDomain.BaseDirectory);
+            LibraryPaths.EnsureDirectories();
             string name=data.Name;foreach(char c in System.IO.Path.GetInvalidFileNameChars())name=name.Replace(c,'_');
             using(var dialog=new SaveFileDialog{Title="Zapisz nowy projekt",Filter="Projekt HexMapEditor (*.hexmap)|*.hexmap",DefaultExt="hexmap",AddExtension=true,OverwritePrompt=false,RestoreDirectory=true,InitialDirectory=LibraryPaths.Hexmaps,FileName=name})
             {
