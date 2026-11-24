@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 namespace HexMapEditor
@@ -16,13 +18,15 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         const string AutoSaveBusyMessage="Trwa autozapis. Poczekaj na zakończenie; zamknięcie okna anuluje oczekujące przygotowanie.";
-        readonly AutoSaveSchedule autoSchedule=new AutoSaveSchedule();
         readonly System.Windows.Forms.Timer autoTimer=new System.Windows.Forms.Timer{Interval=1000};
-        ProjectFileVersion fileVersion;
-        bool autoSaving;
+        bool autoSaving { get { return autoJob!=null; } }
+        readonly Queue<DocumentSession> autoBatch=new Queue<DocumentSession>();
+        readonly List<string> autoFailures=new List<string>();
+        bool autoCycle;
+        int autoWritten;
         sealed class AutoSaveJob
         {
-            internal MapData Document,Snapshot;internal long Revision;internal string Path;internal ProjectFileVersion Expected;
+            internal DocumentSession Document;internal MapData Snapshot;internal long Revision;internal string Path;internal ProjectFileVersion Expected;
             internal CancellationTokenSource Cancel=new CancellationTokenSource();internal ManualResetEvent Permit=new ManualResetEvent(false);internal bool Authorized;
         }
         AutoSaveJob autoJob;
@@ -31,17 +35,42 @@ namespace HexMapEditor
         static bool SameProjectPath(string a,string b){return !String.IsNullOrEmpty(a)&&!String.IsNullOrEmpty(b)&&String.Equals(System.IO.Path.GetFullPath(a),System.IO.Path.GetFullPath(b),StringComparison.OrdinalIgnoreCase);}
         void InitAutoSave()
         {
-            autoTimer.Tick+=(s,e)=>PollAutoSave();autoSchedule.Reset();autoTimer.Start();
+            autoTimer.Tick+=(s,e)=>PollAutoSave();autoTimer.Start();
             Disposed+=(s,e)=>{autoTimer.Dispose();if(autoJob!=null)autoJob.Cancel.Cancel();};
         }
-        void ResetSaveClock(ProjectFileVersion version){fileVersion=version;autoSchedule.Reset();AutoSaveError=null;}
-        bool AutoSafe(){return !autoSaving&&!InkCommitBusy&&modalDepth==0&&gestureButton==MouseButtons.None&&inkBefore==null&&!rightResizing&&propertyEditKey==null&&!TextInputFocused(this);}
+        void ResetSaveClock(ProjectFileVersion version){activeDocument.Version=version;autoSchedule.Reset();AutoSaveError=null;}
+        bool IsAutoSaving(DocumentSession document){return autoJob!=null&&ReferenceEquals(autoJob.Document,document);}
+        bool AutoSafe(){return !autoSaving&&!reviewingExit&&!returningToWelcome&&!InkCommitBusy&&modalDepth==0&&gestureButton==MouseButtons.None&&inkBefore==null&&!rightResizing&&propertyEditKey==null&&!TextInputFocused(this);}
         void PollAutoSave()
         {
-            if(IsDisposed||!IsHandleCreated||!autoSchedule.Ready(!String.IsNullOrEmpty(currentPath),HasUnsavedChanges,AutoSafe()))return;
-            if(fileVersion==null){autoSchedule.Failed(true);AutoSaveError="Brak potwierdzonej wersji pliku. Użyj ręcznego Zapisz jako.";statusLabel.Text=AutoSaveError;return;}
-            var job=new AutoSaveJob{Document=map,Revision=documentRevision,Path=currentPath,Expected=fileVersion};autoSaving=true;autoJob=job;AutoSaveError=null;
-            try{job.Snapshot=ProjectSnapshot.Capture(map);}catch(Exception error){FinishAutoSave(job,null,null,error);return;}
+            if(IsDisposed||!IsHandleCreated||!AutoSafe())return;
+            if(!autoCycle)
+            {
+                foreach(var document in documents)
+                    if(document.Schedule.Ready(document.Path!=null,document.Unsaved,true))autoBatch.Enqueue(document);
+                if(autoBatch.Count==0)return;
+                autoCycle=true;autoWritten=0;autoFailures.Clear();
+            }
+            while(autoBatch.Count>0)
+            {
+                var document=autoBatch.Dequeue();
+                if(!documents.Contains(document)||!document.Schedule.Ready(document.Path!=null,document.Unsaved,true))continue;
+                if(document.Version==null)
+                {
+                    RecordAutoFailure(document,new ProjectConflictException("Brak potwierdzonej wersji pliku. Użyj Zapisz jako."));
+                    continue;
+                }
+                StartAutoSave(document);return;
+            }
+            ReportAutoCycle();
+        }
+        void StartAutoSave(DocumentSession document)
+        {
+            var job=new AutoSaveJob{Document=document,Revision=document.Revision,Path=document.Path,Expected=document.Version};
+            autoJob=job;
+            if(ReferenceEquals(document,activeDocument))UpdateCommandState();
+            try{job.Snapshot=ProjectSnapshot.Capture(document.Map,PresetsForSave(document));}
+            catch(Exception error){FinishAutoSave(job,null,null,error);return;}
             var thread=new Thread(()=>
             {
                 byte[] bytes=null;SavedMapState saved=null;ProjectFileVersion version=null;Exception failure=null;
@@ -58,14 +87,36 @@ namespace HexMapEditor
             }){IsBackground=true,Name="HexMapEditor autosave"};thread.SetApartmentState(ApartmentState.MTA);thread.Start();
         }
         bool QueueAuto(AutoSaveJob job,Action action){try{if(!IsDisposed&&IsHandleCreated){BeginInvoke(action);return true;}}catch(InvalidOperationException){}job.Cancel.Cancel();return false;}
-        bool AutoMatches(AutoSaveJob job){return !IsDisposed&&ReferenceEquals(autoJob,job)&&ReferenceEquals(map,job.Document)&&documentRevision==job.Revision&&SameProjectPath(currentPath,job.Path);}
+        bool AutoMatches(AutoSaveJob job)
+        {return !IsDisposed&&ReferenceEquals(autoJob,job)&&documents.Contains(job.Document)&&job.Document.Revision==job.Revision&&SameProjectPath(job.Document.Path,job.Path);}
         void FinishAutoSave(AutoSaveJob job,SavedMapState saved,ProjectFileVersion version,Exception error)
         {
-            if(!ReferenceEquals(autoJob,job))return;bool matches=AutoMatches(job);autoSaving=false;autoJob=null;
-            if(version!=null&&matches){savedState=saved;savedSnapshot=null;dirty=false;needsFirstSave=false;ResetSaveClock(version);AutoSaveCount++;UpdateCaption();RecentProjects.Shared.Touch(currentPath);statusLabel.Text="Zapisano automatycznie";}
-            else{autoSchedule.Failed(error is ProjectConflictException);AutoSaveError=error==null?"Stan dokumentu zmienił się — autozapis odrzucono.":error is OperationCanceledException?"Autozapis anulowany. Niezapisane zmiany pozostają w pamięci.":"Nie można zapisać automatycznie. "+error.Message;statusLabel.Text=AutoSaveError;}
+            if(!ReferenceEquals(autoJob,job))return;
+            bool matches=AutoMatches(job);autoJob=null;var document=job.Document;
+            if(version!=null&&SameProjectPath(document.Path,job.Path))document.Version=version;
+            if(version!=null&&matches)
+            {
+                document.Saved=saved;document.Dirty=false;document.FirstSave=false;document.Schedule.Reset();
+                autoWritten++;AutoSaveCount++;RecentProjects.Shared.Touch(document.Path);
+            }
+            else RecordAutoFailure(document,error);
+            UpdateTabTitle(document);UpdateCaption();
             job.Permit.Dispose();job.Cancel.Dispose();
+            if(autoBatch.Count==0)ReportAutoCycle();
         }
-        void CancelAutoSave(){if(autoJob!=null){autoJob.Cancel.Cancel();statusLabel.Text="Anulowanie autozapisu… Poczekaj na zakończenie, a następnie ponów polecenie.";}}
+        void RecordAutoFailure(DocumentSession document,Exception error)
+        {
+            document.Schedule.Failed(error is ProjectConflictException);
+            autoFailures.Add(ProjectTitle(document.Path,document.Map.Name)+": "+(error==null?"Stan dokumentu zmienił się.":error.Message));
+        }
+        void ReportAutoCycle()
+        {
+            autoCycle=false;
+            AutoSaveError=autoFailures.Count==0?null:String.Join(Environment.NewLine,autoFailures);
+            if(autoWritten==0&&AutoSaveError==null)return;
+            statusLabel.Text="Autozapis: zapisano "+autoWritten+", problemy: "+autoFailures.Count+".";
+            if(AutoSaveError!=null)tips.SetToolTip(statusLabel,statusLabel.Text+"\n"+AutoSaveError);
+        }
+        void CancelAutoSave(){autoBatch.Clear();if(autoJob!=null){autoJob.Cancel.Cancel();statusLabel.Text="Anulowanie autozapisu… Poczekaj na zakończenie, a następnie ponów polecenie.";}}
     }
 }

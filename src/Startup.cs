@@ -14,20 +14,52 @@ namespace HexMapEditor
         internal Action<Exception> Failure;
         bool opening,exiting;
         Exception transitionError;
+        readonly ProjectLaunch launch;
+        readonly Timer openTimer;
         void TransitionException(object sender,System.Threading.ThreadExceptionEventArgs e){transitionError=e.Exception;StartupTrace.Write("transition.nativeCallback.failed",candidate,e.Exception);if(candidate!=null)candidate.InitialDisplayError=e.Exception;}
         void DetachException(){Application.ThreadException-=TransitionException;}
-        internal StartupContext(string path)
+        internal StartupContext(string path,ProjectLaunch launch=null)
         {
+            this.launch=launch;
             // Initialize the one WPF text host before the native WinForms message loop.
             // Constructing it for the first time from a post-dialog callback can reenter
             // a WPF DisableProcessing scope. No libraries, images or document are preloaded.
             preparedNotes=MainWindow.CreateNoteEditor();
             EditorFactory=(data,file)=>{var notes=preparedNotes;preparedNotes=null;try{return new MainWindow(data,file,true,notes);}catch{if(notes!=null)notes.Dispose();throw;}};
+            CreateWelcome();
+            if(launch!=null)
+            {
+                openTimer=new Timer{Interval=125};
+                openTimer.Tick+=(s,e)=>ForwardOpen();openTimer.Start();
+            }
+            if(!String.IsNullOrEmpty(path))try{MainForm=null;var data=MainWindow.ReadProjectData(path);Open(data,Path.GetFullPath(path));RecentProjects.Shared.Touch(path);return;}catch(Exception ex){ReportFailure(ex);}
+            MainForm=start;start.Show();StartupTrace.Write("start.shown",start);
+        }
+        void CreateWelcome()
+        {
             start=new StartWindow(Open);MainForm=start;
             start.FormClosed+=(s,e)=>StartupTrace.Write("start.closed",s as Form);
             start.HandleDestroyed+=(s,e)=>StartupTrace.Write("start.handleDestroyed",s as Form);
-            if(!String.IsNullOrEmpty(path))try{MainForm=null;var data=MainWindow.ReadProjectData(path);Open(data,Path.GetFullPath(path));RecentProjects.Shared.Touch(path);return;}catch(Exception ex){ReportFailure(ex);}
-            MainForm=start;start.Show();StartupTrace.Write("start.shown",start);
+        }
+        protected override void OnMainFormClosed(object sender,EventArgs e)
+        {
+            var editor=sender as MainWindow;
+            if(editor==null||!editor.ReturningToWelcome){base.OnMainFormClosed(sender,e);return;}
+            CreateWelcome();start.Show();start.Activate();
+            StartupTrace.Write("start.shown",start);
+        }
+        void ForwardOpen()
+        {
+            if(opening||exiting)return;
+            var editor=MainForm as MainWindow;
+            if(editor!=null&&!editor.ReadyForExternalOpen||editor==null&&(start==null||!start.ReadyForExternalOpen))return;
+            string path;
+            if(!launch.Read(out path))return;
+            var target=MainForm;
+            if(target.WindowState==FormWindowState.Minimized)target.WindowState=FormWindowState.Normal;
+            target.Activate();
+            if(path.Length==0)return;
+            if(editor==null)start.OpenPath(path);else editor.OpenExternalProject(path);
         }
         internal void Open(MapData data,string path)
         {
@@ -76,7 +108,7 @@ namespace HexMapEditor
             if(report)ReportFailure(error);
         }
         void ReportFailure(Exception error){StartupTrace.Write("transition.error",start,error);if(Failure!=null)Failure(error);else MessageBox.Show(start,(start==null?"Edytor jest otwarty, ale wystąpił błąd zamykania startu.":"Nie można otworzyć edytora. Ekran startowy pozostaje dostępny.")+"\n\n"+error.Message,"Błąd otwierania",MessageBoxButtons.OK,MessageBoxIcon.Error);}
-        protected override void ExitThreadCore(){exiting=true;DetachException();StartupTrace.Write("loop.exit",MainForm);if(preparedNotes!=null){preparedNotes.Dispose();preparedNotes=null;}if(candidate!=null){var old=candidate;candidate=null;old.InitialDisplayComplete=null;old.Dispose();}base.ExitThreadCore();}
+        protected override void ExitThreadCore(){exiting=true;if(openTimer!=null)openTimer.Dispose();DetachException();StartupTrace.Write("loop.exit",MainForm);if(preparedNotes!=null){preparedNotes.Dispose();preparedNotes=null;}if(candidate!=null){var old=candidate;candidate=null;old.InitialDisplayComplete=null;old.Dispose();}base.ExitThreadCore();}
     }
     internal sealed class StartWindow : DarkForm
     {
@@ -87,6 +119,7 @@ namespace HexMapEditor
         int refreshQueued;
         bool choosing,transition;
         internal bool Transition {get{return transition;}set{transition=value;}}
+        internal bool ReadyForExternalOpen { get { return !choosing&&!transition&&Visible; } }
         internal StartWindow(Action<MapData,string> open)
         {
             this.open=open;Text="HexMapEditor";ClientSize=new Size(650,550);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;AutoScaleMode=AutoScaleMode.Dpi;AutoScroll=true;StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(25,28,36);ForeColor=Color.WhiteSmoke;Font=new Font("Segoe UI",10);DoubleBuffered=true;

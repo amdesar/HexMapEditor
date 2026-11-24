@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
 Wersja 2.8. Stan decyzji 24 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.10.2. Sekcja 53 opisuje poprawki prawego panelu, opisu i ostatnich projektów.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.11.0. Sekcja 54 opisuje karty, robocze presety i zapis dokumentów.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1066,3 +1066,11 @@ Schowek jest źródłem importu grafiki terenu, ikony i obiektu. Źródło przec
 - Formatowanie znakowe z kursorem wewnątrz słowa obejmuje znaki słowa. Jawne zaznaczenie zachowuje swój zakres, także świadomie zaznaczone spacje.
 - Ostatnie projekty pokazują `LastSavedAppVersion` w nawiasie po prawej, w wierszu nazwy. Przy braku wersji nazwa dostaje całą szerokość. Wielokropek skraca wyłącznie nazwę.
 - Nagłówek heksa zaczyna się na wysokości pozostałych widoków i ma wspólną lewą linię z metadanymi. Pole edycji nazwy używa rozmiaru nagłówka. Wiersze promieni mieszczą obramowanie pola przy stałej wysokości. Plus dodawania stanu jest rysowany na środku, a „Ze schowka” w wyborze źródła ikony i obiektu ma styl pozostałych przycisków. [Raport 0.10.2](raport-0.10.2.md).
+
+## 54. Wersja 0.11.0 — karty map
+
+- Jeden dokument na kartę, jedno płótno i jeden zestaw paneli. Dokument ma własną ścieżkę, stan zapisu, historię mapy i opisów oraz kamerę i zaznaczenie. Powrót odtwarza zwinięcie szczegółów. Przy przełączeniu odznacza się materiał, a wspólne narzędzie i szerokości paneli pozostają. Dane widoku są sesyjne.
+- Pasek u dołu ma 36 px, jak pasek narzędzi przy skali testowej. Zawiera stały plus i strzałki, karty o szerokości 207 px oraz status mapy. Aktywacja odsłania właściwą kartę. Ołówek uruchamia zmianę nazwy wskazanego pliku. Zamknięcie aktywnej karty wybiera prawą, następnie lewą. Po ostatniej wraca ekran powitalny.
+- Otwarcie ścieżki już obsługiwanej aktywuje jej kartę. Porównuje się pełne znormalizowane ścieżki z ignorowaniem wielkości liter. Następne wywołanie tego samego EXE przekazuje ścieżkę do działającego procesu tej kopii. Uruchomienie z argumentem bez wcześniejszego procesu otwiera plik bezpośrednio.
+- Plik biblioteczny presetu jest osobny od roboczej palety, zawartości mapy i zachowania szybkiej listy. Powiązane karty współdzielą draft według ścieżki presetu. Brak pliku daje osadzoną kopię roboczą danej karty. Odświeżenie aktualizuje katalog, zachowuje draft i jego ochronę przy zapisie. Użycie ikony lub obiektu zmienia kolejność szybkiego dostępu tylko w bieżącej karcie. Celowe zmiany sekcji współdzielonego presetu są widoczne w kartach, które go używają.
+- Ręczny zapis dotyczy wskazanego dokumentu. Ctrl+S i Zapisz jako dotyczą aktywnego. Cykl autozapisu bierze kwalifikujące się dokumenty z plikiem pojedynczo. Każdy zapis ma własny odcisk pliku, rewizję i wynik. Przerwanie wyjścia zachowuje otwarte karty, nieskończone zmiany i wcześniejsze skuteczne zapisy. Formaty pozostają Map12, preset 5 i dotychczasowa biblioteka. [Raport 0.11.0](raport-0.11.0.md).

@@ -5,7 +5,7 @@ namespace HexMapEditor
 {
     internal static class ProjectSnapshot
     {
-        internal static MapData Capture(MapData map)
+        internal static MapData Capture(MapData map,IEnumerable<TerrainPreset> presets=null)
         {
             var sources=new Dictionary<GraphicSource,GraphicSource>();var graphics=new Dictionary<GraphicDefinition,GraphicDefinition>();
             Func<GraphicSource,GraphicSource> source=s=>{if(s==null)return null;GraphicSource copy;if(!sources.TryGetValue(s,out copy))sources.Add(s,copy=s.SnapshotCopy());return copy;};
@@ -13,7 +13,7 @@ namespace HexMapEditor
             Func<FillVariant,FillVariant> fill=f=>{if(f==null)return null;var copy=f.Copy();copy.Graphic=graphic(f.Graphic);return copy;};
             var copyMap=new MapData{FormatVersion=map.FormatVersion,Name=map.Name,Columns=map.Columns,Rows=map.Rows,Orientation=map.Orientation,LabelMode=map.LabelMode,RowParity=map.RowParity,ColumnParity=map.ColumnParity,ActivePresetId=map.ActivePresetId};
             copyMap.Cells=map.Cells.Select(c=>{var copy=c.SnapshotCopy();copy.Texture=graphic(c.Texture);copy.FogFill=fill(c.FogFill);copy.DarkFill=fill(c.DarkFill);return copy;}).ToList();
-            copyMap.Presets=map.Presets.Select(p=>{var copy=p.Copy();foreach(var t in copy.Terrains){t.Texture=graphic(t.Texture);t.Variants=t.Variants.Select(fill).ToList();}return copy;}).ToList();
+            copyMap.Presets=(presets??map.Presets).Select(p=>{var copy=p.Copy();foreach(var t in copy.Terrains){t.Texture=graphic(t.Texture);t.Variants=t.Variants.Select(fill).ToList();}return copy;}).ToList();
             copyMap.IconAssets=map.IconAssets.Select(a=>new IconAsset{Id=a.Id,Name=a.Name,Png=a.Png,Width=a.Width,Height=a.Height}).ToList();
             copyMap.TerrainAssets=map.TerrainAssets.Select(graphic).ToList();copyMap.GraphicSources=map.GraphicSources.Select(source).ToList();
             copyMap.FogPalette=map.FogPalette.Select(fill).ToList();copyMap.DarkPalette=map.DarkPalette.Select(fill).ToList();

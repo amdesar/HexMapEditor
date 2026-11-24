@@ -22,16 +22,30 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         internal bool TryRenameProject(string name,out string error)
+        {return TryRenameProject(activeDocument,name,out error);}
+        bool TryRenameProject(DocumentSession document,string name,out string error)
         {
-            error=null;if(BlockInkCommit()){error=autoSaving?AutoSaveBusyMessage:InkBusyMessage;return false;}if(String.IsNullOrEmpty(currentPath)){error="Najpierw zapisz nową mapę.";return false;}
-            EndCanvasGesture(true);if(BlockInkCommit()){error=InkBusyMessage;return false;}
-            try{string old=currentPath,next=ProjectRename.Move(old,name,fileVersion);if(next==old)return true;currentPath=next;documentRevision++;RecentProjects.Shared.Renamed(old,next);UpdateCaption();statusLabel.Text=RecentProjects.Shared.Warning??"Zmieniono nazwę pliku. Niezapisane zmiany pozostają w pamięci.";return true;}
+            error=null;if(IsAutoSaving(document)||InkCommitBusy){error=IsAutoSaving(document)?AutoSaveBusyMessage:InkBusyMessage;return false;}
+            if(document.Path==null){error="Najpierw zapisz nową mapę.";return false;}
+            try
+            {
+                string old=document.Path;
+                string destination=ProjectCreation.PathForName(Path.GetDirectoryName(old),name);
+                var opened=FindDocument(destination);
+                if(opened!=null&&!ReferenceEquals(opened,document))throw new IOException("Plik pod tą nazwą jest otwarty w innej karcie.");
+                string next=ProjectRename.Move(old,name,document.Version);
+                if(next==old)return true;
+                document.Path=next;document.Revision++;
+                RecentProjects.Shared.Renamed(old,next);UpdateTabTitle(document);UpdateCaption();
+                statusLabel.Text=RecentProjects.Shared.Warning??"Zmieniono nazwę pliku. Niezapisane zmiany pozostają w pamięci.";
+                return true;
+            }
             catch(Exception ex){error=ex.Message;return false;}
         }
-        void RenameProject()
+        void RenameProject(){RenameDocument(activeDocument);}
+        void ShowRenameProject(DocumentSession document)
         {
-            if(BlockInkCommit()||String.IsNullOrEmpty(currentPath))return;
-            using(var d=new RenameProjectDialog(Path.GetFileName(currentPath),name=>{string error;if(TryRenameProject(name,out error))return true;ShowEditorMessage(error,"Nie można zmienić nazwy pliku",MessageBoxButtons.OK,MessageBoxIcon.Warning);return false;}))RunModal(()=>d.ShowDialog(this));
+            using(var d=new RenameProjectDialog(Path.GetFileName(document.Path),name=>{string error;if(TryRenameProject(document,name,out error))return true;ShowEditorMessage(error,"Nie można zmienić nazwy pliku",MessageBoxButtons.OK,MessageBoxIcon.Warning);return false;}))RunModal(()=>d.ShowDialog(this));
         }
     }
     internal sealed class RenameProjectDialog:EditorDialog

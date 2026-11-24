@@ -81,7 +81,7 @@ namespace HexMapEditor
         }
         void RefreshRecentMenu()
         {
-            var paths=RecentProjects.Shared.Entries;Action refresh=()=>{if(IsDisposed||recentMenu.IsDisposed)return;foreach(ToolStripItem old in recentMenu.DropDownItems.Cast<ToolStripItem>().ToArray())old.Dispose();recentMenu.DropDownItems.Clear();foreach(string p in RecentAvailability.Visible(paths)){string path=p;var item=new ToolStripMenuItem(Path.GetFileNameWithoutExtension(path)){ToolTipText=path};item.Click+=(s,e)=>{if(BlockInkCommit()||!ConfirmDiscard()||!ConfirmPresetsBeforeClose())return;string error;bool migrated;if(!TryLoadProject(path,out error,out migrated))ShowEditorMessage(error,"Nie można otworzyć projektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);};recentMenu.DropDownItems.Add(item);}if(recentMenu.DropDownItems.Count==0)recentMenu.DropDownItems.Add(new ToolStripMenuItem("Brak dostępnych ostatnich projektów"){Enabled=false});};
+            var paths=RecentProjects.Shared.Entries;Action refresh=()=>{if(IsDisposed||recentMenu.IsDisposed)return;foreach(ToolStripItem old in recentMenu.DropDownItems.Cast<ToolStripItem>().ToArray())old.Dispose();recentMenu.DropDownItems.Clear();foreach(string p in RecentAvailability.Visible(paths)){string path=p;var item=new ToolStripMenuItem(Path.GetFileNameWithoutExtension(path)){ToolTipText=path};item.Click+=(s,e)=>{if(!CanChangeDocument())return;string error;bool migrated;if(!TryLoadProject(path,out error,out migrated))ShowEditorMessage(error,"Nie można otworzyć projektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);};recentMenu.DropDownItems.Add(item);}if(recentMenu.DropDownItems.Count==0)recentMenu.DropDownItems.Add(new ToolStripMenuItem("Brak dostępnych ostatnich projektów"){Enabled=false});};
             refresh();RecentAvailability.Refresh(paths,()=>{try{if(!IsDisposed&&IsHandleCreated)BeginInvoke(refresh);}catch(InvalidOperationException){}});
         }
         void FillZoomMenu(ToolStripItemCollection items){foreach(int p in new[]{25,50,75,100,125,150,200,300,400}){int percent=p;items.Add(new ToolStripMenuItem(p+"%",null,(s,e)=>SetZoomPercent(percent)));}items.Add(new ToolStripSeparator());items.Add(new ToolStripMenuItem("Niestandardowe…",null,(s,e)=>{using(var d=new ZoomDialog(scale*100))if(RunModal(()=>d.ShowDialog(this))==DialogResult.OK)SetZoomPercent((float)d.Value);}));}
@@ -92,7 +92,7 @@ namespace HexMapEditor
         void UpdateZoomCaption(){zoomButton.Text=Math.Round(scale*100)+"%";}
         void UpdateCommandState()
         {
-            if(mainMenu==null)return;bool busy=autoSaving||InkCommitBusy;
+            if(mainMenu==null)return;bool busy=IsAutoSaving(activeDocument)||InkCommitBusy;
             foreach(var pair in commandMenus)pair.Value.Enabled=!busy||pair.Key==EditorCommand.Exit;
             commandMenus[EditorCommand.Rename].Enabled=!busy&&!String.IsNullOrEmpty(currentPath);
             Control focus=commandFocus??commandTarget??FocusedEditorControl();var text=focus as TextBoxBase;bool textContext=text!=null;

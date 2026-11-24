@@ -79,7 +79,7 @@ namespace HexMapEditor
                     var preset = ReadFile(file);
                     if (preset.Id == DefaultId) { errors.Add(Path.GetFileName(file) + ": plik nie zastępuje chronionego wzorca Domyślny; dane pliku pozostawiono bez zmian."); continue; }
                     int at = result.FindIndex(p => p.Id == preset.Id); if (at >= 0) { errors.Add(Path.GetFileName(file) + ": powtórzony identyfikator presetu."); continue; }
-                    if (result.Any(p => SameName(p.Name, preset.Name))) { errors.Add(Path.GetFileName(file) + ": powtórzona nazwa presetu."); continue; } result.Add(preset);
+                    result.Add(preset);
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(file) + ": " + ex.Message); }
             }

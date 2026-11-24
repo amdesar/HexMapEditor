@@ -93,12 +93,13 @@ namespace HexMapEditor
             return PickAssetLibrary(owner,false);
         }
         void OpenIconLibrary() { var chosen = PickLibraryIcon(this); if (chosen != null){CurrentQuick.IconRefs[chosen.Id]=chosen.Copy(); SelectIcon(chosen.Id);} }
-        MapData MapForSave(){return MapForSave(map);}
-        internal static MapData MapForSave(MapData map)
+        MapData MapForSave(){return MapForSave(map,PresetsForSave(activeDocument));}
+        internal static MapData MapForSave(MapData map,IEnumerable<TerrainPreset> presets=null)
         {
+            var palette=(presets??map.Presets).Select(p=>p.Copy()).ToList();
             var used = new HashSet<string>(map.Cells.Where(c => c.IconId != null).Select(c => c.IconId).Concat(map.Objects.Select(o=>o.AssetId)));
-            var terrainAssets = TerrainTextures.Collect(DocumentGraphics(map));
-            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = map.Presets, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).Concat(PresetSets.Assets(map.Presets)).GroupBy(a=>a.Id).Select(g=>g.First()).ToList(), FogPalette = map.FogPalette, DarkPalette=map.DarkPalette, Ink=map.Ink, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
+            var terrainAssets = TerrainTextures.Collect(DocumentGraphics(map,palette));
+            return new MapData { FormatVersion = map.FormatVersion, Name = map.Name, Columns = map.Columns, Rows = map.Rows, Orientation = map.Orientation, LabelMode = map.LabelMode, Cells = map.Cells, Presets = palette, ActivePresetId = map.ActivePresetId, RowParity = map.RowParity, ColumnParity = map.ColumnParity, IconAssets = map.IconAssets.Where(a => used.Contains(a.Id)).Concat(PresetSets.Assets(palette)).GroupBy(a=>a.Id).Select(g=>g.First()).ToList(), FogPalette = map.FogPalette, DarkPalette=map.DarkPalette, Ink=map.Ink, TerrainAssets = terrainAssets, Background = map.Background, GraphicSources = HexMapEditor.GraphicSources.Collect(terrainAssets.Select(a => a.Source).Concat(map.Background == null ? new GraphicSource[0] : new[] { map.Background.Source })), Objects=map.Objects, Groups=map.Groups,ObjectStates=StateLibrary.ForSave(map), ExcludedStateIds=map.ExcludedStateIds };
         }
         void BeginMaterialStroke(int start, EditorTool tool)
         {

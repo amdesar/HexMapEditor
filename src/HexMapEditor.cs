@@ -166,15 +166,10 @@ namespace HexMapEditor
         readonly Button redoButton = new Button();
         readonly Button zoomButton = new SingleLineButton();
         readonly ToolTip tips = new ToolTip();
-        MapData map;
-        string currentPath;
-        string savedSnapshot;
         int selected = -1;
         int brushIndex = 2;
-        bool dirty, leftCollapsed, updating, dragging, panGesture;
+        bool leftCollapsed, updating, dragging, panGesture;
         Point brushMouse=new Point(-100,-100);
-        bool needsFirstSave;
-        bool HasUnsavedChanges {get{return dirty||needsFirstSave;}}
         bool rightPanelOpen;
         MouseButtons gestureButton = MouseButtons.None;
         EditorTool gestureTool;
@@ -188,13 +183,9 @@ namespace HexMapEditor
         const float BaseRadius = 28f;
         internal static string Version {get{return AppVersion;}}
         const string AppVersion = ReleaseMetadata.Version;
-        SavedMapState savedState = new SavedMapState();
-        readonly TextHistoryStore textHistory = new TextHistoryStore();
         string editorCellId;
         List<TerrainPreset> libraryPresets = new List<TerrainPreset>();
         readonly Dictionary<int, TerrainState> strokeBefore = new Dictionary<int, TerrainState>();
-        readonly Stack<EditAction> undo = new Stack<EditAction>();
-        readonly Stack<EditAction> redo = new Stack<EditAction>();
 
         internal Action<Exception> InitialDisplayComplete;
         internal Exception InitialDisplayError;
@@ -207,7 +198,7 @@ namespace HexMapEditor
         {
             StartupTrace.Write("editor.construct.begin");
             cellDescription=notes??CreateNoteEditor();
-            map=initial;currentPath=path;
+            activeDocument=new DocumentSession(initial,path);documents.Add(activeDocument);
             Text = "HexMapEditor " + AppVersion; MinimumSize = new Size(1180, 748); Size = new Size(1440, 940);
             StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(25, 28, 36); ForeColor = Color.FromArgb(228, 231, 238); Font = new Font("Segoe UI", 9f); KeyPreview = true;
             LoadProgramIcon();
@@ -218,9 +209,9 @@ namespace HexMapEditor
             Deactivate+=(s,e)=>CancelNumberDrags(this);
             StartupTrace.Write("editor.construct.shell",this);
             Application.AddMessageFilter(this); Disposed += (s,e) => Application.RemoveMessageFilter(this);
-            Shown += (s,e)=>{PositionOverlays();FitMap();UpdateUI();if(!prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();if(path!=null){AdoptLibraryPanel(map);RefreshPresetPicker();}}};
+            Shown += (s,e)=>{PositionOverlays();FitMap();UpdateUI();if(!prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();if(path!=null){AdoptLibraryPanel(activeDocument);RefreshPresetPicker();}}};
             Resize += (s, e) => PositionOverlays(); FormClosing += OnFormClosing; KeyDown += OnKeyDown;
-            if(prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();if(path!=null){AdoptLibraryPanel(map);RefreshPresetPicker();}}
+            if(prepareLibraries){LoadLibraryPresets(true);LoadIcons();LoadObjects();LoadStateLibrary();if(path!=null){AdoptLibraryPanel(activeDocument);RefreshPresetPicker();}}
             StartupTrace.Write("editor.construct.libraries",this);
             ConfigureLeftMinimum();PositionOverlays();FitMap();CaptureSavedState(); UpdateUI();
             InitAutoSave();ResetSaveClock(initial.LoadedFileVersion);
@@ -252,7 +243,7 @@ namespace HexMapEditor
         {
             if (shellToolbar == null) return;
             LayoutMainToolbar();
-            int top = shellToolbar.Height, bottom = 27, height = Math.Max(0, ClientSize.Height - top - bottom);
+            int top = shellToolbar.Height, bottom = BottomHeight, height = Math.Max(0, ClientSize.Height - top - bottom);
             int inset = leftCollapsed ? 18 : LeftPanelWidth+18;
             using (new CanvasUpdate(canvas, canvas.Left != inset))
             {
@@ -277,7 +268,7 @@ namespace HexMapEditor
         }
 
         void MarkDirty() { dirty = savedState.CheckAll(map); UpdateUI(); }
-        void CaptureSavedState() { savedSnapshot = json.Serialize(map); savedState.Capture(map); dirty = false; }
+        void CaptureSavedState() { savedState.Capture(map); dirty = false; }
         void MarkCellDirty(CellData cell) { documentRevision++; dirty = savedState.CheckCell(cell); UpdateCaption(); canvas.Invalidate(); }
         static string ProjectTitle(string path, string initial)
         {
@@ -287,7 +278,7 @@ namespace HexMapEditor
         void UpdateCaption()
         {
             Text = "HexMapEditor — " + ProjectTitle(currentPath,map.Name) + (HasUnsavedChanges ? " *" : "");
-            UpdateSaveAccent();UpdateCommandState();
+            UpdateSaveAccent();UpdateCommandState();UpdateTabTitle(activeDocument);
         }
 
         internal int UiRefreshCount;
@@ -336,19 +327,16 @@ namespace HexMapEditor
         }
 
         internal Func<DialogResult> ConfirmUnsavedForTest;
-        bool ConfirmDiscard()
+        bool ConfirmDiscard(DocumentSession document)
         {
-            if (!HasUnsavedChanges) return true;
-            var result = ConfirmUnsavedForTest!=null?ConfirmUnsavedForTest():ShowEditorMessage("Mapa „"+map.Name+"” zawiera niezapisane zmiany. Czy chcesz je zapisać przed kontynuowaniem?", "Niezapisana mapa", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
-            if (result == DialogResult.Cancel) return false;
-            if (result == DialogResult.No) return true;
-            return SaveProject();
+            if (!document.Unsaved) return true;
+            var result=ConfirmUnsavedForTest!=null?ConfirmUnsavedForTest():ShowEditorMessage("Mapa „"+ProjectTitle(document.Path,document.Map.Name)+"” zawiera niezapisane zmiany. Czy chcesz je zapisać przed kontynuowaniem?", "Niezapisana mapa", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+            return result==DialogResult.No||result==DialogResult.Yes&&SaveDocument(document,false);
         }
 
         void NewProject()
         {
-            if(BlockInkCommit())return;
-            if (!ConfirmDiscard()||!ConfirmPresetsBeforeClose()) return;
+            if(!CanChangeDocument())return;
             var choices = AvailablePresets();
             var created=RunModal(()=>ChooseNewProject(this,map.Orientation,choices));if(created==null)return;
             created.ObjectStates=NewStateDefinitions();
@@ -360,11 +348,7 @@ namespace HexMapEditor
         }
         void AdoptNewProject(MapData data,string path)
         {
-            EndCanvasGesture(true);if(BlockInkCommit())return;documentRevision++;ResetObjectDocument();ClearDocumentIcons();map=data;quickSets.Clear();quickPreset=null;
-            currentPath = path; selected = -1; rightPanelOpen = false; rightCollapsed=false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
-            needsFirstSave=String.IsNullOrEmpty(path);
-            ResetSaveClock(data.LoadedFileVersion);
-            ResetQuality(); CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI();
+            AddDocument(data,path);
         }
 
         internal static MapData CreateProjectData(int columns,int rows,string orientation,string name,TerrainPreset sourcePreset)
@@ -389,8 +373,7 @@ namespace HexMapEditor
 
         void OpenProject()
         {
-            if(BlockInkCommit())return;
-            if (!ConfirmDiscard()||!ConfirmPresetsBeforeClose()) return;
+            if(!CanChangeDocument())return;
             using (var d = new OpenFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap|Wszystkie pliki (*.*)|*.*", Title = "Otwórz mapę", RestoreDirectory = true })
             {
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return;
@@ -426,41 +409,58 @@ namespace HexMapEditor
         }
         bool TryLoadProject(string path, out string error, out bool migrated)
         {
-            error = null; migrated = false; if(InkCommitBusy||autoSaving){error=autoSaving?AutoSaveBusyMessage:InkBusyMessage;return false;}
+            error=null;migrated=false;
             try
             {
-                var loaded=ReadProjectData(path);LoadLibraryPresets(true);AdoptLibraryPanel(loaded);
-                EndCanvasGesture(false); documentRevision++; ResetObjectDocument(); ClearDocumentIcons(); map = loaded;quickSets.Clear();quickPreset=null; currentPath = Path.GetFullPath(path); selected = -1; rightPanelOpen = false; rightCollapsed=false; editorCellId = null; undo.Clear(); redo.Clear(); textHistory.Clear();
-                needsFirstSave=false;ResetSaveClock(loaded.LoadedFileVersion);ResetQuality(); CaptureSavedState(); RefreshPresetPicker(); RecalculateFitTransform(); UpdateUI(); RecentProjects.Shared.Touch(currentPath);return true;
+                path=Path.GetFullPath(path);
+                var existing=FindDocument(path);
+                if(existing!=null&&ActivateDocument(existing)){RecentProjects.Shared.Touch(existing.Path);return true;}
+                if(existing==null&&CanChangeDocument()&&AddDocument(ReadProjectData(path),path))return true;
+                error="Dokończ bieżącą operację przed zmianą karty.";return false;
             }
             catch (Exception ex) { error = ex.Message; migrated = false; return false; }
         }
-
-        bool SaveProject() { if(BlockInkCommit())return false; return String.IsNullOrEmpty(currentPath) ? SaveAsProject() : SaveTo(currentPath); }
-
-        bool SaveAsProject()
+        internal void OpenExternalProject(string path)
         {
-            if(BlockInkCommit())return false;
-            if (String.IsNullOrEmpty(currentPath) && !EnsureLibrary()) return false;
-            using (var d = CreateSaveDialog())
+            string error;bool migrated;
+            if(!TryLoadProject(path,out error,out migrated))ShowEditorMessage(error,"Nie można otworzyć projektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+        }
+
+        bool SaveProject(){return SaveDocument(activeDocument,false);}
+        bool SaveAsProject(){return SaveDocument(activeDocument,true);}
+        bool SaveDocument(DocumentSession document,bool asNew)
+        {
+            if(InkCommitBusy)return false;
+            if(IsAutoSaving(document)){statusLabel.Text=AutoSaveBusyMessage;return false;}
+            if(!asNew&&document.Path!=null)return SaveTo(document,document.Path,true,false);
+            if(document.Path==null&&!EnsureLibrary())return false;
+            using (var d = CreateSaveDialog(document))
             {
                 if (RunModal(() => ProjectCreation.ShowSaveDialog(d,this)) != DialogResult.OK) return false;
-                return SaveAsTo(d.FileName, path => ShowEditorMessage("Plik już istnieje:\n\n" + path + "\n\nCzy chcesz go zastąpić?", "Potwierdź nadpisanie", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2));
+                return SaveAsTo(document,d.FileName,path=>ShowEditorMessage("Plik już istnieje:\n\n"+path+"\n\nCzy chcesz go zastąpić?","Potwierdź nadpisanie",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2));
             }
         }
 
-        SaveFileDialog CreateSaveDialog()
+        SaveFileDialog CreateSaveDialog(DocumentSession document)
         {
-            return new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap", DefaultExt = "hexmap", AddExtension = false, OverwritePrompt = false, RestoreDirectory = true, InitialDirectory = String.IsNullOrEmpty(currentPath) ? LibraryPaths.Hexmaps : Path.GetDirectoryName(Path.GetFullPath(currentPath)), FileName = ProjectFileName(ProjectTitle(currentPath, map.Name)), Title = "Zapisz mapę jako" };
+            return new SaveFileDialog { Filter = "Projekt HexMapEditor (*.hexmap)|*.hexmap", DefaultExt = "hexmap", AddExtension = false, OverwritePrompt = false, RestoreDirectory = true, InitialDirectory = document.Path==null?LibraryPaths.Hexmaps:Path.GetDirectoryName(document.Path), FileName = ProjectFileName(ProjectTitle(document.Path, document.Map.Name)), Title = "Zapisz mapę jako" };
         }
 
         bool SaveAsTo(string path, Func<string, DialogResult> confirmOverwrite)
+        {return SaveAsTo(activeDocument,path,confirmOverwrite);}
+        bool SaveAsTo(DocumentSession document,string path,Func<string,DialogResult> confirmOverwrite)
         {
             string finalPath = Path.GetFullPath(EnsureProjectExtension(path));
+            var opened=FindDocument(finalPath);
+            if(opened!=null&&!ReferenceEquals(opened,document))
+            {
+                statusLabel.Text="Ten plik jest już otwarty w innej karcie. Wybierz inną ścieżkę.";
+                return false;
+            }
             bool exists = File.Exists(finalPath);
             if (exists && confirmOverwrite(finalPath) != DialogResult.Yes) return false;
             // If a new target appears after this check, File.Move fails instead of replacing it.
-            return SaveTo(finalPath, exists, true);
+            return SaveTo(document,finalPath,exists,true);
         }
 
         bool EnsureLibrary()
@@ -480,39 +480,38 @@ namespace HexMapEditor
             return path.EndsWith(".hexmap", StringComparison.OrdinalIgnoreCase) ? path : path + ".hexmap";
         }
 
-        bool SaveTo(string path)
-        {
-            return SaveTo(path, true);
-        }
-
-        bool SaveTo(string path, bool allowOverwrite)
-        {return SaveTo(path,allowOverwrite,false);}
-        bool SaveTo(string path,bool allowOverwrite,bool explicitOverwrite)
+        bool SaveTo(DocumentSession document,string path,bool allowOverwrite,bool explicitOverwrite)
         {
             string error;
-            if (TrySaveCore(path, allowOverwrite, explicitOverwrite, out error)) return true;
+            if (TrySaveCore(document,path,allowOverwrite,explicitOverwrite,out error)) return true;
             ShowEditorMessage("Zapis nie powiódł się. Poprzedni plik pozostał bez zmian.\n\n" + error, "Błąd zapisu", MessageBoxButtons.OK, MessageBoxIcon.Error); return false;
         }
 
         bool TrySaveTo(string path, bool allowOverwrite, out string error)
-        {return TrySaveCore(path,allowOverwrite,false,out error);}
-        bool TrySaveCore(string path,bool allowOverwrite,bool explicitOverwrite,out string error)
+        {return TrySaveCore(activeDocument,path,allowOverwrite,false,out error);}
+        bool TrySaveCore(DocumentSession document,string path,bool allowOverwrite,bool explicitOverwrite,out string error)
         {
-            EndCanvasGesture(true);
-            error = null; if(InkCommitBusy||autoSaving){error=autoSaving?AutoSaveBusyMessage:InkBusyMessage;return false;}
+            if(ReferenceEquals(document,activeDocument))EndCanvasGesture(true);
+            error=null;if(InkCommitBusy||IsAutoSaving(document)){error=IsAutoSaving(document)?AutoSaveBusyMessage:InkBusyMessage;return false;}
             try
             {
-                var expected=!explicitOverwrite&&SameProjectPath(path,currentPath)?fileVersion:null;
-                var version=WritePreparedProject(PrepareProjectBytes(map),path,allowOverwrite,expected);
-                currentPath = Path.GetFullPath(path);needsFirstSave=false;ResetSaveClock(version);CaptureSavedState(); UpdateUI();RecentProjects.Shared.Touch(currentPath); return true;
+                path=Path.GetFullPath(path);
+                var opened=FindDocument(path);
+                if(opened!=null&&!ReferenceEquals(opened,document))throw new IOException("Ten plik jest już otwarty w innej karcie.");
+                var expected=!explicitOverwrite&&SameProjectPath(path,document.Path)?document.Version:null;
+                var version=WritePreparedProject(PrepareProjectBytes(document.Map,PresetsForSave(document)),path,allowOverwrite,expected);
+                document.Path=path;document.FirstSave=false;document.Version=version;document.Schedule.Reset();
+                document.Saved.Capture(document.Map);document.Dirty=false;
+                UpdateTabTitle(document);if(ReferenceEquals(document,activeDocument))UpdateCaption();
+                RecentProjects.Shared.Touch(path);return true;
             }
             catch (Exception ex) { error=ex.Message;return false; }
         }
         internal static ProjectFileVersion WriteProjectData(MapData data,string path,bool allowOverwrite)
         {return WritePreparedProject(PrepareProjectBytes(data),path,allowOverwrite,null);}
-        internal static byte[] PrepareProjectBytes(MapData data)
+        internal static byte[] PrepareProjectBytes(MapData data,IEnumerable<TerrainPreset> presets=null)
         {
-            var output=MapForSave(data);ValidateMap(output);var serializer=MapLogic.Serializer();
+            var output=MapForSave(data,presets);ValidateMap(output);var serializer=MapLogic.Serializer();
             output.LastSavedAppVersion=Version;
             byte[] bytes=new UTF8Encoding(false).GetBytes(serializer.Serialize(output));
             if(bytes.LongLength>GraphicLimits.MapBytes)throw new InvalidDataException("Mapa przekracza limit pliku 256 MiB.");return bytes;
@@ -597,7 +596,16 @@ namespace HexMapEditor
             variants[variant] = signature;
         }
 
-        void OnFormClosing(object sender, FormClosingEventArgs e) { if(autoSaving){CancelAutoSave();e.Cancel=true;return;}if(InkCommitBusy)CancelInkCommit(); EndCanvasGesture(true); if(InkCommitBusy)CancelInkCommit(); if (!ConfirmDiscard()||!ConfirmPresetsBeforeClose()) e.Cancel = true; }
+        void OnFormClosing(object sender, FormClosingEventArgs e)
+        {
+            if(returningToWelcome)return;
+            if(reviewingExit){e.Cancel=true;return;}
+            if(autoSaving){CancelAutoSave();e.Cancel=true;return;}
+            if(!FinishDocumentInteraction()){e.Cancel=true;return;}
+            reviewingExit=true;
+            try { e.Cancel=!documents.All(ConfirmDiscard)||!ReviewPresetDrafts(documents,false); }
+            finally { reviewingExit=false; }
+        }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
             if(InkCommitBusy&&!(e.Alt&&e.KeyCode==Keys.F4)){if(e.KeyCode==Keys.Escape)CancelInkCommit();else BlockInkCommit();e.Handled=true;e.SuppressKeyPress=true;return;}
@@ -661,7 +669,8 @@ namespace HexMapEditor
         {
             if(inkBefore!=null)EndCanvasGesture(true);
             bool axes = map.LabelMode == "Axes" && map.Cells.Count <= 1400;
-            var viewport = RectangleF.FromLTRB(32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), canvas.ClientSize.Width - 32, canvas.ClientSize.Height - 32);
+            int width=rightPanelOpen&&right.Visible?Math.Min(canvas.ClientSize.Width,right.Left-canvas.Left):canvas.ClientSize.Width;
+            var viewport = RectangleF.FromLTRB(32 + (axes ? 28 : 0), 32 + (axes ? 24 : 0), width - 32, canvas.ClientSize.Height - 32);
             scale = Math.Max(.000001f, Math.Min(Math.Max(1, viewport.Width) / Math.Max(bounds.Width, 1), Math.Max(1, viewport.Height) / Math.Max(bounds.Height, 1)));
             pan = new PointF(viewport.Left + viewport.Width / 2f - (bounds.Left + bounds.Width / 2f) * scale, viewport.Top + viewport.Height / 2f - (bounds.Top + bounds.Height / 2f) * scale);
             return true;
@@ -912,7 +921,7 @@ namespace HexMapEditor
 
         bool TryHistory(bool after, out string error)
         {
-            if(autoSaving){error=AutoSaveBusyMessage;return false;}EndCanvasGesture(true); if(InkCommitBusy){error=InkBusyMessage;return false;} var from = after ? redo : undo; var to = after ? undo : redo; error = null; if (from.Count == 0) return true;
+            if(IsAutoSaving(activeDocument)){error=AutoSaveBusyMessage;return false;}EndCanvasGesture(true); if(InkCommitBusy){error=InkBusyMessage;return false;} var from = after ? redo : undo; var to = after ? undo : redo; error = null; if (from.Count == 0) return true;
             try { var action = from.Peek(); ApplyAction(action, after); if(action.BeforeTool==null)documentRevision++; from.Pop(); to.Push(action); if(action.BeforeTool==null)MarkDirty();else{UpdateCommandState();canvas.Invalidate();} return true; }
             catch (Exception ex) { error = ex.Message; return false; }
         }
@@ -958,7 +967,15 @@ namespace HexMapEditor
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             AppDomain.CurrentDomain.UnhandledException+=(sender,error)=>StartupTrace.Write("program.unhandled",null,error.ExceptionObject as Exception);
-            try { Application.Run(new StartupContext(args.Length>0?args[0]:null)); }
+            try
+            {
+                string path=args.Length>0?args[0]:null;
+                using(var launch=new ProjectLaunch())
+                {
+                    if(launch.Primary)Application.Run(new StartupContext(path,launch));
+                    else launch.Forward(path);
+                }
+            }
             catch (Exception ex) { StartupTrace.Write("program.exception",null,ex);MessageBox.Show("Aplikacja napotkała błąd:\n\n" + ex.ToString(), "HexMapEditor — błąd", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
     }

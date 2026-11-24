@@ -26,13 +26,12 @@ namespace HexMapEditor
         internal Func<InkEraseWork,CancellationToken,InkEraseResult> RunInkWork=(work,token)=>work.Execute(token);
         internal Action ObserveInkHandoff;
         void ReleaseInkHandoff(){if(inkHandoff!=null)inkHandoff.Dispose();inkHandoff=null;inkHandoffResult=null;}
-        long documentRevision;
         internal InkTiming LastInkCommitTiming;
         bool InkCommitBusy {get{return pendingInk!=null;}}
         const string InkBusyMessage="Przetwarzanie gumki… Poczekaj na wynik albo wybierz Anuluj wymazywanie.";
         bool BlockInkCommit()
         {
-            if(autoSaving){statusLabel.Text=AutoSaveBusyMessage;return true;}
+            if(IsAutoSaving(activeDocument)){statusLabel.Text=AutoSaveBusyMessage;return true;}
             if(!InkCommitBusy)return false;statusLabel.Text=InkBusyMessage;return true;
         }
         void CancelInkCommit()

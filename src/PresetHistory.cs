@@ -28,7 +28,7 @@ namespace HexMapEditor
     {
         bool CommitPresetFile(PresetFileChange file, PaletteState after, string label, PresetSections savedSections = 0)
         {
-            EndCanvasGesture(true); var before = PaletteState.Capture(map,brushIndex);
+            EndCanvasGesture(true); var before = PaletteState.Capture(map,brushIndex,workingPresets);
             bool paletteChanges = before.Signature != after.Signature;
             bool resetIcons = savedSections.HasFlag(PresetSections.Icons) && CurrentQuick.DraftIcons != null;
             bool resetObjects = savedSections.HasFlag(PresetSections.Objects) && CurrentQuick.DraftObjects != null;
@@ -52,6 +52,7 @@ namespace HexMapEditor
             var removed = after ? change.Before : change.After; var added = after ? change.After : change.Before;
             if (removed != null) libraryPresets.RemoveAll(p=>p.Id==removed.Id);
             if (added != null) libraryPresets.Insert(Math.Max(0,Math.Min(change.Index,libraryPresets.Count)),added.Copy());
+            TrackPresetFile(removed,added);
         }
     }
 }

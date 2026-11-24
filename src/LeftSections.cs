@@ -52,6 +52,12 @@ namespace HexMapEditor
             var presets = Section("Presety", 1);
             presetPickerRow = new Panel { Dock = DockStyle.None, Height = 28 }; presets.Controls.Add(presetPickerRow);
             terrainPicker.DropDownStyle = ComboBoxStyle.DropDownList; terrainPicker.DisplayMember = "Name"; terrainPicker.AccessibleName = "Presety"; presetPickerRow.Controls.Add(terrainPicker);
+            terrainPicker.FormattingEnabled=true;
+            terrainPicker.Format+=(s,e)=>{
+                var preset=e.ListItem as TerrainPreset;
+                if(preset!=null&&AvailablePresets().Count(other=>PresetCatalog.SameName(other.Name,preset.Name))>1)
+                    e.Value=preset.Name+" ("+(preset.FilePath==null?"osadzony":System.IO.Path.GetFileNameWithoutExtension(preset.FilePath))+")";
+            };
             terrainPicker.SelectedIndexChanged += (s, e) => { if (!updating && terrainPicker.SelectedItem != null) SelectPreset(((TerrainPreset)terrainPicker.SelectedItem).Id); };
             refreshPresetsButton = IconAction(presetPickerRow, "refresh", "Odśwież presety", () => LoadLibraryPresets(false));
             presetActions = new FlowLayoutPanel { Height = 32, WrapContents = false }; presets.Controls.Add(presetActions);

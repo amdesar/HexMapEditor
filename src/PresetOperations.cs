@@ -11,12 +11,12 @@ namespace HexMapEditor
     {
         string pickerSignature, paletteSignature;
         Button deletePresetButton,savePresetButton;
-        TerrainPreset ActivePreset() { return map.Presets.First(p => p.Id == map.ActivePresetId); }
+        TerrainPreset ActivePreset() { return workingPresets.First(p => p.Id == map.ActivePresetId); }
         bool PresetReadOnly { get { return map.ActivePresetId == PresetCatalog.DefaultId; } }
         List<TerrainPreset> AvailablePresets()
         {
-            return libraryPresets.Select(p => map.Presets.FirstOrDefault(m => m.Id == p.Id) ?? p)
-                .Concat(map.Presets.Where(p => !libraryPresets.Any(item => item.Id == p.Id))).ToList();
+            return libraryPresets.Select(p => workingPresets.FirstOrDefault(m => m.Id == p.Id) ?? p)
+                .Concat(workingPresets.Where(p => !libraryPresets.Any(item => item.Id == p.Id))).ToList();
         }
         void RefreshPresetPicker()
         {
@@ -67,7 +67,7 @@ namespace HexMapEditor
             try
             {
                 CheckTextureBudget(chosen.Terrains.SelectMany(t => t.Variants).Select(f => f.Graphic));
-                ChangePalette("Wybór presetu", () => { if (!map.Presets.Any(p => p.Id == id)) map.Presets.Add(chosen.Copy()); map.ActivePresetId = id; brushIndex = 0; });
+                ChangePalette("Wybór presetu", () => { if (!workingPresets.Any(p => p.Id == id)) workingPresets.Add(BindPreset(chosen)); map.ActivePresetId = id; brushIndex = 0; });
             }
             catch (InvalidDataException ex)
             {
@@ -77,7 +77,7 @@ namespace HexMapEditor
         }
         void UpdatePresetStatus()
         {
-            var p = ActivePreset(); var stored = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
+            var p = ActivePreset(); var stored = StoredPreset(p);
             if (renamePresetButton != null) renamePresetButton.Enabled = !PresetReadOnly;
             if (addTerrainButton != null) addTerrainButton.Enabled = !PresetReadOnly;
             bool differs = WorkingPresetDirty(p); if(savePresetButton!=null)ChoiceStyle.Apply(savePresetButton,differs);
@@ -121,18 +121,18 @@ namespace HexMapEditor
             error = null;
             try
             {
-                if (map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
-                if (map.Presets.Any(p => PresetCatalog.SameName(p.Name, name))) throw new InvalidDataException("Nazwa jest już używana w projekcie.");
+                if (workingPresets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
+                if (workingPresets.Any(p => PresetCatalog.SameName(p.Name, name))) throw new InvalidDataException("Nazwa jest już używana w projekcie.");
                 var preset = new TerrainPreset { Name = (name ?? "").Trim() };
-                var file = PresetCatalog.PrepareWrite(preset,directory,false,null); var after = PaletteState.Capture(map,brushIndex);
-                after.Presets.Add(preset); after.ActivePresetId=preset.Id; after.BrushIndex=0; after.SelectedTerrainId=null;
+                var file = PresetCatalog.PrepareWrite(preset,directory,false,null); var after = PaletteState.Capture(map,brushIndex,workingPresets);
+                after.Presets.Add(file.After.Copy()); after.ActivePresetId=preset.Id; after.BrushIndex=0; after.SelectedTerrainId=null;
                 CommitPresetFile(file,after,"Nowy zapisany preset"); return true;
             }
             catch (Exception ex) { error = ex.Message; return false; }
         }
         void RemovePreset()
         {
-            var p = ActivePreset(); var saved = libraryPresets.FirstOrDefault(t => t.Id == p.Id);
+            var p = ActivePreset(); var saved = StoredPreset(p);
             if (p.Id == PresetCatalog.DefaultId || saved == null) return;
             bool changed = json.Serialize(p) != json.Serialize(saved);
             string message = "Usunąć preset „" + saved.Name + "” z biblioteki?\n\nDane heksów pozostaną bez zmian. Plik nie trafia do Kosza; Undo przywróci plik i paletę z kopii w pamięci." + (changed ? "\nRobocza paleta ma niezapisane zmiany; Undo odtworzy również ten stan." : "") + "\n\nCofanie jest możliwe tylko, dopóki wpis pozostaje w historii (limit 300). Nowa/Otwórz, wypadnięcie wpisu lub zakończenie programu usuwa tę możliwość.";
@@ -146,9 +146,9 @@ namespace HexMapEditor
             {
                 EndCanvasGesture(true); var current=ActivePreset();
                 if (PresetReadOnly) throw new InvalidDataException("Nie można usunąć chronionego wzorca.");
-                var stored=libraryPresets.SingleOrDefault(p=>p.Id==current.Id);
+                var stored=StoredPreset(current);
                 if (stored==null || stored.FilePath==null || !String.Equals(Path.GetDirectoryName(stored.FilePath),Path.GetFullPath(directory),StringComparison.OrdinalIgnoreCase)) throw new IOException("Brak zapisanego pliku aktywnego presetu.");
-                var after=PaletteState.Capture(map,brushIndex); after.Presets.RemoveAll(p=>p.Id==current.Id);
+                var after=PaletteState.Capture(map,brushIndex,workingPresets); after.Presets.RemoveAll(p=>p.Id==current.Id);
                 if (!after.Presets.Any(p=>p.Id==PresetCatalog.DefaultId)) after.Presets.Add(PresetCatalog.Default());
                 after.ActivePresetId=PresetCatalog.DefaultId;after.BrushIndex=0;after.SelectedTerrainId=PresetCatalog.NeutralId;
                 CommitPresetFile(new PresetFileChange {Before=stored.Copy()},after,"Usunięcie presetu");return true;
@@ -162,7 +162,7 @@ namespace HexMapEditor
         void SavePreset(){SavePresetCore(false);}
         bool SavePresetCore(bool closing)
         {
-            var p = ActivePreset(); bool saved = p.Id != PresetCatalog.DefaultId && libraryPresets.Any(t => t.Id == p.Id);
+            var p = ActivePreset(); bool saved = p.Id != PresetCatalog.DefaultId && StoredPreset(p)!=null;
             using (var d = new SavePresetDialog(p, saved,closing))
             {
                 if (RunModal(() => d.ShowDialog(this)) != DialogResult.OK) return false;
@@ -175,21 +175,11 @@ namespace HexMapEditor
             error = null;
             try
             {
-                if(sections==0)throw new InvalidDataException("Wybierz sekcję presetu.");var current = ActivePreset(); var candidate = WithVisibleSets(current);
-                bool firstSave = current.Id != PresetCatalog.DefaultId && !libraryPresets.Any(p => p.Id == current.Id);
-                // A partial new file must not replace an unsaved source draft's omitted sections.
-                bool replaceDraft = firstSave && sections == PresetSections.All;
-                if (asNew)
-                {
-                    if (!replaceDraft && map.Presets.Count >= 100) throw new InvalidDataException("Limit 100 roboczych presetów w projekcie.");
-                    if (!replaceDraft) candidate.Id = Guid.NewGuid().ToString("N"); candidate.Name = (name ?? "").Trim();
-                    if (map.Presets.Any(p => p.Id != current.Id && PresetCatalog.SameName(p.Name, candidate.Name))) throw new InvalidDataException("Nazwa jest już używana przez inny preset projektu.");
-                }
-                var stored=libraryPresets.FirstOrDefault(p=>p.Id==candidate.Id);
-                if (!asNew && stored==null) throw new IOException("Preset nie ma zapisanego pliku. Zapisz jako nowy.");
-                var latest=asNew?null:PresetCatalog.ReadFile(stored.FilePath);candidate=PresetSets.Merge(candidate,latest,sections);var file=PresetCatalog.PrepareWrite(candidate,directory,!asNew,asNew ? null : stored);
-                var after=PaletteState.Capture(map,brushIndex);
-                if(!asNew){var working=after.Presets.First(p=>p.Id==current.Id);if(sections.HasFlag(PresetSections.Icons))working.Icons=candidate.Icons.Select(i=>i.Copy()).ToList();if(sections.HasFlag(PresetSections.Objects))working.Objects=candidate.Objects.Select(o=>o.Copy()).ToList();}
+                var current=ActivePreset();bool replaceDraft;
+                var file=PrepareWorkingPresetWrite(activeDocument,current,WithVisibleSets(current),directory,asNew,name,sections,out replaceDraft);
+                var candidate=file.After;
+                var after=PaletteState.Capture(map,brushIndex,workingPresets);
+                if(!asNew)ApplySavedSections(after.Presets.First(p=>p.Id==current.Id),candidate,sections);
                 if (asNew)
                 {
                     if(replaceDraft) after.Presets[after.Presets.FindIndex(p=>p.Id==current.Id)]=candidate;

@@ -1,10 +1,10 @@
-# HexMapEditor 0.10.2
+# HexMapEditor 0.11.0
 
 Samodzielny edytor map heksagonalnych Windows: C# / Windows Forms / GDI+ i osadzony edytor opisu WPF z lokalnego .NET Framework. Offline, bez usług i pobierania zależności/zasobów przy uruchamianiu. Rozwijamy istniejący projekt.
 
 ## Uruchamianie
 
-Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.10.2** zapisuje mapy w **formacie 12**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
+Uruchom HexMapEditor.exe albo Uruchom HexMapEditor.bat. Wymagany pełny .NET Framework 4.x z WPF (zalecany 4.8). Aplikacja **0.11.0** zapisuje mapy w **formacie 12**, presety w formacie **5**, ikony biblioteczne w **2**, a wzorce obiektów w **1**.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -13,6 +13,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
 Build.ps1 kompiluje src/*.cs lokalnym kompilatorem. Library pozostaje obok EXE, niezależnie od katalogu roboczego. Główny EXE jest śledzony. Grafiki startowe i symbole interfejsu są rysowane lokalnie, bez zewnętrznych zestawów.
 
 Ta wersja odczytuje mapy 12 i presety 4/5. Starszą mapę odrzuca z komunikatem o wersji formatu, pozostawiając plik na dysku. Brak sekcji ikon/obiektów w presecie 4 oznacza puste zestawy. Biblioteczne grafiki terenu mają format 2.
+
+## Karty map w 0.11.0
+
+Każda mapa ma kartę na dole i własne zaznaczenie, widok, historię, paletę i stan zapisu. Plus otwiera wybór nowej mapy lub pliku. Ołówek zmienia nazwę zapisanego projektu, a × zamyka kartę. Powtórne otwarcie tej samej ścieżki wybiera jej istniejącą kartę. Po zamknięciu ostatniej karty wraca ekran powitalny.
+
+Ctrl+S zapisuje aktywną mapę. Autozapis uwzględnia także zmienione karty w tle, które mają plik. Karty związane z tym samym plikiem presetu widzą jego wspólną paletę i celowe zmiany szybkiego zestawu, a namalowane heksy i obiekty pozostają danymi własnej mapy. [Raport 0.11.0](docs/raport-0.11.0.md).
 
 ## Poprawki 0.10.2
 
@@ -79,7 +85,7 @@ Zwykły start pokazuje istniejącą ikonę, wersję, Otwórz projekt, Stwórz no
 
 **Nowa z edytora**: dokument pozostaje w pamięci, bez pliku, ścieżki i nowego MRU. Gwiazdka i pytanie przy porzuceniu dotyczą także nietkniętej nowej mapy. Pierwsze Zapisz/Ctrl+S otwiera dotychczasowy dialog; Anuluj zachowuje mapę. Udany zapis przypisuje ścieżkę, a kolejne Ctrl+S zapisuje bez dialogu. Zapisz jako nadal działa, z potwierdzeniem nadpisania.
 
-Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.10.2 • 24.11.2026`. Duża nazwa zachowuje styl, autor ma styl napisu wersji. Data wydania pochodzi z jawnej metadanej w `src/ReleaseMetadata.cs`.
+Start pokazuje `HexMapEditor by amdesar` oraz drugi wiersz `Wersja 0.11.0 • 24.11.2026`. Duża nazwa zachowuje styl, autor ma styl napisu wersji. Data wydania pochodzi z jawnej metadanej w `src/ReleaseMetadata.cs`.
 
 `recent-projects.json` **obok EXE**, poza Library, przechowuje do30 pełnych ścieżek (do256KiB). Zapis atomowy po udanym otwarciu/zapisie; missing nie jest usuwany z historii. Dostępność jest sprawdzana w tle; niedostępny nośnik/sieć nie blokuje ekranu. Uszkodzony/niedostępny plik historii nie blokuje pracy. Nie zawiera map ani zasobów.
 

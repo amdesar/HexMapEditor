@@ -42,7 +42,7 @@ namespace HexMapEditor
         }
         void ConfigureLeftMinimum()
         {
-            int client=MaxToolSection+PresetSection+MinTerrainSection+2*MaxQuickSection+shellToolbar.Height+27;
+            int client=MaxToolSection+PresetSection+MinTerrainSection+2*MaxQuickSection+shellToolbar.Height+BottomHeight;
             MinimumSize=new Size(MinimumSize.Width,SizeFromClientSize(new Size(1,client)).Height);
         }
     }

@@ -63,6 +63,10 @@ namespace HexMapEditor
         void ApplyAction(EditAction action, bool after)
         {
             if(action.BeforeTool!=null){ApplyToolNumbers(after?action.AfterTool:action.BeforeTool);return;}
+            var fromPalette=after?action.BeforePalette:action.AfterPalette;
+            var toPalette=after?action.AfterPalette:action.BeforePalette;
+            CheckSharedPaletteHistory(fromPalette,toPalette);
+            CheckSharedQuickHistory(action.QuickPresetId,after?action.BeforeQuick:action.AfterQuick,action.QuickSections);
             // Nothing in memory or on either stack changes before the checked disk transition.
             if(action.BackgroundFileChange!=null)ApplyBackgroundFile(action.BackgroundFileChange,after);
             if (action.LibraryChange != null) ApplyIconLibrary(action.LibraryChange, after);
@@ -88,8 +92,12 @@ namespace HexMapEditor
             foreach(var change in action.Objects)change.Apply(map,after);
             selectedObjects.RemoveWhere(id=>!map.Objects.Any(o=>o.Id==id));
             if (!map.Groups.Any(g => g.Id == selectedGroupId && selectedObjects.SetEquals(g.Members))) selectedGroupId = null;
-            if (action.BeforePalette != null) (after ? action.AfterPalette : action.BeforePalette).Apply(map, out brushIndex);
-            if(action.BeforeQuick!=null)ApplyQuick(action.QuickPresetId,after?action.AfterQuick:action.BeforeQuick,action.QuickSections);
+            if(toPalette!=null)
+            {
+                activeDocument.Presets=toPalette.ApplyWorking(map,out brushIndex);
+                PublishPaletteChanges(fromPalette,toPalette);ResolveWorkingPresets(activeDocument);
+            }
+            if(action.BeforeQuick!=null){ApplyQuick(action.QuickPresetId,after?action.AfterQuick:action.BeforeQuick,action.QuickSections);PublishQuickDraft(action.QuickPresetId,action.QuickSections);}
             if (action.Changes.Count != 0 || action.Layers.Count != 0)
             {
                 var cells = map.Cells.ToDictionary(c => c.Id);
@@ -107,10 +115,10 @@ namespace HexMapEditor
         }
         bool ChangePalette(string label, Action mutate, Action<EditAction> changeMap = null)
         {
-            EndCanvasGesture(true); var before = PaletteState.Capture(map, brushIndex); var action = new EditAction { Label = label, BeforePalette = before };
-            mutate(); var after = PaletteState.Capture(map, brushIndex);
+            EndCanvasGesture(true); var before = PaletteState.Capture(map, brushIndex,workingPresets); var action = new EditAction { Label = label, BeforePalette = before };
+            mutate(); var after = PaletteState.Capture(map, brushIndex,workingPresets);
             if (before.Signature == after.Signature) return false;
-            if (changeMap != null) changeMap(action); action.AfterPalette = after; PushAction(action); RefreshPresetPicker(); MarkDirty(); return true;
+            if (changeMap != null) changeMap(action); action.AfterPalette = after; PublishPaletteChanges(before,after);PushAction(action); RefreshPresetPicker(); MarkDirty(); return true;
         }
         void FillRegion(int start)
         {

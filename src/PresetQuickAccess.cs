@@ -20,8 +20,8 @@ namespace HexMapEditor
         sealed class QuickPair{
             internal List<PresetIcon> DraftIcons;
             internal List<PresetObject> DraftObjects;
+            internal long IconRevision,ObjectRevision;
             internal readonly QuickAccess Icons=new QuickAccess(),Objects=new QuickAccess();internal readonly Dictionary<string,LibraryIcon> IconRefs=new Dictionary<string,LibraryIcon>();internal readonly Dictionary<string,ObjectTemplate> ObjectRefs=new Dictionary<string,ObjectTemplate>();}
-        readonly Dictionary<string,QuickPair> quickSets=new Dictionary<string,QuickPair>();
 
 
         string quickPreset;
@@ -31,7 +31,46 @@ namespace HexMapEditor
         void EnsureQuickPreset()
         {
             if(map==null)return;var p=ActivePreset();QuickPair set;if(!quickSets.TryGetValue(p.Id,out set)){quickSets[p.Id]=set=new QuickPair();set.Icons.Restore(p.Icons.Select(i=>i.Id));set.Objects.Restore(p.Objects.Select(o=>o.Id));foreach(var i in p.Icons)set.IconRefs[i.Id]=i.Icon();foreach(var o in p.Objects)set.ObjectRefs[o.Id]=o.Template();}
+            SyncQuickDraft(p,set);
             if(quickPreset==p.Id)return;quickPreset=p.Id;iconMaterial=objectMaterial=false;activeIcon=activeObject=null;noMaterial=p.Terrains.Count==0;
+        }
+        void SyncQuickDraft(TerrainPreset preset,QuickPair quick)
+        {
+            var shared=SharedFor(preset);
+            if(shared==null)return;
+            if(quick.IconRevision!=shared.IconRevision)
+            {
+                quick.IconRevision=shared.IconRevision;quick.DraftIcons=shared.DraftIcons;
+                var icons=shared.DraftIcons??shared.Palette.Icons;
+                var reserve=quick.Icons.All.Skip(12).ToArray();
+                foreach(var icon in icons)quick.IconRefs[icon.Id]=icon.Icon();
+                quick.Icons.RestoreHistory(icons.Select(i=>i.Id).Concat(reserve).Distinct().Take(24));
+            }
+            if(quick.ObjectRevision!=shared.ObjectRevision)
+            {
+                quick.ObjectRevision=shared.ObjectRevision;quick.DraftObjects=shared.DraftObjects;
+                var objects=shared.DraftObjects??shared.Palette.Objects;
+                var reserve=quick.Objects.All.Skip(12).ToArray();
+                foreach(var item in objects)quick.ObjectRefs[item.Id]=item.Template();
+                quick.Objects.RestoreHistory(objects.Select(o=>o.Id).Concat(reserve).Distinct().Take(24));
+            }
+        }
+        void PublishQuickDraft(string id,PresetSections sections)
+        {
+            QuickPair quick;
+            var shared=SharedFor(workingPresets.FirstOrDefault(p=>p.Id==id));
+            if(shared==null||!quickSets.TryGetValue(id,out quick))return;
+            if(sections.HasFlag(PresetSections.Icons)){shared.DraftIcons=quick.DraftIcons;quick.IconRevision=++shared.IconRevision;}
+            if(sections.HasFlag(PresetSections.Objects)){shared.DraftObjects=quick.DraftObjects;quick.ObjectRevision=++shared.ObjectRevision;}
+        }
+        void CheckSharedQuickHistory(string id,QuickSnapshot expected,PresetSections sections)
+        {
+            if(expected==null)return;
+            var shared=SharedFor(workingPresets.FirstOrDefault(p=>p.Id==id));
+            if(shared==null)return;
+            if(sections.HasFlag(PresetSections.Icons)&&SectionContent(expected.DraftIcons)!=SectionContent(shared.DraftIcons)||
+               sections.HasFlag(PresetSections.Objects)&&SectionContent(expected.DraftObjects)!=SectionContent(shared.DraftObjects))
+                throw new System.IO.IOException("Szybki zestaw wspólnego presetu zmienił się w innej karcie. Zachowano obie historie.");
         }
         TerrainPreset WithVisibleSets(TerrainPreset p)
         {
@@ -62,7 +101,7 @@ namespace HexMapEditor
                 change();
                 var after = VisibleObjects();
                 if (SectionContent(before.OrderBy(o => o.Id, StringComparer.Ordinal)) != SectionContent(after.OrderBy(o => o.Id, StringComparer.Ordinal)))
-                    q.DraftObjects = after;
+                {q.DraftObjects = after;PublishQuickDraft(map.ActivePresetId,PresetSections.Objects);}
             }
             else
             {
@@ -70,7 +109,7 @@ namespace HexMapEditor
                 change();
                 var after = VisibleIcons();
                 if (SectionContent(before.OrderBy(i => i.Id, StringComparer.Ordinal)) != SectionContent(after.OrderBy(i => i.Id, StringComparer.Ordinal)))
-                    q.DraftIcons = after;
+                {q.DraftIcons = after;PublishQuickDraft(map.ActivePresetId,PresetSections.Icons);}
             }
             UpdatePresetStatus();
         }
@@ -87,6 +126,7 @@ namespace HexMapEditor
         {
             var q=CurrentQuick;if(sections.HasFlag(PresetSections.Icons)){q.DraftIcons=null;q.IconRefs.Clear();foreach(var i in p.Icons)q.IconRefs[i.Id]=i.Icon();q.Icons.Restore(p.Icons.Select(i=>i.Id));}
             if(sections.HasFlag(PresetSections.Objects)){q.DraftObjects=null;q.ObjectRefs.Clear();foreach(var o in p.Objects)q.ObjectRefs[o.Id]=o.Template();q.Objects.Restore(p.Objects.Select(o=>o.Id));}
+            PublishQuickDraft(p.Id,sections);
             if(sections.HasFlag(PresetSections.Icons))RefreshIconPreview();if(sections.HasFlag(PresetSections.Objects))RefreshObjectPreview();
         }
         void UsedIcon(string id,bool added=false){var q=CurrentQuick;var entry=FindIcon(id);if(entry==null)return;string before=String.Join("|",q.Icons.Visible);q.IconRefs[id]=entry.Copy();if(added)q.Icons.Added(id);else q.Icons.Used(id);if(before!=String.Join("|",q.Icons.Visible))RefreshIconPreview();}
@@ -113,7 +153,7 @@ namespace HexMapEditor
         }
         void RemoveQuickEntry(string id,bool objects,bool allDrafts=false)
         {
-            if(allDrafts){foreach(var q in quickSets.Values){if(objects)q.Objects.Remove(id);else q.Icons.Remove(id);}}
+            if(allDrafts){foreach(var q in documents.SelectMany(document=>document.QuickSets.Values)){if(objects)q.Objects.Remove(id);else q.Icons.Remove(id);}}
             else if(objects)CurrentQuick.Objects.Remove(id);else CurrentQuick.Icons.Remove(id);
             if(objects){if(activeObject==id){activeObject=null;objectMaterial=false;noMaterial=true;}RefreshObjectPreview();}
             else{if(activeIcon==id){activeIcon=null;iconMaterial=false;noMaterial=true;}RefreshIconPreview();}
@@ -121,7 +161,7 @@ namespace HexMapEditor
         static QuickSnapshot SnapshotQuick(QuickPair q){return new QuickSnapshot{DraftIcons=q.DraftIcons,DraftObjects=q.DraftObjects,Icons=q.Icons.All,Objects=q.Objects.All,IconRefs=q.IconRefs.ToDictionary(x=>x.Key,x=>x.Value.Copy()),ObjectRefs=q.ObjectRefs.ToDictionary(x=>x.Key,x=>x.Value.Copy())};}
         QuickSnapshot CaptureQuick(){return SnapshotQuick(CurrentQuick);}
         QuickLibraryState CaptureLibraryQuick(){EnsureQuickPreset();return new QuickLibraryState{Sets=quickSets.ToDictionary(x=>x.Key,x=>SnapshotQuick(x.Value))};}
-        void RestoreLibraryQuick(QuickLibraryState state){if(state==null)return;foreach(var pair in state.Sets)if(map.Presets.Any(p=>p.Id==pair.Key))ApplyQuick(pair.Key,pair.Value);}
+        void RestoreLibraryQuick(QuickLibraryState state){if(state==null)return;foreach(var pair in state.Sets)if(workingPresets.Any(p=>p.Id==pair.Key))ApplyQuick(pair.Key,pair.Value);}
         void ApplyQuick(string id, QuickSnapshot snapshot, PresetSections sections = PresetSections.All)
         {
             QuickPair q;
