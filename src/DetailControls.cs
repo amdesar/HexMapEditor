@@ -17,14 +17,16 @@ namespace HexMapEditor
         }
         protected override void OnPaint(PaintEventArgs e)
         {
-            if(!Contrast){base.OnPaint(e);return;}
             var bounds=ClientRectangle;
             var flags=TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding;
-            var edge=ForeColor.GetBrightness()>.48f?Color.Black:Color.WhiteSmoke;
-            foreach(var offset in new[] { new Point(-1,0),new Point(1,0),new Point(0,-1),new Point(0,1) })
+            if(Contrast)
             {
-                var at=bounds;at.Offset(offset);
-                TextRenderer.DrawText(e.Graphics,Text,Font,at,edge,flags);
+                var edge=ForeColor.GetBrightness()>.48f?Color.Black:Color.WhiteSmoke;
+                foreach(var offset in new[] { new Point(-1,0),new Point(1,0),new Point(0,-1),new Point(0,1) })
+                {
+                    var at=bounds;at.Offset(offset);
+                    TextRenderer.DrawText(e.Graphics,Text,Font,at,edge,flags);
+                }
             }
             TextRenderer.DrawText(e.Graphics,Text,Font,bounds,ForeColor,flags);
         }
@@ -92,8 +94,8 @@ namespace HexMapEditor
         internal DetailNameHeader(string label, Action<string> commit, ToolTip tips, bool allowEmpty=false)
         {
             this.commit=commit;this.allowEmpty=allowEmpty;
-            Height=38;MinimumSize=new Size(0,38);Dock=DockStyle.Fill;
-            title.Font=new Font("Segoe UI",15,FontStyle.Bold);
+            Height=54;MinimumSize=new Size(0,54);Dock=DockStyle.Fill;
+            title.Font=new Font("Segoe UI",29,FontStyle.Bold);
             Disposed+=(s,e)=>title.Font.Dispose();
             input.AccessibleName=label;
             pencil=ActionButton("",label+" — edytuj",ChoiceStyle.ActiveBorder,Begin,tips);
@@ -144,8 +146,14 @@ namespace HexMapEditor
                 int suffixWidth=suffix.Text.Length==0?0:Math.Min(space,TextRenderer.MeasureText(suffix.Text,suffix.Font).Width);
                 int titleWidth=Math.Min(Math.Max(0,space-suffixWidth),TextRenderer.MeasureText(title.Text,title.Font,Size.Empty,TextFormatFlags.NoPadding).Width+4);
                 title.SetBounds(0,0,titleWidth,height);
-                suffix.SetBounds(titleWidth,Math.Max(0,(height-suffix.PreferredHeight)/2),suffixWidth,suffix.PreferredHeight);
+                int titleBaseline=(height-title.Font.Height)/2+Ascent(title.Font);
+                suffix.SetBounds(titleWidth,Math.Max(0,titleBaseline-Ascent(suffix.Font)),suffixWidth,suffix.PreferredHeight);
             }
+        }
+        static int Ascent(Font font)
+        {
+            var family=font.FontFamily;
+            return (int)Math.Round(font.Height*(double)family.GetCellAscent(font.Style)/family.GetLineSpacing(font.Style));
         }
         void Begin()
         {
@@ -176,6 +184,8 @@ namespace HexMapEditor
     internal sealed class MemberMatrix : TableLayoutPanel
     {
         readonly Dictionary<string, SwitchBox[]> switches=new Dictionary<string, SwitchBox[]>();
+        readonly Dictionary<string, SwitchBox> rowTotals=new Dictionary<string, SwitchBox>();
+        SwitchBox all;
         readonly string actionName;
         bool syncing;
         internal Action<GroupProperty> ColumnClicked;
@@ -186,9 +196,12 @@ namespace HexMapEditor
         {
             this.actionName=actionName;
             AutoSize=true;AutoSizeMode=AutoSizeMode.GrowAndShrink;ColumnCount=6;
-            ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(int width in new[] { 42,52,42,56,54 }) ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,width));
             BackColor=Color.FromArgb(34,38,48);AccessibleName=actionName;
+        }
+        internal static int PropertyWidth(Font font)
+        {
+            return GroupRules.ColumnNames.Concat(new[]{"Wszystko"}).Max(name=>
+                TextRenderer.MeasureText(name,font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width)+8;
         }
         internal void SetMembers(MatrixMember[] members,bool keep=false)
         {
@@ -196,20 +209,33 @@ namespace HexMapEditor
             try
             {
                 foreach(Control c in Controls.Cast<Control>().ToArray())c.Dispose();
-                RowStyles.Clear();switches.Clear();
+                RowStyles.Clear();switches.Clear();rowTotals.Clear();all=null;
+                ColumnCount=keep?7:6;
+                ColumnStyles.Clear();
+                ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+                for(int i=1;i<ColumnCount;i++)ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,PropertyWidth(Font)));
                 AddCell(new Label{Text="Członek",AutoEllipsis=true},0,0);
                 for(int col=0;col<GroupRules.Columns.Length;col++)
                 {
                     var property=GroupRules.Columns[col];
                     var head=new Label{Text=GroupRules.ColumnNames[col],TextAlign=ContentAlignment.MiddleCenter};
-                    if(!keep)
+                    if(!keep||members.Any(m=>!m.Hidden&&(m.Value&property)!=0))
                     {
                         var link=new LinkLabel{Text=head.Text,LinkColor=Color.LightSteelBlue,ActiveLinkColor=Color.White,TextAlign=ContentAlignment.MiddleCenter,
                             AccessibleName="Przełącz całą kolumnę "+head.Text};
-                        link.LinkClicked+=(s,e)=>{if(ColumnClicked!=null)ColumnClicked(property);};
+                        link.LinkClicked+=(s,e)=>{if(keep)Toggle(switches.Values.Select(cells=>cells[Array.IndexOf(GroupRules.Columns,property)]));
+                            else if(ColumnClicked!=null)ColumnClicked(property);};
                         head.Dispose();head=link;
                     }
                     AddCell(head,col+1,0);
+                }
+                if(keep)
+                {
+                    all=TotalSwitch("Zachowaj wszystkie kwalifikujące się wartości",()=>Toggle(switches.Values.SelectMany(cells=>cells)));
+                    var top=new FlowLayoutPanel{FlowDirection=FlowDirection.TopDown,WrapContents=false,Margin=Padding.Empty};
+                    top.Controls.Add(new Label{Text="Wszystko",TextAlign=ContentAlignment.MiddleCenter,Width=PropertyWidth(Font),Height=18,Margin=Padding.Empty});
+                    all.Width=PropertyWidth(Font);all.Margin=Padding.Empty;top.Controls.Add(all);
+                    AddCell(top,6,0);
                 }
                 int row=0;
                 foreach(var member in members)
@@ -227,17 +253,50 @@ namespace HexMapEditor
                     for(int col=0;col<items.Length;col++)
                     {
                         var property=GroupRules.Columns[col];
-                        var box=new SwitchBox { AccessibleName=actionName+" — "+member.Name+" — "+GroupRules.ColumnNames[col],
+                        var box=new SwitchBox { CenterTrack=true,AccessibleName=actionName+" — "+member.Name+" — "+GroupRules.ColumnNames[col],
                             Enabled=!member.Hidden&&(!keep||(member.Value&property)!=0) };
                         if(keep&&(member.Value&property)==0){box.Dispose();AddCell(new Label(),col+1,row);continue;}
                         items[col]=box;
                         string id=member.Id;
-                        box.CheckedChanged+=(s,e)=>{if(!syncing&&ValueChanged!=null)ValueChanged(id,property,box.Checked);};
+                        box.CheckedChanged+=(s,e)=>{if(syncing)return;if(keep)UpdateTotals();else if(ValueChanged!=null)ValueChanged(id,property,box.Checked);};
                         AddCell(box,col+1,row);
                     }
+                    if(keep)
+                    {
+                        var total=TotalSwitch("Zachowaj wszystko — "+member.Name,()=>Toggle(items));
+                        rowTotals.Add(member.Id,total);AddCell(total,6,row);
+                    }
                 }
+                RowCount=row+1;
+                for(int i=0;i<RowCount;i++)RowStyles.Add(new RowStyle(SizeType.Absolute,i==0&&keep?43:25));
             }
             finally { ResumeLayout(true);syncing=false; }
+            if(keep)UpdateTotals();
+        }
+        SwitchBox TotalSwitch(string name,Action toggle)
+        {
+            var box=new SwitchBox{CenterTrack=true,AccessibleName=name,AutoCheck=false};
+            box.Click+=(s,e)=>toggle();return box;
+        }
+        internal void Toggle(IEnumerable<SwitchBox> candidates)
+        {
+            var eligible=candidates.Where(box=>box!=null&&box.Enabled).ToArray();
+            bool on=eligible.Any(box=>!box.Checked);
+            syncing=true;
+            try { foreach(var box in eligible)box.Checked=on; }
+            finally { syncing=false; }
+            UpdateTotals();
+        }
+        void UpdateTotals()
+        {
+            foreach(var pair in rowTotals)SetTotal(pair.Value,switches[pair.Key]);
+            if(all!=null)SetTotal(all,switches.Values.SelectMany(row=>row));
+        }
+        static void SetTotal(SwitchBox total,IEnumerable<SwitchBox> cells)
+        {
+            var eligible=cells.Where(box=>box!=null&&box.Enabled).ToArray();
+            total.Enabled=eligible.Length!=0;
+            total.Checked=eligible.Length!=0&&eligible.All(box=>box.Checked);
         }
         void AddCell(Control c,int column,int row)
         {

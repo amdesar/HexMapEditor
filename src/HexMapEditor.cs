@@ -65,6 +65,8 @@ namespace HexMapEditor
     {
         internal ProjectFileVersion LoadedFileVersion;
         public int FormatVersion { get; set; }
+        // Keep this small metadata field before the variable-length map payload.
+        public string LastSavedAppVersion { get; set; }
         public string Name { get; set; }
         public int Columns { get; set; }
         public int Rows { get; set; }
@@ -149,7 +151,7 @@ namespace HexMapEditor
         readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 64 };
         readonly Panel canvas = new InkCanvas();
         readonly Panel left = new Panel();
-        readonly BufferedPanel right = new BufferedPanel();
+        readonly DetailsDock right = new DetailsDock();
         readonly Button leftToggle = new Button();
         readonly ComboBox terrainPicker = new ComboBox();
         readonly Button orientationToggle = new Button();
@@ -262,8 +264,12 @@ namespace HexMapEditor
             int width = rightCollapsed ? 18 : ClampRightWidth(requestedRightWidth);
             var previous = right.Bounds;
             right.Bounds = new Rectangle(Math.Max(0, ClientSize.Width - width), top, width, height);
-            if (right.Visible && previous.Left < right.Left)
-                canvas.Invalidate(new Rectangle(previous.Left-inset,0,right.Left-previous.Left,canvas.Height));
+            if (right.Visible && previous != right.Bounds)
+            {
+                right.Invalidate(true);
+                if(previous.Left<right.Left)
+                    canvas.Invalidate(new Rectangle(previous.Left-inset,0,right.Left-previous.Left,canvas.Height));
+            }
             }
         }
 
@@ -409,7 +415,7 @@ namespace HexMapEditor
                 var raw = json.DeserializeObject(fileText) as Dictionary<string, object>;
                 if (raw == null || !raw.ContainsKey("FormatVersion") || !(raw["FormatVersion"] is int)) throw new InvalidDataException("Brak jawnego numeru formatu mapy.");
                 int format = (int)raw["FormatVersion"];
-                if (format != 12) throw new InvalidDataException("Obsługiwany format mapy: 12. Starszy plik pozostawiono bez zmian.");
+                if (format != 12) throw new InvalidDataException(ProjectMetadata.IncompatibleMessage(raw));
                 GraphicSchema.Map(raw);
                 if (!raw.ContainsKey("TerrainAssets") || !raw.ContainsKey("GraphicSources") || !raw.ContainsKey("FogPalette") ||
                     !raw.ContainsKey("Background")) throw new InvalidDataException("Brak tabeli grafik, źródeł lub ustawień mgły/tła.");
@@ -515,6 +521,7 @@ namespace HexMapEditor
         internal static byte[] PrepareProjectBytes(MapData data)
         {
             var output=MapForSave(data);ValidateMap(output);var serializer=MapLogic.Serializer();
+            output.LastSavedAppVersion=Version;
             byte[] bytes=new UTF8Encoding(false).GetBytes(serializer.Serialize(output));
             if(bytes.LongLength>GraphicLimits.MapBytes)throw new InvalidDataException("Mapa przekracza limit pliku 256 MiB.");return bytes;
         }
@@ -563,6 +570,7 @@ namespace HexMapEditor
             if (m.LabelMode != "Axes" && m.LabelMode != "InCells" && m.LabelMode != "None") throw new InvalidDataException("Nieprawidłowy tryb etykiet.");
             if (m.RowParity < 0 || m.RowParity > 1 || m.ColumnParity < 0 || m.ColumnParity > 1 || m.Cells == null || m.Cells.Count != m.Columns * m.Rows) throw new InvalidDataException("Nieprawidłowa siatka mapy.");
             var ids = new HashSet<string>(); var variants = new Dictionary<string, string>();
+            long noteCharacters=0;
             foreach (var c in m.Cells)
             {
                 if (c == null || String.IsNullOrWhiteSpace(c.Id) || !ids.Add(c.Id) || String.IsNullOrWhiteSpace(c.Terrain) || !MapLogic.ValidColor(c.Color) || String.IsNullOrWhiteSpace(c.TerrainId) || String.IsNullOrWhiteSpace(c.VariantId) || c.TerrainRevision < 1) throw new InvalidDataException("Nieprawidłowe dane heksu lub terenu.");
@@ -574,6 +582,7 @@ namespace HexMapEditor
                 CheckVariant(variants, c.VariantId, c.TerrainId, c.TerrainRevision, c.Terrain, c.Color, c.TextureId);
                 if (c.IconId != null && !iconIds.Contains(c.IconId)) throw new InvalidDataException("Brak osadzonego zasobu ikony.");
                 if ((c.IconName != null && (String.IsNullOrWhiteSpace(c.IconName) || c.IconName.Length > 200)) || (c.IconEntryId != null && (String.IsNullOrWhiteSpace(c.IconEntryId) || c.IconEntryId.Length > 200)) || (c.IconId == null && (c.IconName != null || c.IconEntryId != null))) throw new InvalidDataException("Nieprawidłowe metadane wystąpienia ikony.");
+                noteCharacters+=NoteCodec.LengthOf(c.RichDescription,c.Description);NoteCodec.CheckMapBudget(noteCharacters);
                 if (c.NotesFormat == "richDocument1") { NoteCodec.Read(c.RichDescription); if (c.Description != NoteCodec.Plain(c.RichDescription)) throw new InvalidDataException("Zwykły tekst nie odpowiada formatowanemu opisowi."); }
                 else if (c.NotesFormat != "plainText" || !String.IsNullOrEmpty(c.RichDescription)) throw new InvalidDataException("Nieobsługiwany format notatek.");
             }

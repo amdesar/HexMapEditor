@@ -13,22 +13,25 @@ namespace HexMapEditor
 {
     internal static class NoteImages
     {
-        internal const int MaxSourceBytes = 2 * 1024 * 1024;
+        internal const int MaxSourceBytes = 8 * 1024 * 1024;
+        internal const int MaxInputSide = 8192;
+        internal const long MaxInputPixels = 24L * 1024 * 1024;
         internal const int MaxPerNote = 12;
-        internal const int MaxPixels = 512;
-        internal const int MaxPngBytes = 1024 * 1024;
+        internal const int MaxPixels = 2048;
+        internal const int MaxPngBytes = 17 * 1024 * 1024;
+        internal const int MaxClipboardCharacters = 36 * 1024 * 1024;
 
         internal static RichNode FromBytes(byte[] bytes)
         {
-            if(bytes==null||bytes.Length<4||bytes.Length>MaxSourceBytes)throw new InvalidDataException("Obraz może mieć najwyżej 2 MiB.");
+            if(bytes==null||bytes.Length<4)throw new InvalidDataException("Brak danych obrazu.");
+            if(bytes.Length>MaxSourceBytes)throw new ImageBudgetException("Zakodowane źródło obrazu może mieć najwyżej 8 MiB.");
             bool png=bytes[0]==137&&bytes[1]==80&&bytes[2]==78&&bytes[3]==71;
             bool jpeg=bytes[0]==255&&bytes[1]==216&&bytes[2]==255;
             if(!png&&!jpeg)throw new InvalidDataException("Osadzany obraz musi być PNG lub JPEG.");
             using(var stream=new MemoryStream(bytes))
             using(var bitmap=System.Drawing.Image.FromStream(stream,true,false))
             {
-                if(bitmap.Width<1||bitmap.Height<1||bitmap.Width>2048||bitmap.Height>2048)
-                    throw new InvalidDataException("Źródło obrazu może mieć najwyżej 2048×2048.");
+                ClipboardRaster.ValidateDimensions(bitmap.Width,bitmap.Height,MaxInputSide,MaxInputPixels);
                 using(var output=new MemoryStream())
                 {
                     double scale=Math.Min(1,MaxPixels/(double)Math.Max(bitmap.Width,bitmap.Height));
@@ -38,6 +41,7 @@ namespace HexMapEditor
                         using(var g=System.Drawing.Graphics.FromImage(copy))
                         {
                             g.InterpolationMode=System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                            g.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;
                             g.DrawImage(bitmap,new System.Drawing.Rectangle(0,0,width,height));
                         }
                         copy.Save(output,System.Drawing.Imaging.ImageFormat.Png);
@@ -49,16 +53,10 @@ namespace HexMapEditor
 
         internal static RichNode FromBitmap(BitmapSource bitmap)
         {
-            if(bitmap==null||bitmap.PixelWidth<1||bitmap.PixelHeight<1||bitmap.PixelWidth>2048||bitmap.PixelHeight>2048)
-                throw new InvalidDataException("Obraz schowka może mieć najwyżej 2048×2048.");
-            using(var stream=new MemoryStream())
-            {
-                double scale=Math.Min(1,MaxPixels/(double)Math.Max(bitmap.PixelWidth,bitmap.PixelHeight));
-                if(scale<1)bitmap=new TransformedBitmap(bitmap,new System.Windows.Media.ScaleTransform(scale,scale));
-                var encoder=new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(bitmap));encoder.Save(stream);
-                return FromPng(stream.ToArray());
-            }
+            ClipboardRaster.ValidateDimensions(bitmap.PixelWidth,bitmap.PixelHeight,MaxInputSide,MaxInputPixels);
+            double scale=Math.Min(1,MaxPixels/(double)Math.Max(bitmap.PixelWidth,bitmap.PixelHeight));
+            if(scale<1)bitmap=new TransformedBitmap(bitmap,new System.Windows.Media.ScaleTransform(scale,scale));
+            return FromPng(ClipboardRaster.Encode(bitmap,MaxPngBytes,MaxPixels,(long)MaxPixels*MaxPixels));
         }
 
         static RichNode FromPng(byte[] bytes)
@@ -125,7 +123,8 @@ namespace HexMapEditor
 
         internal static FlowDocument Parse(string html)
         {
-            if(String.IsNullOrEmpty(html)||html.Length>NoteCodec.MaxCharacters)return null;
+            if(String.IsNullOrEmpty(html))return null;
+            if(html.Length>NoteImages.MaxClipboardCharacters)throw new ImageBudgetException("Dane HTML schowka przekraczają limit 36 Mi znaków.");
             int start=html.IndexOf("<!--StartFragment-->",StringComparison.OrdinalIgnoreCase);
             int end=html.IndexOf("<!--EndFragment-->",StringComparison.OrdinalIgnoreCase);
             if(start>=0&&end>start)html=html.Substring(start+20,end-start-20);
@@ -137,6 +136,7 @@ namespace HexMapEditor
             var doc=NoteCodec.FromPlain("");
             var paragraph=(Paragraph)doc.Blocks.FirstBlock;
             int images=0;
+            long imageCharacters=0;
             string skip=null;
             foreach(Match token in Tokens.Matches(html))
             {
@@ -155,12 +155,21 @@ namespace HexMapEditor
                         var capture=src.Groups.Cast<Group>().Skip(1).FirstOrDefault(g=>g.Success);
                         string data=capture==null?null:capture.Value;
                         int comma=data==null?-1:data.IndexOf(',');
-                        if(comma>0&&images<NoteImages.MaxPerNote)
+                        if(comma>0)
                         {
                             string mime=data.Substring(0,comma).ToLowerInvariant();
                             if(mime=="data:image/png;base64"||mime=="data:image/jpeg;base64")
                             {
-                                try { paragraph.Inlines.Add(NoteImages.Create(NoteImages.FromBytes(Convert.FromBase64String(data.Substring(comma+1)))));images++; }
+                                if(images>=NoteImages.MaxPerNote)throw new ImageBudgetException("Limit 12 obrazów w opisie.");
+                                if(data.Length-comma-1>GraphicLimits.Encoded(NoteImages.MaxSourceBytes))throw new ImageBudgetException("Zakodowane źródło obrazu może mieć najwyżej 8 MiB.");
+                                try
+                                {
+                                    var node=NoteImages.FromBytes(Convert.FromBase64String(data.Substring(comma+1)));
+                                    imageCharacters+=node.Png.Length;
+                                    if(imageCharacters>NoteCodec.MaxCharacters)throw new ImageBudgetException("Obrazy przekraczają limit 24 Mi znaków opisu.");
+                                    paragraph.Inlines.Add(NoteImages.Create(node));images++;
+                                }
+                                catch(ImageBudgetException) { throw; }
                                 catch(FormatException) { } catch(IOException) { } catch(ArgumentException) { } catch(System.Runtime.InteropServices.ExternalException) { }
                             }
                         }

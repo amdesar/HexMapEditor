@@ -39,22 +39,37 @@ namespace HexMapEditor
     {
         static readonly object gate=new object();
         static readonly Dictionary<string,bool?> checkedPaths=new Dictionary<string,bool?>(StringComparer.OrdinalIgnoreCase);
+        static readonly Dictionary<string,string> versions=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
         static int remoteWorkers;
         static bool localWorker;
         static readonly HashSet<string> localPending=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         internal static void Refresh(string[] paths,Action changed)
         {
-            lock(gate)foreach(var p in paths)if(!checkedPaths.ContainsKey(p)||checkedPaths[p].HasValue)checkedPaths[p]=null;
-            lock(gate){foreach(var p in paths.Where(p=>!p.StartsWith(@"\\",StringComparison.Ordinal)))localPending.Add(p);if(!localWorker){localWorker=true;ThreadPool.QueueUserWorkItem(_=>{while(true){string p;lock(gate){p=localPending.FirstOrDefault();if(p==null){localWorker=false;return;}localPending.Remove(p);}bool value=File.Exists(p);lock(gate)checkedPaths[p]=value;changed();}});}}
+            lock(gate)
+            {
+                foreach(var p in versions.Keys.Except(paths,StringComparer.OrdinalIgnoreCase).ToArray())versions.Remove(p);
+                foreach(var p in paths)if(!checkedPaths.ContainsKey(p)||checkedPaths[p].HasValue)checkedPaths[p]=null;
+            }
+            lock(gate){foreach(var p in paths.Where(p=>!p.StartsWith(@"\\",StringComparison.Ordinal)))localPending.Add(p);if(!localWorker){localWorker=true;ThreadPool.QueueUserWorkItem(_=>{while(true){string p;lock(gate){p=localPending.FirstOrDefault();if(p==null){localWorker=false;return;}localPending.Remove(p);}Probe(p);changed();}});}}
             lock(gate)while(remoteWorkers<2&&paths.Any(p=>p.StartsWith(@"\\",StringComparison.Ordinal)&&!checkedPaths[p].HasValue))
             {
                 // Mark a pending path separately so subsequent refreshes cannot duplicate blocked IO.
                 string chosen=paths.FirstOrDefault(p=>p.StartsWith(@"\\",StringComparison.Ordinal)&&!checkedPaths[p].HasValue&&!remotePending.Contains(p));if(chosen==null)break;
                 remoteWorkers++;remotePending.Add(chosen);
-                ThreadPool.QueueUserWorkItem(_=>{string current=chosen;while(current!=null){bool value=File.Exists(current);lock(gate){checkedPaths[current]=value;remotePending.Remove(current);}changed();lock(gate){current=paths.FirstOrDefault(p=>p.StartsWith(@"\\",StringComparison.Ordinal)&&!checkedPaths[p].HasValue&&!remotePending.Contains(p));if(current!=null)remotePending.Add(current);else remoteWorkers--;}}});
+                ThreadPool.QueueUserWorkItem(_=>{string current=chosen;while(current!=null){Probe(current);lock(gate)remotePending.Remove(current);changed();lock(gate){current=paths.FirstOrDefault(p=>p.StartsWith(@"\\",StringComparison.Ordinal)&&!checkedPaths[p].HasValue&&!remotePending.Contains(p));if(current!=null)remotePending.Add(current);else remoteWorkers--;}}});
             }
         }
         static readonly HashSet<string> remotePending=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        static void Probe(string path)
+        {
+            bool exists=File.Exists(path);
+            string version=exists?ProjectMetadata.ReadPrefix(path):null;
+            lock(gate){checkedPaths[path]=exists;versions[path]=version;}
+        }
+        internal static string SavedWith(string path)
+        {
+            lock(gate){string version;return versions.TryGetValue(path,out version)?version:null;}
+        }
         internal static string[] Visible(string[] paths){lock(gate)return paths.Where(p=>checkedPaths.ContainsKey(p)&&checkedPaths[p]==true).Take(5).ToArray();}
     }
 }

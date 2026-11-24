@@ -10,7 +10,8 @@ namespace HexMapEditor
     {
         TableLayoutPanel groupLayout;
         DetailNameHeader groupName;
-        ComboBox groupState, groupSizeMode;
+        ComboBox groupState;
+        Button commonSize, offsetSize;
         ScrubNumber groupSize, groupRadius, groupLightRadius;
         CheckBox groupFrame, groupReveal, groupLight, groupLock;
         Button groupFrameColor;
@@ -23,18 +24,21 @@ namespace HexMapEditor
             groupLayout.Hide();
             groupName = new DetailNameHeader("Nazwa grupy", value => EditGroup("name", g => g.Name=value, false), tips);
             SpanRow(groupLayout,0,groupName);
+            SetDetailRowHeight(groupLayout,0,64);
             groupFrame = new SwitchBox { Text="Obramowanie członków", AutoSize=true };
             groupFrameColor = PropertyButton("Kolor",ChooseFrameColor);
             SpanRow(groupLayout,1,PropertyLine(groupFrame,groupFrameColor));
+            SetDetailRowHeight(groupLayout,1,40);
             SpanRow(groupLayout,2,DetailSection("Ustawienia grupy"));
 
-            groupState = new ComboBox { DropDownStyle=ComboBoxStyle.DropDownList };
+            groupState = new ComboBox { DropDownStyle=ComboBoxStyle.DropDownList,DrawMode=DrawMode.OwnerDrawFixed };
+            groupState.DrawItem+=DrawGroupState;
             PropertyRow(groupLayout,3,"Stan",groupState);
-            groupSizeMode = new ComboBox { DropDownStyle=ComboBoxStyle.DropDownList, Width=105 };
-            groupSizeMode.Items.AddRange(new object[] { "Wspólny", "Przesunięcie" });
             groupSize = new ScrubNumber { Minimum=-1016, Maximum=1024, Width=57 };
-            var reset = PropertyButton("Reset",()=>EditGroup("size",g=>g.SizeValue=g.SizeMode=="Common"?30:0,false));
-            PropertyRow(groupLayout,4,"Rozmiar",WrappingLine(groupSize,groupSizeMode,reset));
+            commonSize=SizeAction("≡","Rozmiar wspólny",()=>SetGroupSizeMode("Common"));
+            offsetSize=SizeAction("±","Przesunięcie rozmiaru",()=>SetGroupSizeMode("Offset"));
+            var reset = SizeAction("↺","Reset rozmiaru (wspólny 30, przesunięcie 0)",()=>EditGroup("size",g=>g.SizeValue=g.SizeMode=="Common"?30:0,false));
+            PropertyRow(groupLayout,4,"Rozmiar",PropertyLine(groupSize,commonSize,offsetSize,reset));
 
             groupReveal = PropertySwitch("Odkrywanie mgły");
             groupLight = PropertySwitch("Pole widzenia");
@@ -59,14 +63,6 @@ namespace HexMapEditor
             SpanRow(groupLayout,13,PropertyButton("Usuń grupę i wszystkie obiekty",ConfirmDeleteSelectedObjects,true));
 
             groupState.SelectedIndexChanged += (s,e) => { var state=groupState.SelectedItem as ObjectStateDefinition;if(state!=null)EditGroup("state",g=>g.StateId=state.Id,false); };
-            groupSizeMode.SelectedIndexChanged += (s,e) =>
-            {
-                if(groupSizeMode.SelectedIndex<0)return;
-                EditGroup("size-mode",g=>{
-                    g.SizeMode=groupSizeMode.SelectedIndex==0?"Common":"Offset";
-                    g.SizeValue=Math.Max(g.SizeMode=="Common"?8:-1016,Math.Min(g.SizeMode=="Common"?1024:1016,g.SizeValue));
-                },false);
-            };
             groupSize.ValueChanged += (s,e)=>EditGroup("size",g=>g.SizeValue=(float)groupSize.Value,true);
             groupFrame.CheckedChanged += (s,e)=>EditGroup("frame",g=>g.FrameEnabled=groupFrame.Checked,false);
             groupReveal.CheckedChanged += (s,e)=>EditGroup("fog",g=>g.RevealsFog=groupReveal.Checked,false);
@@ -75,6 +71,28 @@ namespace HexMapEditor
             groupRadius.ValueChanged += (s,e)=>EditGroup("fog-radius",g=>g.RevealRadius=(int)groupRadius.Value,true);
             groupLightRadius.ValueChanged += (s,e)=>EditGroup("sight-radius",g=>g.LightRadius=(int)groupLightRadius.Value,true);
             foreach(var number in new[] { groupSize,groupRadius,groupLightRadius }) LiveNumber(number);
+        }
+        void SetGroupSizeMode(string mode)
+        {
+            EditGroup("size-mode",g=>{
+                if(g.SizeMode==mode)return;
+                g.SizeMode=mode;
+                g.SizeValue=Math.Max(mode=="Common"?8:-1016,Math.Min(mode=="Common"?1024:1016,g.SizeValue));
+            },false);
+        }
+        void DrawGroupState(object sender,DrawItemEventArgs e)
+        {
+            e.DrawBackground();
+            if(e.Index<0)return;
+            var state=(ObjectStateDefinition)groupState.Items[e.Index];
+            var color=ColorTranslator.FromHtml(state.Color);
+            if(!groupState.Enabled)color=Color.FromArgb(55,60,72);
+            using(var brush=new SolidBrush(color))e.Graphics.FillRectangle(brush,e.Bounds);
+            var foreground=color.R*.299+color.G*.587+color.B*.114>145?Color.Black:Color.White;
+            var label=Rectangle.Inflate(e.Bounds,-4,0);
+            TextRenderer.DrawText(e.Graphics,state.Name,e.Font,label,foreground,
+                TextFormatFlags.SingleLine|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
+            e.DrawFocusRectangle();
         }
         ObjectGroup CurrentGroup(){return map.Groups.FirstOrDefault(g=>g.Id==selectedGroupId);}
         bool GroupMasked(ObjectGroup group){return group.Members.All(id=>ObjectFogLevel(map.Objects.Single(o=>o.Id==id))>0);}
@@ -96,12 +114,12 @@ namespace HexMapEditor
             bool masked=GroupMasked(group);
             groupLayout.Enabled=!masked;
             groupName.Display(group.Id,masked?"":group.Name,masked?"???":group.Name,null,
-                !masked&&group.FrameEnabled?ColorTranslator.FromHtml(group.FrameColor):ChoiceStyle.ActiveBorder,!masked);
+                !masked&&group.FrameEnabled?ColorTranslator.FromHtml(group.FrameColor):ChoiceStyle.ActiveBorder,!masked,!masked&&group.FrameEnabled);
             if(masked)
             {
                 groupFrame.Checked=groupReveal.Checked=groupLight.Checked=groupLock.Checked=false;
                 groupFrameColor.Visible=false;
-                groupState.SelectedIndex=groupSizeMode.SelectedIndex=-1;
+                groupState.SelectedIndex=-1;
                 groupSize.Minimum=-1016;groupSize.Value=0;
                 groupRadius.Parent.Visible=groupLightRadius.Parent.Visible=false;
                 groupMatrix.Hide();
@@ -120,7 +138,10 @@ namespace HexMapEditor
             groupFrameColor.BackColor=ColorTranslator.FromHtml(group.FrameColor);
             groupFrameColor.ForeColor=groupFrameColor.BackColor.GetBrightness()>.55?Color.Black:Color.White;
             bool offset=group.SizeMode=="Offset";
-            groupSizeMode.SelectedIndex=offset?1:0;
+            ChoiceStyle.Apply(commonSize,!offset);
+            ChoiceStyle.Apply(offsetSize,offset);
+            commonSize.AccessibleDescription=offset?"Nieaktywny":"Aktywny";
+            offsetSize.AccessibleDescription=offset?"Aktywny":"Nieaktywny";
             groupSize.Minimum=offset?-1016:8;groupSize.Maximum=offset?1016:1024;
             groupSize.Value=(decimal)group.SizeValue;
             groupReveal.Checked=group.RevealsFog.Value;

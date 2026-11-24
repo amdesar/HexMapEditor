@@ -107,25 +107,32 @@ namespace HexMapEditor
             scroll.Controls.Add(hexBody);right.Controls.Add(scroll);
             hexSummary=new TableLayoutPanel {Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=1};
             hexDetailName=new DetailNameHeader("Własna nazwa heksa",RenameSelectedHex,tips,true);
+            hexDetailName.Margin=Padding.Empty;
             hexSummary.Controls.Add(hexDetailName);
-            hexTerrain=new DetailCaption{Height=26,Contrast=true,Dock=DockStyle.Top};
-            hexTerrain.Font=new Font("Segoe UI",12,FontStyle.Bold);
-            hexTerrain.Disposed+=(s,e)=>hexTerrain.Font.Dispose();
-            hexIcon=new Label{Height=26,Font=hexTerrain.Font,Dock=DockStyle.Top,AutoEllipsis=true,TextAlign=ContentAlignment.MiddleLeft};
-            hexSummary.Controls.Add(hexTerrain);hexSummary.Controls.Add(hexIcon);
-            hexPreview=new BufferedPanel{Height=100,Dock=DockStyle.Top,AccessibleName="Podgląd heksa bez obiektów"};
-            hexPreview.Paint+=PaintHexDetail;hexSummary.Controls.Add(hexPreview);
+            var detailsFont=DetailMetadataFont();
+            hexTerrain=new DetailCaption{Contrast=true,Dock=DockStyle.Fill,Font=detailsFont,Margin=Padding.Empty};
+            hexIcon=new DetailCaption{Font=detailsFont,Dock=DockStyle.Fill,Margin=Padding.Empty};
+            var summaryRows=new TableLayoutPanel{Dock=DockStyle.Top,Height=82,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
+            summaryRows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            summaryRows.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,84));
+            summaryRows.RowStyles.Add(new RowStyle(SizeType.Percent,50));
+            summaryRows.RowStyles.Add(new RowStyle(SizeType.Percent,50));
+            summaryRows.Disposed+=(s,e)=>detailsFont.Dispose();
+            summaryRows.Controls.Add(hexTerrain,0,0);summaryRows.Controls.Add(hexIcon,0,1);
+            hexPreview=new BufferedPanel{Dock=DockStyle.Fill,AccessibleName="Podgląd heksa bez obiektów"};
+            hexPreview.Paint+=PaintHexDetail;summaryRows.Controls.Add(hexPreview,1,0);summaryRows.SetRowSpan(hexPreview,2);
+            hexSummary.Controls.Add(summaryRows);
             hexObjectTitle=DetailSection("Obiekty na heksie");
-            hexObjectTitle.Dock=DockStyle.Top;hexObjectTitle.Paint+=(s,e)=>e.Graphics.DrawLine(Pens.DimGray,0,0,hexObjectTitle.Width,0);
+            hexObjectTitle.Dock=DockStyle.Top;
             hexSummary.Controls.Add(hexObjectTitle);
             hexObjects=new BufferedFlowPanel{Dock=DockStyle.Top,WrapContents=true,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink};
             hexSummary.Controls.Add(hexObjects);
-            hexNoteFooter=new Panel{Dock=DockStyle.Top,Height=38};
+            hexNoteFooter=new Panel{Dock=DockStyle.Top,Height=28};
             hexNoteFooter.Paint+=(s,e)=>e.Graphics.DrawLine(Pens.DimGray,0,0,hexNoteFooter.Width,0);
             var title=DetailSection("Opis");title.Dock=DockStyle.Fill;
             expandDescription=PropertyButton("Powiększ opis",()=>{descriptionExpanded=!descriptionExpanded;UpdateHexDescriptionLayout();});
-            expandDescription.Dock=DockStyle.Right;
-            hexNoteFooter.Controls.Add(title);hexNoteFooter.Controls.Add(expandDescription);
+            hexNoteFooter.Controls.Add(title);
+            cellDescription.AddExpandButton(expandDescription);
             cellDescription.Dock=DockStyle.Fill;
             hexBody.Controls.Add(cellDescription);hexBody.Controls.Add(hexNoteFooter);hexBody.Controls.Add(hexSummary);
             scroll.Layout+=(s,e)=>SizeHexBody();
@@ -139,6 +146,7 @@ namespace HexMapEditor
         void UpdateHexDescriptionLayout()
         {
             hexSummary.Visible=!descriptionExpanded;
+            hexNoteFooter.Visible=!descriptionExpanded;
             expandDescription.Text=descriptionExpanded?"Wróć do szczegółów":"Powiększ opis";
             SizeHexBody();
         }
@@ -152,6 +160,7 @@ namespace HexMapEditor
                 descriptionExpanded=false;
                 textHistory.BreakGroups();editorCellId=key;
                 cellDescription.SetContent(hidden?null:cell.RichDescription,hidden?"Treść ukryta przez mgłę lub ograniczenie widoczności.":cell.Description);
+                cellDescription.UpdateTools();
             }
             cellDescription.Enabled=!hidden;
             string coordinate=Coordinate(selected);
@@ -160,8 +169,9 @@ namespace HexMapEditor
             hexTerrain.Text=hidden?"Dane heksa ukryte":MapLogic.IsUnpainted(cell)?"Brak terenu":cell.Terrain;
             var color=hidden?Color.Silver:RepresentativeColors.Get(cell.Color,cell.Texture,cell.Gradient,map.Orientation=="FlatTop");
             hexTerrain.ForeColor=color.A==0?ParseColor(cell.Color):Color.FromArgb(255,color);
-            hexIcon.Visible=!hidden&&cell.IconId!=null;
-            hexIcon.Text=hexIcon.Visible?cell.IconName??map.IconAssets.First(a=>a.Id==cell.IconId).Name:"";
+            bool hasIcon=!hidden&&cell.IconId!=null;
+            hexIcon.Text=hasIcon?cell.IconName??map.IconAssets.First(a=>a.Id==cell.IconId).Name:"";
+            hexIcon.Visible=hasIcon;
             hexPreview.Visible=!hidden;
             hexPreview.Invalidate();
             RefreshHexMembers(key,hidden);
@@ -171,7 +181,9 @@ namespace HexMapEditor
         {
             if(selected<0||selected>=map.Cells.Count||CellMasked(selected))return;
             var cell=map.Cells[selected];
-            var center=new PointF(50,50);const float radius=44;
+            var client=((Control)sender).ClientSize;
+            var center=new PointF(client.Width/2f,client.Height/2f);
+            float radius=Math.Max(1,Math.Min(client.Width,client.Height)/2f-4);
             e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
             using(var path=HexPath(center,radius))
             using(var brush=new SolidBrush(ParseColor(cell.Color)))

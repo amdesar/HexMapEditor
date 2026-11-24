@@ -114,7 +114,14 @@ namespace HexMapEditor
         {
             var visible=RecentAvailability.Visible(paths);projects.SuspendLayout();try{while(projects.Controls.Count>0){var c=projects.Controls[0];projects.Controls.RemoveAt(0);c.Dispose();}
                 if(visible.Length==0)projects.Controls.Add(new Label{Text=paths.Length==0?"Brak ostatnich projektów. Otwórz mapę lub stwórz nową.":"Brak potwierdzonych dostępnych projektów. Sprawdzanie odbywa się w tle.",AutoSize=false,Size=new Size(projects.Width-8,64),ForeColor=Color.Silver});
-                foreach(var path in visible){var b=new Button{Text=Path.GetFileNameWithoutExtension(path),Width=projects.Width-8,Height=43,Margin=new Padding(0,0,0,8),TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true,FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(34,38,48)};tips.SetToolTip(b,path);b.Click+=(s,e)=>OpenPath(path);projects.Controls.Add(b);}
+                foreach(var path in visible)
+                {
+                    var name=Path.GetFileNameWithoutExtension(path);
+                    var version=RecentAvailability.SavedWith(path);
+                    var b=new RecentProjectButton(name,version){Width=projects.Width-8};
+                    tips.SetToolTip(b,version==null?path:path+"\nOstatni zapis: "+version);
+                    b.Click+=(s,e)=>OpenPath(path);projects.Controls.Add(b);
+                }
             }finally{projects.ResumeLayout(true);}
         }
         void ChooseOpen(){if(choosing||transition)return;choosing=true;try{using(var dialog=new OpenFileDialog{Filter="Projekt HexMapEditor (*.hexmap)|*.hexmap",RestoreDirectory=true,Title="Otwórz projekt"})if(dialog.ShowDialog(this)==DialogResult.OK)OpenPathCore(dialog.FileName);}finally{choosing=false;}}
@@ -129,6 +136,29 @@ namespace HexMapEditor
             try{string warning;var presets=PresetCatalog.Load(LibraryPaths.Presets,out warning);if(warning.Length>0)MessageBox.Show(this,warning,"Pominięte presety",MessageBoxButtons.OK,MessageBoxIcon.Warning);string stateWarning;var states=StateLibrary.Load(Path.Combine(LibraryPaths.Root,"Objects","States"),out stateWarning).Select(entry=>entry.Definition.Copy()).ToList();if(stateWarning.Length>0)MessageBox.Show(this,stateWarning,"Pominięte stany",MessageBoxButtons.OK,MessageBoxIcon.Warning);using(var dialog=new NewMapDialog("PointyTop",presets)){ProjectCreation.ConfigureStart(dialog,states);if(dialog.ShowDialog(this)==DialogResult.OK)open(dialog.CreatedProject.Data,dialog.CreatedProject.Path);}}
             catch(Exception ex){MessageBox.Show(this,ex.Message,"Nie można utworzyć projektu",MessageBoxButtons.OK,MessageBoxIcon.Error);}
             finally{choosing=false;}
+        }
+    }
+
+    internal sealed class RecentProjectButton : Button
+    {
+        readonly string projectName,versionLabel;
+        internal RecentProjectButton(string name,string version)
+        {
+            projectName=name;
+            versionLabel=version==null?null:"Ostatni zapis: "+version;
+            AccessibleName=versionLabel==null?name:name+", "+versionLabel;
+            Height=43;Margin=new Padding(0,0,0,8);FlatStyle=FlatStyle.Flat;BackColor=Color.FromArgb(34,38,48);
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            var flags=TextFormatFlags.SingleLine|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix;
+            var row=Rectangle.Inflate(ClientRectangle,-8,-2);
+            if(versionLabel!=null)row.Height/=2;
+            TextRenderer.DrawText(e.Graphics,projectName,Font,row,ForeColor,flags);
+            if(versionLabel==null)return;
+            row.Offset(0,row.Height);
+            TextRenderer.DrawText(e.Graphics,versionLabel,Font,row,Color.Silver,flags);
         }
     }
 }

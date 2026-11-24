@@ -64,14 +64,14 @@ namespace HexMapEditor
         {
             this.members=members;
             Text=dissolve?"Rozwiąż grupę":"Odłącz od grupy";
-            StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(565,370);MinimumSize=new Size(535,260);
-            var note=new Label { Dock=DockStyle.Top, Height=50, Text=(dissolve?"Wszystkie obiekty pozostaną na mapie. ":"Obiekt pozostanie na mapie. ")
+            StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(565,370);MinimumSize=new Size(535,260);Padding=new Padding(14,12,14,10);
+            var note=new Label { Dock=DockStyle.Top, Height=52, Text=(dissolve?"Wszystkie obiekty pozostaną na mapie. ":"Obiekt pozostanie na mapie. ")
                 +"W tabeli zaznacz wartości wynikowe, które mają pozostać po operacji. Zmianę można cofnąć." };
             var footer=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=43,FlowDirection=FlowDirection.RightToLeft};
             var ok=new EditorButton{Text=dissolve?"Rozwiąż":"Odłącz",Width=120,DialogResult=DialogResult.OK};
             var cancel=new EditorButton{Text="Anuluj",Width=90,DialogResult=DialogResult.Cancel};
             footer.Controls.AddRange(new Control[]{ok,cancel});
-            var scroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true};
+            var scroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true,Padding=new Padding(0,10,0,6)};
             matrix.Dock=DockStyle.Top;scroll.Controls.Add(matrix);
             Controls.Add(scroll);Controls.Add(mode);Controls.Add(note);Controls.Add(footer);
             matrix.SetMembers(members,true);

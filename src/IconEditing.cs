@@ -53,19 +53,18 @@ namespace HexMapEditor
         void ImportIcon(){ImportIcon(this);}
         void ImportIcon(IWin32Window owner)
         {
-            using(var choice=new GraphicSourceDialog("Dodaj ikonę","obiektów")){
-                if(RunModal(()=>choice.ShowDialog(owner))!=DialogResult.OK)return;
-                if(choice.FromLibrary){var graphic=PickObjectGraphic(owner);if(graphic!=null){string error;if(!TryImportCounterpart(graphic,false,out error))ShowLibraryMessage(owner,error,"Nie można dodać ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);}return;}
-            }
-            using (var dialog = new OpenFileDialog { Title = "Dodaj ikonę", Filter = "Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif", RestoreDirectory = true })
+            try
             {
-                if (RunModal(() => dialog.ShowDialog(owner)) != DialogResult.OK) return;
-                try
-                {
-                    var asset = CropImportedIcon(dialog.FileName,owner);if(asset==null)return; string error;
-                    if (!TryChangeLibraryIcon(null, new LibraryIcon { Name = asset.Name, Asset = asset }, false, Path.Combine(LibraryPaths.Root,"Icons"), out error)) throw new IOException(error);
-                }                catch (Exception ex) { ShowLibraryMessage(owner,"Import nie powiódł się; mapa nie została zmieniona.\n" + ex.Message, "Import ikony", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                using(var choice=new GraphicSourceDialog("Dodaj ikonę","obiektów")){
+                    if(RunModal(()=>choice.ShowDialog(owner))!=DialogResult.OK)return;
+                    if(choice.FromLibrary){var graphic=PickObjectGraphic(owner);if(graphic!=null){string error;if(!TryImportCounterpart(graphic,false,out error))ShowLibraryMessage(owner,error,"Nie można dodać ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);}return;}
+                    var asset=choice.FromClipboard?CropClipboardIcon(owner,"Ikona ze schowka"):ChooseSquareGraphicFile(owner,"Dodaj ikonę");
+                    if(asset==null)return;
+                    string saveError;
+                    if(!TryChangeLibraryIcon(null,new LibraryIcon{Name=asset.Name,Asset=asset},false,Path.Combine(LibraryPaths.Root,"Icons"),out saveError))throw new IOException(saveError);
+                }
             }
+            catch(Exception ex){ShowLibraryMessage(owner,ex.Message,"Import ikony",MessageBoxButtons.OK,MessageBoxIcon.Error);}
         }
         void DeleteLibraryIcon(){DeleteLibraryIcon(this);}
         void DeleteLibraryIcon(IWin32Window owner)

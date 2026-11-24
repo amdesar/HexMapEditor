@@ -27,9 +27,10 @@ namespace HexMapEditor
         readonly string name;
         internal readonly SquareCropState Draft;
         internal IconAsset Result{get;private set;}
-        internal SquareImportDialog(string path)
+        internal SquareImportDialog(string path):this(IconAssets.ReadImport(path),Path.GetFileNameWithoutExtension(path)){}
+        internal SquareImportDialog(Bitmap bitmap,string sourceName)
         {
-            source=IconAssets.ReadImport(path);name=Path.GetFileNameWithoutExtension(path);name=name.Substring(0,Math.Min(200,name.Length));Draft=new SquareCropState(source.Size);
+            source=bitmap;name=sourceName.Substring(0,Math.Min(200,sourceName.Length));Draft=new SquareCropState(source.Size);
             Text="Kadrowanie importowanej grafiki";ClientSize=new Size(640,660);Font=new Font("Segoe UI",9);FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;StartPosition=FormStartPosition.CenterParent;
             var surface=new SquareCropSurface(source,Draft){Bounds=new Rectangle(16,40,608,536)};
             var hint=new Label{Text="Przeciągaj: przesunięcie • Kółko: skala • Obrót suwakiem. Zapis tylko wnętrza kwadratu512×512.",Bounds=new Rectangle(16,10,608,24)};
@@ -58,5 +59,22 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         IconAsset CropImportedIcon(string path,IWin32Window owner){using(var dialog=new SquareImportDialog(path))return RunModal(()=>dialog.ShowDialog(owner))==DialogResult.OK?dialog.Result:null;}
+        IconAsset ChooseSquareGraphicFile(IWin32Window owner,string title)
+        {
+            using(var file=new OpenFileDialog{Title=title,Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})
+                return RunModal(()=>file.ShowDialog(owner))==DialogResult.OK?CropImportedIcon(file.FileName,owner):null;
+        }
+        IconAsset CropClipboardIcon(IWin32Window owner,string name)
+        {
+            var bytes=ReadClipboardGraphic(8*1024*1024,2048);
+            using(var dialog=new SquareImportDialog(IconAssets.ReadImport(bytes),name))
+                return RunModal(()=>dialog.ShowDialog(owner))==DialogResult.OK?dialog.Result:null;
+        }
+        static byte[] ReadClipboardGraphic(int limit,int side)
+        {
+            var bytes=ClipboardRaster.Read(System.Windows.Clipboard.GetDataObject(),limit,side,(long)side*side);
+            if(bytes==null)throw new InvalidDataException("Schowek nie zawiera obsługiwanej grafiki.");
+            return bytes;
+        }
     }
 }

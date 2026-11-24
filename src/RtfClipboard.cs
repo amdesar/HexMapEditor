@@ -13,7 +13,8 @@ namespace HexMapEditor
         public static string Filter(string source) { return Filter(source,null); }
         internal static string Filter(string source, Func<string,string> picture)
         {
-            if (String.IsNullOrEmpty(source) || source.Length > NoteCodec.MaxCharacters || !source.StartsWith(@"{\rtf", StringComparison.Ordinal)) throw new InvalidDataException("Nieobsługiwany lub zbyt duży RTF.");
+            if (String.IsNullOrEmpty(source) || !source.StartsWith(@"{\rtf", StringComparison.Ordinal)) throw new InvalidDataException("Nieobsługiwany RTF.");
+            if (source.Length > NoteImages.MaxClipboardCharacters) throw new ImageBudgetException("Dane RTF schowka przekraczają limit 36 Mi znaków.");
             int at = 0; string result = Group(source, ref at, 0,picture); if (at != source.Length && !String.IsNullOrWhiteSpace(source.Substring(at))) throw new InvalidDataException("Nieprawidłowy RTF."); return result;
         }
         static string Destination(string source, int start)

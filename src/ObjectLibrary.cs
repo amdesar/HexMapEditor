@@ -68,12 +68,19 @@ namespace HexMapEditor
         {
             using(var choice=new GraphicSourceDialog("Dodaj wzorzec obiektu","ikon")){
                 if(RunModal(()=>choice.ShowDialog(owner))!=DialogResult.OK)return;
-                if(!choice.FromLibrary){ImportObjectFile(owner);return;}
+                if(!choice.FromLibrary)
+                {
+                    try
+                    {
+                        var asset=choice.FromClipboard?CropClipboardIcon(owner,"Obiekt ze schowka"):ChooseSquareGraphicFile(owner,"Dodaj wzorzec obiektu");
+                        if(asset!=null)SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false,owner);
+                    }
+                    catch(Exception ex){ShowLibraryMessage(owner,ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+                    return;
+                }
                 var graphic=PickLibraryIcon(owner);if(graphic!=null){string error;if(!TryImportCounterpart(graphic,true,out error))ShowLibraryMessage(owner,error,"Nie można dodać obiektu",MessageBoxButtons.OK,MessageBoxIcon.Error);}
             }
         }
-        void ImportObjectFile(){ImportObjectFile(this);}
-        void ImportObjectFile(IWin32Window owner){using(var d=new OpenFileDialog{Title="Dodaj wzorzec obiektu",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true})if(RunModal(()=>d.ShowDialog(owner))==DialogResult.OK)try{var asset=CropImportedIcon(d.FileName,owner);if(asset==null)return;SaveObjectTemplate(null,new ObjectTemplate{Name=asset.Name,Asset=asset},false,owner);}catch(Exception ex){ShowLibraryMessage(owner,ex.Message,"Import obiektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
         void EditObjectTemplate(){EditObjectTemplate(this);}
         void EditObjectTemplate(IWin32Window owner){var before=libraryObjects.FirstOrDefault(o=>o.Id==activeObject);if(before==null||!objectMaterial){ShowLibraryMessage(owner,"Zaznacz wzorzec obiektu","Edytuj obiekt",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}using(var d=new IconEditDialog(before.Graphic(),PickObjectGraphic,PickLibraryIcon,"Edytuj wzorzec obiektu")){
                 d.SetLightDefaults(before.LightEnabled,before.LightRadius);

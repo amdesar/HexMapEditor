@@ -19,9 +19,15 @@ namespace HexMapEditor
         {
             if (updating || BlockInkCommit() || selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected];
             if (cell.RichDescription == null && document == NoteCodec.Write(NoteCodec.FromPlain(cell.Description))) return;
+            CheckDescriptionBudget(cell,document,plain);
             string initial = DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, "description", initial); history.Record("rich:" + document, kind); textHistory.Trim();
             cell.RichDescription = document; cell.Description = plain; cell.NotesFormat = "richDocument1"; MarkCellDirty(cell);
+        }
+        void CheckDescriptionBudget(CellData current,string rich,string plain)
+        {
+            NoteCodec.CheckMapBudget(map.Cells.Sum(cell=>ReferenceEquals(cell,current)?
+                NoteCodec.LengthOf(rich,plain):NoteCodec.LengthOf(cell.RichDescription,cell.Description)));
         }
         void TextUndo(string field, bool repeat)
         {
@@ -29,13 +35,20 @@ namespace HexMapEditor
             if (selected < 0 || CellMasked(selected)) return; var cell = map.Cells[selected]; textHistory.BreakGroups();
             string initial = field == "name" ? cell.Name : DescriptionHistoryState(cell);
             var history = textHistory.For(cell.Id, field, initial); int before = history.Cursor;
-            string value = repeat ? history.Redo() : history.Undo(); if (before == history.Cursor) return;
+            int target=before+(repeat?1:-1);
+            if(target<0||target>=history.States.Count)return;
+            string value=history.States[target];
+            bool rich = value.StartsWith("rich:", StringComparison.Ordinal);
+            string richText=rich?value.Substring(5):null;
+            string plain=rich?NoteCodec.Plain(richText):value.Substring(6);
+            try { CheckDescriptionBudget(cell,richText,plain); }
+            catch (Exception ex) { ShowEditorMessage(ex.Message,"Opis heksu",MessageBoxButtons.OK,MessageBoxIcon.Warning);return; }
+            if(repeat)history.Redo();else history.Undo();
             updating = true;
             try
             {
-                bool rich = value.StartsWith("rich:", StringComparison.Ordinal);
-                cell.RichDescription = rich ? value.Substring(5) : null;
-                cell.Description = rich ? NoteCodec.Plain(cell.RichDescription) : value.Substring(6);
+                cell.RichDescription = richText;
+                cell.Description = plain;
                 cell.NotesFormat = rich ? "richDocument1" : "plainText";
                 cellDescription.SetContent(cell.RichDescription, cell.Description);
             }

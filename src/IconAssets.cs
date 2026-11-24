@@ -39,7 +39,16 @@ namespace HexMapEditor
         internal static Bitmap ReadImport(string path)
         {
             if(new FileInfo(path).Length>8*1024*1024)throw new InvalidDataException("Import: plik może mieć najwyżej 8 MiB.");
-            using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read))using(var image=Image.FromStream(stream,true,false)){
+            using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read))return ReadImport(stream);
+        }
+        internal static Bitmap ReadImport(byte[] bytes)
+        {
+            using(var stream=new MemoryStream(bytes,false))return ReadImport(stream);
+        }
+        static Bitmap ReadImport(Stream stream)
+        {
+            if(stream.Length>8*1024*1024)throw new InvalidDataException("Import: obraz może mieć najwyżej 8 MiB.");
+            using(var image=Image.FromStream(stream,true,false)){
                 if(image is Metafile||image.Width>2048||image.Height>2048||image.Width<1||image.Height<1)throw new InvalidDataException("Import: bitmapa do2048×2048; bez metaplików i SVG.");
                 if(!new[]{ImageFormat.Png.Guid,ImageFormat.Jpeg.Guid,ImageFormat.Bmp.Guid,ImageFormat.Gif.Guid}.Contains(image.RawFormat.Guid)||image.GetFrameCount(new FrameDimension(image.FrameDimensionsList[0]))!=1)throw new InvalidDataException("Obsługiwane są nieruchome PNG, JPG, BMP i GIF.");
                 return new Bitmap(image);

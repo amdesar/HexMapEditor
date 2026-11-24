@@ -8,6 +8,7 @@ using System.Windows.Forms;
 
 namespace HexMapEditor
 {
+    internal enum TerrainGraphicInput { Library, File, Clipboard }
     public sealed class TerrainGraphic
     {
         public int GraphicFormatVersion { get; set; }
@@ -165,10 +166,10 @@ namespace HexMapEditor
             UpdateUI();
         }
 
-        GraphicDefinition ChooseTerrainGraphic(IWin32Window owner, bool import)
-        {return ChooseTerrainGraphicCore(owner,import,false);}
-        void ManageTerrainGraphics(){RunModal(()=>ChooseTerrainGraphicCore(this,false,true));}
-        GraphicDefinition ChooseTerrainGraphicCore(IWin32Window owner, bool import, bool manage)
+        GraphicDefinition ChooseTerrainGraphic(IWin32Window owner,TerrainGraphicInput input)
+        {return ChooseTerrainGraphicCore(owner,input,false);}
+        void ManageTerrainGraphics(){RunModal(()=>ChooseTerrainGraphicCore(this,TerrainGraphicInput.Library,true));}
+        GraphicDefinition ChooseTerrainGraphicCore(IWin32Window owner,TerrainGraphicInput input,bool manage)
         {
             try
             {
@@ -178,9 +179,9 @@ namespace HexMapEditor
                     terrainGraphics = TerrainGraphicLibrary.Load(LibraryPaths.TerrainGraphics, out warning);
                     if (warning.Length != 0) MessageBox.Show(owner, warning, "Pominięte grafiki terenów", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
-                if (import)
+                if(input!=TerrainGraphicInput.Library)
                 {
-                    var entry = ImportTerrainGraphic(owner);
+                    var entry = ImportTerrainGraphic(owner,input==TerrainGraphicInput.Clipboard);
                     return entry == null ? null : RememberGraphic(entry);
                 }
                 using (var picker = new TerrainGraphicPicker(() => terrainGraphics, map.Orientation == "FlatTop", manage))
@@ -203,9 +204,10 @@ namespace HexMapEditor
             }
         }
 
-        TerrainGraphic ImportTerrainGraphic(IWin32Window owner)
+        TerrainGraphic ImportTerrainGraphic(IWin32Window owner,bool clipboard=false)
         {
-            var asset = CropTerrainFile(owner);
+            var asset=clipboard?CropTerrainSource(owner,
+                GraphicSources.Import(ReadClipboardGraphic(GraphicSources.MaxFileBytes,GraphicLimits.SourceSide)),"Grafika ze schowka"):CropTerrainFile(owner);
             if (asset == null) return null;
             return CommitGraphicImport(asset, (existing, proposed) =>
             {
@@ -241,11 +243,14 @@ namespace HexMapEditor
                 if (file.ShowDialog(owner) != DialogResult.OK) return null;
                 string name = Path.GetFileNameWithoutExtension(file.FileName).Trim();
                 if (name.Length == 0) name = "Grafika terenu";
-                var source = GraphicSources.Import(file.FileName);
-                var graphic = new GraphicDefinition { Source = source, SourceId = source.Id, Name = name.Substring(0, Math.Min(200, name.Length)) };
-                graphic.Seal();
-                return OpenTerrainCrop(owner, graphic, true);
+                return CropTerrainSource(owner,GraphicSources.Import(file.FileName),name);
             }
+        }
+        GraphicDefinition CropTerrainSource(IWin32Window owner,GraphicSource source,string name)
+        {
+            var graphic=new GraphicDefinition{Source=source,SourceId=source.Id,Name=name.Substring(0,Math.Min(200,name.Length))};
+            graphic.Seal();
+            return OpenTerrainCrop(owner,graphic,true);
         }
 
         GraphicDefinition ShowTerrainCrop(IWin32Window owner, GraphicDefinition graphic)

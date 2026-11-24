@@ -95,14 +95,14 @@ namespace HexMapEditor
                 int read = 0, count;
                 while (read < bytes.Length && (count = stream.Read(bytes, read, bytes.Length - read)) > 0) read += count;
                 if (read != bytes.Length) throw new IOException("Nie odczytano całego obrazu.");
-                var source = new GraphicSource { Id = Id(bytes), Data = Convert.ToBase64String(bytes) };
-                using (var image = ReadImage(bytes))
-                {
-                    source.Width = image.Width;
-                    source.Height = image.Height;
-                }
-                return source;
+                return Import(bytes);
             }
+        }
+        internal static GraphicSource Import(byte[] bytes)
+        {
+            if(bytes.Length<1||bytes.Length>MaxFileBytes)throw new InvalidDataException("Źródło musi mieć od 1 bajta do 32 MiB.");
+            using(var image=ReadImage(bytes))
+                return new GraphicSource{Id=Id(bytes),Data=Convert.ToBase64String(bytes),Width=image.Width,Height=image.Height};
         }
         static Bitmap ReadImage(byte[] bytes)
         {

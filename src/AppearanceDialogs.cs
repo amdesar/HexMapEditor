@@ -18,7 +18,7 @@ namespace HexMapEditor
         readonly Button undoLocal = new EditorButton { Image = EditorIcons.Small("undo"), Width = 36, Height = 26, AccessibleName = "Cofnij wariant" };
         readonly Button redoLocal = new EditorButton { Image = EditorIcons.Small("redo"), Width = 36, Height = 26, AccessibleName = "Ponów wariant" };
         readonly ToolTip tips = new ToolTip();
-        internal Func<IWin32Window, bool, GraphicDefinition> ChooseGraphic;
+        internal Func<IWin32Window,TerrainGraphicInput,GraphicDefinition> ChooseGraphic;
         internal Func<IWin32Window, GraphicDefinition, GraphicDefinition> EditCrop;
         internal Func<bool> CanAccept;
         internal List<FillVariant> Fills { get; private set; }
@@ -172,24 +172,28 @@ namespace HexMapEditor
         readonly TerrainPreview preview;
         readonly FillVariant draft;
         readonly Label valueLabel;
-        internal Func<IWin32Window,bool,GraphicDefinition> ChooseGraphic;
+        internal Func<IWin32Window,TerrainGraphicInput,GraphicDefinition> ChooseGraphic;
         internal Func<IWin32Window,GraphicDefinition,GraphicDefinition> EditCrop;
         readonly Button crop=new EditorButton{Text="Kadruj…",Width=80};
         internal FillVariant Result{get;private set;}
         int Kind{get{return graphic.Checked?2:gradient.Checked?1:0;}}
         internal FillVariantDialog(FillVariant initial,bool flat):base("Wariant wyglądu",300)
         {
+            ClientSize=new Size(460,300);
             draft=initial.Copy();var choices=new FlowLayoutPanel{WrapContents=false};choices.Controls.AddRange(new Control[]{solid,gradient,graphic});
-            var library=new EditorButton{Text="Biblioteka…",Width=88};var import=new EditorButton{Text="Importuj…",Width=80};graphicButtons.Controls.AddRange(new Control[]{import,library,crop});
+            var clipboard=new EditorButton{Text="Schowek",Width=72};
+            var library=new EditorButton{Text="Biblioteka",Width=82};var import=new EditorButton{Text="Plik",Width=53};
+            crop.Text="Kadruj";graphicButtons.Controls.AddRange(new Control[]{clipboard,import,library,crop});
             Row(0,"Typ",choices,true);var value=new Panel();value.Controls.AddRange(new Control[]{color,graphicButtons});color.Dock=graphicButtons.Dock=DockStyle.Fill;Row(1,"Kolor",value,true);valueLabel=(Label)Layout.GetControlFromPosition(0,1);
             preview=new TerrainPreview(flat){Dock=DockStyle.Fill};Layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));Layout.Controls.Add(preview,0,2);Layout.SetColumnSpan(preview,3);
             Buttons(3,()=>{if(Kind==2&&draft.Graphic==null)return;if(Kind!=2){draft.Graphic=null;draft.GraphicId=null;}if(Kind!=1)draft.Gradient=null;Result=draft.Copy();DialogResult=DialogResult.OK;});
             color.Click+=(s,e)=>{using(var picker=new PaintPickerDialog(ColorTranslator.FromHtml(draft.Color),draft.Gradient,false,flat,Kind==1))if(picker.ShowDialog(this)==DialogResult.OK){draft.Color=picker.Hex;draft.Gradient=picker.Gradient;if(picker.Gradient==null)solid.Checked=true;else gradient.Checked=true;RefreshPreview();}};
-            library.Click+=(s,e)=>Pick(false);import.Click+=(s,e)=>Pick(true);crop.Click+=(s,e)=>{if(draft.Graphic==null||EditCrop==null)return;var next=EditCrop(this,draft.Graphic);if(next!=null){draft.Graphic=next;draft.GraphicId=next.Id;RefreshPreview();}};
+            clipboard.Click+=(s,e)=>Pick(TerrainGraphicInput.Clipboard);
+            library.Click+=(s,e)=>Pick(TerrainGraphicInput.Library);import.Click+=(s,e)=>Pick(TerrainGraphicInput.File);crop.Click+=(s,e)=>{if(draft.Graphic==null||EditCrop==null)return;var next=EditCrop(this,draft.Graphic);if(next!=null){draft.Graphic=next;draft.GraphicId=next.Id;RefreshPreview();}};
             foreach(var option in new[]{solid,gradient,graphic})option.CheckedChanged+=(s,e)=>RefreshPreview();
             if(draft.Graphic!=null)graphic.Checked=true;else if(draft.Gradient!=null)gradient.Checked=true;else solid.Checked=true;RefreshPreview();
         }
-        void Pick(bool import){if(ChooseGraphic==null)return;var next=ChooseGraphic(this,import);if(next!=null){draft.Graphic=next;draft.GraphicId=next.Id;RefreshPreview();}}
+        void Pick(TerrainGraphicInput input){if(ChooseGraphic==null)return;var next=ChooseGraphic(this,input);if(next!=null){draft.Graphic=next;draft.GraphicId=next.Id;RefreshPreview();}}
         void RefreshPreview()
         {
             if(preview==null)return;int kind=Kind;valueLabel.Text=kind==2?"Grafika":kind==1?"Gradient":"Kolor";

@@ -115,6 +115,12 @@ namespace HexMapEditor
             right.BackColor = Color.FromArgb(34, 38, 48); right.Visible = false;
             BuildHexDetails();
             cellDescription.Changed = DescriptionEdited; cellDescription.HistoryRequested = repeat => TextUndo("description", repeat);
+            cellDescription.HistoryAvailable=repeat=>{
+                if(selected<0||selected>=map.Cells.Count||CellMasked(selected))return false;
+                var cell=map.Cells[selected];
+                var history=textHistory.For(cell.Id,"description",DescriptionHistoryState(cell));
+                return repeat?history.Cursor+1<history.States.Count:history.Cursor>0;
+            };
             cellDescription.SaveRequested = asNew => { if (asNew) SaveAsProject(); else SaveProject(); };
             cellDescription.BreakHistoryGroup = () => textHistory.BreakGroups();
             cellDescription.Error = message => ShowEditorMessage(message, "Opis heksu", MessageBoxButtons.OK, MessageBoxIcon.Warning);

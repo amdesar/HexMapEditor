@@ -293,7 +293,13 @@ namespace HexMapEditor
                 {
                     dialog.CanAccept = () => !dialog.UpdateMap || !StateUsed(id) || GuardLayer(MapLayer.Objects, dialog);
                     if (RunModal(() => dialog.ShowDialog(this)) != DialogResult.OK) return;
-                    if (id == null) AddObjectState(dialog.StateName, dialog.StateColor, dialog.Allows);
+                    if (id == null)
+                    {
+                        if(AvailableStates().Concat(libraryStates.Select(s=>s.Definition)).Any(s=>PresetCatalog.SameName(s.Name,dialog.StateName))&&
+                            ShowEditorMessage("Stan o nazwie „"+dialog.StateName+"” już istnieje. Dodać kolejny?","Powtórzona nazwa stanu",
+                                MessageBoxButtons.OKCancel,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.OK)return;
+                        AddObjectState(dialog.StateName, dialog.StateColor, dialog.Allows);
+                    }
                     else
                     {
                         var next = new ObjectStateDefinition { Id = id, Name = dialog.StateName,

@@ -40,10 +40,19 @@ namespace HexMapEditor
 
     internal static class NoteCodec
     {
-        public const int MaxCharacters = 2 * 1024 * 1024;
+        public const int MaxCharacters = 24 * 1024 * 1024;
+        internal const long MaxMapCharacters = 64L * 1024 * 1024;
+        internal static long LengthOf(string rich, string plain)
+        {
+            return (long)(rich ?? "").Length + (plain ?? "").Length;
+        }
+        internal static void CheckMapBudget(long characters)
+        {
+            if(characters>MaxMapCharacters)throw new InvalidDataException("Opisy tej mapy przekraczają wspólny limit 64 Mi znaków.");
+        }
         public static RichDocument Read(string json)
         {
-            if (json == null || json.Length > MaxCharacters) throw new InvalidDataException("Opis przekracza limit 2 Mi znaków modelu dokumentu.");
+            if (json == null || json.Length > MaxCharacters) throw new InvalidDataException("Opis przekracza limit 24 Mi znaków modelu dokumentu.");
             var doc = MapLogic.Serializer().Deserialize<RichDocument>(json);
             if (doc == null || doc.SchemaVersion != 1 || doc.Blocks == null) throw new InvalidDataException("Nieobsługiwany model opisu.");
             int count = 0, images=0; foreach (var node in doc.Blocks) Validate(node, "block", 0, ref count,ref images); return doc;
@@ -198,17 +207,26 @@ namespace HexMapEditor
         string lastValid;
         public Action<string, string, string> Changed;
         public Action<bool> HistoryRequested;
+        public Func<bool,bool> HistoryAvailable;
         public Action<bool> SaveRequested;
         public Action BreakHistoryGroup;
         public Action<string> Error;
         public Func<int[]> TableSizeRequested;
         public Func<string> ImagePathRequested;
+        readonly Forms.Panel numberBar=new Forms.Panel{Dock=Forms.DockStyle.Top,Height=35,Padding=new Forms.Padding(3,2,3,2)};
+        readonly Dictionary<Button,Func<bool>> toolStates=new Dictionary<Button,Func<bool>>();
+        Button undoTool,redoTool;
+        internal void AddExpandButton(Forms.Button button)
+        {
+            button.Dock=Forms.DockStyle.Right;
+            numberBar.Controls.Add(button);
+        }
         public RichNoteEditor()
         {
             host.Dock = Forms.DockStyle.Fill; Controls.Add(host);
-            var numberBar=new Forms.FlowLayoutPanel{Dock=Forms.DockStyle.Top,Height=33,WrapContents=false};
-            numberBar.Controls.Add(new Forms.Label{Text="Rozmiar czcionki",AutoSize=true,Margin=new Forms.Padding(6,8,2,0)});
+            numberBar.Controls.Add(new Forms.Label{Text="Rozmiar czcionki",AutoSize=true,Location=new System.Drawing.Point(6,9)});
             var size=new ScrubNumber{Minimum=1,Maximum=400,Value=12,Width=62,AccessibleName="Rozmiar czcionki opisu"};
+            size.Location=new System.Drawing.Point(111,4);
             numberBar.Controls.Add(size);Controls.Add(numberBar);
             size.EditFinished+=(s,e)=>{if(!e.Cancelled&&e.Changed)Mutate("format",()=>Box.Selection.ApplyPropertyValue(TextElement.FontSizeProperty,(double)size.Value));};
             Box.SelectionChanged+=(s,e)=>{
@@ -217,18 +235,19 @@ namespace HexMapEditor
             };
             var dock = new DockPanel { LastChildFill = true, Background = new SolidColorBrush(Color.FromRgb(36, 40, 50)) }; host.Child = dock;
             var tools = new WrapPanel { Margin = new Thickness(3) }; DockPanel.SetDock(tools, System.Windows.Controls.Dock.Top); dock.Children.Add(tools);
-            Button(tools, "↶", "Cofnij opis", () => { if (HistoryRequested != null) HistoryRequested(false); });
-            Button(tools, "↷", "Ponów opis", () => { if (HistoryRequested != null) HistoryRequested(true); });
-            Button(tools, "B", "Pogrubienie", () => Execute(EditingCommands.ToggleBold));
-            Button(tools, "I", "Kursywa", () => Execute(EditingCommands.ToggleItalic));
-            Button(tools, "U", "Podkreślenie", () => ToggleDecoration(TextDecorationLocation.Underline));
-            Button(tools, "S", "Przekreślenie", () => ToggleDecoration(TextDecorationLocation.Strikethrough));
-            Button(tools, "⇤", "Wyrównaj do lewej", () => Execute(EditingCommands.AlignLeft));
-            Button(tools, "↔", "Wyśrodkuj", () => Execute(EditingCommands.AlignCenter));
-            Button(tools, "⇥", "Wyrównaj do prawej", () => Execute(EditingCommands.AlignRight));
-            Button(tools, "≡", "Wyjustuj akapity", () => Execute(EditingCommands.AlignJustify));
-            Button(tools, "•≡", "Lista punktowana", () => Execute(EditingCommands.ToggleBullets));
-            Button(tools, "1≡", "Lista numerowana", () => Execute(EditingCommands.ToggleNumbering));
+            undoTool=Button(tools, "↶", "Cofnij opis", () => { if (HistoryRequested != null) HistoryRequested(false); });
+            redoTool=Button(tools, "↷", "Ponów opis", () => { if (HistoryRequested != null) HistoryRequested(true); });
+            Track(Button(tools,"B","Pogrubienie",()=>Execute(EditingCommands.ToggleBold)),TextElement.FontWeightProperty,FontWeights.Bold);
+            Track(Button(tools,"I","Kursywa",()=>Execute(EditingCommands.ToggleItalic)),TextElement.FontStyleProperty,FontStyles.Italic);
+            TrackDecoration(Button(tools,"U","Podkreślenie",()=>ToggleDecoration(TextDecorationLocation.Underline)),TextDecorationLocation.Underline);
+            TrackDecoration(Button(tools,"S","Przekreślenie",()=>ToggleDecoration(TextDecorationLocation.Strikethrough)),TextDecorationLocation.Strikethrough);
+            Track(Button(tools,"⇤","Wyrównaj do lewej",()=>Execute(EditingCommands.AlignLeft)),Paragraph.TextAlignmentProperty,TextAlignment.Left);
+            Track(Button(tools,"↔","Wyśrodkuj",()=>Execute(EditingCommands.AlignCenter)),Paragraph.TextAlignmentProperty,TextAlignment.Center);
+            Track(Button(tools,"⇥","Wyrównaj do prawej",()=>Execute(EditingCommands.AlignRight)),Paragraph.TextAlignmentProperty,TextAlignment.Right);
+            Track(Button(tools,"≡","Wyjustuj akapity",()=>Execute(EditingCommands.AlignJustify)),Paragraph.TextAlignmentProperty,TextAlignment.Justify);
+            toolStates.Add(Button(tools,"•≡","Lista punktowana",()=>Execute(EditingCommands.ToggleBullets)),()=>IsList(false));
+            toolStates.Add(Button(tools,"1≡","Lista numerowana",()=>Execute(EditingCommands.ToggleNumbering)),()=>IsList(true));
+            Box.SelectionChanged+=(s,e)=>{if(!loading)UpdateTools();};
             Button(tools, "▣", "Wklej tekst i obrazy", () => Paste(false));
             Button(tools, "▣T", "Wklej jako zwykły tekst", () => Paste(true));
             Button(tools, "▦", "Wstaw edytowalną tabelę", () => { int[] dimensions = TableSizeRequested == null ? new[] { 2, 2 } : TableSizeRequested(); if (dimensions != null) InsertTable(dimensions[0], dimensions[1]); });
@@ -266,6 +285,59 @@ namespace HexMapEditor
             menu.Items.Add(new MenuItem { Header = "Wklej", Command = ApplicationCommands.Paste, CommandTarget = Box });
             menu.Items.Add(new Separator()); menu.Items.Add(PlainPasteItem); PlainPasteItem.Click += (s, e) => Paste(true);
             menu.Opened += (s, e) => { try { PlainPasteItem.IsEnabled = HasPlainClipboardText(); } catch { PlainPasteItem.IsEnabled = false; } }; Box.ContextMenu = menu;
+            UpdateTools();
+        }
+        void Track(Button button,DependencyProperty property,object value)
+        {toolStates.Add(button,()=>Equals(Box.Selection.GetPropertyValue(property),value));}
+        void TrackDecoration(Button button,TextDecorationLocation location)
+        {
+            toolStates.Add(button,()=>{
+                var decorations=Box.Selection.GetPropertyValue(Inline.TextDecorationsProperty) as TextDecorationCollection;
+                return decorations!=null&&decorations.Any(item=>item.Location==location);
+            });
+        }
+        bool IsList(bool numbered)
+        {
+            var item=Box.Selection.Start.Paragraph==null?null:Box.Selection.Start.Paragraph.Parent as ListItem;
+            var list=item==null?null:item.Parent as List;
+            if(list==null)return false;
+            bool bullet=list.MarkerStyle==TextMarkerStyle.Disc||list.MarkerStyle==TextMarkerStyle.Circle||list.MarkerStyle==TextMarkerStyle.Square;
+            return numbered!=bullet;
+        }
+        static readonly Brush ToolBackground=new SolidColorBrush(Color.FromRgb(49,54,67));
+        static readonly Brush ToolAccent=new SolidColorBrush(Color.FromRgb(42,70,105));
+        static readonly ControlTemplate ToolTemplate=CreateToolTemplate();
+        static ControlTemplate CreateToolTemplate()
+        {
+            // Use a local template so the Windows disabled theme cannot replace
+            // the dark background and light icon with a white empty square.
+            var border=new FrameworkElementFactory(typeof(Border),"Frame");
+            border.SetValue(Border.BackgroundProperty,new TemplateBindingExtension(Control.BackgroundProperty));
+            border.SetValue(Border.BorderBrushProperty,new TemplateBindingExtension(Control.BorderBrushProperty));
+            border.SetValue(Border.BorderThicknessProperty,new Thickness(1));
+            var content=new FrameworkElementFactory(typeof(ContentPresenter),"Glyph");
+            content.SetValue(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center);
+            content.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center);
+            content.SetValue(FrameworkElement.MarginProperty,new TemplateBindingExtension(Control.PaddingProperty));
+            border.AppendChild(content);
+            var template=new ControlTemplate(typeof(Button)){VisualTree=border};
+            var hover=new Trigger{Property=UIElement.IsMouseOverProperty,Value=true};
+            hover.Setters.Add(new Setter(Border.BorderBrushProperty,Brushes.LightSteelBlue,"Frame"));
+            template.Triggers.Add(hover);
+            var focus=new Trigger{Property=UIElement.IsKeyboardFocusedProperty,Value=true};
+            focus.Setters.Add(new Setter(Border.BorderBrushProperty,Brushes.WhiteSmoke,"Frame"));
+            template.Triggers.Add(focus);
+            var disabled=new Trigger{Property=UIElement.IsEnabledProperty,Value=false};
+            disabled.Setters.Add(new Setter(UIElement.OpacityProperty,.45,"Frame"));
+            template.Triggers.Add(disabled);
+            return template;
+        }
+        internal void UpdateTools()
+        {
+            if(undoTool==null||redoTool==null)return;
+            undoTool.IsEnabled=HistoryAvailable!=null&&HistoryAvailable(false);
+            redoTool.IsEnabled=HistoryAvailable!=null&&HistoryAvailable(true);
+            foreach(var pair in toolStates)pair.Key.Background=pair.Value()?ToolAccent:ToolBackground;
         }
         internal bool HandleHistoryKey(Key key, System.Windows.Input.ModifierKeys modifiers)
         {
@@ -286,25 +358,38 @@ namespace HexMapEditor
                 var section = block as Section; if (section != null) FitTablesIn(section.Blocks);
             }
         }
-        static void Button(WrapPanel parent, string text, string tip, Action action)
+        sealed class NoteToolButton : Button
         {
-            var b = new Button { Content = text, ToolTip = tip, Margin = new Thickness(2), Padding = new Thickness(5, 2, 5, 2), MinHeight = 25, MinWidth = 27, Background=new SolidColorBrush(Color.FromRgb(49,54,67)), Foreground=Brushes.WhiteSmoke, BorderBrush=Brushes.SlateGray };
-            System.Windows.Automation.AutomationProperties.SetName(b, tip); b.Click += (s, e) => action(); parent.Children.Add(b);
+            protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+            {
+                bool canFocus=Focusable;
+                Focusable=false;
+                try { base.OnMouseLeftButtonDown(e); }
+                finally { Focusable=canFocus; }
+            }
+        }
+        static Button Button(WrapPanel parent, string text, string tip, Action action)
+        {
+            var b = new NoteToolButton { Content = text, ToolTip = tip, Margin = new Thickness(2), Padding = new Thickness(5, 2, 5, 2),
+                MinHeight=32,MinWidth=33,FontSize=20,Background=ToolBackground,Foreground=Brushes.WhiteSmoke,BorderBrush=Brushes.SlateGray,Template=ToolTemplate };
+            System.Windows.Automation.AutomationProperties.SetName(b, tip); b.Click += (s, e) => action(); parent.Children.Add(b);return b;
         }
         void Notify(string kind)
         {
             try { string json = NoteCodec.Write(Box.Document); if (Changed != null) Changed(json, NoteCodec.Plain(json), kind); lastValid = json; }
             catch (Exception ex) { loading = true; try { Box.Document = NoteCodec.FromJson(lastValid); } finally { loading = false; } if (Error != null) Error(ex.Message); }
+            UpdateTools();
         }
         public void SetContent(string json, string plain)
         {
             loading = true; try { Box.Document = String.IsNullOrEmpty(json) ? NoteCodec.FromPlain(plain) : NoteCodec.FromJson(json); lastValid = NoteCodec.Write(Box.Document); } finally { loading = false; }
+            UpdateTools();
         }
         public string ContentJson { get { return NoteCodec.Write(Box.Document); } }
         public void Mutate(string kind, Action action)
         {
-            string before = ContentJson; loading = true;
-            try { Box.Focus(); Box.BeginChange(); try { action(); } finally { Box.EndChange(); } NoteCodec.Write(Box.Document); }
+            string before = lastValid; loading = true;
+            try { Box.BeginChange(); try { action(); } finally { Box.EndChange(); } }
             catch (Exception ex) { Box.Document = NoteCodec.FromJson(before); if (Error != null) Error(ex.Message); }
             finally { loading = false; } Notify(kind);
         }
@@ -353,22 +438,22 @@ namespace HexMapEditor
                 var html=NoteHtmlClipboard.Parse(data.GetData(DataFormats.Html,false) as string);
                 if(html!=null&&(document==null||Images(html.Blocks).Any()))document=html;
             }
-            if(document!=null){PasteDocument(document);return;}
-            if(!String.IsNullOrEmpty(fallback)){Mutate("paste",()=>Box.Selection.Text=fallback);return;}
-            if(data.GetDataPresent("PNG",false))
+            if(document!=null&&(Images(document.Blocks).Any()||!String.IsNullOrWhiteSpace(new TextRange(document.ContentStart,document.ContentEnd).Text)))
             {
-                var png=data.GetData("PNG",false);
-                var bytes=png as byte[];
-                var stream=png as MemoryStream;
-                if(bytes==null&&stream!=null&&stream.Length<=NoteImages.MaxSourceBytes)bytes=stream.ToArray();
-                if(bytes!=null){InsertImage(NoteImages.FromBytes(bytes));return;}
+                PasteDocument(document);return;
             }
-            if(data.GetDataPresent(DataFormats.Bitmap,true))
+            if(!String.IsNullOrWhiteSpace(fallback)){Mutate("paste",()=>Box.Selection.Text=fallback);return;}
+            var bytes=ClipboardRaster.ReadEncoded(data,NoteImages.MaxSourceBytes);
+            if(bytes!=null)
             {
-                var bitmap=data.GetData(DataFormats.Bitmap,true) as BitmapSource;
-                if(bitmap==null)bitmap=Clipboard.GetImage();
-                if(bitmap!=null)InsertImage(NoteImages.FromBitmap(bitmap));
+                try { InsertImage(NoteImages.FromBytes(bytes));return; }
+                catch(ImageBudgetException) { throw; }
+                catch(ArgumentException) { }
+                catch(InvalidDataException) { }
             }
+            var bitmap=ClipboardRaster.ReadBitmap(data);
+            if(bitmap!=null){InsertImage(NoteImages.FromBitmap(bitmap));return;}
+            if(Error!=null)Error("Schowek nie zawiera odczytywalnego tekstu ani obrazu.");
         }
 
         public void PasteRtf(string rtf,string fallback)
@@ -399,13 +484,23 @@ namespace HexMapEditor
                     while(i<group.Length&&Char.IsDigit(group[i]))i++;
                     continue;
                 }
-                if(c=='{'&&pixels.Length==0&&group.IndexOf(@"{\*\blipuid",i-1,StringComparison.OrdinalIgnoreCase)==i-1)
+                if(c=='{'&&pixels.Length==0)
                 {
-                    int end=group.IndexOf('}',i);
-                    if(end<0)return null;
-                    i=end+1;continue;
+                    // Word emits nested picture properties (picprop/sp/sn/sv) and
+                    // a blipuid before the encoded raster. They are not pixels.
+                    int depth=1;
+                    while(i<group.Length&&depth!=0)
+                    {
+                        char tag=group[i++];
+                        if(tag=='\\'&&i<group.Length&&"{}\\".IndexOf(group[i])>=0)i++;
+                        else if(tag=='{')depth++;
+                        else if(tag=='}')depth--;
+                    }
+                    if(depth!=0)return null;
+                    continue;
                 }
-                if(!Uri.IsHexDigit(c)||pixels.Length>=2*NoteImages.MaxSourceBytes)return null;
+                if(!raster||!Uri.IsHexDigit(c))return null;
+                if(pixels.Length>=2*NoteImages.MaxSourceBytes)throw new ImageBudgetException("Zakodowane źródło obrazu może mieć najwyżej 8 MiB.");
                 pixels.Append(c);
             }
             if(!raster||pixels.Length<8||pixels.Length%2!=0)return null;
@@ -419,12 +514,20 @@ namespace HexMapEditor
         {
             string prefix="HME"+Guid.NewGuid().ToString("N");
             var pictures=new Dictionary<string,RichNode>();
+            long pictureCharacters=0;
             string filtered=RtfClipboard.Filter(rtf,group=>{
-                if(pictures.Count>=NoteImages.MaxPerNote)throw new InvalidDataException("Limit 12 obrazów w opisie.");
                 var bytes=ReadPictureBytes(group);
                 if(bytes==null)return "";
+                if(pictures.Count>=NoteImages.MaxPerNote)throw new ImageBudgetException("Limit 12 obrazów w opisie.");
                 var marker=prefix+pictures.Count.ToString("D2")+"IMAGE";
-                try { pictures.Add(marker,NoteImages.FromBytes(bytes)); }
+                try
+                {
+                    var node=NoteImages.FromBytes(bytes);
+                    pictureCharacters+=node.Png.Length;
+                    if(pictureCharacters>NoteCodec.MaxCharacters)throw new ImageBudgetException("Obrazy przekraczają limit 24 Mi znaków opisu.");
+                    pictures.Add(marker,node);
+                }
+                catch(ImageBudgetException){throw;}
                 catch(IOException){return "";} catch(ArgumentException){return "";} catch(System.Runtime.InteropServices.ExternalException){return "";}
                 return "{"+marker+"}";
             });
@@ -496,7 +599,7 @@ namespace HexMapEditor
             {
                 var path=ImagePathRequested==null?null:ImagePathRequested();
                 if(path==null)return;
-                if(new FileInfo(path).Length>NoteImages.MaxSourceBytes)throw new InvalidDataException("Obraz może mieć najwyżej 2 MiB.");
+                if(new FileInfo(path).Length>NoteImages.MaxSourceBytes)throw new ImageBudgetException("Zakodowane źródło obrazu może mieć najwyżej 8 MiB.");
                 InsertImage(NoteImages.FromBytes(File.ReadAllBytes(path)));
             }
             catch(Exception ex){if(Error!=null)Error(ex.Message);}

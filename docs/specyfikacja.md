@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja 2.7. Stan decyzji 20 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.10.0. Ustalenia sekcji 51 mają pierwszeństwo w zakresie prawego panelu, grup i formatu mapy.
+Wersja 2.8. Stan decyzji 24 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.10.1. Sekcja 52 aktualizuje szczegóły zapisu, prawego panelu, grup i schowka.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1046,3 +1046,15 @@ Macierz grupy przechowuje osobne wybory członka dla stanu, rozmiaru, odkrywania
 Odłączenie i rozwiązanie zachowują obiekty na mapie. Można pozostawić wartości indywidualne, zachować bieżące wynikowe albo wybrać je właściwość po właściwości dla poszczególnych obiektów. Usunięcie grupy usuwa jej wystąpienia z mapy. Zatwierdzone operacje są pojedynczymi krokami historii.
 
 Map12 zapisuje i waliduje macierz grupy oraz obrazy opisu. Starsze formaty map są odrzucane z komunikatem. Zapis presetów nadal używa formatu 5, a formaty bibliotek pozostają dotychczasowe. [Raport 0.10.0](raport-0.10.0.md).
+
+## 52. Wersja 0.10.1 — zapis, szczegóły i schowek
+
+Writer mapy wpisuje opcjonalne `LastSavedAppVersion` w istniejącym Map12. Każda udana operacja zapisu publikuje wersję aplikacji wraz z całą mapą. Ostatnie projekty odczytują ograniczony początek pliku w tle. Bez odczytanej wersji etykieta jest pomijana. Przy nieobsługiwanym schemacie komunikat podaje wersję wykonującą ostatni zapis albo jej brak. Presety i biblioteki zachowują formaty.
+
+Trzy widoki szczegółów zachowują polecenia „Dostosuj”, „Zamknij” i zwijanie. Nagłówki nazw są największe. Heks pokazuje teren i ikonę w dwóch wierszach obok wspólnego podglądu. Nazwa ikony pochodzi z pola mapy. Powiększenie opisu znajduje się w wierszu rozmiaru czcionki. Pokazanie promienia lub koloru ramki nie zwiększa wysokości wiersza.
+
+W grupie wspólny stan ma kolorowe pozycje, a tryb rozmiaru wybierają ikony „Wspólny” i „Przesunięcie” obok resetu. Macierz ma równe kolumny właściwości. Przy rozwiązaniu grupy zwykły nagłówek przełącza kwalifikujące się komórki kolumny, „Wszystko” przełącza wiersz albo całą tabelę. Wszystkie On oznaczają wyłączenie na następne kliknięcie, pozostałe konfiguracje oznaczają włączenie. Zmiany pojedynczych komórek odświeżają stan zbiorczy. Wyłączona wartość grupowej funkcji może zostać zachowana. Potwierdzenie rozwiązania stanowi jeden krok historii.
+
+Obraz w opisie ma do 2048 px na dłuższym boku przy zachowaniu proporcji i alfy. PNG/JPEG z pliku lub schowka ma do 8 MiB przed dekodowaniem, do 8192 px na bok i do 24 Mi pikseli. Ten sam limit wymiarów obowiązuje bitmapę ze schowka. Pojedyncze osadzenie ma do 17 MiB PNG, opis do 12 obrazów i 24 Mi znaków modelu, a suma opisów mapy do 64 Mi znaków. Zapis mapy pozostaje ograniczony do 256 MiB. RTF z osadzonym rastrem zachowuje kolejność treści, w tym dane Worda z właściwościami obrazu. Zewnętrzne obrazy pozostają niewczytane.
+
+Schowek jest źródłem importu grafiki terenu, ikony i obiektu. Źródło przechodzi tę samą walidację i to samo kadrowanie co plik. Teren zachowuje maskę heksagonalną, a ikony i obiekty kadr kwadratowy. Zapis i historia zasobów zaczynają się po akceptacji kadru. [Raport 0.10.1](raport-0.10.1.md).
