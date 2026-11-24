@@ -297,7 +297,7 @@ namespace HexMapEditor
             {
                 UpdateCaption();
                 UpdateZoomCaption();
-                statusLabel.Text = HasDocuments?"Kursor: " + (selected >= 0 ? Coordinate(selected) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count:"Brak otwartej mapy";
+                UpdateMapStatus(HasDocuments&&statusCell<map.Cells.Count?statusCell:-1);
                 dimensionsLabel.Text = map.Columns + " × " + map.Rows;
                 orientationToggle.Text = OrientationNames.Display(map.Orientation); orientationToggle.Image = EditorIcons.Small(map.Orientation == "FlatTop" ? "flat" : "pointy");
                 tips.SetToolTip(orientationToggle, map.Orientation == "FlatTop" ? "Flat Top: pozioma krawędź na górze" : "Pointy Top: wierzchołek na górze");
@@ -611,7 +611,7 @@ namespace HexMapEditor
             if(!FinishDocumentInteraction()){e.Cancel=true;return;}
             reviewingExit=true;
             try { e.Cancel=!ReviewWindowExit(); }
-            finally { reviewingExit=false;if(e.Cancel&&HasDocuments)HidePresetReview(); }
+            finally { reviewingExit=false;if(e.Cancel)HidePresetReview(); }
         }
         void OnKeyDown(object sender, KeyEventArgs e)
         {
@@ -854,7 +854,7 @@ namespace HexMapEditor
         {
             if (autoSaving || InkCommitBusy || modalDepth > 0 || rightResizing) return;
             brushMouse=e.Location;
-            int hit = HitTest(e.Location); coordinateLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—"); statusLabel.Text = "Kursor: " + (hit >= 0 ? Coordinate(hit) : "—") + "     " + map.Columns + " × " + map.Rows + " pól     " + OrientationNames.Display(map.Orientation) + "     Łącznie heksów: " + map.Cells.Count;
+            int hit = HitTest(e.Location); UpdateMapStatus(hit);
             if (previewCell != hit || hit<0&&(currentTool==EditorTool.Brush||currentTool==EditorTool.FogBrush||currentTool==EditorTool.DarkBrush)) { previewCell = hit; canvas.Invalidate(); }
             if(currentTool==EditorTool.Eraser||currentTool==EditorTool.Stylus){inkCursor=e.Location;canvas.Invalidate();}
             if (e.Button == MouseButtons.None) { waitingForMouseRelease = false; if (gestureButton != MouseButtons.None) EndCanvasGesture(true); return; }

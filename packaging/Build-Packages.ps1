@@ -45,6 +45,7 @@ $manifest = [ordered]@{
     'HexMapEditor.exe' = $exe
     'deployment.mode' = (Join-Path $PSScriptRoot 'portable.mode')
     'README-Portable.txt' = (Join-Path $PSScriptRoot 'README-Portable.txt')
+    'LICENSE' = (Join-Path $root 'LICENSE')
 }
 $zipName = Join-Path $destination "HexMapEditor-$version-Portable.zip"
 $file = [IO.File]::Open($zipName, [IO.FileMode]::CreateNew)

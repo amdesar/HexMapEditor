@@ -87,7 +87,10 @@ internal static class SetupStorageTool
             }
             bool hasData = Directory.Exists(Path.Combine(legacyRoot, "Library")) || ProfileFiles.Any(name => File.Exists(Path.Combine(legacyRoot, name)));
             string library = String.IsNullOrWhiteSpace(documents) ? "" : Path.Combine(documents, "HexMapEditor", "Library");
-            return new[] { "OK", library, detected, legacyRoot, hasData ? "1" : "0", identity.User.Value };
+            string desktop = fixtureProfile.Length == 0
+                ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolderOption.DoNotVerify)
+                : Path.Combine(fixtureProfile, "Desktop");
+            return new[] { "OK", library, detected, legacyRoot, hasData ? "1" : "0", identity.User.Value, desktop };
         }
     }
 

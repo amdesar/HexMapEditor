@@ -11,12 +11,19 @@ namespace HexMapEditor
     {
         string pickerSignature, paletteSignature;
         Button deletePresetButton,savePresetButton;
-        TerrainPreset ActivePreset() { return workingPresets.First(p => p.Id == map.ActivePresetId); }
-        bool PresetReadOnly { get { return map.ActivePresetId == PresetCatalog.DefaultId; } }
+        TerrainPreset ActivePreset() { return presetReview??workingPresets.First(p => p.Id == map.ActivePresetId); }
+        bool PresetReadOnly { get { return ActivePreset().Id == PresetCatalog.DefaultId; } }
         List<TerrainPreset> AvailablePresets()
         {
-            return libraryPresets.Select(p => workingPresets.FirstOrDefault(m => m.Id == p.Id) ?? p)
+            var available=libraryPresets.Select(p => workingPresets.FirstOrDefault(m => m.Id == p.Id) ?? p)
                 .Concat(workingPresets.Where(p => !libraryPresets.Any(item => item.Id == p.Id))).ToList();
+            if(presetReview!=null)
+            {
+                int index=available.FindIndex(p=>p.Id==presetReview.Id);
+                if(index<0)available.Add(presetReview);
+                else available[index]=presetReview;
+            }
+            return available;
         }
         void RefreshPresetPicker()
         {
@@ -31,7 +38,8 @@ namespace HexMapEditor
                     pickerSignature = key;
                 }
                 terrainPicker.SelectedItem = ActivePreset();
-                var palette = ActivePreset(); brushIndex = Math.Max(0, Math.Min(brushIndex, palette.Terrains.Count - 1));
+                var palette = ActivePreset();
+                if(presetReview==null)brushIndex = Math.Max(0, Math.Min(brushIndex, palette.Terrains.Count - 1));
                 string signature = palette.Id + ":" + json.Serialize(palette.Terrains);
                 if (signature != paletteSignature)
                 {
@@ -51,13 +59,16 @@ namespace HexMapEditor
                     }
                     finally { paletteTiles.ResumeLayout(true); if (body != null) body.ResumeLayout(true); left.ResumeLayout(true); }
                 }
-                bool quickChanged=quickPreset!=map.ActivePresetId||!quickSets.ContainsKey(map.ActivePresetId);EnsureQuickPreset();if(quickChanged){RefreshIconPreview();RefreshObjectPreview();}UpdateTerrainSelection(); UpdatePresetStatus(); UpdateMaterialIndicator();
+                bool quickChanged=presetReview!=null||quickPreset!=map.ActivePresetId||!quickSets.ContainsKey(map.ActivePresetId);
+                EnsureQuickPreset();
+                if(quickChanged){RefreshIconPreview();RefreshObjectPreview();}
+                UpdateTerrainSelection(); UpdatePresetStatus(); UpdateMaterialIndicator();
             }
             finally { updating = previous; }
         }
         void UpdateTerrainSelection()
         {
-            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex, map.Orientation == "FlatTop",lowQuality); tile.Delete.Enabled = !PresetReadOnly; }
+            var p = ActivePreset(); foreach (TerrainTile tile in paletteTiles.Controls) { int at = p.Terrains.FindIndex(t => t.TerrainId == tile.TerrainId); if (at >= 0) tile.UpdateTerrain(p.Terrains[at], presetReview==null && !iconMaterial && !objectMaterial && !noMaterial && at == brushIndex, map.Orientation == "FlatTop",lowQuality); tile.Delete.Enabled = !PresetReadOnly; }
         }
         void SelectTerrain(string id) { EndCanvasGesture(true); int at = ActivePreset().Terrains.FindIndex(t => t.TerrainId == id); if (at >= 0) { brushIndex = at; iconMaterial = false; objectMaterial=false;noMaterial=false; MaterialChosen(); RefreshIconSelection(); UpdateMaterialIndicator(); } }
         void MaterialChosen() { if (!updating && (currentTool == EditorTool.FogBrush || currentTool == EditorTool.FogBucket || currentTool == EditorTool.DarkBrush || currentTool == EditorTool.DarkBucket)) SelectTool(EditorTool.Brush); }
@@ -80,7 +91,7 @@ namespace HexMapEditor
             var p = ActivePreset(); var stored = StoredPreset(p);
             if (renamePresetButton != null) renamePresetButton.Enabled = !PresetReadOnly;
             if (addTerrainButton != null) addTerrainButton.Enabled = !PresetReadOnly;
-            bool differs = WorkingPresetDirty(p); if(savePresetButton!=null)ChoiceStyle.Apply(savePresetButton,differs);
+            bool differs = presetReview!=null||WorkingPresetDirty(p); if(savePresetButton!=null)ChoiceStyle.Apply(savePresetButton,differs);
             string status = p.Id == PresetCatalog.DefaultId ? (differs ? "Kopia robocza wzorca Domyślny *" : "Domyślny: chroniony wzorzec") : stored == null ? "Preset niezapisany w bibliotece" : differs ? "Paleta różni się od zapisanego presetu *" : "Paleta zgodna z zapisanym presetem";
             presetStateLabel.Text = status; presetStateLabel.ForeColor = differs ? Color.FromArgb(244,113,113) : ForeColor; tips.SetToolTip(presetStateLabel, status + "\nNazwa robocza: " + p.Name); presetStateLabel.AccessibleName = status;
             if (deletePresetButton != null) { deletePresetButton.Enabled = p.Id != PresetCatalog.DefaultId && stored != null; tips.SetToolTip(deletePresetButton, p.Id == PresetCatalog.DefaultId ? "Chronionego wzorca Domyślny nie można usunąć." : stored == null ? "Ten roboczy preset nie ma pliku w bibliotece." : "Usuń własny preset z biblioteki; dane mapy pozostaną."); }

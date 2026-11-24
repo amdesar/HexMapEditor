@@ -20,7 +20,7 @@
 | 0.11.1 | Jednolite kafelki kart, wspólny termin autozapisu, podgląd mapy i presetu przy zamykaniu oraz dopasowania pod nakładką prawego panelu |
 | 0.12.0 | Instalator dla bieżącego użytkownika, Portable ZIP, opcjonalna rejestracja skojarzenia, aktualizator z decyzją użytkownika i zachowaniem danych |
 | 0.12.1 | Instalacja w Program Files, osobny wybór Library, opcjonalny skrót pulpitu, rozpoznanie instalacji i danych 0.12.0, link do Runtime oraz korekta powitania |
-| 0.12.2 | Nagłówek Zakładki, zwykły lewy panel przed pytaniem o zapis presetu i nieruchome pola dolnego statusu |
+| 0.12.2 | Kanał testowy GitHub, wybór lokalizacji map według aktywnej Library, skrót pulpitu, cztery korekty edytora i przygotowanie wydania testowego |
 | 0.13.0 | Rzeczywiste źródła grafik i [kolejka importu](backlog-import-z-folderow.md), docelowe foldery Library |
 | 0.13.x | Końcowa stabilizacja i uzgodnione testy |
 | 1.0.0 | Wyłącznie oznaczenia wersji, bez nowych zmian funkcjonalnych/stylistycznych |

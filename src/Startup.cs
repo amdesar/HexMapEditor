@@ -152,6 +152,13 @@ namespace HexMapEditor
             projects.Bounds=new Rectangle(163,232,324,264);Controls.Add(projects);Shown+=(s,e)=>{StartupTrace.Write("start.visible",this);RefreshProjects();};
             var update=new EditorButton{Text="Sprawdź aktualizacje",Bounds=new Rectangle(434,500,180,30),Anchor=AnchorStyles.Bottom|AnchorStyles.Right};
             update.Click+=(s,e)=>{if(UpdateRequested!=null)UpdateRequested();};Controls.Add(update);
+            var github=new ProjectLinkButton{Text="GitHub",Bounds=new Rectangle(36,500,108,30),Anchor=AnchorStyles.Bottom|AnchorStyles.Left};
+            tips.SetToolTip(github,"Otwórz stronę projektu HexMapEditor w przeglądarce");
+            github.Click+=(s,e)=>{
+                try{UpdateController.OpenReleaseLink(new Uri(UpdateChannelConfiguration.ProjectUrl));}
+                catch(Exception error){MessageBox.Show(this,error.Message,"Strona projektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            };
+            Controls.Add(github);
             Load+=(s,e)=>{var area=Screen.FromControl(this).WorkingArea;Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);};Disposed+=(s,e)=>tips.Dispose();
         }
         Button ButtonAt(string text,int x,int y){var b=new Button{Text=text,Bounds=new Rectangle(x,y,280,44),FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(38,65,96)};b.FlatAppearance.BorderColor=Color.FromArgb(90,145,205);Controls.Add(b);return b;}
@@ -192,6 +199,40 @@ namespace HexMapEditor
             try{string warning;var presets=PresetCatalog.Load(LibraryPaths.Presets,out warning);if(warning.Length>0)MessageBox.Show(this,warning,"Pominięte presety",MessageBoxButtons.OK,MessageBoxIcon.Warning);string stateWarning;var states=StateLibrary.Load(Path.Combine(LibraryPaths.Root,"Objects","States"),out stateWarning).Select(entry=>entry.Definition.Copy()).ToList();if(stateWarning.Length>0)MessageBox.Show(this,stateWarning,"Pominięte stany",MessageBoxButtons.OK,MessageBoxIcon.Warning);using(var dialog=new NewMapDialog("PointyTop",presets)){ProjectCreation.ConfigureStart(dialog,states);if(dialog.ShowDialog(this)==DialogResult.OK)open(dialog.CreatedProject.Data,dialog.CreatedProject.Path);}}
             catch(Exception ex){MessageBox.Show(this,ex.Message,"Nie można utworzyć projektu",MessageBoxButtons.OK,MessageBoxIcon.Error);}
             finally{choosing=false;}
+        }
+    }
+
+    internal sealed class ProjectLinkButton : Button
+    {
+        bool hover;
+        internal ProjectLinkButton()
+        {
+            SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+            FlatStyle=FlatStyle.Flat;
+            Cursor=Cursors.Hand;
+            ForeColor=Color.WhiteSmoke;
+        }
+        protected override void OnMouseEnter(EventArgs e){base.OnMouseEnter(e);hover=true;Invalidate();}
+        protected override void OnMouseLeave(EventArgs e){base.OnMouseLeave(e);hover=false;Invalidate();}
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var bounds=Rectangle.Inflate(ClientRectangle,-1,-1);
+            int diameter=Math.Max(4,bounds.Height/2);
+            e.Graphics.Clear(Parent.BackColor);
+            e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using(var shape=new System.Drawing.Drawing2D.GraphicsPath())
+            using(var fill=new SolidBrush(hover?Color.FromArgb(44,49,60):Color.FromArgb(13,16,22)))
+            using(var edge=new Pen(Focused&&ShowFocusCues?ChoiceStyle.ActiveBorder:Color.FromArgb(74,81,98)))
+            {
+                shape.AddArc(bounds.Left,bounds.Top,diameter,diameter,180,90);
+                shape.AddArc(bounds.Right-diameter,bounds.Top,diameter,diameter,270,90);
+                shape.AddArc(bounds.Right-diameter,bounds.Bottom-diameter,diameter,diameter,0,90);
+                shape.AddArc(bounds.Left,bounds.Bottom-diameter,diameter,diameter,90,90);
+                shape.CloseFigure();
+                e.Graphics.FillPath(fill,shape);e.Graphics.DrawPath(edge,shape);
+            }
+            TextRenderer.DrawText(e.Graphics,Text,Font,bounds,ForeColor,
+                TextFormatFlags.SingleLine|TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);
         }
     }
 

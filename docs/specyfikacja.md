@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja 2.9. Stan decyzji 24 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.12.1. Karty i robocze presety opisuje sekcja 54, reguły zapisu i zamykania sekcja 55, a instalację i dystrybucję sekcje 56–57.
+Wersja 2.10. Stan decyzji 24 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.12.2. Karty i robocze presety opisuje sekcja 54, reguły zapisu i zamykania sekcja 55, a instalację i dystrybucję sekcje 56–58.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1094,3 +1094,10 @@ Schowek jest źródłem importu grafiki terenu, ikony i obiektu. Źródło przec
 - `deployment.mode` rozpoznaje instalację. Chroniona konfiguracja `library-location.txt` zawiera pełną ścieżkę Library. `Data` mieści listę ostatnich projektów oraz podfolder `Hexmaps` dla nowych map zapisywanych z powitania. Portable i uruchomienie samodzielnego EXE trzymają dane obok swojej kopii.
 - Skrót Start jest standardowy, a własny skrót instalatora na pulpicie opcjonalny. Skojarzenie udostępnia program dla plików .hexmap bez zmiany UserChoice. Deinstalacja usuwa pliki programu, własną rejestrację i własne skróty. Library, Data i mapy zostają.
 - Setup wykrywa jeszcze zainstalowaną kopię 0.12.0 dla bieżącego użytkownika i wyjaśnia, jak ją odinstalować. Jeśli po niej zostały dane, proponuje dobrowolną kopię do pustego celu z zachowaniem oryginałów oraz ścieżek map. Bez odpowiedniego Runtime instalacja jest wstrzymana i pokazuje oficjalną stronę pobrania. [Raport 0.12.1](raport-0.12.1.md).
+
+## 58. Wersja 0.12.2 — wydanie testowe
+
+- Powitanie otwiera adres projektu po kliknięciu „GitHub” po lewej stronie. Aktualizacje mają przycisk po prawej. Nowy projekt z powitania zapisuje jeden plik w `Hexmaps` aktywnej Library. Dotychczasowe mapy i ścieżki pozostają na miejscu.
+- Kanał testowy korzysta z listy wydań GitHub i uwzględnia opublikowane wydania oznaczone jako pre-release oraz wydania stabilne. Wybiera najwyższą nowszą wersję numerowaną i wymaga właściwej paczki. Użytkownik decyduje o przejściu do następnej wersji. Portable otwiera link do ZIP. Domyślny kanał stabilny jest planowany dla 1.0.0.
+- Setup zachowuje identyfikator instalacji i wybory 0.12.1. Nowy skrót na pulpicie to `HexMapEditor`. Własny skrót o starej nazwie można zastąpić przy wolnej nazwie docelowej. Przy kolizji pozostaje ręczny skrót i dostęp przez menu Start.
+- Pod obiektami znajduje się nagłówek Zakładki. Przy zamykaniu roboczy preset jest widoczny w zwykłych kontrolkach lewego panelu, także bez mapy. Współrzędne są w osobnym polu o zmierzonej szerokości. Przejęcie fog w macierzy zależy od efektywnego stanu członka i pozostawia zapisany wybór. [Raport 0.12.2](raport-0.12.2.md).

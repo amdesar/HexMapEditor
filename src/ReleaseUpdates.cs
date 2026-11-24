@@ -29,19 +29,23 @@ namespace HexMapEditor
     internal sealed class ReleaseUpdates
     {
         const int MetadataLimit = 2 * 1024 * 1024;
+        internal const int ReleasesPerPage = 30;
+        const int PageLimit = 20;
         const long PackageLimit = 64L * 1024 * 1024;
         internal const string Unconfigured = "Kanał aktualizacji nie jest skonfigurowany.";
         static readonly Regex RepositoryPart = new Regex(@"^[a-zA-Z0-9_-][a-zA-Z0-9_.-]{0,99}\z");
-        static readonly Regex StableTag = new Regex(@"^v?(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\z");
+        static readonly Regex VersionTag = new Regex(@"^v?(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\z");
         static readonly Regex Digest = new Regex(@"^sha256:[a-fA-F0-9]{64}\z");
         readonly string project;
         readonly Action<Uri, Action<Stream>> receive;
+        readonly bool includePrereleases;
 
-        internal ReleaseUpdates(string owner, string repository, Action<Uri, Action<Stream>> receive = null)
+        internal ReleaseUpdates(string owner, string repository, Action<Uri, Action<Stream>> receive = null, bool includePrereleases = false)
         {
             if (RepositoryPart.IsMatch(owner) && RepositoryPart.IsMatch(repository))
                 project = owner + "/" + repository;
             this.receive = receive ?? Receive;
+            this.includePrereleases = includePrereleases;
         }
         internal bool Configured { get { return project != null; } }
 
@@ -66,7 +70,38 @@ namespace HexMapEditor
         internal ReleaseOffer Check(Version current, bool installed)
         {
             if (!Configured) throw new InvalidOperationException(Unconfigured);
-            var endpoint = new Uri("https://api.github.com/repos/" + project + "/releases/latest");
+            var serializer = new JavaScriptSerializer { MaxJsonLength = MetadataLimit, RecursionLimit = 24 };
+            Version latest = current;
+            ReleaseMetadataJson release = null;
+            for (int page = 1; ; page++)
+            {
+                if (page > PageLimit) throw new InvalidDataException("Lista wydań przekracza limit sprawdzania kanału aktualizacji.");
+                var endpoint = new Uri("https://api.github.com/repos/" + project + "/releases?per_page=" + ReleasesPerPage + "&page=" + page);
+                var releases = serializer.Deserialize<ReleaseMetadataJson[]>(ReadMetadata(endpoint));
+                if (releases == null || releases.Length > ReleasesPerPage)
+                    throw new InvalidDataException("Kanał zwrócił nieprawidłową listę wydań.");
+                foreach (var item in releases)
+                {
+                    if (item == null || item.draft == null || item.prerelease == null)
+                        throw new InvalidDataException("Kanał zwrócił niepełne metadane wydania.");
+                    Version version;
+                    string tag = item.tag_name ?? "";
+                    if (item.draft.Value || (item.prerelease.Value && !includePrereleases) ||
+                        !VersionTag.IsMatch(tag) || !Version.TryParse(tag.TrimStart('v'), out version) || version <= current) continue;
+                    if (version > latest || (version == latest && release.prerelease.Value && !item.prerelease.Value))
+                    {
+                        latest = version;
+                        release = item;
+                    }
+                }
+                if (releases.Length < ReleasesPerPage) break;
+            }
+            if (release == null) return null;
+            return PackageFor(latest, release, installed);
+        }
+
+        string ReadMetadata(Uri endpoint)
+        {
             string json = null;
             receive(endpoint, source => {
                 using (var memory = new MemoryStream())
@@ -75,14 +110,12 @@ namespace HexMapEditor
                     json = new UTF8Encoding(false, true).GetString(memory.ToArray());
                 }
             });
-            var release = new JavaScriptSerializer { MaxJsonLength = MetadataLimit, RecursionLimit = 24 }.Deserialize<ReleaseMetadataJson>(json);
-            if (release == null || release.draft == null || release.prerelease == null)
-                throw new InvalidDataException("Kanał zwrócił niepełne metadane wydania.");
-            Version latest;
-            string tag = release.tag_name ?? "";
-            if (release.draft.Value || release.prerelease.Value || !StableTag.IsMatch(tag) ||
-                !Version.TryParse(tag.TrimStart('v'), out latest) || latest <= current) return null;
+            return json;
+        }
 
+        ReleaseOffer PackageFor(Version latest, ReleaseMetadataJson release, bool installed)
+        {
+            string tag = release.tag_name;
             string name = "HexMapEditor-" + latest.ToString(3) + (installed ? "-Setup.exe" : "-Portable.zip");
             var matching = (release.assets ?? new ReleaseAssetJson[0]).Where(asset => asset != null && asset.name == name).ToArray();
             if (matching.Length != 1)

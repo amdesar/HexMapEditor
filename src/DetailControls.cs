@@ -179,6 +179,7 @@ namespace HexMapEditor
     {
         internal string Id, Name;
         internal bool Hidden;
+        internal bool FogAvailable=true;
         internal GroupProperty Value;
     }
 
@@ -255,7 +256,7 @@ namespace HexMapEditor
                     {
                         var property=GroupRules.Columns[col];
                         var box=new SwitchBox { CenterTrack=true,AccessibleName=actionName+" — "+member.Name+" — "+GroupRules.ColumnNames[col],
-                            Enabled=!member.Hidden&&(!keep||(member.Value&property)!=0) };
+                            Enabled=!member.Hidden&&(keep?(member.Value&property)!=0:property!=GroupProperty.Fog||member.FogAvailable) };
                         if(keep&&(member.Value&property)==0){box.Dispose();AddCell(new Label(),col+1,row);continue;}
                         items[col]=box;
                         string id=member.Id;
@@ -315,8 +316,17 @@ namespace HexMapEditor
         internal void SetValues(IEnumerable<MatrixMember> members)
         {
             syncing=true;
-            try { foreach(var member in members) for(int i=0;i<5;i++) if(switches[member.Id][i]!=null)
-                    switches[member.Id][i].Checked=!member.Hidden&&(member.Value&GroupRules.Columns[i])!=0; }
+            try
+            {
+                foreach(var member in members) for(int i=0;i<5;i++)
+                {
+                    var box=switches[member.Id][i];
+                    if(box==null)continue;
+                    var property=GroupRules.Columns[i];
+                    box.Enabled=!member.Hidden&&(property!=GroupProperty.Fog||member.FogAvailable);
+                    box.Checked=!member.Hidden&&(member.Value&property)!=0;
+                }
+            }
             finally { syncing=false; }
         }
         internal GroupProperty Read(string id)

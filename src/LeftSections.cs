@@ -28,8 +28,8 @@ namespace HexMapEditor
         void BuildSections()
         {
             left.AutoScroll=false;
-            leftSections = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty, Padding = Padding.Empty };
-            foreach (var style in new[] { new RowStyle(SizeType.Absolute, MaxToolSection), new RowStyle(SizeType.Absolute, PresetSection), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, 120), new RowStyle(SizeType.Absolute, 120) }) leftSections.RowStyles.Add(style);
+            leftSections = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Margin = Padding.Empty, Padding = Padding.Empty };
+            foreach (var style in new[] { new RowStyle(SizeType.Absolute, MaxToolSection), new RowStyle(SizeType.Absolute, PresetSection), new RowStyle(SizeType.Percent, 100), new RowStyle(SizeType.Absolute, MaxQuickSection), new RowStyle(SizeType.Absolute, MaxQuickSection), new RowStyle(SizeType.Absolute, TabsHeadingHeight) }) leftSections.RowStyles.Add(style);
             left.Controls.Add(leftSections);
             left.ClientSizeChanged+=(s,e)=>LayoutLeftSections();
             var toolbox = Section("Przybornik", 0);
@@ -84,8 +84,9 @@ namespace HexMapEditor
             IconAction(objectActions,"plus","Dodaj wzorzec obiektu",AddObjectTemplate);IconAction(objectActions,"pencil","Edytuj wzorzec obiektu",EditObjectTemplate);deleteObjectButton=IconAction(objectActions,"trash","Usuń wzorzec obiektu",ChooseObjectRemoval);var objectLibraryButton=SmallButton(objectActions,"…",OpenObjectLibrary,48);objectLibraryButton.Height=26;IconAction(objectActions,"labels","Lista obiektów na mapie",OpenObjectInstances);
             objectActions.Layout+=(s,e)=>LayoutFunctions(objectActions);
             objectPreview=new BufferedFlowPanel{Dock=DockStyle.Fill,AutoScroll=false,WrapContents=true};objects.Controls.Add(objectPreview);objectPreview.BringToFront();
+            Section("Zakładki",5);
             SelectTool(EditorTool.Select); LayoutPalette(); RefreshPresetPicker(); UpdateMaterialIndicator();
-            canvas.MouseLeave += (s, e) => { if(pointerActive){EndCanvasGesture(true);ClearPointerContext();} brushMouse=new Point(-100,-100);inkCursor=null;inkPrevious=null;activeStroke=null;previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
+            canvas.MouseLeave += (s, e) => { statusCell=-1;coordinateLabel.Text=HasDocuments?"Kursor: —":""; if(pointerActive){EndCanvasGesture(true);ClearPointerContext();} brushMouse=new Point(-100,-100);inkCursor=null;inkPrevious=null;activeStroke=null;previewCell = -1; previousStrokePoint = null; objectPreviousCursor=null; canvas.Invalidate(); };
             Disposed += (s, e) => { foreach (var b in documentBitmaps.Values) b.Dispose(); foreach (var b in libraryBitmaps.Values) b.Dispose(); };
         }
         bool layingOutPalette;

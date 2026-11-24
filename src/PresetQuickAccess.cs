@@ -25,14 +25,25 @@ namespace HexMapEditor
 
 
         string quickPreset;
-        QuickPair CurrentQuick{get{EnsureQuickPreset();return quickSets[map.ActivePresetId];}}
+        QuickPair CurrentQuick{get{if(reviewQuick!=null)return reviewQuick;EnsureQuickPreset();return quickSets[map.ActivePresetId];}}
         LibraryIcon FindIcon(string id){LibraryIcon i;return id!=null&&CurrentQuick.IconRefs.TryGetValue(id,out i)?i:libraryIcons.FirstOrDefault(a=>a.Id==id);}
         ObjectTemplate FindTemplate(string id){ObjectTemplate o;return id!=null&&CurrentQuick.ObjectRefs.TryGetValue(id,out o)?o:libraryObjects.FirstOrDefault(a=>a.Id==id);}
         void EnsureQuickPreset()
         {
-            if(map==null)return;var p=ActivePreset();QuickPair set;if(!quickSets.TryGetValue(p.Id,out set)){quickSets[p.Id]=set=new QuickPair();set.Icons.Restore(p.Icons.Select(i=>i.Id));set.Objects.Restore(p.Objects.Select(o=>o.Id));foreach(var i in p.Icons)set.IconRefs[i.Id]=i.Icon();foreach(var o in p.Objects)set.ObjectRefs[o.Id]=o.Template();}
+            if(map==null||reviewQuick!=null)return;
+            var p=ActivePreset();QuickPair set;
+            if(!quickSets.TryGetValue(p.Id,out set))quickSets[p.Id]=set=BuildQuickSet(p);
             SyncQuickDraft(p,set);
             if(quickPreset==p.Id)return;quickPreset=p.Id;iconMaterial=objectMaterial=false;activeIcon=activeObject=null;noMaterial=p.Terrains.Count==0;
+        }
+        static QuickPair BuildQuickSet(TerrainPreset preset)
+        {
+            var set=new QuickPair();
+            set.Icons.Restore(preset.Icons.Select(i=>i.Id));
+            set.Objects.Restore(preset.Objects.Select(o=>o.Id));
+            foreach(var icon in preset.Icons)set.IconRefs[icon.Id]=icon.Icon();
+            foreach(var item in preset.Objects)set.ObjectRefs[item.Id]=item.Template();
+            return set;
         }
         void SyncQuickDraft(TerrainPreset preset,QuickPair quick)
         {

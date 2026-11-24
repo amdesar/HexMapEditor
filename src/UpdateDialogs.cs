@@ -9,7 +9,8 @@ namespace HexMapEditor
 {
     internal sealed class UpdateController
     {
-        readonly ReleaseUpdates channel = new ReleaseUpdates(UpdateChannelConfiguration.Owner, UpdateChannelConfiguration.Repository);
+        readonly ReleaseUpdates channel = new ReleaseUpdates(UpdateChannelConfiguration.Owner, UpdateChannelConfiguration.Repository,
+            includePrereleases: UpdateChannelConfiguration.IncludePrereleases);
         readonly Func<Form, bool> currentWindow;
         readonly Func<Form, VerifiedInstaller, bool> finish;
         bool busy;
@@ -41,7 +42,7 @@ namespace HexMapEditor
                 if (!CanPrompt(owner)) return;
                 if (offer == null)
                 {
-                    if (manual) Tell(owner, "Brak nowszej stabilnej wersji.");
+                    if (manual) Tell(owner, "Brak nowszej wersji w tym kanale.");
                     return;
                 }
                 using (var dialog = new UpdateOfferDialog(offer))

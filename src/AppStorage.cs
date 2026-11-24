@@ -50,6 +50,6 @@ namespace HexMapEditor
             return Path.GetFullPath(path);
         }
         internal string RecentProjectsPath { get { return Path.Combine(DataRoot, "recent-projects.json"); } }
-        internal string MapRoot { get { return Path.Combine(Installed ? DataRoot : LibraryRoot, "Hexmaps"); } }
+        internal string MapRoot { get { return Path.Combine(LibraryRoot, "Hexmaps"); } }
     }
 }

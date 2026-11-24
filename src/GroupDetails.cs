@@ -51,7 +51,11 @@ namespace HexMapEditor
             SpanRow(groupLayout,8,DetailSection("Ustawienia indywidualne"));
             SpanRow(groupLayout,9,new Label { Text="Włącz, aby użyć wartości grupy.",AutoSize=true });
             groupMatrix = new MemberMatrix("Użyj wartości grupy");
-            groupMatrix.ColumnClicked = property => EditGroup("column",g=>GroupRules.ToggleColumn(g,property),false);
+            groupMatrix.ColumnClicked = property => EditGroup("column",g=>{
+                var eligible=property==GroupProperty.Fog?map.Objects.Where(o=>g.Members.Contains(o.Id)&&
+                    ObjectFogLevel(o)==0&&GroupRules.Allows(map,GroupRules.EffectiveSide(g,o))).Select(o=>o.Id).ToArray():null;
+                GroupRules.ToggleColumn(g,property,eligible);
+            },false);
             groupMatrix.MemberClicked = SelectPanelMember;
             groupMatrix.ValueChanged = (id,property,on) => EditGroup("member",g=>GroupRules.Set(g,id,property,on),false);
             SpanRow(groupLayout,10,groupMatrix);
@@ -154,7 +158,8 @@ namespace HexMapEditor
             groupLightRadius.Parent.Visible=groupLight.Checked;
             groupLock.Checked=group.Locked.Value;
             var members=group.Members.Select(id=>map.Objects.Single(o=>o.Id==id)).Select(o=>new MatrixMember {
-                Id=o.Id, Hidden=ObjectFogLevel(o)>0, Name=ObjectFogLevel(o)>0?"???":o.Name, Value=GroupRules.Used(group,o.Id)
+                Id=o.Id, Hidden=ObjectFogLevel(o)>0, Name=ObjectFogLevel(o)>0?"???":o.Name, Value=GroupRules.Used(group,o.Id),
+                FogAvailable=GroupRules.Allows(map,GroupRules.EffectiveSide(group,o))
             }).ToArray();
             signature=group.Id+json.Serialize(members.Select(m=>new {m.Id,m.Name,m.Hidden}));
             if(signature!=groupMembersSignature){groupMatrix.SetMembers(members);groupMembersSignature=signature;}

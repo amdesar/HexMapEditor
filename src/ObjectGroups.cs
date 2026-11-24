@@ -59,18 +59,22 @@ namespace HexMapEditor
             else group.Overrides[id] = (int)value;
         }
 
-        internal static void ToggleColumn(ObjectGroup group, GroupProperty property)
+        internal static void ToggleColumn(ObjectGroup group, GroupProperty property, IEnumerable<string> eligible = null)
         {
-            bool enable = group.Members.Any(id => (Used(group,id) & property) == 0);
-            foreach (var id in group.Members) Set(group,id,property,enable);
+            var members = eligible ?? group.Members;
+            bool enable = members.Any(id => (Used(group,id) & property) == 0);
+            foreach (var id in members) Set(group,id,property,enable);
         }
+
+        internal static string EffectiveSide(ObjectGroup group,MapObject member)
+        { return (Used(group,member.Id)&GroupProperty.State)!=0?group.StateId:member.Side; }
 
         public static MapObject Effective(MapData map, MapObject obj)
         {
             var effective = obj.Copy();
             var group = For(map,obj.Id);
             var use = Used(group,obj.Id);
-            if ((use & GroupProperty.State) != 0) effective.Side = group.StateId;
+            effective.Side = EffectiveSide(group,obj);
             if ((use & GroupProperty.Size) != 0)
                 effective.Size = group.SizeMode == "Offset" ? Math.Max(8,Math.Min(1024,obj.Size+group.SizeValue)) : group.SizeValue;
             if ((use & GroupProperty.Fog) != 0)

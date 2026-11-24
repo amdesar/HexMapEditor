@@ -48,8 +48,8 @@ namespace HexMapEditor.Tests
             var client = new ReleaseUpdates("fixture", "public-releases", (uri, read) => {
                 if (uri.Host == "api.github.com")
                 {
-                    Check(uri.AbsolutePath == "/repos/" + project + "/releases/latest", "Metadata URL used other source");
-                    using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(release)))) read(stream);
+                    Check(uri.AbsolutePath == "/repos/" + project + "/releases" && uri.Query=="?per_page=30&page=1", "Metadata URL used other source");
+                    using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new[]{release})))) read(stream);
                 }
                 else
                 {
@@ -97,6 +97,32 @@ namespace HexMapEditor.Tests
             release["draft"] = false;
             release["tag_name"] = "v0.12.1-rc.1";
             Check(client.Check(current,true)==null, "Prerelease tag offered");
+            release["tag_name"]=tag;
+            var pages=new List<int>();
+            var newer=new Dictionary<string,object>(release);
+            const string newTag="v0.12.10";
+            newer["tag_name"]=newTag;newer["prerelease"]=true;
+            var newAssets=new[]{new Dictionary<string,object>(normal),new Dictionary<string,object>(portable)};
+            foreach(var asset in newAssets)
+            {
+                asset["name"]=((string)asset["name"]).Replace("0.12.1","0.12.10");
+                asset["browser_download_url"]=((string)asset["browser_download_url"]).Replace("0.12.1","0.12.10");
+            }
+            newer["assets"]=newAssets;
+            var futureDraft=new Dictionary<string,object>(release);
+            futureDraft["tag_name"]="v9.0.0";futureDraft["draft"]=true;
+            var testing=new ReleaseUpdates("fixture","public-releases",(uri,read)=>{
+                Check(uri.Host=="api.github.com"&&uri.AbsolutePath=="/repos/"+project+"/releases","Unexpected paging host");
+                bool first=uri.Query=="?per_page=30&page=1";
+                Check(first||uri.Query=="?per_page=30&page=2","Unexpected page");
+                pages.Add(first?1:2);
+                var data=first?Enumerable.Repeat(release,ReleaseUpdates.ReleasesPerPage).ToArray():new[]{newer,futureDraft};
+                using(var stream=new MemoryStream(Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(data))))read(stream);
+            },includePrereleases:true);
+            Check(testing.Check(current,true).Version==new Version(0,12,10)&&pages.SequenceEqual(new[]{1,2}),"Test channel missed numeric latest on second page");
+            Check(testing.Check(current,false).Download.AbsolutePath.EndsWith("/"+newTag+"/HexMapEditor-0.12.10-Portable.zip"),"Wrong Portable link");
+            newer["assets"]=new[]{newAssets[1]};
+            Refuses<InvalidDataException>(()=>testing.Check(current,true),"Missing newest Setup looked up to date or fell back");
             var denied = new ReleaseUpdates("fixture", "private", (uri,read)=>{throw new IOException("HTTP 403");});
             Refuses<IOException>(()=>denied.Check(current,true), "Access failure represented as up-to-date");
             Check(ReleaseUpdates.AllowedAssetRedirect(new Uri("https://release-assets.githubusercontent.com/github-production-release-asset-2e65be/fixture?a=b")) &&

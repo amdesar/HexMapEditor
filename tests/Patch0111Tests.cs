@@ -244,8 +244,10 @@ namespace HexMapEditor.Tests
                 var seen=new List<string>();
                 w.ConfirmPresetForTest=p=>{
                     seen.Add(p.Name);
-                    var preview=Get<PresetReviewPanel>(w,"presetReview");
-                    Check(Cards(w).Count==0&&!Get<Panel>(w,"canvas").Visible&&preview.Visible&&preview.AccessibleName.Contains(p.Name),"Preset review reopened or failed to show draft");
+                    var preview=Get<TerrainPreset>(w,"presetReview");
+                    Check(Cards(w).Count==0&&!Get<Panel>(w,"canvas").Visible&&Get<TableLayoutPanel>(w,"leftSections").Visible&&
+                        ReferenceEquals(Get<ComboBox>(w,"terrainPicker").SelectedItem,preview)&&preview.Name==p.Name,
+                        "Preset review reopened a map or failed to show the draft in the normal panel");
                     return p.Id=="0111-shared"?DialogResult.Yes:DialogResult.Cancel;
                 };
                 bool partial=false;
@@ -268,7 +270,7 @@ namespace HexMapEditor.Tests
                 Check(partial&&saved.Icons.Count==icons.Icons.Length-1&&saved.Terrains[0].Name!="Wspólny draft","Detached partial save changed wrong section");
                 Check(!Get<Timer>(w,"autoTimer").Enabled,"Empty editor retains ticking schedule");
                 Open(w,paths[0]);
-                Check(Cards(w).Count==1&&Get<Panel>(w,"canvas").Visible&&Get<Timer>(w,"autoTimer").Enabled&&Get<PresetReviewPanel>(w,"presetReview")==null,"Opening map after preset cancel");
+                Check(Cards(w).Count==1&&Get<Panel>(w,"canvas").Visible&&Get<Timer>(w,"autoTimer").Enabled&&Get<TerrainPreset>(w,"presetReview")==null,"Opening map after preset cancel");
                 var draft=(TerrainPreset)Call(w,"ActivePreset");
                 Check(draft.Terrains[0].Name=="Wspólny draft"&&(bool)Call(w,"WorkingPresetDirty",draft),"Omitted draft section lost after cancelled close");
             }

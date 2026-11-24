@@ -56,7 +56,7 @@ namespace HexMapEditor
 
         Panel tabBar, tabViewport;
         Button tabsBack,tabsForward;
-        int firstTab;
+        int firstTab, cursorWidth, statusWidth, statusCell=-1;
         readonly Dictionary<DocumentSession,Panel> tabControls=new Dictionary<DocumentSession,Panel>();
         bool reviewingExit,returningToWelcome;
         internal bool ReturningToWelcome { get { return returningToWelcome; } }
@@ -66,10 +66,6 @@ namespace HexMapEditor
         void BuildDocumentBar()
         {
             tabBar=new BufferedPanel{Dock=DockStyle.Bottom,Height=quickStrip.Height,BackColor=shellToolbar.BackColor};
-            tabBar.Paint+=(s,e)=>{
-                if(leftCollapsed)return;
-                using(var pen=new Pen(ChoiceStyle.NeutralBorder))e.Graphics.DrawLine(pen,4,0,LeftPanelWidth-4,0);
-            };
             tabViewport=new Panel{TabStop=false};
             Controls.Add(tabBar);
             var menu=new ContextMenuStrip{Renderer=new FitMenuRenderer(),BackColor=tabBar.BackColor,ForeColor=Color.WhiteSmoke};
@@ -85,9 +81,35 @@ namespace HexMapEditor
             statusLabel.TextAlign=ContentAlignment.MiddleLeft;statusLabel.AutoEllipsis=true;
             statusLabel.Padding=new Padding(8,0,4,0);
             statusLabel.TextChanged+=(s,e)=>tips.SetToolTip(statusLabel,statusLabel.Text);
-            tabBar.Controls.Add(tabViewport);tabBar.Controls.Add(statusLabel);
+            coordinateLabel.TextAlign=ContentAlignment.MiddleLeft;
+            coordinateLabel.Padding=new Padding(8,0,4,0);
+            tabBar.Controls.Add(tabViewport);tabBar.Controls.Add(coordinateLabel);tabBar.Controls.Add(statusLabel);
+            MeasureMapStatus();
+            tabBar.FontChanged+=(s,e)=>{MeasureMapStatus();LayoutTabs();};
+            DpiChanged+=(s,e)=>{MeasureMapStatus();LayoutTabs();};
             tabBar.Layout+=(s,e)=>LayoutTabs();
             AddTab(activeDocument);
+        }
+
+        void MeasureMapStatus()
+        {
+            const int maxSide=200;
+            const TextFormatFlags flags=TextFormatFlags.SingleLine|TextFormatFlags.NoPadding;
+            Func<string,int> width=text=>TextRenderer.MeasureText(text,tabBar.Font,Size.Empty,flags).Width;
+            // Proportional fonts can make an earlier column wider than the last one.
+            int column=Enumerable.Range(0,maxSide).Max(i=>width(MapLogic.Coordinate(i,maxSide).TrimEnd('1')));
+            int row=Enumerable.Range(1,maxSide).Max(i=>width(i.ToString()));
+            cursorWidth=Math.Max(width("Kursor: —"),width("Kursor: ")+column+row)+coordinateLabel.Padding.Horizontal+6;
+            statusWidth=new[]{"PointyTop","FlatTop"}.Max(orientation=>width(MapStatusText(maxSide,maxSide,orientation,maxSide*maxSide)))
+                +statusLabel.Padding.Horizontal+6;
+        }
+        static string MapStatusText(int columns,int rows,string orientation,int count)
+        { return columns+" × "+rows+" pól     "+OrientationNames.Display(orientation)+"     Łącznie heksów: "+count; }
+        void UpdateMapStatus(int cell)
+        {
+            statusCell=cell;
+            coordinateLabel.Text=HasDocuments?"Kursor: "+(cell>=0?Coordinate(cell):"—"):"";
+            statusLabel.Text=HasDocuments?MapStatusText(map.Columns,map.Rows,map.Orientation,map.Cells.Count):"Brak otwartej mapy";
         }
 
         Button TabButton(Control parent,string text,string accessible,Action action)
@@ -133,11 +155,11 @@ namespace HexMapEditor
         void LayoutTabs(bool reveal=false)
         {
             if(tabViewport==null||statusLabel.Parent==null)return;
-            int statusWidth=TextRenderer.MeasureText("Kursor: GR200     200 × 200 pól     Flat Top     Łącznie heksów: 40000",statusLabel.Font).Width+statusLabel.Padding.Horizontal;
             const int gap=2, arrowWidth=24;
             int start=tabsBack.Right+gap;
-            int edge=Math.Max(start+arrowWidth+gap,tabBar.ClientSize.Width-statusWidth);
-            statusLabel.SetBounds(edge,0,Math.Max(0,tabBar.ClientSize.Width-edge),BottomHeight);
+            int edge=Math.Max(start+arrowWidth+gap,tabBar.ClientSize.Width-cursorWidth-statusWidth);
+            coordinateLabel.SetBounds(edge,0,cursorWidth,BottomHeight);
+            statusLabel.SetBounds(coordinateLabel.Right,0,Math.Max(0,tabBar.ClientSize.Width-coordinateLabel.Right),BottomHeight);
             int visible=Math.Max(0,(edge-start-arrowWidth-2*gap)/TabWidth);
             if(reveal&&visible>0)
             {
@@ -206,6 +228,7 @@ namespace HexMapEditor
             ResetObjectDocument();ClearDocumentIcons();InkLayerRenderer.Clear();
             descriptionExpanded=false;editorCellId=null;quickPreset=null;commandFocus=null;commandTarget=null;
             activeDocument=document;
+            statusCell=-1;
             leftSections.Visible=true;canvas.Visible=true;
             ResolveWorkingPresets(document);
             selected=map.Cells.FindIndex(cell=>cell.Id==document.Hex);

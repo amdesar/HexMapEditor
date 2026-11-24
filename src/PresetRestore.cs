@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -22,8 +21,10 @@ namespace HexMapEditor
             internal readonly Dictionary<string,QuickPair> QuickSets=new Dictionary<string,QuickPair>();
         }
         readonly List<PresetWorkspace> retainedPresets=new List<PresetWorkspace>();
-        PresetReviewPanel presetReview;
+        TerrainPreset presetReview;
+        QuickPair reviewQuick;
         bool reviewWasCollapsed;
+        int reviewTerrainOffset;
 
         void RestorePresetSections()
         {
@@ -96,18 +97,23 @@ namespace HexMapEditor
         }
         void ShowPresetReview(TerrainPreset candidate)
         {
-            if(presetReview==null)reviewWasCollapsed=leftCollapsed;
-            if(presetReview!=null)presetReview.Dispose();
-            leftCollapsed=false;PositionOverlays();tabBar.Invalidate();
-            presetReview=new PresetReviewPanel(candidate,tips){Dock=DockStyle.Fill};
-            left.Controls.Add(presetReview);presetReview.BringToFront();
+            if(presetReview==null){reviewWasCollapsed=leftCollapsed;reviewTerrainOffset=terrainOffset;}
+            presetReview=candidate;
+            reviewQuick=BuildQuickSet(candidate);
+            terrainOffset=0;
+            leftCollapsed=false;leftSections.Visible=true;PositionOverlays();
+            RefreshPresetPicker();
             PaintBeforeClosePrompt();
         }
         void HidePresetReview()
         {
             if(presetReview==null)return;
-            presetReview.Dispose();presetReview=null;
-            leftCollapsed=reviewWasCollapsed;PositionOverlays();tabBar.Invalidate();
+            presetReview=null;reviewQuick=null;
+            leftCollapsed=reviewWasCollapsed;
+            terrainOffset=reviewTerrainOffset;
+            leftSections.Visible=HasDocuments;
+            PositionOverlays();
+            if(HasDocuments){RefreshPresetPicker();RefreshIconPreview();RefreshObjectPreview();}
         }
         bool SaveClosingPreset(PresetWorkspace workspace,TerrainPreset preset,TerrainPreset candidate)
         {
@@ -139,52 +145,4 @@ namespace HexMapEditor
         }
     }
 
-    internal sealed class PresetReviewPanel:Panel
-    {
-        readonly FlowLayoutPanel rows;
-        internal PresetReviewPanel(TerrainPreset preset,ToolTip tips)
-        {
-            BackColor=Color.FromArgb(34,38,48);AccessibleName="Roboczy preset: "+preset.Name;
-            rows=new BufferedFlowPanel{Dock=DockStyle.Fill,AutoScroll=true,WrapContents=false,FlowDirection=FlowDirection.TopDown,Padding=new Padding(8)};
-            Controls.Add(rows);
-            var title=AddRow(preset.Name,null,tips);
-            title.Font=new Font(Font,FontStyle.Bold);
-            title.Disposed+=(sender,args)=>title.Font.Dispose();
-            AddRow("Tereny ("+preset.Terrains.Count+")",null,tips);
-            foreach(var terrain in preset.Terrains)
-            {
-                var swatch=new Bitmap(20,16);
-                using(var g=Graphics.FromImage(swatch))g.Clear(ColorTranslator.FromHtml(terrain.Color));
-                AddRow(terrain.Name,swatch,tips);
-            }
-            AddRow("Ikony ("+preset.Icons.Count+")",null,tips);
-            foreach(var icon in preset.Icons)AddRow(icon.Name,Thumbnail(icon.Asset),tips);
-            AddRow("Obiekty ("+preset.Objects.Count+")",null,tips);
-            foreach(var item in preset.Objects)AddRow(item.Name,Thumbnail(item.Asset),tips);
-        }
-        Label AddRow(string text,Image thumbnail,ToolTip tips)
-        {
-            var label=new Label{Text=text,AutoEllipsis=true,Width=224,Height=24,TextAlign=ContentAlignment.MiddleLeft,
-                ImageAlign=ContentAlignment.MiddleLeft,Padding=new Padding(thumbnail==null?0:25,0,0,0),Image=thumbnail};
-            if(thumbnail!=null)
-            {
-                label.Image=null;
-                label.Paint+=(s,e)=>e.Graphics.DrawImageUnscaled(thumbnail,0,(label.Height-thumbnail.Height)/2);
-                label.Disposed+=(s,e)=>thumbnail.Dispose();
-            }
-            tips.SetToolTip(label,text);
-            rows.Controls.Add(label);
-            return label;
-        }
-        static Image Thumbnail(IconAsset asset)
-        {
-            if(asset==null)return null;
-            using(var image=IconAssets.Decode(asset))
-            {
-                var thumbnail=new Bitmap(20,20);
-                using(var g=Graphics.FromImage(thumbnail))g.DrawImage(image,0,0,20,20);
-                return thumbnail;
-            }
-        }
-    }
 }

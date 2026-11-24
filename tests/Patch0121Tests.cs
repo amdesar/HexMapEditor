@@ -37,7 +37,7 @@ namespace HexMapEditor.Tests
             File.WriteAllText(Path.Combine(local,AppStorage.LibraryLocationFile),alternative);
             var installed=new AppStorage(local);
             Check(installed.Installed&&installed.LibraryRoot==alternative&&installed.DataRoot==Path.Combine(local,"Data")&&
-                installed.MapRoot==Path.Combine(local,"Data","Hexmaps")&&installed.RecentProjectsPath==Path.Combine(local,"Data","recent-projects.json"),"Installed roots");
+                installed.MapRoot==Path.Combine(alternative,"Hexmaps")&&installed.RecentProjectsPath==Path.Combine(local,"Data","recent-projects.json"),"Installed roots");
         }
         static void Installed(string mapPath)
         {
@@ -48,7 +48,7 @@ namespace HexMapEditor.Tests
             Check(RecentProjects.Shared.Entries.Contains(mapPath,StringComparer.OrdinalIgnoreCase),"MRU did not retain the map path");
             var open=MainWindow.ReadProjectData(mapPath);
             Check(open.FormatVersion==12&&open.Presets.Any(p=>p.Id=="legacy-0121-fixture")&&open.LastSavedAppVersion=="0.12.0","Map12 loaded or original save untouched");
-            Check(!Directory.Exists(Path.Combine(LibraryPaths.Root,"Hexmaps")),"Maps migrated into chosen Library");
+            Check(!Directory.EnumerateFiles(LibraryPaths.Hexmaps,"*.hexmap").Any(),"Maps migrated into chosen Library");
             var own=new TerrainPreset{Name="Preset zapisany po upgrade"};
             PresetCatalog.Write(own,LibraryPaths.Presets,false);
             Check(PresetCatalog.Load(LibraryPaths.Presets,out warning).Any(p=>p.Id==own.Id),"New preset could not round-trip");

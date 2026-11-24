@@ -78,6 +78,7 @@ Name: desktop; Description: "Utwórz skrót na pulpicie"; GroupDescription: "Opc
 Source: "{#StorageTool}"; DestName: "SetupStorageTool.exe"; Flags: dontcopy noencryption
 Source: "{#Payload}"; DestDir: "{app}"; DestName: "HexMapEditor.exe"; Flags: ignoreversion
 Source: "installed.mode"; DestDir: "{app}"; DestName: "deployment.mode"; Flags: ignoreversion
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{tmp}\library-location.txt"; DestDir: "{app}"; Flags: external ignoreversion
 
 [Icons]
@@ -101,7 +102,7 @@ var
   LibraryEdit: TNewEdit;
   LibraryBrowse: TNewButton;
   CopyLegacy: TNewCheckBox;
-  DocumentsLibrary, CustomLibrary, LegacyProgram, LegacyRoot, OriginalSid, PreviousProgram: String;
+  DocumentsLibrary, CustomLibrary, LegacyProgram, LegacyRoot, OriginalSid, PreviousProgram, OriginalDesktop: String;
   LegacyData, MigrationOffered: Boolean;
 
 function InitializeSetup: Boolean;
@@ -167,13 +168,14 @@ var
 begin
   InitializeStorageTool;
   ErrorText := RunStorage('inspect', Arg('{#FixtureProfile}') + ' ' + Arg('{#LegacyProductId}'), Info);
-  if (ErrorText <> '') or (GetArrayLength(Info) <> 6) then
+  if (ErrorText <> '') or (GetArrayLength(Info) <> 7) then
     RaiseException('Nie można ustalić konta użytkownika i jego Dokumentów. ' + ErrorText);
   DocumentsLibrary := Info[1];
   LegacyProgram := Info[2];
   LegacyRoot := Info[3];
   LegacyData := Info[4] = '1';
   OriginalSid := Info[5];
+  OriginalDesktop := Info[6];
   if not IsAccountSid(OriginalSid) then RaiseException('Nieprawidłowa tożsamość użytkownika Setup.');
   PreviousProgram := OldProgram;
 
@@ -292,19 +294,19 @@ begin
     SetPreviousData(PreviousDataKey, 'LegacyOffered', '1');
 end;
 
-function DesktopLink: String;
+function DesktopLink(const Name: String): String;
 begin
-  Result := ExpandConstant('{#DesktopDirectory}\HexMapEditor (instalator).lnk');
+  Result := ExpandConstant('{#DesktopDirectory}') + '\' + Name + '.lnk';
 end;
 
-function OwnDesktopLink: Boolean;
+function OwnDesktopLink(const Path: String): Boolean;
 var Shell, Link: Variant;
 begin
   Result := False;
-  if (not FileExists(DesktopLink)) or IsReparse(DesktopLink) then exit;
+  if (not FileExists(Path)) or IsReparse(Path) then exit;
   try
     Shell := CreateOleObject('WScript.Shell');
-    Link := Shell.CreateShortcut(DesktopLink);
+    Link := Shell.CreateShortcut(Path);
     Result := (Link.Description = DesktopTag) and (Link.Arguments = '') and
       (CompareText(Link.TargetPath, ExpandConstant('{app}\HexMapEditor.exe')) = 0);
   except
@@ -343,10 +345,6 @@ begin
   end;
   if not ValidPathField(ChosenLibrary) then begin
     Result := 'Podaj pełną ścieżkę katalogu Library.';
-    exit;
-  end;
-  if WizardIsTaskSelected('desktop') and FileExists(DesktopLink) and not OwnDesktopLink then begin
-    Result := 'Na pulpicie istnieje skrót „HexMapEditor (instalator)”, który nie należy do Setup. Odznacz tworzenie skrótu i ponów instalację.';
     exit;
   end;
   ProgramDir := RemoveBackslashUnlessRoot(WizardDirValue);
@@ -405,22 +403,43 @@ begin
   RegDeleteKeyIncludingSubkeys({#AssociationRoot}, '{#Classes}\{#ProgId}');
 end;
 
+procedure RemoveOwnDesktopLinks;
+var Current, Previous: String;
+begin
+  Current := DesktopLink('HexMapEditor');
+  Previous := DesktopLink('HexMapEditor (instalator)');
+  if OwnDesktopLink(Current) then DeleteFile(Current);
+  if OwnDesktopLink(Previous) then DeleteFile(Previous);
+end;
+
 procedure ApplyDesktop;
-var TemporaryLink, Exe: String;
+var TemporaryLink, Exe, Current, Previous, PersonalLink: String;
 begin
   if not WizardIsTaskSelected('desktop') then begin
-    if OwnDesktopLink then DeleteFile(DesktopLink);
+    RemoveOwnDesktopLinks;
     exit;
   end;
-  if OwnDesktopLink then exit;
+  Current := DesktopLink('HexMapEditor');
+  Previous := DesktopLink('HexMapEditor (instalator)');
+  PersonalLink := AddBackslash(OriginalDesktop) + 'HexMapEditor.lnk';
+  if ((FileExists(Current) or IsReparse(Current)) and not OwnDesktopLink(Current)) or
+    ((OriginalDesktop <> '') and (CompareText(Current, PersonalLink) <> 0) and FileExists(PersonalLink)) then begin
+    Log('Pozostawiono zewnętrzny skrót HexMapEditor. Skrót programu jest w menu Start.');
+    SuppressibleMsgBox('Na pulpicie istnieje już skrót „HexMapEditor”. Pozostawiono go bez zmian. Skrót programu znajdziesz w menu Start.',
+      mbInformation, MB_OK, IDOK);
+    exit;
+  end;
+  if not OwnDesktopLink(Current) then begin
 #ifdef Fixture
-  ForceDirectories(ExpandConstant('{#DesktopDirectory}'));
+    ForceDirectories(ExpandConstant('{#DesktopDirectory}'));
 #endif
-  Exe := ExpandConstant('{app}\HexMapEditor.exe');
-  TemporaryLink := CreateShellLink(ExpandConstant('{tmp}\desktop-owned.lnk'), DesktopTag, Exe, '',
-    ExpandConstant('{app}'), Exe, 0, SW_SHOWNORMAL);
-  if not FileCopy(TemporaryLink, DesktopLink, True) then
-    RaiseException('Nie można utworzyć skrótu. Istniejący skrót pozostawiono bez zmian.');
+    Exe := ExpandConstant('{app}\HexMapEditor.exe');
+    TemporaryLink := CreateShellLink(ExpandConstant('{tmp}\desktop-owned.lnk'), DesktopTag, Exe, '',
+      ExpandConstant('{app}'), Exe, 0, SW_SHOWNORMAL);
+    if not CopyFile(TemporaryLink, Current, True) then
+      RaiseException('Nie można utworzyć skrótu na pulpicie. Skrót programu jest w menu Start.');
+  end;
+  if OwnDesktopLink(Previous) then DeleteFile(Previous);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -452,5 +471,5 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if (CurUninstallStep = usUninstall) and OwnDesktopLink then DeleteFile(DesktopLink);
+  if CurUninstallStep = usUninstall then RemoveOwnDesktopLinks;
 end;

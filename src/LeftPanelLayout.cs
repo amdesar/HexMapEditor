@@ -8,6 +8,7 @@ namespace HexMapEditor
     {
         const int LeftPanelWidth=276,FunctionWidth=48,FunctionHeight=26;
         const int MaxToolSection=192,PresetSection=114,MinTerrainSection=126,MaxQuickSection=120;
+        const int TabsHeadingHeight=26;
         int ParameterWidth{get{return Math.Max(54,TextRenderer.MeasureText("-360",Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width+26);}}
         void LayoutFunctions(FlowLayoutPanel row)
         {int i=0;foreach(Control b in row.Controls){b.Size=new Size(FunctionWidth,FunctionHeight);b.Margin=new Padding(i==0?2:0,0,i==4?0:5,0);i++;}row.WrapContents=false;}
@@ -42,7 +43,7 @@ namespace HexMapEditor
         }
         void ConfigureLeftMinimum()
         {
-            int client=MaxToolSection+PresetSection+MinTerrainSection+2*MaxQuickSection+shellToolbar.Height+BottomHeight;
+            int client=MaxToolSection+PresetSection+MinTerrainSection+2*MaxQuickSection+TabsHeadingHeight+shellToolbar.Height+BottomHeight;
             MinimumSize=new Size(MinimumSize.Width,SizeFromClientSize(new Size(1,client)).Height);
         }
     }

@@ -1,9 +1,12 @@
 namespace HexMapEditor
 {
-    // Set both values at build time only after selecting a public releases repository.
+    // The test channel includes published prereleases. The default is planned
+    // to become stable at 1.0.0.
     internal static class UpdateChannelConfiguration
     {
-        internal const string Owner = "";
-        internal const string Repository = "";
+        internal const string Owner = "amdesar";
+        internal const string Repository = "HexMapEditor";
+        internal const bool IncludePrereleases = true;
+        internal const string ProjectUrl = "https://github.com/" + Owner + "/" + Repository;
     }
 }
