@@ -20,6 +20,8 @@ function LocalFree(Handle: LongWord): LongWord;
   external 'LocalFree@kernel32.dll stdcall';
 function CreateSecuredDirectory(Path: String; var Security: TSecurityAttributes): Boolean;
   external 'CreateDirectoryW@kernel32.dll stdcall';
+function IsUserAnAdmin: Boolean;
+  external 'IsUserAnAdmin@shell32.dll stdcall';
 
 function WaitForEditor: Boolean;
 var
@@ -99,12 +101,20 @@ begin
   ExtractTemporaryFile('SetupStorageTool.exe');
   Response := ExpandConstant('{tmp}\storage-response.txt');
   if not SaveStringToFile(Response, '', False) then RaiseException('Nie można przygotować odpowiedzi pomocnika Setup.');
-#ifndef Fixture
   // Only these two files are opened to the original user. The response cannot
   // introduce code into the administrator-owned temporary directory.
-  ApplyFileDacl(ExpandConstant('{tmp}\SetupStorageTool.exe'), 'GRGX');
-  ApplyFileDacl(Response, 'GRGW');
-#endif
+  if IsAdminInstallMode then begin
+    ApplyFileDacl(ExpandConstant('{tmp}\SetupStorageTool.exe'), 'GRGX');
+    ApplyFileDacl(Response, 'GRGW');
+  end;
+end;
+
+function ReadStorageResult(const Response: String; ExitCode: Integer; var Info: TArrayOfString): String;
+begin
+  Result := 'Pomocnik Setup nie zwrócił poprawnej odpowiedzi.';
+  if not LoadStringsFromFile(Response, Info) then exit;
+  if (GetArrayLength(Info) >= 1) and (ExitCode = 0) and (Info[0] = 'OK') then Result := ''
+  else if (GetArrayLength(Info) >= 2) and (Info[0] = 'ERROR') then Result := Info[1];
 end;
 
 function RunStorage(const Operation, Arguments: String; var Info: TArrayOfString): String;
@@ -124,20 +134,30 @@ begin
     Result := Result + ' ' + SysErrorMessage(ExitCode);
     exit;
   end;
-  if not LoadStringsFromFile(Response, Info) then exit;
-  if (GetArrayLength(Info) >= 1) and (ExitCode = 0) and (Info[0] = 'OK') then Result := ''
-  else if (GetArrayLength(Info) >= 2) and (Info[0] = 'ERROR') then Result := Info[1];
+  Result := ReadStorageResult(Response, ExitCode, Info);
+end;
+
+function CheckMachineProgram(const Path: String): String;
+var Response: String; ExitCode: Integer; Info: TArrayOfString;
+begin
+  // This result controls elevated writes. Use a separate, non-shared file
+  // written by the bundled helper under Setup's own token.
+  Response := ExpandConstant('{tmp}\machine-response.txt');
+  if not SaveStringToFile(Response, '', False) then RaiseException('Nie można przygotować kontroli katalogu programu.');
+  if not Exec(ExpandConstant('{tmp}\SetupStorageTool.exe'), Arg(Response) + ' machine ' + Arg(Path),
+    ExpandConstant('{win}'), SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+    RaiseException('Nie można sprawdzić ochrony katalogu programu. ' + SysErrorMessage(ExitCode));
+  Result := ReadStorageResult(Response, ExitCode, Info);
 end;
 
 procedure CreateDataLeaf(const Path, Sid: String);
-#ifndef Fixture
 var Security: TSecurityAttributes;
-#endif
 begin
   if DirExists(Path) then exit;
-#ifdef Fixture
-  if not CreateDir(Path) then RaiseException('Nie można utworzyć katalogu danych: ' + Path);
-#else
+  if not IsAdminInstallMode then begin
+    if not CreateDir(Path) then RaiseException('Nie można utworzyć katalogu danych: ' + Path);
+    exit;
+  end;
   // Grant access only when atomically creating this new, dedicated data leaf.
   // FILE_GENERIC_READ|FILE_GENERIC_WRITE|FILE_GENERIC_EXECUTE|DELETE (Modify).
   if not ConvertSecurity('D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;' + Sid + ')',
@@ -149,5 +169,4 @@ begin
   finally
     LocalFree(Security.Descriptor);
   end;
-#endif
 end;

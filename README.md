@@ -2,7 +2,7 @@
 
 HexMapEditor to działający offline edytor map heksagonalnych na Windows, przeznaczony m.in. do prowadzenia kampanii RPG.
 
-**Wersja testowa 0.12.2.** Odnośniki będą działać po opublikowaniu wydania `v0.12.2` z paczkami. Do tego czasu paczki GitHub są niedostępne.
+**Publiczna wersja testowa 0.12.2.** Poniżej są paczki wydania `v0.12.2`. Zmianę instalatora przygotowaną w 0.12.3 opisuje [raport 0.12.3](docs/raport-0.12.3.md).
 
 [![Instalator Windows EXE](https://img.shields.io/badge/Windows-Setup%20EXE-2864a6)](https://github.com/amdesar/HexMapEditor/releases/download/v0.12.2/HexMapEditor-0.12.2-Setup.exe)
 [![Portable ZIP](https://img.shields.io/badge/Portable-ZIP-3b7964)](https://github.com/amdesar/HexMapEditor/releases/download/v0.12.2/HexMapEditor-0.12.2-Portable.zip)
@@ -22,7 +22,7 @@ HexMapEditor to działający offline edytor map heksagonalnych na Windows, przez
 
 Wymagany jest Windows 10 lub 11 z pełnym .NET Framework 4.8 albo 4.8.1. [Pobierz .NET Framework Runtime](https://dotnet.microsoft.com/download/dotnet-framework/net48).
 
-1. **Instalator** — uruchom Setup, wybierz folder programu i Library, po czym uruchom edytor z menu Start. Setup może wymagać zgody administratora.
+1. **Instalator** — uruchom Setup, wybierz folder programu i Library, po czym uruchom edytor z menu Start. Od 0.12.3 własny katalog zapisywalny na Twoim koncie obsługuje tryb „Tylko dla mnie”. Tryb dla wszystkich użytkowników proponuje Program Files i wymaga zgody administratora.
 2. **Portable** — rozpakuj całe ZIP do zapisywalnego folderu i uruchom `HexMapEditor.exe`. Biblioteka i dane pozostają obok kopii.
 3. Wybierz **Stwórz nowy projekt**. Nowa mapa trafi do `Hexmaps` w aktywnej Library. **Zapisz jako** pozwala wybrać inny folder.
 

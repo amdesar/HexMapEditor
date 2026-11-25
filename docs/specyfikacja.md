@@ -1,6 +1,6 @@
 # Specyfikacja użytkowa — HexMapEditor
-Wersja 2.10. Stan decyzji 24 listopada 2026.
-Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.12.2. Karty i robocze presety opisuje sekcja 54, reguły zapisu i zamykania sekcja 55, a instalację i dystrybucję sekcje 56–58.
+Wersja 2.11. Stan decyzji 26 listopada 2026.
+Istniejący projekt HexMapEditor-Codex. Bieżący przyrost 0.12.3. Karty i robocze presety opisuje sekcja 54, reguły zapisu i zamykania sekcja 55, a instalację i dystrybucję sekcje 56–59.
 
 ## 1. Cel i zasady odczytywania wymagań
 Budujemy uniwersalny, jednoosobowy edytor map heksagonalnych na Windows. Pierwsze zastosowanie to kampania RPG, w tym mapy kosmosu, kontynentów i powierzchni planet. Treści użytkownika nie ograniczamy do konkretnego świata ani systemu RPG. Nie implementujemy reguł podróży, dni, encounterów, kart postaci ani modułu walki.
@@ -1101,3 +1101,9 @@ Schowek jest źródłem importu grafiki terenu, ikony i obiektu. Źródło przec
 - Kanał testowy korzysta z listy wydań GitHub i uwzględnia opublikowane wydania oznaczone jako pre-release oraz wydania stabilne. Wybiera najwyższą nowszą wersję numerowaną i wymaga właściwej paczki. Użytkownik decyduje o przejściu do następnej wersji. Portable otwiera link do ZIP. Domyślny kanał stabilny jest planowany dla 1.0.0.
 - Setup zachowuje identyfikator instalacji i wybory 0.12.1. Nowy skrót na pulpicie to `HexMapEditor`. Własny skrót o starej nazwie można zastąpić przy wolnej nazwie docelowej. Przy kolizji pozostaje ręczny skrót i dostęp przez menu Start.
 - Pod obiektami znajduje się nagłówek Zakładki. Przy zamykaniu roboczy preset jest widoczny w zwykłych kontrolkach lewego panelu, także bez mapy. Współrzędne są w osobnym polu o zmierzonej szerokości. Przejęcie fog w macierzy zależy od efektywnego stanu członka i pozostawia zapisany wybór. [Raport 0.12.2](raport-0.12.2.md).
+
+## 59. Wersja 0.12.3 — instalacja we własnym katalogu
+
+- Instalacja maszynowa proponuje Program Files i chroni zapis plików programu oraz deinstalatora. Zapisywalny katalog można wybrać w trybie bieżącego użytkownika, także na innym dostępnym dysku. Przy świeżej instalacji maszynowej kreator może zaproponować przejście do trybu „Tylko dla mnie” z tą samą ścieżką.
+- Instalacja i deinstalacja w trybie bieżącego użytkownika działają z jego zwykłymi uprawnieniami. Aktualizator wskazuje w tym trybie właściwy Setup i oczekiwaną sumę SHA-256. W trybie maszynowym pozostaje weryfikowane przekazanie do instalatora po decyzji użytkownika.
+- Upgrade zachowuje dotychczasowy tryb, folder programu i dane. Library nadal wybiera się osobno, a nowe mapy z powitania powstają w jej folderze `Hexmaps`. [Raport 0.12.3](raport-0.12.3.md).

@@ -4,17 +4,23 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
-// Only Setup runs this tool, using Inno's pre-elevation credentials.
+// Setup reads profile data and tests write access with the original token.
+// The separate machine check reads ACLs and uses an administrator-only response.
 internal static class SetupStorageTool
 {
     static readonly string[] ProfileFiles = { "recent-projects.json", "settings.json" };
-    const uint Delete = 0x10000, DeleteChild = 0x40, BackupSemantics = 0x02000000, ShareAll = 7;
+    const uint BackupSemantics = 0x02000000, ShareAll = 7;
+    const string TrustedInstaller = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
+    const FileSystemRights Redirect = FileSystemRights.Delete | FileSystemRights.DeleteSubdirectoriesAndFiles |
+        FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership | FileSystemRights.WriteAttributes |
+        (FileSystemRights)0x50000000; // GENERIC_WRITE and GENERIC_ALL
 
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
     static extern SafeFileHandle CreateFile(string path, uint access, uint share, IntPtr security, uint mode, uint flags, IntPtr template);
@@ -30,9 +36,10 @@ internal static class SetupStorageTool
             string[] result = new[] { "OK" };
             switch (args[1])
             {
-                case "inspect": result = Inspect(args[2], args[3]); break;
-                case "program": RequireProtectedProgram(Absolute(args[2])); break;
-                case "probe": Probe(args[2], args[3], args[4], args[5] == "protected"); break;
+                case "inspect": result = Inspect(args[2], args[3], args[4]); break;
+                case "machine": RequireProtectedProgram(Absolute(args[2])); break;
+                case "user-program": RequireWritableProgram(Absolute(args[2])); break;
+                case "probe": Probe(args[2], args[3], args[4]); break;
                 case "copy": Copy(args[2], args[3], args[4]); break;
                 default: throw new InvalidOperationException("Nieznana operacja konfiguracji danych.");
             }
@@ -56,7 +63,14 @@ internal static class SetupStorageTool
             foreach (var line in lines) writer.WriteLine(line);
     }
 
-    static string[] Inspect(string fixtureProfile, string legacyKey)
+    static string UserInstallation(string product)
+    {
+        using (var registry = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry32))
+        using (var key = registry.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + product + "_is1"))
+            return key == null ? "" : (key.GetValue("InstallLocation", "") as string ?? "").TrimEnd('\\');
+    }
+
+    static string[] Inspect(string fixtureProfile, string legacyKey, string currentKey)
     {
         using (var identity = WindowsIdentity.GetCurrent())
         {
@@ -67,16 +81,8 @@ internal static class SetupStorageTool
                 ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments, Environment.SpecialFolderOption.DoNotVerify)
                 : Path.Combine(fixtureProfile, "Przekierowane Dokumenty");
             string legacyRoot = Path.Combine(userLocal, "amdesar", "HexMapEditor");
-            string detected = "";
-            using (var registry = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry32))
-            using (var key = registry.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + legacyKey + "_is1"))
-            {
-                if (key != null)
-                {
-                    string folder = key.GetValue("InstallLocation", "") as string;
-                    if (!String.IsNullOrWhiteSpace(folder) && File.Exists(Path.Combine(folder, "HexMapEditor.exe"))) detected = folder;
-                }
-            }
+            string detected = UserInstallation(legacyKey);
+            if (detected.Length != 0 && !File.Exists(Path.Combine(detected, "HexMapEditor.exe"))) detected = "";
             if (detected.Length == 0)
             {
                 string standard = Path.Combine(userLocal, "Programs", "HexMapEditor");
@@ -90,7 +96,7 @@ internal static class SetupStorageTool
             string desktop = fixtureProfile.Length == 0
                 ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolderOption.DoNotVerify)
                 : Path.Combine(fixtureProfile, "Desktop");
-            return new[] { "OK", library, detected, legacyRoot, hasData ? "1" : "0", identity.User.Value, desktop };
+            return new[] { "OK", library, detected, legacyRoot, hasData ? "1" : "0", identity.User.Value, desktop, UserInstallation(currentKey) };
         }
     }
 
@@ -98,7 +104,8 @@ internal static class SetupStorageTool
     {
         if (!Regex.IsMatch(path, @"^(?:[A-Za-z]:\\|\\\\[^\\?\.][^\\]*\\[^\\]+)") || path.IndexOfAny(new[] { '"', '\r', '\n' }) >= 0)
             throw new IOException("Podaj pełną ścieżkę katalogu.");
-        return Path.GetFullPath(path).TrimEnd('\\');
+        string full = Path.GetFullPath(path);
+        return full.Length == 3 ? full : full.TrimEnd('\\');
     }
     static bool ContainsPath(string parent, string child)
     {
@@ -130,27 +137,66 @@ internal static class SetupStorageTool
         using (var handle = CreateFile(path, access, ShareAll, IntPtr.Zero, 3, BackupSemantics, IntPtr.Zero))
             return !handle.IsInvalid;
     }
+    static bool Trusted(SecurityIdentifier sid)
+    {
+        return sid != null && (sid.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid) ||
+            sid.IsWellKnown(WellKnownSidType.LocalSystemSid) || sid.Value == TrustedInstaller);
+    }
+
+    static void CheckMachineAccess(FileSystemInfo entry, FileSystemSecurity acl, FileSystemRights rights)
+    {
+        var raw = new RawSecurityDescriptor(acl.GetSecurityDescriptorBinaryForm(), 0);
+        if (!Trusted(raw.Owner) || raw.DiscretionaryAcl == null ||
+            raw.DiscretionaryAcl.Cast<GenericAce>().OfType<QualifiedAce>().Any(rule =>
+                rule.AceQualifier == AceQualifier.AccessAllowed && (rule.AceFlags & AceFlags.InheritOnly) == 0 &&
+                ((FileSystemRights)rule.AccessMask & rights) != 0 && !Trusted(rule.SecurityIdentifier)))
+            throw new IOException("W tej lokalizacji użyj trybu „Tylko dla mnie”. Instalacja dla wszystkich wymaga chronionego katalogu: " + entry.FullName);
+    }
+
+    static DirectoryInfo ExistingDirectory(string program)
+    {
+        var drive = new DriveInfo(Path.GetPathRoot(program));
+        if (!drive.IsReady) throw new IOException("Wybrany dysk nie jest dostępny: " + drive.Name);
+        var at = new DirectoryInfo(program);
+        while (!at.Exists)
+        {
+            if (File.Exists(at.FullName)) throw new IOException("Wybrana ścieżka koliduje z istniejącym plikiem: " + at.FullName);
+            at = at.Parent;
+            if (at == null) throw new IOException("Nie znaleziono dostępnego katalogu nadrzędnego.");
+        }
+        return at;
+    }
+
     static void RequireProtectedProgram(string program)
     {
-        // An otherwise protected child is still replaceable if its parent can delete it.
-        for (var at = new DirectoryInfo(program); at.Parent != null; at = at.Parent)
-            if (CanChangeDirectory(at.FullName, Delete) || CanChangeDirectory(at.FullName, 0x40000) ||
-                CanChangeDirectory(at.Parent.FullName, DeleteChild))
-                throw new IOException("Katalog programu musi być chroniony przed modyfikacją przez zwykłego użytkownika. Wybierz Program Files lub inny chroniony katalog.");
-        if (CanChangeDirectory(program, 0x2))
-            throw new IOException("Bieżący użytkownik ma prawo zapisu plików w katalogu programu. Wybierz chroniony katalog programu.");
-        foreach (string name in new[] { "HexMapEditor.exe", "deployment.mode", "library-location.txt" })
+        var directory = ExistingDirectory(program);
+        for (var at = directory; at != null; at = at.Parent)
         {
-            string file = Path.Combine(program, name);
-            if (File.Exists(file) && (CanChangeDirectory(file, 0x2) || CanChangeDirectory(file, Delete)))
-                throw new IOException("Istniejący plik programu pozwala na modyfikację przez zwykłego użytkownika.");
+            CheckOrdinaryEntry(at.FullName);
+            CheckMachineAccess(at, at.GetAccessControl(), Redirect | (at == directory ? FileSystemRights.Write : 0));
+        }
+        if (!directory.FullName.Equals(program, StringComparison.OrdinalIgnoreCase)) return;
+        foreach (var file in directory.EnumerateFiles().Where(file =>
+            new[] { "HexMapEditor.exe", "deployment.mode", "library-location.txt", "LICENSE" }.Contains(file.Name, StringComparer.OrdinalIgnoreCase) ||
+            Regex.IsMatch(file.Name, @"^unins\d+\.(exe|dat|msg)$", RegexOptions.IgnoreCase)))
+        {
+            CheckOrdinaryEntry(file.FullName);
+            CheckMachineAccess(file, file.GetAccessControl(), Redirect | FileSystemRights.Write);
         }
     }
-    static void Probe(string program, string data, string library, bool lockedProgram)
+
+    static void RequireWritableProgram(string program)
+    {
+        var directory = ExistingDirectory(program);
+        // Non-mutating check, also used to select the safe scope before Setup creates any folders.
+        uint access = directory.FullName.Equals(program, StringComparison.OrdinalIgnoreCase) ? 0x2u : 0x4u;
+        if (!CanChangeDirectory(directory.FullName, access))
+            throw new IOException("Nie można zapisywać w wybranym katalogu programu z bieżącego konta: " + program);
+    }
+    static void Probe(string program, string data, string library)
     {
         program = Absolute(program); data = Absolute(data); library = Absolute(library);
         EnsureSeparate(program, data, library);
-        if (lockedProgram) RequireProtectedProgram(program);
         Directory.CreateDirectory(library);
         string actualProgram = FinalDirectory(program);
         string actualData = FinalDirectory(data);

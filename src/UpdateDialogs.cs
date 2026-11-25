@@ -37,7 +37,9 @@ namespace HexMapEditor
             bool downloading = false;
             try
             {
-                bool installed = AppStorage.Current.Installed;
+                var storage = AppStorage.Current;
+                bool installed = storage.Installed;
+                bool canLaunch = storage.CanLaunchInstaller;
                 var offer = await Task.Run(() => channel.Check(new Version(ReleaseMetadata.Version), installed));
                 if (!CanPrompt(owner)) return;
                 if (offer == null)
@@ -45,9 +47,9 @@ namespace HexMapEditor
                     if (manual) Tell(owner, "Brak nowszej wersji w tym kanale.");
                     return;
                 }
-                using (var dialog = new UpdateOfferDialog(offer))
+                using (var dialog = new UpdateOfferDialog(offer, canLaunch))
                     if (Prompt(owner, () => dialog.ShowDialog(owner)) != DialogResult.OK) return;
-                if (!installed)
+                if (!canLaunch)
                 {
                     OpenReleaseLink(offer.Download);
                     return;
@@ -106,10 +108,11 @@ namespace HexMapEditor
 
     internal sealed class UpdateOfferDialog : DarkForm
     {
-        internal UpdateOfferDialog(ReleaseOffer offer)
+        internal UpdateOfferDialog(ReleaseOffer offer, bool canLaunchInstaller)
         {
+            bool manualSetup = offer.Setup && !canLaunchInstaller;
             Text = "Dostępna aktualizacja";
-            ClientSize = new Size(500, 206);
+            ClientSize = new Size(525, manualSetup ? 245 : 206);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = MaximizeBox = false;
@@ -118,18 +121,26 @@ namespace HexMapEditor
                 AutoSize = true, Location = new Point(16, 16)
             });
             Controls.Add(new Label {
-                Text = offer.Setup ? "Po pobraniu i sprawdzeniu instalatora możesz zamknąć edytor i zaktualizować bieżącą instalację."
+                Text = manualSetup ? "Pobierz Setup, porównaj jego SHA-256 i zamknij edytor. Uruchom Setup zwyczajnie, w trybie „Tylko dla mnie”, w bieżącej lokalizacji."
+                    : offer.Setup ? "Po pobraniu i sprawdzeniu instalatora możesz zamknąć edytor i zaktualizować bieżącą instalację."
                     : "Zamknij edytor i zastąp pliki programu z ZIP w obecnym folderze. Zachowaj folder Library, ustawienia, recent-projects.json i mapy.",
-                Bounds = new Rectangle(16, 50, 468, 61)
+                Bounds = new Rectangle(16, 50, 493, 61)
             });
             var notes = new EditorButton { Text = "Otwórz opis wydania", Bounds = new Rectangle(16, 110, 185, 30) };
             notes.Click += (s, e) => {
                 try { UpdateController.OpenReleaseLink(offer.Notes); }
                 catch (Exception error) { MessageBox.Show(this, error.Message, "Opis wydania", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             };
-            var ok = new EditorButton { Text = offer.Setup ? "Pobierz instalator" : "Otwórz link do ZIP",
-                DialogResult = DialogResult.OK, Bounds = new Rectangle(190, 158, 160, 32) };
-            var cancel = new EditorButton { Text = "Pomiń", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(365, 158, 119, 32) };
+            if (manualSetup)
+            {
+                Controls.Add(new Label { Text = "SHA-256", Bounds = new Rectangle(16, 149, 66, 25) });
+                Controls.Add(new TextBox { Text = offer.Sha256, ReadOnly = true, Font = new Font("Consolas", 8),
+                    AccessibleName = "Oczekiwana suma SHA-256 instalatora", Bounds = new Rectangle(82, 147, 427, 25) });
+            }
+            int y = manualSetup ? 197 : 158;
+            var ok = new EditorButton { Text = manualSetup ? "Otwórz link do Setup" : offer.Setup ? "Pobierz instalator" : "Otwórz link do ZIP",
+                DialogResult = DialogResult.OK, Bounds = new Rectangle(216, y, 160, 32) };
+            var cancel = new EditorButton { Text = "Pomiń", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(390, y, 119, 32) };
             Controls.AddRange(new Control[] { notes, ok, cancel });
             AcceptButton = CancelButton = cancel;
         }

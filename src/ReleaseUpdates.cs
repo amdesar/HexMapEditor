@@ -284,12 +284,13 @@ namespace HexMapEditor
         }
         internal void Launch()
         {
-            if (!AppStorage.Current.Installed) throw new InvalidOperationException("Instalator można uruchomić tylko z wersji zainstalowanej.");
+            if (!AppStorage.Current.CanLaunchInstaller) throw new InvalidOperationException("Ten tryb instalacji wymaga ręcznego uruchomienia Setup.");
             string installDirectory = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
             using (OpenVerified())
             using (var editor = Process.GetCurrentProcess())
             using (var installer = Process.Start(new ProcessStartInfo(FilePath) {
                 Arguments = "/WaitForEditorPid=" + editor.Id + " /DIR=\"" + installDirectory + "\" /NORESTART",
+                WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows),
                 UseShellExecute = true
             }))
             {

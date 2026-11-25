@@ -142,7 +142,8 @@ namespace HexMapEditor.Tests
             File.WriteAllText(marker,AppStorage.InstalledMode);
             File.WriteAllText(Path.Combine(app,AppStorage.LibraryLocationFile),profile);
             var installed = new AppStorage(app);
-            Check(installed.Installed && installed.LibraryRoot==profile && installed.DataRoot==Path.Combine(app,"Data"), "Split installed paths");
+            Check(installed.Installed && installed.CanLaunchInstaller && installed.LibraryRoot==profile &&
+                installed.DataRoot==Path.Combine(app,"Data"), "Split installed paths");
             File.WriteAllText(marker,"invalid");
             Refuses<InvalidDataException>(()=>new AppStorage(app),"Invalid marker silently used wrong root");
             Check(RecentProjects.Shared.Entries.Length==0, "Fixture acquired MRU entries");
@@ -161,6 +162,26 @@ namespace HexMapEditor.Tests
             var reopened = MainWindow.ReadProjectData(path);
             Check(reopened.FormatVersion==12 && reopened.LastSavedAppVersion==ReleaseMetadata.Version && reopened.Cells.Count==48 &&
                 RecentProjects.Shared.Entries.Single()==path, "Fresh Map12 round trip");
+        }
+        static void PersonalUpdate()
+        {
+            File.WriteAllText(Path.Combine(Root,AppStorage.ModeFile),AppStorage.UserInstalledMode);
+            string library=Directory.CreateDirectory(Path.Combine(Root,"Personal library")).FullName;
+            File.WriteAllText(Path.Combine(Root,AppStorage.LibraryLocationFile),library);
+            var storage=AppStorage.Current;
+            Check(storage.Installed&&!storage.CanLaunchInstaller&&storage.LibraryRoot==library&&
+                storage.MapRoot==Path.Combine(library,"Hexmaps")&&storage.RecentProjectsPath==Path.Combine(Root,"Data","recent-projects.json"),
+                "Wrong routing or data in personal mode");
+            var address=new Uri("https://github.com/amdesar/HexMapEditor/releases/download/v0.12.4/HexMapEditor-0.12.4-Setup.exe");
+            string sha=new string('a',64);
+            var offer=new ReleaseOffer(new Version(0,12,4),null,"HexMapEditor-0.12.4-Setup.exe",address,address,sha,100,true);
+            using(var dialog=new UpdateOfferDialog(offer,storage.CanLaunchInstaller))
+            {
+                Check(dialog.Controls.OfType<Button>().Any(button=>button.Text=="Otwórz link do Setup"),"Missing manual download");
+                Check(dialog.Controls.OfType<TextBox>().Any(box=>box.ReadOnly&&box.Text==sha),"Missing expected checksum");
+            }
+            using(var installer=new VerifiedInstaller(Path.Combine(Root,"must-not-run.exe"),sha,100))
+                Refuses<InvalidOperationException>(()=>installer.Launch(),"Personal mode offered to start installer");
         }
         static void Set(MainWindow window,string name,object val)
         {
@@ -205,6 +226,7 @@ namespace HexMapEditor.Tests
                 switch(args[0]) {
                     case "channel":Channel(args[1]);break;
                     case "paths":Data();break;
+                    case "personal-update":PersonalUpdate();break;
                     case "close":CloseFlow();break;
                     default:throw new ArgumentException("Pass one explicit Case.");
                 }

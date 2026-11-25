@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('channel','paths','close')][string]$Case,
+    [Parameter(Mandatory)][ValidateSet('channel','paths','close','personal-update')][string]$Case,
     [string]$Setup
 )
 $ErrorActionPreference='Stop'

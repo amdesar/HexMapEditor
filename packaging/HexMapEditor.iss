@@ -24,10 +24,10 @@
   #define LegacyProductId "amdesar.HexMapEditor.Windows"
   #define DisplayName "HexMapEditor"
   #define InstallGuard "Local\amdesar.HexMapEditor.Installed"
-  #define AssociationRoot "HKLM"
+  #define AssociationRoot "HKA"
   #define Classes "Software\Classes"
   #define ProgramGroupPath "{group}\HexMapEditor"
-  #define DesktopDirectory "{commondesktop}"
+  #define DesktopDirectory "{autodesktop}"
   #define InstallDirectory "{autopf}\HexMapEditor"
   #define FixtureProfile ""
 #endif
@@ -53,13 +53,15 @@ AllowUNCPath=no
 PrivilegesRequired=lowest
 #else
 PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=dialog
+UsePreviousPrivileges=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 #endif
 MinVersion=10.0
 CloseApplications=no
 RestartApplications=no
 ChangesAssociations=yes
-SetupMutex={#ProductId}.Setup
+SetupMutex={#ProductId}.Setup.{code:SetupScope}
 SetupIconFile=..\assets\app\icon.ico
 UninstallDisplayIcon={app}\HexMapEditor.exe
 Compression=lzma2
@@ -77,7 +79,8 @@ Name: desktop; Description: "Utwórz skrót na pulpicie"; GroupDescription: "Opc
 [Files]
 Source: "{#StorageTool}"; DestName: "SetupStorageTool.exe"; Flags: dontcopy noencryption
 Source: "{#Payload}"; DestDir: "{app}"; DestName: "HexMapEditor.exe"; Flags: ignoreversion
-Source: "installed.mode"; DestDir: "{app}"; DestName: "deployment.mode"; Flags: ignoreversion
+Source: "installed.mode"; DestDir: "{app}"; DestName: "deployment.mode"; Flags: ignoreversion; Check: IsAdminInstallMode
+Source: "installed-user.mode"; DestDir: "{app}"; DestName: "deployment.mode"; Flags: ignoreversion; Check: not IsAdminInstallMode
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{tmp}\library-location.txt"; DestDir: "{app}"; Flags: external ignoreversion
 
@@ -103,12 +106,18 @@ var
   LibraryBrowse: TNewButton;
   CopyLegacy: TNewCheckBox;
   DocumentsLibrary, CustomLibrary, LegacyProgram, LegacyRoot, OriginalSid, PreviousProgram, OriginalDesktop: String;
-  LegacyData, MigrationOffered: Boolean;
+  LegacyData, MigrationOffered, RestartForUser: Boolean;
+  OppositeProgram: String;
 
 function InitializeSetup: Boolean;
 var
   ErrorCode: Integer;
 begin
+  if not IsAdminInstallMode and IsUserAnAdmin then begin
+    SuppressibleMsgBox('Uruchom instalator dla bieżącego użytkownika bez podniesionych uprawnień.', mbError, MB_OK, IDOK);
+    Result := False;
+    exit;
+  end;
   Result := IsDotNetInstalled(net48, 0);
 #ifdef Fixture
   if ExpandConstant('{param:FixtureMissingRuntime|0}') = '1' then Result := False;
@@ -125,12 +134,34 @@ begin
   Result := WaitForEditor;
 end;
 
+function MachineProgram: String;
+begin
+  Result := '';
+#ifndef Fixture
+  if IsWin64 then RegQueryStringValue(HKLM64, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1',
+    'InstallLocation', Result);
+  if Result = '' then RegQueryStringValue(HKLM32, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1',
+    'InstallLocation', Result);
+  Result := RemoveBackslashUnlessRoot(Result);
+#endif
+end;
+
 function OldProgram: String;
 begin
   Result := '';
   RegQueryStringValue(HKA, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1',
     'InstallLocation', Result);
   Result := RemoveBackslashUnlessRoot(Result);
+end;
+
+function SetupScope(Param: String): String;
+begin
+  if IsAdminInstallMode then Result := 'machine' else Result := 'user';
+end;
+
+function HasProgramEntry(const ProgramDir, Name: String): Boolean;
+begin
+  Result := GetFileAttributes(AddBackslash(ProgramDir) + Name) <> $FFFFFFFF;
 end;
 
 function ChosenLibrary: String;
@@ -167,8 +198,8 @@ var
   Width, RadioLeft: Integer;
 begin
   InitializeStorageTool;
-  ErrorText := RunStorage('inspect', Arg('{#FixtureProfile}') + ' ' + Arg('{#LegacyProductId}'), Info);
-  if (ErrorText <> '') or (GetArrayLength(Info) <> 7) then
+  ErrorText := RunStorage('inspect', Arg('{#FixtureProfile}') + ' ' + Arg('{#LegacyProductId}') + ' ' + Arg('{#ProductId}'), Info);
+  if (ErrorText <> '') or (GetArrayLength(Info) <> 8) then
     RaiseException('Nie można ustalić konta użytkownika i jego Dokumentów. ' + ErrorText);
   DocumentsLibrary := Info[1];
   LegacyProgram := Info[2];
@@ -178,6 +209,8 @@ begin
   OriginalDesktop := Info[6];
   if not IsAccountSid(OriginalSid) then RaiseException('Nieprawidłowa tożsamość użytkownika Setup.');
   PreviousProgram := OldProgram;
+  if IsAdminInstallMode then OppositeProgram := Info[7]
+  else OppositeProgram := MachineProgram;
 
   LibraryPage := CreateCustomPage(wpSelectDir, 'Lokalizacja biblioteki',
     'Wybierz katalog terenów, ikon, obiektów i presetów. Położenie biblioteki nie zmienia położenia map.');
@@ -241,7 +274,7 @@ begin
 end;
 
 function ProgramChoiceError: String;
-var ProgramDir: String;
+var ProgramDir: String; Candidate: TFindRec;
 begin
   ProgramDir := RemoveBackslashUnlessRoot(WizardDirValue);
   Result := '';
@@ -249,19 +282,65 @@ begin
     Result := 'Wykryto instalację HexMapEditor 0.12.0 dla bieżącego użytkownika:' + #13#10 + LegacyProgram + #13#10#13#10 +
       'Zapisz pracę, zamknij edytor i odinstaluj starą wersję w ustawieniach Windows. Następnie uruchom ten Setup ponownie. ' +
       'Starsza deinstalacja pozostawia Library, mapy i dane użytkownika.'
+  else if OppositeProgram <> '' then
+    Result := 'HexMapEditor jest już zainstalowany w „' + OppositeProgram +
+      '”. Uruchom Setup ponownie w zakresie użytym przy poprzedniej instalacji.'
+  else if not ValidPathField(ProgramDir) then
+    Result := 'Podaj pełną ścieżkę katalogu programu na dostępnym dysku.'
   else if (PreviousProgram <> '') and (CompareText(PreviousProgram, ProgramDir) <> 0) then
     Result := 'Istniejąca instalacja jest w „' + PreviousProgram + '”. Aby wybrać inny katalog programu, zamknij edytor i odinstaluj program. ' +
       'Katalogi danych pozostaną na miejscu.'
   else if (PreviousProgram = '') and
-    (FileExists(AddBackslash(ProgramDir) + 'HexMapEditor.exe') or FileExists(AddBackslash(ProgramDir) + 'deployment.mode')) then
-    Result := 'Ten katalog zawiera już kopię programu. Wybierz inny katalog instalacji.';
+    (HasProgramEntry(ProgramDir, 'HexMapEditor.exe') or HasProgramEntry(ProgramDir, 'deployment.mode') or
+     HasProgramEntry(ProgramDir, 'library-location.txt') or HasProgramEntry(ProgramDir, 'LICENSE')) then
+    Result := 'Ten katalog zawiera pliki kolidujące z instalacją. Wybierz inny katalog instalacji.'
+  else if (PreviousProgram = '') and FindFirst(AddBackslash(ProgramDir) + 'unins*', Candidate) then begin
+    FindClose(Candidate);
+    Result := 'Ten katalog zawiera pliki dezinstalatora. Wybierz inny katalog instalacji.';
+  end;
+end;
+
+function SwitchToPersonalInstall: Boolean;
+var Info: TArrayOfString; ErrorCode: Integer; AppDir: String;
+begin
+  Result := False;
+  if not IsAdminInstallMode or (PreviousProgram <> '') or WizardSilent then exit;
+  AppDir := RemoveBackslashUnlessRoot(WizardDirValue);
+  if RunStorage('user-program', Arg(AppDir), Info) <> '' then exit;
+  if MsgBox('Wybrany katalog jest zapisywalny na Twoim koncie. Kontynuować w trybie „Tylko dla mnie” z tym folderem?',
+    mbConfirmation, MB_YESNO) <> IDYES then begin
+    Result := True;
+    exit;
+  end;
+  Result := True;
+  if ExecAsOriginalUser(ExpandConstant('{srcexe}'), '/CURRENTUSER /SP- /DIR=' + Arg(AppDir),
+    ExpandConstant('{win}'), SW_SHOWNORMAL, ewNoWait, ErrorCode) then begin
+    RestartForUser := True;
+    WizardForm.Close;
+  end else
+    MsgBox('Nie można ponownie uruchomić kreatora. Uruchom Setup i wybierz „Tylko dla mnie”. ' +
+      SysErrorMessage(ErrorCode), mbError, MB_OK);
+end;
+
+procedure CancelButtonClick(CurPageID: Integer; var Cancel, Confirm: Boolean);
+begin
+  if RestartForUser then begin
+    Cancel := True;
+    Confirm := False;
+  end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var ErrorText: String;
 begin
   ErrorText := '';
-  if CurPageID = wpSelectDir then ErrorText := ProgramChoiceError;
+  if CurPageID = wpSelectDir then begin
+    ErrorText := ProgramChoiceError;
+    if (ErrorText = '') and SwitchToPersonalInstall then begin
+      Result := False;
+      exit;
+    end;
+  end;
   if CurPageID = LibraryPage.ID then begin
     if not ValidPathField(ChosenLibrary) then ErrorText := 'Podaj pełną, dostępną ścieżkę katalogu Library.';
     if CustomRadio.Checked then CustomLibrary := Trim(LibraryEdit.Text);
@@ -317,10 +396,13 @@ end;
 function StorageArguments: String;
 begin
   Result := Arg(WizardDirValue) + ' ' + Arg(AddBackslash(WizardDirValue) + 'Data') + ' ' + Arg(ChosenLibrary);
+end;
+
+function IsProtectedScope: Boolean;
+begin
+  Result := IsAdminInstallMode;
 #ifdef Fixture
-  Result := Result + ' ' + Arg('fixture');
-#else
-  Result := Result + ' ' + Arg('protected');
+  if ExpandConstant('{param:FixtureMachineProbe|0}') = '1' then Result := True;
 #endif
 end;
 
@@ -332,9 +414,6 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ProgramDir, DataDir, AdjacentDir: String;
-#ifndef Fixture
-  ExistingParent: String;
-#endif
   Info, Location: TArrayOfString;
 begin
   Result := ProgramChoiceError;
@@ -352,26 +431,27 @@ begin
   AdjacentDir := AddBackslash(ProgramDir) + 'Library';
   try
     RequireOrdinaryParents(ProgramDir);
+    if IsProtectedScope then Result := CheckMachineProgram(ProgramDir)
+    else Result := RunStorage('user-program', Arg(ProgramDir), Info);
+    if Result <> '' then begin
+      Log(Result);
+      exit;
+    end;
     if not DirExists(ProgramDir) then begin
-#ifndef Fixture
-      // Validate the existing parent before creating any descendant as administrator.
-      ExistingParent := ExtractFileDir(ProgramDir);
-      while (ExistingParent <> '') and not DirExists(ExistingParent) do
-        ExistingParent := ExtractFileDir(ExistingParent);
-      if ExistingParent = '' then RaiseException('Nie znaleziono istniejącego katalogu nadrzędnego programu.');
-      Result := RunStorage('program', Arg(ExistingParent), Info);
-      if Result <> '' then exit;
-#endif
       if not ForceDirectories(ProgramDir) then RaiseException('Nie można utworzyć katalogu programu.');
     end;
     RequireOrdinaryParents(ProgramDir);
     RequireOrdinaryParents(AddBackslash(ProgramDir) + 'HexMapEditor.exe');
     RequireOrdinaryParents(AddBackslash(ProgramDir) + 'deployment.mode');
     RequireOrdinaryParents(AddBackslash(ProgramDir) + 'library-location.txt');
-#ifndef Fixture
-    Result := RunStorage('program', Arg(ProgramDir), Info);
-    if Result <> '' then exit;
-#endif
+    RequireOrdinaryParents(AddBackslash(ProgramDir) + 'LICENSE');
+    if IsProtectedScope then begin
+      Result := CheckMachineProgram(ProgramDir);
+      if Result <> '' then begin
+        Log(Result);
+        exit;
+      end;
+    end;
     RequireOrdinaryParents(DataDir);
     CreateDataLeaf(DataDir, OriginalSid);
     if CompareText(RemoveBackslashUnlessRoot(ChosenLibrary), AdjacentDir) = 0 then begin
@@ -464,6 +544,11 @@ end;
 
 function InitializeUninstall: Boolean;
 begin
+  if not IsAdminInstallMode and IsUserAnAdmin then begin
+    SuppressibleMsgBox('Uruchom deinstalator bieżącego użytkownika bez podniesionych uprawnień.', mbError, MB_OK, IDOK);
+    Result := False;
+    exit;
+  end;
   Result := not CheckForMutexes('{#InstallGuard}');
   if not Result then
     SuppressibleMsgBox('Zapisz pracę i zamknij HexMapEditor przed odinstalowaniem.', mbError, MB_OK, IDOK);
