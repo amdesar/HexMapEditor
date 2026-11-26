@@ -36,6 +36,8 @@ namespace HexMapEditor
         static readonly Regex RepositoryPart = new Regex(@"^[a-zA-Z0-9_-][a-zA-Z0-9_.-]{0,99}\z");
         static readonly Regex VersionTag = new Regex(@"^v?(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\z");
         static readonly Regex Digest = new Regex(@"^sha256:[a-fA-F0-9]{64}\z");
+        static readonly Regex ReleaseAssetPath = new Regex(
+            @"\A/github-production-release-asset/[0-9]+/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\z");
         readonly string project;
         readonly Action<Uri, Action<Stream>> receive;
         readonly bool includePrereleases;
@@ -150,8 +152,18 @@ namespace HexMapEditor
         }
         internal static bool AllowedAssetRedirect(Uri url)
         {
-            return (SecureHost(url, "release-assets.githubusercontent.com") || SecureHost(url, "objects.githubusercontent.com")) &&
-                url.AbsolutePath.StartsWith("/github-production-release-asset-", StringComparison.Ordinal);
+            bool releaseAssets = SecureHost(url, "release-assets.githubusercontent.com");
+            if (!releaseAssets && !SecureHost(url, "objects.githubusercontent.com")) return false;
+            return url.AbsolutePath.StartsWith("/github-production-release-asset-", StringComparison.Ordinal) ||
+                (releaseAssets && ReleaseAssetPath.IsMatch(url.AbsolutePath));
+        }
+        internal static Uri RedirectTarget(bool api, int redirects, int code, string location)
+        {
+            Uri next;
+            if (api || redirects >= 1 || (code != 302 && code != 303 && code != 307) ||
+                !Uri.TryCreate(location, UriKind.Absolute, out next) || !AllowedAssetRedirect(next))
+                throw new IOException("Kanał aktualizacji zwrócił nieoczekiwane przekierowanie.");
+            return next;
         }
         static void Receive(Uri url, Action<Stream> read)
         {
@@ -176,12 +188,7 @@ namespace HexMapEditor
                             using (var contents = response.GetResponseStream()) read(contents);
                             return;
                         }
-                        Uri next;
-                        int code = (int)response.StatusCode;
-                        if (api || redirects >= 1 || (code != 302 && code != 303 && code != 307) ||
-                            !Uri.TryCreate(response.Headers["Location"], UriKind.Absolute, out next) || !AllowedAssetRedirect(next))
-                            throw new IOException("Kanał aktualizacji zwrócił nieoczekiwane przekierowanie.");
-                        url = next;
+                        url = RedirectTarget(api, redirects, (int)response.StatusCode, response.Headers["Location"]);
                     }
                 }
                 catch (WebException error)

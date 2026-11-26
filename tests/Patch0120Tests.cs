@@ -126,9 +126,35 @@ namespace HexMapEditor.Tests
             var denied = new ReleaseUpdates("fixture", "private", (uri,read)=>{throw new IOException("HTTP 403");});
             Refuses<IOException>(()=>denied.Check(current,true), "Access failure represented as up-to-date");
             Check(ReleaseUpdates.AllowedAssetRedirect(new Uri("https://release-assets.githubusercontent.com/github-production-release-asset-2e65be/fixture?a=b")) &&
+                ReleaseUpdates.AllowedAssetRedirect(new Uri("https://objects.githubusercontent.com/github-production-release-asset-2e65be/fixture?a=b")) &&
                 !ReleaseUpdates.AllowedAssetRedirect(new Uri("https://release-assets.githubusercontent.com.attacker.invalid/github-production-release-asset-2e65be/fixture")) &&
                 !ReleaseUpdates.AllowedAssetRedirect(new Uri("http://release-assets.githubusercontent.com/github-production-release-asset-2e65be/fixture")),
                 "Redirect whitelist");
+            GitHubAssetRedirect();
+        }
+        static void GitHubAssetRedirect()
+        {
+            const string host = "https://release-assets.githubusercontent.com";
+            const string asset = "/github-production-release-asset/1445291919/3448b74e-bfcd-4fcc-a824-3f1c3e253e4c";
+            const string location = host + asset + "?fixture=signature";
+            Check(ReleaseUpdates.RedirectTarget(false, 0, 302, location) == new Uri(location),
+                "Released asset path or its signature query was rejected");
+            foreach (var invalid in new[] {
+                "https://example.invalid" + asset,
+                "https://release-assets.githubusercontent.com.example.invalid" + asset,
+                "https://objects.githubusercontent.com" + asset,
+                "http://release-assets.githubusercontent.com" + asset,
+                host + ":444" + asset,
+                host + asset.Replace("1445291919", "144529191x"),
+                host + asset.Replace("3448b74e-bfcd-4fcc-a824-3f1c3e253e4c", "not-a-uuid"),
+                host + asset + "/extra",
+                host + asset + "/",
+                host + asset + "#fragment"
+            })
+                Refuses<IOException>(() => ReleaseUpdates.RedirectTarget(false, 0, 302, invalid), "Invalid asset redirect accepted");
+            Refuses<IOException>(() => ReleaseUpdates.RedirectTarget(false, 1, 302, location), "Second redirect accepted");
+            Refuses<IOException>(() => ReleaseUpdates.RedirectTarget(true, 0, 302, location), "API redirect accepted");
+            Refuses<IOException>(() => ReleaseUpdates.RedirectTarget(false, 0, 301, location), "Unexpected redirect status accepted");
         }
         static void Data()
         {

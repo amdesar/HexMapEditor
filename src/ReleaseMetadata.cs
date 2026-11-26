@@ -2,7 +2,7 @@ namespace HexMapEditor
 {
     internal static class ReleaseMetadata
     {
-        internal const string Version = "0.12.3";
+        internal const string Version = "0.12.4";
         // Jawna data przygotowania wydania, nigdy zegar uruchomienia ani mtime EXE.
         internal const string Date = "26.11.2026";
     }
