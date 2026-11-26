@@ -33,10 +33,10 @@ namespace HexMapEditor
                 if(delta>180)delta-=360; if(delta< -180)delta+=360;
                 CropMath.Rotate(draft,activeFlat,delta); RefreshView();
             };
-            var reset = new Button { Text = "Obrót 0°", Bounds = new Rectangle(512,488,110,28) };
+            var reset = new EditorButton { Text = "Obrót 0°", Bounds = new Rectangle(512,488,110,28) };
             reset.Click += (s,e) => { CropMath.Rotate(draft,activeFlat,-(activeFlat ? draft.Flat : draft.Pointy).Angle); RefreshView(); };
-            var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(400,546,105,30) };
-            var cancel = new Button { Text = "Anuluj", Bounds = new Rectangle(516,546,105,30), DialogResult = DialogResult.Cancel };
+            var accept = new EditorButton { Text = "Zatwierdź", Bounds = new Rectangle(400,546,105,30) };
+            var cancel = new EditorButton { Text = "Anuluj", Bounds = new Rectangle(516,546,105,30), DialogResult = DialogResult.Cancel };
             DarkTextBox nameBox = null;
             if (newImport)
             {

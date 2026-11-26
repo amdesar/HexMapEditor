@@ -12,7 +12,7 @@ namespace HexMapEditor
         readonly CanvasAspectPreview preview = new CanvasAspectPreview { Bounds = new Rectangle(403, 58, 365, 310) };
         readonly TrackBar opacity = Slider(0, 100, 100), saturation = Slider(0, 200, 100), blur = Slider(0, 24, 0);
         readonly Label values = new Label { Bounds = new Rectangle(15, 453, 620, 25) };
-        readonly Button remove = new Button { Text = "Usuń tło", Bounds = new Rectangle(286, 10, 110, 28) };
+        readonly Button remove = new EditorButton { Text = "Usuń tło", Destructive=true, Bounds = new Rectangle(286, 10, 110, 28) };
         bool updating;
         readonly Size viewport;
         Bitmap previewSource, filtered, covered;
@@ -35,18 +35,17 @@ namespace HexMapEditor
             Text = "Tło mapy"; ClientSize = new Size(780, 526); FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent; MaximizeBox = MinimizeBox = false;
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI", 9);
-            var import = new Button { Text = "Z pliku…", Bounds = new Rectangle(149, 10, 125, 28) };
-            var library = new Button { Text = "Z biblioteki…", Bounds = new Rectangle(12,10,125,28) };
-            if (importQueue) { import.Visible = library.Visible = remove.Visible = false; }
-            remove.FlatStyle=FlatStyle.Flat;remove.ForeColor=Color.FromArgb(244,113,113);remove.FlatAppearance.BorderColor=remove.ForeColor;
-            remove.EnabledChanged+=(s,e)=>{remove.ForeColor=remove.Enabled?Color.FromArgb(244,113,113):Color.Gray;remove.FlatAppearance.BorderColor=remove.ForeColor;};
-            remove.FlatAppearance.MouseOverBackColor=Color.FromArgb(80,42,48);remove.FlatAppearance.MouseDownBackColor=Color.FromArgb(100,44,52);
+            var import = new EditorButton { Text = "Z pliku…", Bounds = new Rectangle(149, 10, 125, 28) };
+            var library = new EditorButton { Text = "Z biblioteki…", Bounds = new Rectangle(12,10,125,28) };
+            var clipboard = new EditorButton { Text="Importuj ze schowka", Bounds=new Rectangle(407,10,163,28) };
+            if (importQueue) { import.Visible = library.Visible = clipboard.Visible = remove.Visible = false; }
             library.Click+=(s,e)=>{if(ChooseLibrary==null)return;var chosen=ChooseLibrary();if(chosen==null)return;draft=chosen.Settings.Copy();draft.Source=draft.Source.Pin();draft.LibraryId=chosen.Id;ImportName=null;UpdateSettings();};
-            var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(407,15,365,22) };
+            var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(12,39,365,19) };
             opacity.Location = new Point(12, 403); saturation.Location = new Point(272, 403); blur.Location = new Point(532, 403);
-            var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(546, 484, 106, 29) };
-            var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(660, 484, 106, 29) };
+            var accept = new EditorButton { Text = "Zatwierdź", Bounds = new Rectangle(546, 484, 106, 29) };
+            var cancel = new EditorButton { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(660, 484, 106, 29) };
             import.Click += (s, e) => Import();
+            clipboard.Click+=(s,e)=>ImportClipboard();
             remove.Click += (s, e) => { draft = null; ImportName=null; UpdateSettings(); };
             crop.Changed = QueuePreview;
             foreach (var slider in new[] { opacity, saturation, blur }) slider.ValueChanged += (s, e) =>
@@ -64,9 +63,9 @@ namespace HexMapEditor
                 slider.MouseCaptureChanged += (s,e) => { if (!slider.Capture && Control.MouseButtons==MouseButtons.None) FinishPreview(); };
             }
             accept.Click += (s, e) => { if (CanAccept != null && !CanAccept())return;var result=draft==null?null:draft.Copy();if(SaveAndApply!=null&&!SaveAndApply(result,draft==null?null:draft.LibraryId))return;Result=result;DialogResult=DialogResult.OK; };
-            var reset = new Button { Text = "100%", Bounds = new Rectangle(462,403,58,26), AccessibleName = "Przywróć nasycenie 100%" };
+            var reset = new EditorButton { Text = "100%", Bounds = new Rectangle(462,403,58,26), AccessibleName = "Przywróć nasycenie 100%" };
             reset.Click += (s,e) => saturation.Value = 100;
-            Controls.AddRange(new Control[] { crop, preview, import, remove, library, hint, opacity, saturation, blur, accept, cancel, values, reset,
+            Controls.AddRange(new Control[] { crop, preview, import, clipboard, remove, library, hint, opacity, saturation, blur, accept, cancel, values, reset,
                 new Label { Text = "Podgląd na płótnie", Bounds = new Rectangle(403,35,365,22) },
                 new Label { Text = "Krycie", Location = new Point(12, 381), AutoSize = true },
                 new Label { Text = "Nasycenie", Location = new Point(272, 381), AutoSize = true },
@@ -81,14 +80,32 @@ namespace HexMapEditor
                 if (file.ShowDialog(this) != DialogResult.OK) return;
                 try
                 {
-                    var source = GraphicSources.Import(file.FileName);
-                    draft = new MapBackground { Source = source, SourceId = source.Id };
                     string name=Path.GetFileNameWithoutExtension(file.FileName).Trim();
-                    ImportName=name.Length==0?"Tło":PresetFiles.Shorten(name,200);
-                    UpdateSettings();
+                    SetImportedSource(GraphicSources.Import(file.FileName),name.Length==0?"Tło":PresetFiles.Shorten(name,200));
                 }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, "Import tła", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             }
+        }
+        internal bool ImportClipboard(IWin32Window owner=null)
+        {
+            try{SetClipboardSource(System.Windows.Clipboard.GetDataObject());return true;}
+            catch(Exception error)
+            {
+                MessageBox.Show(owner??this,error.Message,"Import tła",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                return false;
+            }
+        }
+        internal void SetClipboardSource(System.Windows.IDataObject clipboard)
+        {
+            const int side=GraphicLimits.SourceSide;
+            var bytes=ClipboardRaster.Read(clipboard,GraphicSources.MaxFileBytes,side,(long)side*side);
+            if(bytes==null)throw new InvalidDataException("Schowek nie zawiera obsługiwanej grafiki.");
+            SetImportedSource(GraphicSources.Import(bytes),"Tło ze schowka");
+        }
+        void SetImportedSource(GraphicSource source,string name)
+        {
+            draft=new MapBackground{Source=source,SourceId=source.Id};
+            ImportName=name;UpdateSettings();
         }
         void UpdateSettings()
         {

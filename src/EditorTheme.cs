@@ -17,6 +17,7 @@ namespace HexMapEditor
     }
     internal static class EditorTheme
     {
+        internal static readonly Color DisabledText=Color.FromArgb(167,175,189),ErrorText=Color.FromArgb(255,145,145),LinkText=Color.FromArgb(137,192,250);
         [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr h,int attr,ref int value,int size);
         internal static void Caption(Form form){try{int yes=1;if(DwmSetWindowAttribute(form.Handle,20,ref yes,4)!=0)DwmSetWindowAttribute(form.Handle,19,ref yes,4);}catch(DllNotFoundException){}catch(EntryPointNotFoundException){} }
         internal static void Apply(Control root)
@@ -26,7 +27,7 @@ namespace HexMapEditor
             var text=root as TextBoxBase;if(text!=null){text.BackColor=Color.FromArgb(41,46,58);text.ForeColor=Color.WhiteSmoke;}
             var combo=root as ComboBox;if(combo!=null){combo.BackColor=Color.FromArgb(41,46,58);combo.ForeColor=Color.WhiteSmoke;combo.FlatStyle=FlatStyle.Flat;}
             var list=root as ListBox;if(list!=null){list.BackColor=Color.FromArgb(41,46,58);list.ForeColor=Color.WhiteSmoke;}
-            var button=root as Button;if(button!=null){if(button.DialogResult==DialogResult.Cancel||button.DialogResult==DialogResult.No)button.CausesValidation=false;if(button.UseVisualStyleBackColor){button.UseVisualStyleBackColor=false;button.FlatStyle=FlatStyle.Flat;button.BackColor=Color.FromArgb(49,54,67);button.ForeColor=Color.WhiteSmoke;button.FlatAppearance.BorderColor=Color.FromArgb(76,83,98);}}
+            var button=root as Button;if(button!=null){if(button.DialogResult==DialogResult.Cancel||button.DialogResult==DialogResult.No)button.CausesValidation=false;if(button.UseVisualStyleBackColor){button.UseVisualStyleBackColor=false;button.FlatStyle=FlatStyle.Flat;ChoiceStyle.Apply(button,false);}}
             if(root is TrackBar||root is TabPage){root.BackColor=Color.FromArgb(34,38,48);root.ForeColor=Color.WhiteSmoke;}
             foreach(Control child in root.Controls)Apply(child);
         }

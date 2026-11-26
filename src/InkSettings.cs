@@ -14,7 +14,7 @@ namespace HexMapEditor
             var label=new Label{Text="Rozmiar rysika i gumki",AutoSize=true,Location=new Point(0,3)};inkSettings.Controls.Add(label);
             inkSize=new ScrubNumber{Minimum=1,Maximum=200,DecimalPlaces=0,Increment=1,Value=5,Width=68,Location=new Point(0,24),AccessibleName="Grubość rysika / średnica gumki (logiczne piksele ekranu)"};inkSettings.Controls.Add(inkSize);
             inkSize.ValueChanged+=(s,e)=>{if(updating)return;EndCanvasGesture(true);inkToolSize=(float)inkSize.Value;canvas.Invalidate();};
-            BindToolNumber(inkSize);
+            inkSize.UseLocalHistory=true;
             inkColorButton=SmallButton(inkSettings,"Kolor rysika",()=>ChooseInkColor(false),112);inkColorButton.Location=new Point(0,28);
             pointerColorButton=SmallButton(inkSettings,"Kolor wskaźnika",()=>ChooseInkColor(true),100);pointerColorButton.AccessibleName="Kolor chwilowego wskaźnika";tips.SetToolTip(pointerColorButton,pointerColorButton.AccessibleName);
             inkSettings.Layout+=(s,e)=>{int half=inkSettings.ClientSize.Width/2;label.SetBounds(0,0,inkSettings.ClientSize.Width-ParameterWidth-5,26);label.AutoSize=false;label.TextAlign=ContentAlignment.MiddleLeft;inkSize.SetBounds(label.Right+5,0,ParameterWidth,26);inkColorButton.SetBounds(0,32,half-2,28);pointerColorButton.SetBounds(half+2,32,inkSettings.ClientSize.Width-half-2,28);};

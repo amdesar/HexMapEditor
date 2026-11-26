@@ -18,7 +18,7 @@ namespace HexMapEditor
         readonly Label status = new Label { Dock = DockStyle.Top, Height = 30, Text = "Sprawdzanie folderów…" };
         readonly Button add = new EditorButton { Text = "Dodaj", AutoSize = true };
         readonly Button skip = new EditorButton { Text = "Pomiń na teraz", AutoSize = true };
-        readonly Button delete = new EditorButton { Text = "Usuń plik…", AutoSize = true };
+        readonly Button delete = new EditorButton { Text = "Usuń plik…", AutoSize = true, Destructive = true };
         readonly Button addRest = new EditorButton { Text = "Dodaj pozostałe z domyślnym kadrem", AutoSize = true };
         readonly Button skipRest = new EditorButton { Text = "Pomiń pozostałe", AutoSize = true };
         readonly Button close = new EditorButton { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
@@ -35,8 +35,16 @@ namespace HexMapEditor
             files.FontChanged += (s,e) => QueueColumnSize();
             files.DrawItem += (s,e) => { }; // Details view draws each cell in DrawSubItem.
             files.DrawColumnHeader += (s,e) => PaintCell(e.Graphics,e.Bounds,e.Header.Text,Color.FromArgb(49,54,67));
-            files.DrawSubItem += (s,e) => PaintCell(e.Graphics,e.Bounds,e.SubItem.Text,
-                e.Item.Selected ? Color.FromArgb(63,82,118) : files.BackColor);
+            files.DrawSubItem += (s,e) => {
+                PaintCell(e.Graphics,e.Bounds,e.SubItem.Text,e.Item.Selected ? ChoiceStyle.ActiveBack : files.BackColor);
+                if(e.Item.Focused&&files.Focused)using(var pen=new Pen(ChoiceStyle.ActiveBorder))
+                {
+                    e.Graphics.DrawLine(pen,e.Bounds.Left,e.Bounds.Top,e.Bounds.Right,e.Bounds.Top);
+                    e.Graphics.DrawLine(pen,e.Bounds.Left,e.Bounds.Bottom-1,e.Bounds.Right,e.Bounds.Bottom-1);
+                }
+            };
+            files.GotFocus+=(s,e)=>files.Invalidate();
+            files.LostFocus+=(s,e)=>files.Invalidate();
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true, Padding = new Padding(0,5,0,0) };
             buttons.Controls.AddRange(new Control[] { add, skip, delete, addRest, skipRest, close });
             Controls.Add(files); Controls.Add(status); Controls.Add(buttons); CancelButton = close;

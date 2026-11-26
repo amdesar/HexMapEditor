@@ -26,6 +26,7 @@
 | 0.13.1 | Jeden kreator Setup, aktualizacja obu trybów instalowanych z aplikacji i ciemna kolejka importu |
 | 0.13.2 | Nazwane oryginały bezpośrednio w folderach kategorii Library, z odczytem dotychczasowych źródeł |
 | 0.13.3 | Metadane grafik w podfolderach kategorii i kontrola blokady konkretnego EXE podczas aktualizacji |
+| 0.13.4 | Szybkie warstwy Widoku, lokalna historia pól narzędzi, panel aktualizacji, kontrast, tło ze schowka, O programie i upuszczanie map |
 | 0.13.x | Końcowa stabilizacja i uzgodnione testy |
 | 1.0.0 | Wyłącznie oznaczenia wersji, bez nowych zmian funkcjonalnych/stylistycznych |
 

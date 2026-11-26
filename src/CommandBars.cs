@@ -32,9 +32,7 @@ namespace HexMapEditor
             Sep(file);AddCommand(file,"Zapisz",EditorCommand.Save,"Ctrl+S");AddCommand(file,"Zapisz jako…",EditorCommand.SaveAs,"Ctrl+Shift+S");Sep(file);AddCommand(file,"Zakończ",EditorCommand.Exit,"Alt+F4");
             var edit=Category("&Edycja");AddCommand(edit,"Cofnij",EditorCommand.Undo,"Ctrl+Z");AddCommand(edit,"Ponów",EditorCommand.Redo,"Ctrl+Y");Sep(edit);var rename=AddCommand(edit,"Zmień nazwę pliku…",EditorCommand.Rename);rename.ToolTipText="Dostępne po pierwszym zapisie mapy. Zmienia nazwę pliku, bez zapisu niezapisanych zmian.";
             mapMenu=Category("&Mapa");AddCommand(mapMenu,"Rozmiar mapy…",EditorCommand.Resize);var orientation=new ToolStripMenuItem("Orientacja");mapMenu.DropDownItems.Add(orientation);pointyMenu=new ToolStripMenuItem("Pointy Top",null,(s,e)=>ChangeOrientation("PointyTop"));flatMenu=new ToolStripMenuItem("Flat Top",null,(s,e)=>ChangeOrientation("FlatTop"));orientation.DropDownItems.AddRange(new ToolStripItem[]{pointyMenu,flatMenu});AddCommand(mapMenu,"Tło mapy…",EditorCommand.Background);
-            var view= viewMenu=Category("&Widok");var layers=new ToolStripMenuItem("Warstwy");view.DropDownItems.Add(layers);layerItems=new ToolStripMenuItem[LayerNames.Length];
-            foreach(int i in new[]{4,0,1,2,5,3,6}){var layer=(MapLayer)i;var item=new ToolStripMenuItem(LayerNames[i]);item.Click+=(s,e)=>{if(!BlockInkCommit())SetLayerVisible(layer,!LayerVisible(layer));};layerItems[i]=item;layers.DropDownItems.Add(item);}
-            layers.DropDown.Closing+=(s,e)=>{if(e.CloseReason==ToolStripDropDownCloseReason.ItemClicked)e.Cancel=true;};
+            var view= viewMenu=Category("&Widok");var layers=new ToolStripMenuItem("Warstwy");view.DropDownItems.Add(layers);layerItems=FillLayerMenu(layers.DropDown);
             axesMenu=new ToolStripMenuItem("Osie");view.DropDownItems.Add(axesMenu);foreach(string mode in new[]{"Axes","InCells","None"}){string value=mode;var item=new ToolStripMenuItem(mode=="Axes"?"Osie":mode=="InCells"?"Współrzędne w heksach":"Brak współrzędnych"){Tag=mode};item.Click+=(s,e)=>{if(BlockInkCommit()||map.LabelMode==value)return;EndCanvasGesture(true);map.LabelMode=value;MarkDirty();};axesMenu.DropDownItems.Add(item);}
             var quality=new ToolStripMenuItem("Jakość");view.DropDownItems.Add(quality);qualityHigh=new ToolStripMenuItem("Wysoka",null,(s,e)=>SetLowQuality(false));qualityLow=new ToolStripMenuItem("Niska",null,(s,e)=>SetLowQuality(true));quality.DropDownItems.AddRange(new ToolStripItem[]{qualityHigh,qualityLow});Sep(view);
             var zoomMenu=new ToolStripMenuItem("Powiększenie");view.DropDownItems.Add(zoomMenu);FillZoomMenu(zoomMenu.DropDownItems);
@@ -51,7 +49,8 @@ namespace HexMapEditor
             ConfigureButton(zoomButton,"100%","fit","Ustaw powiększenie 100%",SetZoom100,ZoomButtonWidth());zoomButton.Image=null;
             ConfigureButton(zoomArrow,"▾","fit","Powiększenie — presety i wartość niestandardowa",ShowZoomMenu,24);zoomArrow.Image=null;zoomArrow.MouseDown+=(s,e)=>{if(GetMessageTime()!=zoomClosingStamp)suppressZoomOpen=false;};zoomArrow.KeyDown+=(s,e)=>suppressZoomOpen=false;
             var zoomHost=new Panel{Size=new Size(zoomButton.Width+zoomArrow.Width,32),Margin=Padding.Empty};zoomButton.Location=Point.Empty;zoomArrow.Location=new Point(zoomButton.Width,0);zoomHost.Controls.Add(zoomButton);zoomHost.Controls.Add(zoomArrow);quickStrip.Items.Add(new ToolStripControlHost(zoomHost){AutoSize=false,Size=zoomHost.Size,Margin=new Padding(1,0,1,0),Overflow=ToolStripItemOverflow.AsNeeded});
-            Quick(new Button(),EditorCommand.FitMap,"fit","Dopasuj mapę",32);Quick(new Button(),EditorCommand.FitAll,"fitall","Dopasuj wszystko — widoczne warstwy",32);quickStrip.Items.Add(new ToolStripSeparator());qualityButton=new Button();Quick(qualityButton,EditorCommand.Quality,null,"Wysoka / Niska jakość — tylko podgląd sesji",60);
+            Quick(new Button(),EditorCommand.FitMap,"fit","Dopasuj mapę",32);Quick(new Button(),EditorCommand.FitAll,"fitall","Dopasuj wszystko — widoczne warstwy",32);quickStrip.Items.Add(new ToolStripSeparator());
+            AddQuickLayers();qualityButton=new Button();Quick(qualityButton,EditorCommand.Quality,null,"Wysoka / Niska jakość — tylko podgląd sesji",60);
             AddDetailsCommands();
             MenuFence(quickStrip.OverflowButton.DropDown);UpdateQualityButton();UpdateCommandState();
         }
@@ -71,18 +70,28 @@ namespace HexMapEditor
         {
             var focus=commandFocus??commandTarget??FocusedEditorControl();commandFocus=null;
             if(cellDescription.ContainsFocus||IsWithin(focus,cellDescription)){TextUndo("description",repeat);return;}
+            var number=LocalToolNumber(focus);if(number!=null){number.StepLocal(repeat);UpdateCommandState();return;}
             var draft=focus as DraftNameBox;if(draft!=null){draft.Step(repeat);return;}
             var text=focus as TextBoxBase;if(text!=null){var rich=text as RichTextBox;if(repeat&&rich!=null)rich.Redo();else if(text.CanUndo)text.Undo();return;}
             if(repeat)Redo();else Undo();
         }
         static bool IsWithin(Control child,Control parent){for(var c=child;c!=null;c=c.Parent)if(c==parent)return true;return false;}
+        static ScrubNumber LocalToolNumber(Control focus)
+        {
+            for(var control=focus;control!=null;control=control.Parent)
+            {
+                var field=control as ScrubNumber;
+                if(field!=null&&field.UseLocalHistory)return field;
+            }
+            return null;
+        }
         static bool NeedsDocument(EditorCommand command)
         {return command!=EditorCommand.New&&command!=EditorCommand.Open&&command!=EditorCommand.Exit&&command!=EditorCommand.About;}
         void ExecuteCommand(EditorCommand command)
         {
             if(!HasDocuments&&NeedsDocument(command))return;
             if(command!=EditorCommand.Exit&&BlockInkCommit())return;CommandExecutions[command]=CommandExecutions.ContainsKey(command)?CommandExecutions[command]+1:1;
-            switch(command){case EditorCommand.New:NewProject();break;case EditorCommand.Open:OpenProject();break;case EditorCommand.Save:SaveProject();break;case EditorCommand.SaveAs:SaveAsProject();break;case EditorCommand.Exit:Close();break;case EditorCommand.Undo:CommandHistory(false);break;case EditorCommand.Redo:CommandHistory(true);break;case EditorCommand.Rename:RenameProject();break;case EditorCommand.Resize:ResizeProject();break;case EditorCommand.Background:EditBackground();break;case EditorCommand.FitMap:EndCanvasGesture(true);FitMap();break;case EditorCommand.FitAll:EndCanvasGesture(true);FitEverything();break;case EditorCommand.Quality:SetLowQuality(!lowQuality);break;case EditorCommand.About:using(var d=new AboutDialog(Icon))RunModal(()=>d.ShowDialog(this));break;}commandFocus=null;
+            switch(command){case EditorCommand.New:NewProject();break;case EditorCommand.Open:OpenProject();break;case EditorCommand.Save:SaveProject();break;case EditorCommand.SaveAs:SaveAsProject();break;case EditorCommand.Exit:Close();break;case EditorCommand.Undo:CommandHistory(false);break;case EditorCommand.Redo:CommandHistory(true);break;case EditorCommand.Rename:RenameProject();break;case EditorCommand.Resize:ResizeProject();break;case EditorCommand.Background:EditBackground();break;case EditorCommand.FitMap:EndCanvasGesture(true);FitMap();break;case EditorCommand.FitAll:EndCanvasGesture(true);FitEverything();break;case EditorCommand.Quality:SetLowQuality(!lowQuality);break;case EditorCommand.About:ShowAbout();break;}commandFocus=null;
         }
         void RefreshRecentMenu()
         {
@@ -103,11 +112,13 @@ namespace HexMapEditor
             commandMenus[EditorCommand.Rename].Enabled=!busy&&!String.IsNullOrEmpty(currentPath);
             Control focus=commandFocus??commandTarget??FocusedEditorControl();var text=focus as TextBoxBase;bool textContext=text!=null;
             var draft=focus as DraftNameBox;
-            commandMenus[EditorCommand.Undo].Enabled=documentReady&&(draft!=null?draft.CanStep(false):textContext?text.CanUndo:undo.Count>0);
-            commandMenus[EditorCommand.Redo].Enabled=documentReady&&(draft!=null?draft.CanStep(true):textContext?text.CanUndo:redo.Count>0);
+            var number=LocalToolNumber(focus);
+            commandMenus[EditorCommand.Undo].Enabled=documentReady&&(number!=null?number.CanStepLocal(false):draft!=null?draft.CanStep(false):textContext?text.CanUndo:undo.Count>0);
+            commandMenus[EditorCommand.Redo].Enabled=documentReady&&(number!=null?number.CanStepLocal(true):draft!=null?draft.CanStep(true):textContext?text.CanUndo:redo.Count>0);
             foreach(var pair in quickCommands)pair.Value.Enabled=commandMenus.ContainsKey(pair.Key)?commandMenus[pair.Key].Enabled:documentReady;
             mapMenu.Enabled=viewMenu.Enabled=HasDocuments;
             qualityHigh.Enabled=qualityLow.Enabled=pointyMenu.Enabled=flatMenu.Enabled=documentReady;zoomButton.Enabled=zoomArrow.Enabled=documentReady;
+            if(quickLayers!=null)quickLayers.Enabled=documentReady;
             pointyMenu.Checked=map.Orientation=="PointyTop";flatMenu.Checked=!pointyMenu.Checked;qualityHigh.Checked=!lowQuality;qualityLow.Checked=lowQuality;
             foreach(ToolStripMenuItem item in axesMenu.DropDownItems)item.Checked=(string)item.Tag==map.LabelMode;UpdateLayerChecks();
         }
@@ -119,9 +130,5 @@ namespace HexMapEditor
     {
         readonly ScrubNumber value=new ScrubNumber{Minimum=1,Maximum=12800,DecimalPlaces=2,Increment=1,PixelsPerStep=4};internal decimal Value{get{return value.Value;}}
         internal ZoomDialog(float initial):base("Powiększenie",128){value.Value=(decimal)Math.Max(1,Math.Min(12800,initial));Row(0,"Procent (%)",value,true);Buttons(1,()=>{if(value.CommitText())DialogResult=DialogResult.OK;});}
-    }
-    internal sealed class AboutDialog:DarkForm
-    {
-        internal AboutDialog(Icon appIcon){Text="O programie";ClientSize=new Size(390,160);FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;StartPosition=FormStartPosition.CenterParent;Font=new Font("Segoe UI",10);try{Icon=appIcon==null?Icon.ExtractAssociatedIcon(Application.ExecutablePath):(Icon)appIcon.Clone();}catch{}var pic=new PictureBox{Image=Icon==null?null:Icon.ToBitmap(),Bounds=new Rectangle(20,24,54,54),SizeMode=PictureBoxSizeMode.Zoom};Controls.Add(pic);Controls.Add(new Label{Text="HexMapEditor\nby amdesar\nWersja "+ReleaseMetadata.Version+" • "+ReleaseMetadata.Date,AutoSize=true,Location=new Point(91,22)});var close=new Button{Text="Zamknij",DialogResult=DialogResult.OK,Bounds=new Rectangle(270,116,100,30)};Controls.Add(close);AcceptButton=CancelButton=close;Disposed+=(s,e)=>{if(pic.Image!=null)pic.Image.Dispose();};}
     }
 }

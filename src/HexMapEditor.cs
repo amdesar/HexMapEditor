@@ -122,7 +122,6 @@ namespace HexMapEditor
 
     internal sealed class EditAction
     {
-        public ToolNumbers BeforeTool,AfterTool;
         internal PresetSections QuickSections;
         internal string NamedCellId,BeforeCellName,AfterCellName;
         internal string QuickPresetId;internal QuickSnapshot BeforeQuick,AfterQuick;
@@ -210,6 +209,7 @@ namespace HexMapEditor
             LoadProgramIcon();
             StartupTrace.Write("editor.construct.icon",this);
             InitializeShell(); InitInk(); InitBackgroundResize(); InitCameraInteraction();
+            AttachMapDrop();
             Disposed+=(s,e)=>{if(saveButton.Image!=null&&!ReferenceEquals(saveButton.Image,EditorIcons.Small("save")))saveButton.Image.Dispose();};
             TrackCommandFocus(this);
             Deactivate+=(s,e)=>CancelNumberDrags(this);
@@ -630,7 +630,7 @@ namespace HexMapEditor
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            return HandleHistoryShortcut(keyData) || base.ProcessCmdKey(ref msg, keyData);
+            return HandleLayerShortcut(keyData) || HandleHistoryShortcut(keyData) || base.ProcessCmdKey(ref msg, keyData);
         }
 
         bool HandleHistoryShortcut(Keys keyData)
@@ -640,11 +640,12 @@ namespace HexMapEditor
             if ((key != Keys.Z && key != Keys.Y) || (keyData & Keys.Control) == 0) return false;
             if ((keyData & Keys.Modifiers) != Keys.Control) return true;
 
+            var local=LocalToolNumber(FocusedEditorControl());
+            if(local!=null){local.StepLocal(key==Keys.Y);return true;}
             for(var c=FocusedEditorControl();c!=null;c=c.Parent){var n=c as ScrubNumber;if(n!=null&&!n.IsEditing){if(key==Keys.Y)Redo();else Undo();return true;}}
             if(FocusedEditorControl() is TextBoxBase)return false;
 
             bool repeat = key == Keys.Y;
-            var number=FocusedEditorControl() as ScrubNumber;if(number!=null&&!number.IsEditing){if(repeat)Redo();else Undo();return true;}
             if (cellDescription.ContainsFocus) TextUndo("description", repeat);
             else if (objectDetailPanel.ContainsFocus || !TextInputFocused(this))
             {
@@ -935,7 +936,7 @@ namespace HexMapEditor
         bool TryHistory(bool after, out string error)
         {
             if(IsAutoSaving(activeDocument)){error=AutoSaveBusyMessage;return false;}EndCanvasGesture(true); if(InkCommitBusy){error=InkBusyMessage;return false;} var from = after ? redo : undo; var to = after ? undo : redo; error = null; if (from.Count == 0) return true;
-            try { var action = from.Peek(); ApplyAction(action, after); if(action.BeforeTool==null)documentRevision++; from.Pop(); to.Push(action); if(action.BeforeTool==null)MarkDirty();else{UpdateCommandState();canvas.Invalidate();} return true; }
+            try { var action = from.Peek(); ApplyAction(action, after); documentRevision++; from.Pop(); to.Push(action); MarkDirty(); return true; }
             catch (Exception ex) { error = ex.Message; return false; }
         }
         void Undo() { string error; if (!TryHistory(false, out error)) ShowEditorMessage(error, "Nie można cofnąć", MessageBoxButtons.OK, MessageBoxIcon.Warning); }

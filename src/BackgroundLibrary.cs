@@ -85,7 +85,7 @@ namespace HexMapEditor
             BackColor=Color.FromArgb(34,38,48);ForeColor=Color.WhiteSmoke;
             Controls.Add(new Label{Text="Zastosować ustawienia i zapisać je w bibliotece?",Bounds=new Rectangle(15,12,355,30)});
             string[] names={"Zapisz jako nowe tło","Nadpisz wybrane tło","Tylko zastosuj do mapy","Wróć do edycji"};
-            for(int i=0;i<names.Length;i++){int choice=i+1;var b=new Button{Text=names[i],Bounds=new Rectangle(15,45+i*40,355,32),FlatStyle=FlatStyle.Flat,Enabled=(i!=1||overwrite)&&(i!=2||applyMap)};b.Click+=(s,e)=>{Choice=choice;DialogResult=choice==4?DialogResult.Cancel:DialogResult.OK;};Controls.Add(b);if(i==0)AcceptButton=b;if(i==3)CancelButton=b;}
+            for(int i=0;i<names.Length;i++){int choice=i+1;var b=new EditorButton{Text=names[i],Bounds=new Rectangle(15,45+i*40,355,32),Enabled=(i!=1||overwrite)&&(i!=2||applyMap)};b.Click+=(s,e)=>{Choice=choice;DialogResult=choice==4?DialogResult.Cancel:DialogResult.OK;};Controls.Add(b);if(i==0)AcceptButton=b;if(i==3)CancelButton=b;}
         }
     }
     public sealed partial class MainWindow
@@ -141,6 +141,15 @@ namespace HexMapEditor
                 picker.Rename=entry=>{using(var d=new NameDialog("Zmień nazwę tła",entry.Name))if(d.ShowDialog(picker)==DialogResult.OK&&d.Value!=entry.Name)CommitBackground(null,entry,BackgroundLibrary.Prepare(LibraryPaths.Backgrounds,entry,d.Value,entry.Settings,backgroundLibrary),false);};
                 picker.Delete=entry=>{if(MessageBox.Show(picker,"Usunąć tło „"+entry.Name+"” z biblioteki? Mapy zachowają własne dane. Bez Kosza; Undo tylko w zachowanej historii sesji (300 wpisów, do Nowa/Otwórz lub zakończenia programu).","Usuń tło z biblioteki",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)CommitBackground(null,entry,null,false);};
                 picker.Edit=entry=>{using(var d=new BackgroundDialog(entry.Settings,canvas.ClientSize)){d.LibraryOnly=true;d.ChooseLibrary=()=>ChooseBackground(d);d.SaveAndApply=(settings,id)=>AcceptBackground(d,settings,id,false);d.ShowDialog(picker);}};
+                picker.ImportClipboard=()=>{
+                    using(var dialog=new BackgroundDialog(null,canvas.ClientSize){LibraryOnly=true})
+                    {
+                        if(!dialog.ImportClipboard(picker))return;
+                        dialog.ChooseLibrary=()=>ChooseBackground(dialog);
+                        dialog.SaveAndApply=(settings,id)=>AcceptBackground(dialog,settings,id,false);
+                        dialog.ShowDialog(picker);
+                    }
+                };
                 return picker.ShowDialog(owner)==DialogResult.OK?picker.Selected:null;
             }
         }

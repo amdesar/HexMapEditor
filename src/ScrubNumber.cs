@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
@@ -10,6 +11,11 @@ namespace HexMapEditor
     {
         readonly NumberTextBox input=new NumberTextBox{BorderStyle=BorderStyle.None,TextAlign=HorizontalAlignment.Right,Visible=false,TabStop=false};
         decimal current,min,max=100,step=1,original;int precision,startX;float dragDpi=1;bool down,scrubbing,editing,finishing,hover;
+        readonly NumberSteps<decimal> values=new NumberSteps<decimal>();
+        readonly NumberSteps<string> drafts=new NumberSteps<string>();
+        string lastDraft;
+        bool restoringDraft;
+        internal bool UseLocalHistory { get; set; }
         internal event EventHandler EditStarting;
         internal event EventHandler<NumberEditEventArgs> EditFinished;
         public event EventHandler ValueChanged;
@@ -32,6 +38,10 @@ namespace HexMapEditor
             NumberInputRouter.Ensure();Disposed+=(s,e)=>NumberInputRouter.Leave(this);
             Size=new Size(80,26);MinimumSize=new Size(36,23);PixelsPerStep=8;TabStop=true;DoubleBuffered=true;BackColor=Color.FromArgb(41,46,58);ForeColor=Color.WhiteSmoke;Cursor=Cursors.SizeWE;
             input.BackColor=Color.FromArgb(39,55,78);input.ForeColor=ForeColor;Controls.Add(input);
+            input.TextChanged+=(s,e)=>{
+                if(!UseLocalHistory||!editing||finishing||restoringDraft)return;
+                drafts.Record(lastDraft);lastDraft=input.Text;
+            };
             input.KeyDown+=(s,e)=>{if(e.KeyCode==Keys.Enter){CommitText();e.Handled=e.SuppressKeyPress=true;}else if(e.KeyCode==Keys.Escape){Finish(true);e.Handled=e.SuppressKeyPress=true;}};
             input.Validating+=(s,e)=>CommitText();
             input.LostFocus+=(s,e)=>{if(editing&&!ContainsFocus)CommitText();};
@@ -49,13 +59,36 @@ namespace HexMapEditor
             return Math.Max(minimum,Math.Min(maximum,Decimal.Round(parsed,places,MidpointRounding.AwayFromZero)));
         }
         void Start(){if(editing||scrubbing)return;original=current;if(EditStarting!=null)EditStarting(this,EventArgs.Empty);}
-        internal void BeginText(){if(!Enabled)return;if(editing)return;Start();editing=true;NumberInputRouter.Enter(this);input.Text=Format();input.Visible=true;input.Focus();input.SelectAll();Invalidate();}
+        internal void BeginText(){if(!Enabled)return;if(editing)return;Start();editing=true;NumberInputRouter.Enter(this);ResetDraft();input.Visible=true;input.Focus();input.SelectAll();Invalidate();}
         internal bool CommitText(){if(!editing)return true;Value=TextNormalizer==null?Normalize(input.Text,original,min,max,precision):TextNormalizer(input.Text,original);Finish(false);return true;}
         internal void Finish(bool cancel)
         {
             if(finishing||(!editing&&!scrubbing))return;finishing=true;bool changed=current!=original;
-            try{if(cancel)Value=original;editing=false;NumberInputRouter.Leave(this);scrubbing=false;down=false;Capture=false;if(input.ContainsFocus){if(Parent!=null)Parent.Focus();else Focus();}input.Visible=false;input.BackColor=Color.FromArgb(39,55,78);if(EditFinished!=null)EditFinished(this,new NumberEditEventArgs(cancel,changed));}
+            try{if(cancel)Value=original;else if(UseLocalHistory&&changed)values.Record(original);editing=false;drafts.Clear();NumberInputRouter.Leave(this);scrubbing=false;down=false;Capture=false;if(input.ContainsFocus){if(Parent!=null)Parent.Focus();else Focus();}input.Visible=false;input.BackColor=Color.FromArgb(39,55,78);if(EditFinished!=null)EditFinished(this,new NumberEditEventArgs(cancel,changed));}
             finally{finishing=false;Invalidate();}
+        }
+        void ResetDraft(){drafts.Clear();RestoreDraft(Format());}
+        void RestoreDraft(string text)
+        {
+            restoringDraft=true;
+            try{input.Text=lastDraft=text;input.SelectionStart=input.TextLength;input.ClearUndo();}
+            finally{restoringDraft=false;}
+        }
+        internal bool CanStepLocal(bool redo)
+        {
+            return !down&&!scrubbing&&(editing&&drafts.CanStep(redo)||(!editing||input.Text==Format())&&values.CanStep(redo));
+        }
+        internal void StepLocal(bool redo)
+        {
+            if(!CanStepLocal(redo))return;
+            string draft;
+            if(editing&&drafts.TryStep(redo,input.Text,out draft)){RestoreDraft(draft);return;}
+            decimal previous;
+            if(values.TryStep(redo,current,out previous))
+            {
+                Value=original=previous;
+                if(editing)ResetDraft();
+            }
         }
         internal void BeginScrub(int x){if(!Enabled)return;if(editing&&!CommitText())return;down=true;startX=x;using(var g=CreateGraphics())dragDpi=g.DpiX/96f;Focus();Capture=true;}
         internal void MoveScrub(int x){if(!down)return;int delta=x-startX;if(!scrubbing&&Math.Abs(delta)>=Math.Max(4,SystemInformation.DragSize.Width/2)){Start();scrubbing=true;}if(scrubbing)Value=original+Math.Truncate((decimal)(delta/dragDpi)/Math.Max(1,PixelsPerStep))*step;}
@@ -71,6 +104,8 @@ namespace HexMapEditor
         protected override void OnLayout(LayoutEventArgs e){base.OnLayout(e);input.SetBounds(6,Math.Max(3,(Height-input.PreferredHeight)/2),Math.Max(10,Width-12-(Suffix.Length>0?14:0)),input.PreferredHeight);}
         protected override bool ProcessCmdKey(ref Message msg,Keys keys)
         {
+            if(UseLocalHistory&&(keys==(Keys.Control|Keys.Z)||keys==(Keys.Control|Keys.Y)))
+            {StepLocal(keys==(Keys.Control|Keys.Y));return true;}
             if(keys==Keys.Enter&&editing){CommitText();return true;}
             if((down||scrubbing)&&(keys==(Keys.Control|Keys.Z)||keys==(Keys.Control|Keys.Y)))return true;
             if(keys==Keys.Escape&&IsEditing){Finish(true);return true;}
@@ -79,6 +114,21 @@ namespace HexMapEditor
             return base.ProcessCmdKey(ref msg,keys);
         }
         protected override void OnMouseWheel(MouseEventArgs e){if(ContainsFocus){Start();scrubbing=true;Value=current+(e.Delta>0?step:-step);Finish(false);}base.OnMouseWheel(e);}
-        protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var p=new Pen(!Enabled?Color.FromArgb(57,61,70):IsEditing?Color.FromArgb(89,136,183):hover?Color.FromArgb(112,123,144):Color.FromArgb(76,83,98)))e.Graphics.DrawRectangle(p,0,0,Width-1,Height-1);if(!editing)TextRenderer.DrawText(e.Graphics,Format(),Font,new Rectangle(5,1,Width-10-(Suffix.Length>0?14:0),Height-2),Enabled?ForeColor:Color.Gray,TextFormatFlags.Right|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);if(Suffix.Length>0)TextRenderer.DrawText(e.Graphics,Suffix,Font,new Rectangle(Width-17,1,14,Height-2),Enabled?ForeColor:Color.Gray,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPadding);}
+        protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var p=new Pen(!Enabled?Color.FromArgb(57,61,70):IsEditing?Color.FromArgb(89,136,183):hover?Color.FromArgb(112,123,144):Color.FromArgb(76,83,98)))e.Graphics.DrawRectangle(p,0,0,Width-1,Height-1);if(!editing)TextRenderer.DrawText(e.Graphics,Format(),Font,new Rectangle(5,1,Width-10-(Suffix.Length>0?14:0),Height-2),Enabled?ForeColor:EditorTheme.DisabledText,TextFormatFlags.Right|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);if(Suffix.Length>0)TextRenderer.DrawText(e.Graphics,Suffix,Font,new Rectangle(Width-17,1,14,Height-2),Enabled?ForeColor:EditorTheme.DisabledText,TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPadding);}
+    }
+    internal sealed class NumberSteps<T>
+    {
+        readonly List<T> undo=new List<T>(),redo=new List<T>();
+        internal void Clear(){undo.Clear();redo.Clear();}
+        internal void Record(T before){Push(undo,before);redo.Clear();}
+        internal bool CanStep(bool forward){return (forward?redo:undo).Count>0;}
+        internal bool TryStep(bool forward,T current,out T result)
+        {
+            var from=forward?redo:undo;
+            if(from.Count==0){result=current;return false;}
+            int last=from.Count-1;
+            result=from[last];from.RemoveAt(last);Push(forward?undo:redo,current);return true;
+        }
+        static void Push(List<T> history,T value){if(history.Count==100)history.RemoveAt(0);history.Add(value);}
     }
 }

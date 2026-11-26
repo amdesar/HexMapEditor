@@ -9,7 +9,8 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         bool hideTerrain, hideIcons, hideObjects, hideDarkness, hideInk;
-        ToolStripMenuItem[] layerItems;
+        ToolStripMenuItem[] layerItems, quickLayerItems;
+        ToolStripDropDownButton quickLayers;
         static readonly string[] LayerNames = { "Tereny", "Ikony", "Obiekty", "Mgła", "Tło", "Ograniczenie widoczności", "Rysik" };
 
         bool LayerVisible(MapLayer layer)
@@ -45,8 +46,12 @@ namespace HexMapEditor
 
         void UpdateLayerChecks()
         {
-            if (layerItems == null) return;
-            for (int i = 0; i < layerItems.Length; i++) layerItems[i].Checked = LayerVisible((MapLayer)i);
+            for (int i = 0; i < LayerNames.Length; i++)
+            {
+                bool visible=LayerVisible((MapLayer)i);
+                if(layerItems!=null)layerItems[i].Checked=visible;
+                if(quickLayerItems!=null)quickLayerItems[i].Checked=visible;
+            }
         }
 
         bool GuardLayer(MapLayer layer, IWin32Window owner = null)
@@ -75,40 +80,48 @@ namespace HexMapEditor
             return true;
         }
 
-        void BuildViewMenu(Control parent)
+        ToolStripMenuItem[] FillLayerMenu(ToolStripDropDown menu)
         {
-            var menu = new ContextMenuStrip { BackColor = Color.FromArgb(34, 38, 48), ForeColor = Color.WhiteSmoke,
-                Renderer = new FitMenuRenderer() };
-            layerItems = new ToolStripMenuItem[LayerNames.Length];
+            var items=new ToolStripMenuItem[LayerNames.Length];
             foreach (int i in new[] { (int)MapLayer.Background, (int)MapLayer.Terrain, (int)MapLayer.Icons, (int)MapLayer.Objects, (int)MapLayer.Darkness, (int)MapLayer.Fog, (int)MapLayer.Ink })
             {
                 var layer = (MapLayer)i;
                 var item = new ToolStripMenuItem(LayerNames[i]);
-                item.Click += (sender, args) => SetLayerVisible(layer, !LayerVisible(layer));
-                layerItems[i] = item;
+                item.Click += (sender, args) => { if(!BlockInkCommit())SetLayerVisible(layer,!LayerVisible(layer)); };
+                items[i] = item;
                 menu.Items.Add(item);
             }
-            menu.Opening += (sender, args) => { EndCanvasGesture(true); UpdateLayerChecks(); };
+            menu.Opening += (sender, args) => UpdateLayerChecks();
             menu.Closing += (sender, args) =>
             {
                 if (args.CloseReason == ToolStripDropDownCloseReason.ItemClicked) args.Cancel = true;
             };
-            menu.Closed += (sender, args) =>
+            return items;
+        }
+        void AddQuickLayers()
+        {
+            var menu=new ToolStripDropDownMenu { BackColor=shellToolbar.BackColor,ForeColor=ForeColor,Renderer=new FitMenuRenderer() };
+            quickLayerItems=FillLayerMenu(menu);MenuFence(menu);
+            quickLayers=new ToolStripDropDownButton("Warstwy widoku",EditorIcons.Small("layers"))
             {
-                waitingForMouseRelease = Control.MouseButtons != MouseButtons.None;
-                requireFreshCanvasDown = true;
+                DisplayStyle=ToolStripItemDisplayStyle.Image,AccessibleName="Warstwy widoku",
+                ToolTipText="Warstwy widoku — pokaż lub ukryj warstwy (Ctrl+Shift+L)",Overflow=ToolStripItemOverflow.AsNeeded,
+                DropDown=menu
             };
+            quickStrip.Items.Add(quickLayers);
+        }
 
-            var strip = new ToolStrip { AutoSize = false, Size = new Size(72, 32), Margin = new Padding(1),
-                Padding = Padding.Empty, GripStyle = ToolStripGripStyle.Hidden, CanOverflow = false,
-                BackColor = Color.FromArgb(49, 54, 67), Renderer = new FitButtonRenderer() };
-            var button = new ToolStripDropDownButton("Widok", EditorIcons.Small("labels"))
+        bool HandleLayerShortcut(Keys keyData)
+        {
+            if(keyData!=(Keys.Control|Keys.Shift|Keys.L)||quickLayers==null||!quickLayers.Enabled)return false;
+            if(quickLayers.DropDown.Visible)quickLayers.HideDropDown();
+            else
             {
-                AutoSize = false, Size = strip.Size, Margin = Padding.Empty, ShowDropDownArrow = false,
-                ForeColor = ForeColor, AccessibleName = "Widok — warstwy", DropDown = menu
-            };
-            strip.Items.Add(button);
-            parent.Controls.Add(strip);
+                if(quickLayers.Placement==ToolStripItemPlacement.Overflow)quickStrip.OverflowButton.ShowDropDown();
+                quickLayers.ShowDropDown();
+                quickLayerItems[(int)MapLayer.Background].Select();
+            }
+            return true;
         }
     }
 }

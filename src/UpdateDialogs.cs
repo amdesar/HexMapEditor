@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -50,43 +51,23 @@ namespace HexMapEditor
                     if (manual) Tell(owner, "Brak nowszej wersji w tym kanale.");
                     return;
                 }
-                using (var dialog = new UpdateOfferDialog(offer))
-                    if (Prompt(owner, () => dialog.ShowDialog(owner)) != DialogResult.OK) return;
-                if (!installed)
+                using(var dialog=new UpdateOfferDialog(offer))
                 {
-                    OpenReleaseLink(offer.Download);
-                    return;
-                }
-                if (VerifiedInstaller.HasElevatedToken())
-                {
-                    Tell(owner,"Uruchom edytor ze zwykłymi uprawnieniami i ponów aktualizację.");
-                    return;
-                }
-
-                downloading = true;
-                using (var progress = new Form {
-                    Text = "Aktualizacja HexMapEditor", ClientSize = new Size(410, 86),
-                    FormBorderStyle = FormBorderStyle.FixedToolWindow, StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false,
-                    ControlBox = false
-                })
-                {
-                    var message = new Label { Bounds = new Rectangle(14,12,382,24), Text = "Pobieranie instalatora…" };
-                    var bar = new ProgressBar { Bounds = new Rectangle(14,45,382,22) };
-                    progress.Controls.AddRange(new Control[] { message, bar });
-                    IProgress<int> received = new Progress<int>(value => {
-                        if (progress.IsDisposed) return;
-                        bar.Value = value;
-                        if (value == 100) message.Text = "Sprawdzanie pliku instalatora…";
-                    });
-                    progress.Show(owner);
-                    VerifiedInstaller installer;
-                    try { installer = await Task.Run(() => channel.DownloadSetup(offer, downloadRoot, received.Report)); }
-                    finally { progress.Close(); }
+                    if(installed)dialog.Download=(token,progress)=>{
+                        downloading=true;
+                        if(VerifiedInstaller.HasElevatedToken())
+                            throw new InvalidOperationException("Uruchom edytor ze zwykłymi uprawnieniami i ponów aktualizację.");
+                        return Task.Run(()=>channel.DownloadSetup(offer,downloadRoot,progress.Report,token));
+                    };
+                    var result=Prompt(owner,()=>dialog.ShowDialog(owner));
+                    if(dialog.Error!=null)throw dialog.Error;
+                    if(result!=DialogResult.OK||!CanPrompt(owner))return;
+                    if(!installed){OpenReleaseLink(offer.Download);return;}
+                    var installer=dialog.TakeInstaller();
                     try
                     {
-                        if (!CanPrompt(owner)) return;
-                        installer.LockForLaunch(); // Verify before asking to save or closing anything.
-                        if (finish(owner, installer)) installer = null;
+                        installer.LockForLaunch();
+                        if(finish(owner,installer))installer=null;
                     }
                     finally { if (installer != null) installer.Dispose(); }
                 }
@@ -121,6 +102,13 @@ namespace HexMapEditor
 
     internal sealed class UpdateOfferDialog : DarkForm
     {
+        readonly Label message=new Label{Bounds=new Rectangle(16,50,493,64)};
+        readonly ProgressBar bar=new ProgressBar{Bounds=new Rectangle(16,114,493,22),Visible=false};
+        readonly EditorButton notes,accept,cancel;
+        CancellationTokenSource cancellation;
+        VerifiedInstaller downloaded;
+        internal Func<CancellationToken,IProgress<int>,Task<VerifiedInstaller>> Download;
+        internal Exception Error {get;private set;}
         internal UpdateOfferDialog(ReleaseOffer offer)
         {
             Text = "Dostępna aktualizacja";
@@ -132,22 +120,53 @@ namespace HexMapEditor
                 Text = "HexMapEditor " + offer.Version.ToString(3) + (offer.Label == null ? "" : " · " + offer.Label),
                 AutoSize = true, Location = new Point(16, 16)
             });
-            Controls.Add(new Label {
-                Text = offer.Setup ? "Program pobierze i sprawdzi instalator. Przed zamknięciem edytora zapiszesz niezapisane mapy i presety albo anulujesz aktualizację."
-                    : "Zamknij edytor i zastąp pliki programu z ZIP w obecnym folderze. Zachowaj folder Library, ustawienia, recent-projects.json i mapy.",
-                Bounds = new Rectangle(16, 50, 493, 61)
-            });
-            var notes = new EditorButton { Text = "Otwórz opis wydania", Bounds = new Rectangle(16, 110, 185, 30) };
+            message.Text=offer.Setup ? "Program pobierze i sprawdzi instalator. Przed zamknięciem edytora zapiszesz niezapisane mapy i presety albo anulujesz aktualizację."
+                : "Zamknij edytor i zastąp pliki programu z ZIP w obecnym folderze. Zachowaj folder Library, ustawienia, recent-projects.json i mapy.";
+            notes = new EditorButton { Text = "Otwórz opis wydania", Bounds = new Rectangle(16, 158, 166, 32) };
             notes.Click += (s, e) => {
                 try { UpdateController.OpenReleaseLink(offer.Notes); }
                 catch (Exception error) { MessageBox.Show(this, error.Message, "Opis wydania", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             };
-            var ok = new EditorButton { Text = offer.Setup ? "Zainstaluj aktualizację" : "Otwórz link do ZIP",
-                DialogResult = DialogResult.OK, Bounds = new Rectangle(204, 158, 172, 32) };
-            var cancel = new EditorButton { Text = "Pomiń", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(390, 158, 119, 32) };
-            Controls.AddRange(new Control[] { notes, ok, cancel });
+            accept = new EditorButton { Text = offer.Setup ? "Zainstaluj aktualizację" : "Otwórz link do ZIP",
+                Bounds = new Rectangle(190, 158, 186, 32) };
+            ChoiceStyle.Apply(accept,true);accept.Click+=(s,e)=>{if(offer.Setup)StartDownload();else DialogResult=DialogResult.OK;};
+            cancel = new EditorButton { Text = "Pomiń", Destructive=true, Bounds = new Rectangle(390, 158, 119, 32) };
+            cancel.Click+=(s,e)=>{if(cancellation!=null)CancelDownload();else DialogResult=DialogResult.Cancel;};
+            var tips=new ToolTip();
+            tips.SetToolTip(notes,"Otwórz opis wersji w przeglądarce");
+            tips.SetToolTip(accept,offer.Setup?"Pobierz i sprawdź instalator":"Pobierz ręcznie paczkę Portable");
+            tips.SetToolTip(cancel,"Pomiń ofertę lub anuluj bieżące pobieranie");
+            Disposed+=(s,e)=>{tips.Dispose();if(downloaded!=null)downloaded.Dispose();};
+            Controls.AddRange(new Control[] { message,bar,notes,accept,cancel });
             AcceptButton = CancelButton = cancel;
+            cancel.DialogResult=DialogResult.None;
         }
+        async void StartDownload()
+        {
+            if(Download==null||cancellation!=null)return;
+            using(var tokenSource=new CancellationTokenSource())
+            {
+                cancellation=tokenSource;
+                accept.Enabled=notes.Enabled=false;cancel.Text="Anuluj";cancel.Focus();bar.Visible=true;
+                message.Text="Pobieranie instalatora…";
+                IProgress<int> progress=new Progress<int>(value=>{
+                    if(IsDisposed||cancellation!=tokenSource||tokenSource.IsCancellationRequested)return;
+                    bar.Value=value;if(value==100)message.Text="Sprawdzanie pliku instalatora…";
+                });
+                try{downloaded=await Download(tokenSource.Token,progress);}
+                catch(Exception error){if(!tokenSource.IsCancellationRequested)Error=error;}
+                finally{cancellation=null;}
+                DialogResult=downloaded!=null&&!tokenSource.IsCancellationRequested?DialogResult.OK:DialogResult.Cancel;
+            }
+        }
+        void CancelDownload()
+        {cancellation.Cancel();cancel.Enabled=false;message.Text="Anulowanie pobierania…";}
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if(cancellation!=null){CancelDownload();e.Cancel=true;}
+            base.OnFormClosing(e);
+        }
+        internal VerifiedInstaller TakeInstaller(){var result=downloaded;downloaded=null;return result;}
     }
 
     public sealed partial class MainWindow

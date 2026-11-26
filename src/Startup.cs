@@ -42,6 +42,7 @@ namespace HexMapEditor
         void CreateWelcome()
         {
             start=new StartWindow(Open);MainForm=start;
+            start.DroppedProjects=OpenDroppedProjects;
             start.UpdateRequested=()=>updates.Check(start,true);
             start.FormClosed+=(s,e)=>StartupTrace.Write("start.closed",s as Form);
             start.HandleDestroyed+=(s,e)=>StartupTrace.Write("start.handleDestroyed",s as Form);
@@ -88,6 +89,16 @@ namespace HexMapEditor
             }
             catch(Exception ex){Rollback(null,ex);}
         }
+        string[] remainingDropped=new string[0];
+        void OpenDroppedProjects(string[] paths)
+        {
+            var errors=new System.Collections.Generic.List<string>();
+            var accepted=MapDrop.Validate(paths,LibraryPaths.Root,errors);
+            if(errors.Count!=0)start.ShowUpdateDialog(()=>MessageBox.Show(start,String.Join("\n\n",errors),
+                "Otwieranie upuszczonych map",MessageBoxButtons.OK,MessageBoxIcon.Warning));
+            for(int i=0;i<accepted.Count;i++)
+                if(start.OpenPath(accepted[i])){remainingDropped=accepted.Skip(i+1).ToArray();return;}
+        }
         void OpenCore(MapData data,string path)
         {
             transitionError=null;Application.ThreadException+=TransitionException;StartupTrace.Write("transition.begin",start);
@@ -107,6 +118,8 @@ namespace HexMapEditor
                         if(editor.IsDisposed||!editor.Visible||!editor.IsHandleCreated)throw new InvalidOperationException("Nie udało się pokazać edytora.");
                         StartupTrace.Write("editor.ready",editor);MainForm=editor;candidate=null;opening=false;DetachException();
                         var previous=start;start=null;previous.Transition=false;previous.Close();StartupTrace.Write("transition.committed",editor);
+                        var remaining=remainingDropped;remainingDropped=new string[0];
+                        if(remaining.Length!=0)editor.BeginInvoke((Action)(()=>editor.OpenDroppedProjects(remaining)));
                     }catch(Exception ex){if(candidate!=null)Rollback(editor,ex);else{StartupTrace.Write("transition.closeStart.failed",editor,ex);ReportFailure(ex);}}
                 };
                 editor.Show();StartupTrace.Write("editor.showReturned",editor);
@@ -117,7 +130,7 @@ namespace HexMapEditor
         }
         void Rollback(MainWindow editor,Exception error,bool report=true)
         {
-            if(!opening)return;candidate=null;opening=false;DetachException();StartupTrace.Write("transition.rollback",editor,error);
+            if(!opening)return;candidate=null;opening=false;remainingDropped=new string[0];DetachException();StartupTrace.Write("transition.rollback",editor,error);
             if(editor!=null&&!editor.IsDisposed){editor.InitialDisplayComplete=null;editor.Dispose();}
             if(start!=null&&!start.IsDisposed){MainForm=start;start.Transition=false;start.Show();start.Activate();}
             if(report)ReportFailure(error);
@@ -134,6 +147,7 @@ namespace HexMapEditor
         int refreshQueued;
         bool choosing,transition;
         internal Action UpdateRequested;
+        internal Action<string[]> DroppedProjects;
         readonly Button importPending = new EditorButton { Name = "pendingFolderImport", Visible = false,
             Bounds = new Rectangle(150,500,278,30), Anchor = AnchorStyles.Bottom };
         internal bool Transition {get{return transition;}set{transition=value;}}
@@ -141,6 +155,7 @@ namespace HexMapEditor
         internal StartWindow(Action<MapData,string> open)
         {
             this.open=open;Text="HexMapEditor";ClientSize=new Size(650,550);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;AutoScaleMode=AutoScaleMode.Dpi;AutoScroll=true;StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(25,28,36);ForeColor=Color.WhiteSmoke;Font=new Font("Segoe UI",10);DoubleBuffered=true;
+            foreach(var target in new Control[]{this,projects})MapDrop.Attach(target,()=>ReadyForExternalOpen,paths=>{if(DroppedProjects!=null)DroppedProjects(paths);});
             Icon icon=null;try{using(var external=new Icon(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","app","icon.ico")))icon=(Icon)external.Clone();}catch{try{icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{}}
             if(icon!=null){Icon=icon;var picture=new PictureBox{Image=icon.ToBitmap(),SizeMode=PictureBoxSizeMode.Zoom,Bounds=new Rectangle(38,36,64,64)};Controls.Add(picture);Disposed+=(s,e)=>{picture.Image.Dispose();icon.Dispose();};}
             var title=new Label{Name="appTitle",Text="HexMapEditor",Font=new Font(Font.FontFamily,28,FontStyle.Bold),AutoSize=true,Location=new Point(120,32)};Controls.Add(title);

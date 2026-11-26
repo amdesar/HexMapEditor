@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Web.Script.Serialization;
 using Microsoft.Win32.SafeHandles;
 
@@ -201,14 +202,18 @@ namespace HexMapEditor
                 }
             }
         }
-        static void CopyBounded(Stream source, Stream destination, long limit, Action<long> transferred = null)
+        static void CopyBounded(Stream source, Stream destination, long limit, Action<long> transferred = null,
+            CancellationToken cancellation = default(CancellationToken))
         {
             var time = Stopwatch.StartNew();
             byte[] buffer = new byte[64 * 1024];
             long bytes = 0;
-            int count;
-            while ((count = source.Read(buffer, 0, buffer.Length)) != 0)
+            while (true)
             {
+                cancellation.ThrowIfCancellationRequested();
+                int count=source.Read(buffer,0,buffer.Length);
+                cancellation.ThrowIfCancellationRequested();
+                if(count==0)break;
                 bytes += count;
                 if (time.ElapsedMilliseconds > 90000) throw new IOException("Przekroczono czas transferu aktualizacji.");
                 if (bytes > limit) throw new InvalidDataException("Przekroczono oczekiwany rozmiar aktualizacji.");
@@ -216,8 +221,10 @@ namespace HexMapEditor
                 if (transferred != null) transferred(bytes);
             }
         }
-        internal VerifiedInstaller DownloadSetup(ReleaseOffer offer, string temporaryRoot, Action<int> progress = null)
+        internal VerifiedInstaller DownloadSetup(ReleaseOffer offer, string temporaryRoot, Action<int> progress = null,
+            CancellationToken cancellation = default(CancellationToken))
         {
+            cancellation.ThrowIfCancellationRequested();
             if (!offer.Setup) throw new InvalidOperationException("Kopia przenośna aktualizuje się z ZIP.");
             var directory = Path.Combine(temporaryRoot, "HexMapEditor-update-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
@@ -226,8 +233,10 @@ namespace HexMapEditor
             {
                 using (var file = new FileStream(result.FilePath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                     receive(offer.Download, source => CopyBounded(source, file, offer.Bytes,
-                        progress == null ? (Action<long>)null : bytes => progress((int)(100 * bytes / offer.Bytes))));
+                        progress == null ? (Action<long>)null : bytes => progress((int)(100 * bytes / offer.Bytes)),cancellation));
+                cancellation.ThrowIfCancellationRequested();
                 using (result.OpenVerified()) { }
+                cancellation.ThrowIfCancellationRequested();
                 // Preserve Windows' internet-origin checks for an unsigned download.
                 MarkInternetOrigin(result.FilePath);
                 return result;

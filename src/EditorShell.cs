@@ -38,6 +38,7 @@ namespace HexMapEditor
                 { var points = Enumerable.Range(0, 6).Select(i => { double a = (i * 60 + (key == "flat" ? 0 : -90)) * Math.PI / 180; return new PointF(11 + 9 * (float)Math.Cos(a), 11 + 9 * (float)Math.Sin(a)); }).ToArray(); g.DrawPolygon(p, points); }
                 else if (key == "new") { g.DrawRectangle(p, 5, 2, 12, 18); g.DrawLine(p, 8, 11, 14, 11); g.DrawLine(p, 11, 8, 11, 14); }
                 else if(key=="plus"){g.DrawLine(p,4,11,18,11);g.DrawLine(p,11,4,11,18);}
+                else if(key=="layers"){g.DrawPolygon(p,new[]{new Point(2,7),new Point(11,2),new Point(20,7),new Point(11,12)});g.DrawLines(p,new[]{new Point(2,11),new Point(11,16),new Point(20,11)});g.DrawLines(p,new[]{new Point(2,15),new Point(11,20),new Point(20,15)});}
                 else if(key=="restore"){g.DrawRectangle(p,4,3,14,16);g.DrawLine(p,7,7,15,7);g.DrawLines(p,new[]{new Point(15,12),new Point(7,12),new Point(10,9)});g.DrawLine(p,7,12,10,15);}
                 else if (key == "open" || key == "library") { g.DrawLines(p, new[] { new Point(2, 18), new Point(2, 5), new Point(9, 5), new Point(11, 8), new Point(20, 8), new Point(17, 18), new Point(2, 18) }); }
                 else if (key == "save" || key == "saveas") { g.DrawRectangle(p, 3, 3, 16, 16); g.DrawRectangle(p, 7, 3, 8, 6); g.DrawRectangle(p, 7, 13, 8, 6); if (key == "saveas") g.DrawLine(p, 1, 20, 20, 1); }

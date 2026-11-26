@@ -10,6 +10,16 @@ namespace HexMapEditor
             e.ArrowColor = e.Item.Enabled ? Color.WhiteSmoke : Color.FromArgb(145, 149, 158);
             base.OnRenderArrow(e);
         }
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+        {if(!e.Item.Enabled)e.TextColor=EditorTheme.DisabledText;base.OnRenderItemText(e);}
+        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
+        {
+            var rect=Rectangle.Inflate(e.ImageRectangle,-1,-1);
+            using(var background=new SolidBrush(ChoiceStyle.ActiveBack))e.Graphics.FillRectangle(background,rect);
+            using(var pen=new Pen(e.Item.Enabled?Color.WhiteSmoke:EditorTheme.DisabledText,2))
+                e.Graphics.DrawLines(pen,new[]{new Point(rect.Left+3,rect.Top+rect.Height/2),
+                    new Point(rect.Left+rect.Width/2-1,rect.Bottom-4),new Point(rect.Right-2,rect.Top+3)});
+        }
     }
     internal sealed class FitButtonRenderer : ToolStripProfessionalRenderer
     {
@@ -31,6 +41,8 @@ namespace HexMapEditor
         }
 
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e) { }
+        protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
+        {e.ArrowColor=e.Item.Enabled?Color.WhiteSmoke:EditorTheme.DisabledText;base.OnRenderArrow(e);}
     }
 
     internal sealed class FitMenuColors : ProfessionalColorTable

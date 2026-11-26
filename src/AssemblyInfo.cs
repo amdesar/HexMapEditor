@@ -3,5 +3,5 @@ using System.Runtime.Versioning;
 [assembly: TargetFramework(".NETFramework,Version=v4.8")]
 [assembly: AssemblyTitle("HexMapEditor")]
 [assembly: AssemblyProduct("HexMapEditor")]
-[assembly: AssemblyVersion("0.13.3.0")]
-[assembly: AssemblyFileVersion("0.13.3.0")]
+[assembly: AssemblyVersion("0.13.4.0")]
+[assembly: AssemblyFileVersion("0.13.4.0")]
