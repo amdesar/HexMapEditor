@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace HexMapEditor
@@ -23,6 +24,7 @@ namespace HexMapEditor
         internal Func<MapBackground,string,bool> SaveAndApply;
         internal MapBackground Initial {get;private set;}
         internal MapBackground Result { get; private set; }
+        internal string ImportName { get; private set; }
         static TrackBar Slider(int min, int max, int value) { return new TrackBar { Minimum = min, Maximum = max, Value = value, TickStyle = TickStyle.None, Width = 185, Height = 35 }; }
         internal BackgroundDialog(MapBackground initial, Size viewport, bool importQueue = false)
         {
@@ -39,13 +41,13 @@ namespace HexMapEditor
             remove.FlatStyle=FlatStyle.Flat;remove.ForeColor=Color.FromArgb(244,113,113);remove.FlatAppearance.BorderColor=remove.ForeColor;
             remove.EnabledChanged+=(s,e)=>{remove.ForeColor=remove.Enabled?Color.FromArgb(244,113,113):Color.Gray;remove.FlatAppearance.BorderColor=remove.ForeColor;};
             remove.FlatAppearance.MouseOverBackColor=Color.FromArgb(80,42,48);remove.FlatAppearance.MouseDownBackColor=Color.FromArgb(100,44,52);
-            library.Click+=(s,e)=>{if(ChooseLibrary==null)return;var chosen=ChooseLibrary();if(chosen==null)return;draft=chosen.Settings.Copy();draft.Source=draft.Source.Pin();draft.LibraryId=chosen.Id;UpdateSettings();};
+            library.Click+=(s,e)=>{if(ChooseLibrary==null)return;var chosen=ChooseLibrary();if(chosen==null)return;draft=chosen.Settings.Copy();draft.Source=draft.Source.Pin();draft.LibraryId=chosen.Id;ImportName=null;UpdateSettings();};
             var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(407,15,365,22) };
             opacity.Location = new Point(12, 403); saturation.Location = new Point(272, 403); blur.Location = new Point(532, 403);
             var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(546, 484, 106, 29) };
             var cancel = new Button { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(660, 484, 106, 29) };
             import.Click += (s, e) => Import();
-            remove.Click += (s, e) => { draft = null; UpdateSettings(); };
+            remove.Click += (s, e) => { draft = null; ImportName=null; UpdateSettings(); };
             crop.Changed = QueuePreview;
             foreach (var slider in new[] { opacity, saturation, blur }) slider.ValueChanged += (s, e) =>
             {
@@ -81,6 +83,8 @@ namespace HexMapEditor
                 {
                     var source = GraphicSources.Import(file.FileName);
                     draft = new MapBackground { Source = source, SourceId = source.Id };
+                    string name=Path.GetFileNameWithoutExtension(file.FileName).Trim();
+                    ImportName=name.Length==0?"Tło":PresetFiles.Shorten(name,200);
                     UpdateSettings();
                 }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, "Import tła", MessageBoxButtons.OK, MessageBoxIcon.Warning); }

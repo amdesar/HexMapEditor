@@ -17,7 +17,7 @@ namespace HexMapEditor
             if (new[] { "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$" }.Contains(device) || (device.Length == 4 && (device.StartsWith("COM") || device.StartsWith("LPT")) && "123456789¹²³".Contains(device[3]))) stem = "_" + stem;
             return stem;
         }
-        static string Shorten(string value, int length)
+        internal static string Shorten(string value, int length)
         { if (value.Length <= length) return value; if (Char.IsHighSurrogate(value[length - 1])) length--; return value.Substring(0, length).TrimEnd('.', ' '); }
         internal static string Destination(string directory, string name, string current, bool allowSuffix = true)
         {

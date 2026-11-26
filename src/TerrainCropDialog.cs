@@ -37,7 +37,25 @@ namespace HexMapEditor
             reset.Click += (s,e) => { CropMath.Rotate(draft,activeFlat,-(activeFlat ? draft.Flat : draft.Pointy).Angle); RefreshView(); };
             var accept = new Button { Text = "Zatwierdź", Bounds = new Rectangle(400,546,105,30) };
             var cancel = new Button { Text = "Anuluj", Bounds = new Rectangle(516,546,105,30), DialogResult = DialogResult.Cancel };
+            DarkTextBox nameBox = null;
+            if (newImport)
+            {
+                Controls.Add(new Label { Text="Nazwa", Bounds=new Rectangle(291,36,53,26), TextAlign=ContentAlignment.MiddleLeft });
+                nameBox = new DarkTextBox { Text=draft.Name, MaxLength=200, Bounds=new Rectangle(345,36,277,26), AccessibleName="Nazwa grafiki terenu" };
+                Controls.Add(nameBox);
+            }
             accept.Click += (s,e) => {
+                if (nameBox != null)
+                {
+                    string name = nameBox.Text.Trim();
+                    if (name.Length == 0)
+                    {
+                        MessageBox.Show(this,"Podaj nazwę grafiki.","Kadrowanie grafiki",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                        nameBox.Focus();
+                        return;
+                    }
+                    draft.Name = name;
+                }
                 // Legacy Linked metadata must not create an invisible recrop/history step on OK.
                 bool unchanged = !newImport && MapLogic.Serializer().Serialize(new[]{draft.Pointy,draft.Flat}) == MapLogic.Serializer().Serialize(new[]{initial.Pointy,initial.Flat});
                 draft.Linked=false; draft.Seal(); Result=unchanged ? initial.Copy() : draft.Copy(); DialogResult=DialogResult.OK;

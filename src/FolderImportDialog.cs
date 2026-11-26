@@ -132,14 +132,18 @@ namespace HexMapEditor
                     case ImportCategory.Terrains:
                         using (var dialog = new TerrainCropDialog(draft.Terrain, false, true))
                         { if (dialog.ShowDialog(this) != DialogResult.OK) return; draft.Terrain = dialog.Result; }
+                        draft.Name = draft.Terrain.Name;
                         break;
                     case ImportCategory.Backgrounds:
                         using (var dialog = new BackgroundDialog(draft.Background, new Size(640,480), true))
                         { if (dialog.ShowDialog(this) != DialogResult.OK) return; draft.Background = dialog.Result; }
+                        using (var dialog = new NameDialog("Nazwa nowego tła", name))
+                        { if (dialog.ShowDialog(this) != DialogResult.OK) return; draft.Name = dialog.Value; }
                         break;
                     default:
                         using (var dialog = new SquareImportDialog(source, name))
                         { if (dialog.ShowDialog(this) != DialogResult.OK) return; draft.Square = dialog.Result; }
+                        draft.Name = draft.Square.Name;
                         break;
                 }
                 string note = draft.Save(import, item);
@@ -201,7 +205,7 @@ namespace HexMapEditor
         static string ImportName(ImportCandidate item)
         {
             string name = Path.GetFileNameWithoutExtension(item.Name).Trim();
-            return name.Length == 0 ? "Grafika" : name.Substring(0, Math.Min(200, name.Length));
+            return name.Length == 0 ? "Grafika" : PresetFiles.Shorten(name,200);
         }
     }
 
@@ -214,13 +218,13 @@ namespace HexMapEditor
     internal sealed class ImportDraft
     {
         readonly GraphicSource source;
-        readonly string name;
+        internal string Name;
         internal GraphicDefinition Terrain;
         internal IconAsset Square;
         internal MapBackground Background;
         internal ImportDraft(ImportCategory category, GraphicSource source, string name, bool defaults)
         {
-            this.source = source; this.name = name;
+            this.source = source; Name = name;
             if (category == ImportCategory.Terrains)
             {
                 Terrain = new GraphicDefinition { Name = name, Source = source, Linked = !defaults };
@@ -234,6 +238,6 @@ namespace HexMapEditor
             }
         }
         internal string Save(FolderImport import, ImportCandidate item)
-        { return import.Commit(item, source, name, Terrain, Square, Background); }
+        { return import.Commit(item, source, Name, Terrain, Square, Background); }
     }
 }

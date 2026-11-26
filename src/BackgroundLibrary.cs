@@ -15,7 +15,7 @@ namespace HexMapEditor
         public string Name { get; set; }
         public long LibraryOrder { get; set; }
         public MapBackground Settings { get; set; }
-        internal string Path;
+        internal string Path, SourceFile;
         internal byte[] Bytes;
         public override string ToString(){return Name;}
     }
@@ -31,9 +31,9 @@ namespace HexMapEditor
             if(parameters==null||!new[]{"SourceId","Left","Top","Width","Height","Opacity","Saturation","Blur"}.All(parameters.ContainsKey))throw new InvalidDataException("Brak wymaganych parametrów tła.");
             var item=serializer.ConvertToType<BackgroundEntry>(raw);
             if(item==null||item.BackgroundFormatVersion!=1||String.IsNullOrWhiteSpace(item.Id)||item.Id.Length>200||String.IsNullOrWhiteSpace(item.Name)||item.Name.Length>200||item.LibraryOrder<0||item.Settings==null)throw new InvalidDataException("Nieprawidłowy wpis biblioteki teł.");
-            GraphicSource source;
-            if(!sources.TryGetValue(item.Settings.SourceId??"",out source))sources[item.Settings.SourceId]=source=TerrainGraphicLibrary.ReadSource(System.IO.Path.GetDirectoryName(path),item.Settings.SourceId);
-            item.Settings.Source=source;item.Settings.LibraryId=item.Id;BackgroundRenderer.Validate(item.Settings);
+            item.SourceFile=LibraryImageStore.ReadReference(raw);
+            item.Settings.Source=TerrainGraphicLibrary.ReadSource(System.IO.Path.GetDirectoryName(path),item.Settings.SourceId,item.SourceFile,sources);
+            item.Settings.LibraryId=item.Id;BackgroundRenderer.Validate(item.Settings);
             item.Path=System.IO.Path.GetFullPath(path);item.Bytes=bytes;return item;
         }
         internal static List<BackgroundEntry> Load(string directory,out string warning)
@@ -55,7 +55,11 @@ namespace HexMapEditor
             entry.Settings.Source=settings.Source.Pin();entry.Settings.LibraryId=entry.Id;
             entry.Path=PresetFiles.Destination(directory,"background-"+PresetFiles.Stem(name),before==null?null:before.Path);
             if(!System.IO.Path.GetFileName(entry.Path).StartsWith("background-",StringComparison.Ordinal))throw new IOException("Za długa ścieżka biblioteki teł.");
-            entry.Bytes=Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(entry));return entry;
+            entry.SourceFile=before!=null && before.Settings.SourceId==settings.SourceId ? before.SourceFile :
+                LibraryImageStore.Store(directory,name,settings.Source);
+            entry.Bytes=Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new
+                { entry.BackgroundFormatVersion, entry.Id, entry.Name, entry.LibraryOrder, entry.Settings, entry.SourceFile }));
+            return entry;
         }
     }
     internal sealed class BackgroundFileChange
@@ -68,7 +72,7 @@ namespace HexMapEditor
             {
                 foreach(var path in Directory.GetFiles(System.IO.Path.GetDirectoryName(to.Path),"background-*.json"))
                     if((from==null||!String.Equals(path,from.Path,StringComparison.OrdinalIgnoreCase))&&PresetCatalog.ReadIdentity(path).Id==to.Id)throw new IOException("Inny plik ma już ID tego tła: "+path);
-                TerrainGraphicLibrary.StoreSource(System.IO.Path.GetDirectoryName(to.Path),to.Settings.Source);
+                TerrainGraphicLibrary.ReadSource(System.IO.Path.GetDirectoryName(to.Path),to.Settings.SourceId,to.SourceFile);
             }
             LibraryFiles.Transition(from==null?null:from.Path,from==null?null:from.Bytes,to==null?null:to.Path,to==null?null:to.Bytes);
         }
@@ -122,7 +126,7 @@ namespace HexMapEditor
                 {
                     if(choice.ShowDialog(owner)!=DialogResult.OK)return false;
                     if(choice.Choice==3){if(applyMap)CommitBackground(settings,null,null,true);return true;}
-                    string name=before==null?"Tło":before.Name;
+                    string name=before==null?(owner.ImportName??"Tło"):before.Name;
                     if(choice.Choice==1){using(var d=new NameDialog("Nazwa nowego tła",name)){if(d.ShowDialog(owner)!=DialogResult.OK)return false;name=d.Value;}before=null;}
                     var after=BackgroundLibrary.Prepare(LibraryPaths.Backgrounds,before,name,settings,backgroundLibrary);
                     settings=settings.Copy();settings.LibraryId=after.Id;CommitBackground(settings,before,after,applyMap);return true;

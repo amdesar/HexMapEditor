@@ -13,10 +13,10 @@ namespace HexMapEditor
         public string Name { get; set; }
         public IconAsset Asset { get; set; }
         public long LibraryOrder { get; set; }
-        internal string FilePath;
+        internal string FilePath, SourceFile;
         internal byte[] DiskBytes;
         public LibraryIcon() { IconFormatVersion = 2; Id = Guid.NewGuid().ToString("N"); }
-        internal LibraryIcon Copy() { return new LibraryIcon { Id = Id, Name = Name, Asset = Asset, LibraryOrder = LibraryOrder, FilePath = FilePath, DiskBytes = DiskBytes }; }
+        internal LibraryIcon Copy() { return (LibraryIcon)MemberwiseClone(); }
     }
     internal static class IconLibrary
     {
@@ -34,16 +34,25 @@ namespace HexMapEditor
             LibraryIcon icon;
             if (raw.ContainsKey("IconFormatVersion")) icon = json.ConvertToType<LibraryIcon>(raw);
             else { var asset = json.ConvertToType<IconAsset>(raw); icon = new LibraryIcon { Id = asset.Id, Name = asset.Name, Asset = asset }; }
-            if (icon.IconFormatVersion == 3) icon.Asset = SquareLibraryAsset.Read(Path.GetDirectoryName(path), raw);
+            if (icon.IconFormatVersion == 3)
+            {
+                icon.SourceFile = LibraryImageStore.ReadReference(raw);
+                icon.Asset = SquareLibraryAsset.Read(Path.GetDirectoryName(path), raw, icon.SourceFile);
+            }
             Validate(icon); icon.FilePath = Path.GetFullPath(path); icon.DiskBytes = bytes; return icon;
         }
-        internal static byte[] Metadata(LibraryIcon entry)
+        internal static byte[] Metadata(LibraryIcon entry, LibraryIcon before = null)
         {
             Validate(entry);
+            if (before != null && before.IconFormatVersion == 2 && ReferenceEquals(entry.Asset, before.Asset))
+                return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(entry));
+            var source = SquareLibraryAsset.SourceFor(entry.Asset);
+            entry.SourceFile = before != null && before.IconFormatVersion == 3 && before.Asset.LibrarySource.Id == source.Id
+                ? before.SourceFile : LibraryImageStore.Store(Path.GetDirectoryName(entry.FilePath), entry.Name, source);
             entry.IconFormatVersion = 3;
             return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new {
                 entry.IconFormatVersion, entry.Id, entry.Name, entry.LibraryOrder,
-                SourceId = SquareLibraryAsset.SourceFor(entry.Asset).Id, AssetName = entry.Asset.Name, Crop = entry.Asset.LibraryCrop
+                SourceId = source.Id, entry.SourceFile, AssetName = entry.Asset.Name, Crop = entry.Asset.LibraryCrop
             }));
         }
         public static string Destination(string directory, string name, string current)
@@ -57,13 +66,13 @@ namespace HexMapEditor
             Directory.CreateDirectory(directory); string marker = Path.Combine(directory, ".starter-icons-v2");
             if (!File.Exists(marker))
             {
+                LibraryImageStore.CheckCatalog(directory);
                 var ids = new HashSet<string>(Directory.GetFiles(directory,"*.json").Select(SquareLibraryAsset.ReadStarterIdentity));
                 foreach (var entry in StarterSets.Icons())
                 {
                     if (ids.Contains(entry.Id)) continue;
-                    byte[] metadata = Metadata(entry);
-                    LibraryImageStore.Store(directory, SquareLibraryAsset.SourceFor(entry.Asset));
-                    LibraryFiles.Transition(null, null, Destination(directory, entry.Name, null), metadata);
+                    entry.FilePath = Destination(directory, entry.Name, null);
+                    LibraryFiles.Transition(null, null, entry.FilePath, Metadata(entry));
                 }
                 MapLogic.AtomicWrite(marker, "1", false);
             }
@@ -91,7 +100,7 @@ namespace HexMapEditor
             var from = after ? Before : After;
             var to = after ? After : Before;
             if (to != null && to.IconFormatVersion == 3)
-                LibraryImageStore.Store(Path.GetDirectoryName(to.FilePath), SquareLibraryAsset.SourceFor(to.Asset));
+                LibraryImageStore.VerifySquare(to.FilePath, SquareLibraryAsset.SourceFor(to.Asset), to.SourceFile);
             LibraryFiles.Transition(from == null ? null : from.FilePath, after ? BeforeBytes : AfterBytes,
                 to == null ? null : to.FilePath, after ? AfterBytes : BeforeBytes);
         }

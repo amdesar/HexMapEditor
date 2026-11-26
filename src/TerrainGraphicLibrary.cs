@@ -16,7 +16,7 @@ namespace HexMapEditor
         public string Name { get; set; }
         public GraphicDefinition Asset { get; set; }
         public long LibraryOrder { get; set; }
-        internal string Path;
+        internal string Path, SourceFile;
         internal byte[] Bytes;
         public TerrainGraphic() { GraphicFormatVersion = 2; }
     }
@@ -31,7 +31,7 @@ namespace HexMapEditor
             var to = forward ? After : Before;
             if (to != null)
             {
-                TerrainGraphicLibrary.StoreSource(Path.GetDirectoryName(to.Path), to.Asset.Source);
+                TerrainGraphicLibrary.ReadSource(Path.GetDirectoryName(to.Path), to.Asset.SourceId, to.SourceFile);
                 foreach (string path in TerrainGraphicLibrary.Files(Path.GetDirectoryName(to.Path)))
                 {
                     if (from != null && String.Equals(path, from.Path, StringComparison.OrdinalIgnoreCase)) continue;
@@ -61,9 +61,8 @@ namespace HexMapEditor
                 String.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 200 || item.LibraryOrder < 0)
                 throw new InvalidDataException("Nieprawidłowe metadane grafiki terenu.");
             if (item.Asset == null) throw new InvalidDataException("Brak definicji kadrów.");
-            GraphicSource shared;
-            if (sources != null && sources.TryGetValue(item.Asset.SourceId, out shared)) item.Asset.Source = shared;
-            else { item.Asset.Source = ReadSource(Path.GetDirectoryName(path), item.Asset.SourceId); if (sources != null) sources.Add(item.Asset.SourceId, item.Asset.Source); }
+            item.SourceFile = LibraryImageStore.ReadReference(raw);
+            item.Asset.Source = ReadSource(Path.GetDirectoryName(path), item.Asset.SourceId, item.SourceFile, sources);
             TerrainTextures.Validate(item.Asset);
             item.Path = Path.GetFullPath(path);
             item.Bytes = bytes;
@@ -74,11 +73,22 @@ namespace HexMapEditor
             LibraryImageStore.ValidateId(id);
             return Path.Combine(directory, "Sources", id + ".json");
         }
-        internal static GraphicSource ReadSource(string directory, string id)
+        internal static GraphicSource ReadSource(string directory, string id, string file, Dictionary<string, GraphicSource> sources = null)
         {
-            var binary = LibraryImageStore.Find(directory, id);
+            string key = id + "\n" + file;
+            GraphicSource source;
+            if (sources != null && sources.TryGetValue(key, out source)) return source;
+            source = ReadSourceFile(directory, id, file);
+            if (sources != null) sources.Add(key, source);
+            return source;
+        }
+        static GraphicSource ReadSourceFile(string directory, string id, string file)
+        {
+            var binary = LibraryImageStore.Find(directory, id, file);
             if (binary != null) return binary;
             string path = SourcePath(directory, id);
+            LibraryImageStore.RequireOrdinaryPath(Path.GetDirectoryName(path));
+            LibraryImageStore.RequireOrdinaryPath(path);
             if (new FileInfo(path).Length > GraphicLimits.SourceJsonBytes) throw new InvalidDataException("Za duży plik źródła.");
             var source = MapLogic.Serializer().Deserialize<GraphicSource>(File.ReadAllText(path));
             if (source == null || source.Id != id) throw new InvalidDataException("Sprzeczny identyfikator źródła.");
@@ -86,9 +96,6 @@ namespace HexMapEditor
             source.MakeLibraryReference(path); // Keep metadata in the catalog, pin immutable bytes only when selected.
             return source;
         }
-        internal static void StoreSource(string directory, GraphicSource source)
-        { LibraryImageStore.Store(directory, source); }
-
         internal static List<TerrainGraphic> Load(string directory, out string warning)
         {
             Directory.CreateDirectory(directory);
@@ -111,7 +118,8 @@ namespace HexMapEditor
             return LibrarySequence.Sort(items, i => i.LibraryOrder, i => i.Id).ToList();
         }
 
-        internal static TerrainGraphic Prepare(string directory, TerrainGraphic before, string name, GraphicDefinition asset, IEnumerable<TerrainGraphic> entries, bool allowSuffix = true)
+        internal static TerrainGraphic Prepare(string directory, TerrainGraphic before, string name, GraphicDefinition asset, IEnumerable<TerrainGraphic> entries,
+            bool allowSuffix = true, string importName = null)
         {
             if (before == null && entries.Count() >= GraphicLimits.LibraryEntries) throw new InvalidDataException("Limit 128 aktywnych grafik biblioteki.");
             TerrainTextures.Validate(asset);
@@ -123,9 +131,12 @@ namespace HexMapEditor
             {
                 Id = before == null ? Guid.NewGuid().ToString("N") : before.Id,
                 Name = name, Asset = asset, Path = path,
+                SourceFile = before != null && before.Asset.SourceId == asset.SourceId ? before.SourceFile :
+                    LibraryImageStore.Store(directory, importName ?? name, asset.Source),
                 LibraryOrder = before == null ? LibrarySequence.Next(entries.Select(e => e.LibraryOrder)) : before.LibraryOrder
             };
-            item.Bytes = Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(item));
+            item.Bytes = Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new
+                { item.GraphicFormatVersion, item.Id, item.Name, item.Asset, item.LibraryOrder, item.SourceFile }));
             return item;
         }
     }
@@ -213,7 +224,7 @@ namespace HexMapEditor
             if (terrainGraphics.Count >= GraphicLimits.LibraryEntries) throw new InvalidOperationException("Biblioteka mieści najwyżej 128 grafik terenów.");
             string name = asset.Name;
             for (int suffix = 2; terrainGraphics.Any(g => PresetCatalog.SameName(g.Name, name)); suffix++) name = asset.Name + " (" + suffix + ")";
-            var item = TerrainGraphicLibrary.Prepare(directory, null, name, asset, terrainGraphics);
+            var item = TerrainGraphicLibrary.Prepare(directory, null, name, asset, terrainGraphics, importName:asset.Name);
             ChangeTerrainGraphic(null, item);
             return item;
         }
@@ -235,7 +246,7 @@ namespace HexMapEditor
         }
         GraphicDefinition CropTerrainSource(IWin32Window owner,GraphicSource source,string name)
         {
-            var graphic=new GraphicDefinition{Source=source,SourceId=source.Id,Name=name.Substring(0,Math.Min(200,name.Length))};
+            var graphic=new GraphicDefinition{Source=source,SourceId=source.Id,Name=PresetFiles.Shorten(name,200)};
             graphic.Seal();
             return OpenTerrainCrop(owner,graphic,true);
         }

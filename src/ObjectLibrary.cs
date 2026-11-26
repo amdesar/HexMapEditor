@@ -17,7 +17,7 @@ namespace HexMapEditor
         public long LibraryOrder { get; set; }
         public bool LightEnabled {get;set;}
         public int LightRadius {get;set;}
-        internal string FilePath; internal byte[] DiskBytes;
+        internal string FilePath, SourceFile; internal byte[] DiskBytes;
         public ObjectTemplate(){ObjectFormatVersion=1;LightRadius=1;Id=Guid.NewGuid().ToString("N");}
         internal ObjectTemplate Copy(){return (ObjectTemplate)MemberwiseClone();}
         internal LibraryIcon Graphic(){return new LibraryIcon{Id=Id,Name=Name,Asset=Asset};}
@@ -39,7 +39,7 @@ namespace HexMapEditor
                 if((from!=null&&id==from.Id)||(to!=null&&id==to.Id))throw new IOException("Konflikt ID wzorca obiektu: "+path);
             }
             if (to != null && to.ObjectFormatVersion == 2)
-                LibraryImageStore.Store(directory, SquareLibraryAsset.SourceFor(to.Asset));
+                LibraryImageStore.VerifySquare(to.FilePath, SquareLibraryAsset.SourceFor(to.Asset), to.SourceFile);
             LibraryFiles.Transition(from==null?null:from.FilePath,from==null?null:from.DiskBytes,to==null?null:to.FilePath,to==null?null:to.DiskBytes);
         }
     }
@@ -53,15 +53,25 @@ namespace HexMapEditor
             var raw=serializer.DeserializeObject(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF')) as Dictionary<string,object>;
             if(raw==null)throw new InvalidDataException("Nieprawidłowy plik obiektu.");
             var entry=serializer.ConvertToType<ObjectTemplate>(raw);
-            if(entry.ObjectFormatVersion==2)entry.Asset=SquareLibraryAsset.Read(Path.GetDirectoryName(path),raw);
+            if(entry.ObjectFormatVersion==2)
+            {
+                entry.SourceFile=LibraryImageStore.ReadReference(raw);
+                entry.Asset=SquareLibraryAsset.Read(Path.GetDirectoryName(path),raw,entry.SourceFile);
+            }
             Validate(entry);entry.FilePath=Path.GetFullPath(path);entry.DiskBytes=bytes;return entry;
         }
-        internal static byte[] Metadata(ObjectTemplate entry)
+        internal static byte[] Metadata(ObjectTemplate entry, ObjectTemplate before = null)
         {
-            Validate(entry);entry.ObjectFormatVersion=2;
+            Validate(entry);
+            if (before != null && before.ObjectFormatVersion == 1 && ReferenceEquals(entry.Asset, before.Asset))
+                return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(entry));
+            var source = SquareLibraryAsset.SourceFor(entry.Asset);
+            entry.SourceFile = before != null && before.ObjectFormatVersion == 2 && before.Asset.LibrarySource.Id == source.Id
+                ? before.SourceFile : LibraryImageStore.Store(Path.GetDirectoryName(entry.FilePath), entry.Name, source);
+            entry.ObjectFormatVersion=2;
             return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new {
                 entry.ObjectFormatVersion, entry.Id, entry.Name, entry.LibraryOrder, entry.LightEnabled, entry.LightRadius,
-                SourceId=SquareLibraryAsset.SourceFor(entry.Asset).Id, AssetName=entry.Asset.Name, Crop=entry.Asset.LibraryCrop
+                SourceId=source.Id, entry.SourceFile, AssetName=entry.Asset.Name, Crop=entry.Asset.LibraryCrop
             }));
         }
         public static string Destination(string directory,string name,string current){var path=PresetFiles.Destination(directory,"object-"+PresetFiles.Stem(name),current);if(!Path.GetFileName(path).StartsWith("object-",StringComparison.Ordinal))throw new IOException("Za długa ścieżka obiektu.");return path;}
@@ -69,12 +79,12 @@ namespace HexMapEditor
         {
             Directory.CreateDirectory(directory);string marker=Path.Combine(directory,".starter-objects-v2");
             if(!File.Exists(marker)){
+                LibraryImageStore.CheckCatalog(directory);
                 var ids=new HashSet<string>(Directory.GetFiles(directory,"*.json").Select(SquareLibraryAsset.ReadStarterIdentity));
                 foreach(var entry in StarterSets.Objects()){
                     if(ids.Contains(entry.Id))continue;
-                    byte[] metadata=Metadata(entry);
-                    LibraryImageStore.Store(directory,SquareLibraryAsset.SourceFor(entry.Asset));
-                    LibraryFiles.Transition(null,null,Destination(directory,entry.Name,null),metadata);
+                    entry.FilePath=Destination(directory,entry.Name,null);
+                    LibraryFiles.Transition(null,null,entry.FilePath,Metadata(entry));
                 }MapLogic.AtomicWrite(marker,"1",false);
             }
             var result=new List<ObjectTemplate>();var errors=new List<string>();
@@ -138,7 +148,7 @@ namespace HexMapEditor
                 if(before==null&&libraryObjects.Count>=128)throw new IOException("Limit 128 wzorców.");
                 if(next!=null){next=next.Copy();next.Name=(next.Name??"").Trim();ObjectLibrary.Validate(next);if(before!=null&&before.Id!=next.Id||before==null&&libraryObjects.Any(o=>o.Id==next.Id))throw new IOException("Konflikt tożsamości wzorca.");next.FilePath=ObjectLibrary.Destination(directory,next.Name,before==null?null:before.FilePath);next.LibraryOrder = before == null ? LibrarySequence.Next(libraryObjects.Select(o => o.LibraryOrder)) : before.LibraryOrder;
                     next.DiskBytes=before!=null&&next.Name==before.Name&&ReferenceEquals(next.Asset,before.Asset)&&next.LightEnabled==before.LightEnabled&&next.LightRadius==before.LightRadius
-                        ?before.DiskBytes:ObjectLibrary.Metadata(next);}
+                        ?before.DiskBytes:ObjectLibrary.Metadata(next,before);}
                 var action=new EditAction{Label=before==null?"Dodanie wzorca":next==null?"Usunięcie wzorca":"Edycja wzorca"};
                 if(update&&before!=null&&next!=null)foreach(var o in map.Objects.Where(o=>o.TemplateId==before.Id)){
                     if(o.AssetId==next.Asset.Id)continue;var after=o.Copy();after.AssetId=next.Asset.Id;action.Objects.Add(new ObjectChange{Before=o.Copy(),After=after,Index=map.Objects.IndexOf(o)});

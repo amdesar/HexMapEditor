@@ -47,27 +47,32 @@ namespace HexMapEditor.Tests
             var models = ObjectLibrary.Load(objects,out warning);
             Check(starters.Count == 20 && models.Count == 12, "Factory catalog");
             Check(starters.All(i=>i.Asset.LibraryCrop==null) && models.All(i=>i.Asset.LibraryCrop==null), "Factory PNG got a crop");
+            Check(starters.All(i=>i.SourceFile.EndsWith("-original.png") && Path.GetDirectoryName(i.Asset.LibrarySource.LibraryFile)==icons)
+                && models.All(i=>i.SourceFile.EndsWith("-original.png") && Path.GetDirectoryName(i.Asset.LibrarySource.LibraryFile)==objects)
+                && !Directory.Exists(Path.Combine(library,"Sources")), "Factory sources are not local named PNGs");
+            var starterFiles = Directory.GetFiles(icons,"*.png").Concat(Directory.GetFiles(objects,"*.png")).ToArray();
             var first = starters[0];
             var renamed = first.Copy(); renamed.Name = "Nazwa użytkownika";
-            renamed.DiskBytes = IconLibrary.Metadata(renamed);
+            renamed.DiskBytes = IconLibrary.Metadata(renamed,first);
             new IconLibraryChange { Before = first, BeforeBytes = first.DiskBytes, After = renamed, AfterBytes = renamed.DiskBytes }.Write(true);
             var refreshed = IconLibrary.Load(icons,out warning);
             Check(refreshed.Count == 20 && refreshed.Single(i=>i.Id==first.Id).Name==renamed.Name &&
-                refreshed.Single(i=>i.Id==first.Id).Asset.Id==first.Asset.Id, "Restart replaced a starter");
+                refreshed.Single(i=>i.Id==first.Id).Asset.Id==first.Asset.Id && renamed.SourceFile==first.SourceFile &&
+                starterFiles.SequenceEqual(Directory.GetFiles(icons,"*.png").Concat(Directory.GetFiles(objects,"*.png"))), "Restart replaced a starter");
             var original = Picture(Color.Orange, true);
             string input = Path.Combine(Root,"Source.jpg"); File.WriteAllBytes(input,original);
             IconAsset asset;
             using (var crop = new SquareImportDialog(input))
             {
-                crop.Show(); crop.Draft.Zoom(1.2); ((Button)crop.AcceptButton).PerformClick(); asset = crop.Result;
+                var nameBox=crop.Controls.OfType<DarkTextBox>().Single();
+                Check(nameBox.Text=="Source","Default name is not the input filename");
+                crop.Show(); nameBox.Text="Próba Łąki"; crop.Draft.Zoom(1.2); ((Button)crop.AcceptButton).PerformClick(); asset = crop.Result;
             }
-            Check(asset != null && asset.LibrarySource.Id == GraphicSources.Id(original), "Crop forgot original file");
-            var entry = new LibraryIcon { Name = "Próba", Asset = asset, FilePath = IconLibrary.Destination(icons,"Próba",null) };
-            entry.DiskBytes = IconLibrary.Metadata(entry);
-            new IconLibraryChange { After = entry, AfterBytes = entry.DiskBytes }.Write(true);
+            Check(asset != null && asset.Name=="Próba Łąki" && asset.LibrarySource.Id == GraphicSources.Id(original), "Crop forgot name or original file");
+            var entry = AddIcon(icons, asset);
             var otherCrop = asset.LibraryCrop.Copy(); otherCrop.Angle = 29;
             var changed = SquareLibraryAsset.Render(asset.LibrarySource, "Drugi", otherCrop);
-            var model = new ObjectTemplate { Name = "Drugi", Asset = changed, FilePath = ObjectLibrary.Destination(objects,"Drugi",null) };
+            var model = new ObjectTemplate { Name = "Source", Asset = changed, FilePath = ObjectLibrary.Destination(objects,"Source",null) };
             model.DiskBytes = ObjectLibrary.Metadata(model);
             new ObjectLibraryChange { After = model }.Write(true);
             var readIcon = IconLibrary.Read(entry.FilePath);
@@ -75,13 +80,21 @@ namespace HexMapEditor.Tests
             Check(readIcon.Asset.Png == asset.Png && readObject.Asset.Png == changed.Png && readObject.Asset.Png != readIcon.Asset.Png,
                 "Restart changed pixels or merged crops");
             Check(readObject.Asset.LibraryCrop.Angle == 29 && readIcon.Asset.LibraryCrop.Angle == 0 &&
-                readIcon.Asset.LibrarySource.LibraryFile == readObject.Asset.LibrarySource.LibraryFile &&
+                readIcon.SourceFile=="Próba Łąki-original.jpg" && readObject.SourceFile=="Source-original.jpg" &&
+                readIcon.Asset.LibrarySource.LibraryFile != readObject.Asset.LibrarySource.LibraryFile &&
+                File.ReadAllBytes(readObject.Asset.LibrarySource.LibraryFile).SequenceEqual(original) &&
                 File.ReadAllBytes(readIcon.Asset.LibrarySource.LibraryFile).SequenceEqual(original) &&
                 File.ReadAllBytes(input).SequenceEqual(original), "Original bytes or independent settings lost");
             Check(!File.ReadAllText(model.FilePath).Contains("\"Png\"") && !File.ReadAllText(entry.FilePath).Contains("\"Data\""),
                 "Catalog embeds image data");
-            new IconLibraryChange { Before=readIcon, BeforeBytes=readIcon.DiskBytes }.Write(true);
-            Check(!File.Exists(entry.FilePath) && ObjectLibrary.Read(model.FilePath).Asset.Png==changed.Png, "Removing one crop destroyed another");
+            var second = AddIcon(icons,changed);
+            Check(second.Id!=entry.Id && second.SourceFile==entry.SourceFile && IconLibrary.Read(second.FilePath).Asset.Png==changed.Png,
+                "Second crop changed the original or reused entry identity");
+            var deletion = new IconLibraryChange { Before=readIcon, BeforeBytes=readIcon.DiskBytes };
+            deletion.Write(true);
+            Check(!File.Exists(entry.FilePath) && IconLibrary.Read(second.FilePath).Asset.Png==changed.Png, "Removing one crop destroyed another");
+            deletion.Write(false);
+            Check(IconLibrary.Read(entry.FilePath).SourceFile==second.SourceFile,"Undo did not restore the original reference");
             var clipboard = new System.Windows.DataObject();
             using(var stream = new MemoryStream(Picture(Color.Red,false)))
             {
@@ -93,13 +106,96 @@ namespace HexMapEditor.Tests
                 {
                     dialog.Show(); ((Button)dialog.AcceptButton).PerformClick();
                     Check(dialog.Result != null && dialog.Result.LibrarySource.Id==source.Id,"Clipboard crop lost its graphic source");
+                    var clipboardEntry = AddIcon(icons,dialog.Result);
+                    Check(clipboardEntry.SourceFile=="Ze schowka-original.png" && File.ReadAllBytes(Path.Combine(icons,clipboardEntry.SourceFile)).SequenceEqual(bytes),
+                        "Clipboard original changed bytes or name");
                 }
             }
+            var nextSource = GraphicSources.Import(Picture(Color.Pink,false));
+            var nextAsset = SquareLibraryAsset.Render(nextSource, "PRÓBA ŁĄKI", new SquareCropState(new Size(nextSource.Width,nextSource.Height)).Transform);
+            Check(AddIcon(icons,nextAsset).SourceFile=="PRÓBA ŁĄKI-original-2.png","Case-insensitive collision or format not handled");
+            var reserved=LibraryImageStore.Store(objects,"CON.Nazwa: zdjęcia",nextSource);
+            Check(reserved=="_CON.Nazwa_ zdjęcia-original.png","Reserved and invalid Windows characters");
+            var longSource=GraphicSources.Import(Picture(Color.Navy,false));
+            var longFile=LibraryImageStore.Store(objects,new String('ą',200),longSource);
+            Check(longFile.Length<200 && longFile.EndsWith("-original.png"),"Original name did not fit filesystem budget");
             var legacy = new LibraryIcon { Id = "old", Name="Stara", Asset = asset };
             string old = Path.Combine(icons,"icon-old.json");
             string raw = MapLogic.Serializer().Serialize(legacy);
             File.WriteAllText(old,raw);
             Check(IconLibrary.Read(old).Asset.Png == asset.Png && File.ReadAllText(old)==raw, "Old record was rewritten");
+            string tampered=Path.Combine(icons,"icon-invalid.json");
+            string json=File.ReadAllText(entry.FilePath);
+            foreach (string badPath in new[] { @"..\Próba Łąki-original.jpg", @"C:\Próba Łąki-original.jpg", "Resources/Próba Łąki-original.jpg" })
+            {
+                File.WriteAllText(tampered,json.Replace(MapLogic.Serializer().Serialize(entry.SourceFile), MapLogic.Serializer().Serialize(badPath)));
+                try { IconLibrary.Read(tampered); throw new InvalidOperationException("Accepted invalid reference: "+badPath); }
+                catch(InvalidDataException) { }
+            }
+            string originalFile = Path.Combine(icons,entry.SourceFile);
+            File.WriteAllBytes(originalFile,Convert.FromBase64String(nextSource.Data));
+            try { IconLibrary.Read(entry.FilePath); throw new InvalidOperationException("Accepted replaced bytes"); }
+            catch(InvalidDataException) { }
+            File.WriteAllBytes(originalFile,original);
+            Legacy(library, original);
+            string moved=Path.Combine(Root,"Relocated Library");
+            Directory.Move(library,moved);
+            Check(IconLibrary.Read(Path.Combine(moved,"Icons",Path.GetFileName(entry.FilePath))).Asset.Png==asset.Png &&
+                TerrainGraphicLibrary.Load(Path.Combine(moved,"Terrains","Graphics"),out warning).Count==3 && warning=="",
+                "Moving the entire Library broke relative references");
+        }
+        static LibraryIcon AddIcon(string directory, IconAsset asset)
+        {
+            var entry = new LibraryIcon { Name=asset.Name, Asset=asset, FilePath=IconLibrary.Destination(directory,asset.Name,null) };
+            entry.DiskBytes=IconLibrary.Metadata(entry);
+            new IconLibraryChange { After=entry, AfterBytes=entry.DiskBytes }.Write(true);
+            return entry;
+        }
+        static void Legacy(string library, byte[] original)
+        {
+            var source=GraphicSources.Import(original);
+            string central=Directory.CreateDirectory(Path.Combine(library,"Sources")).FullName;
+            string legacyFile=Path.Combine(central,source.Id+".jpg");
+            File.WriteAllBytes(legacyFile,original);
+            var crop=new SquareCropState(new Size(source.Width,source.Height)).Transform;
+            var json=MapLogic.Serializer();
+            string icons=Path.Combine(library,"Icons"), objects=Path.Combine(library,"Objects");
+            string iconFile=Path.Combine(icons,"icon-z-0131.json"), objectFile=Path.Combine(objects,"object-z-0131.json");
+            File.WriteAllText(iconFile,json.Serialize(new { IconFormatVersion=3, Id="legacy-icon", Name="Ikona 0131", SourceId=source.Id, AssetName="Ikona", Crop=crop }));
+            File.WriteAllText(objectFile,json.Serialize(new { ObjectFormatVersion=2, Id="legacy-object", Name="Obiekt 0131", SourceId=source.Id, AssetName="Obiekt", Crop=crop }));
+            var icon=IconLibrary.Read(iconFile);
+            var edited=icon.Copy(); edited.Name="Zmieniona stara";
+            edited.DiskBytes=IconLibrary.Metadata(edited,icon);
+            new IconLibraryChange { Before=icon, BeforeBytes=icon.DiskBytes, After=edited, AfterBytes=edited.DiskBytes }.Write(true);
+            Check(IconLibrary.Read(iconFile).Asset.LibrarySource.LibraryFile==legacyFile &&
+                ObjectLibrary.Read(objectFile).Asset.LibrarySource.LibraryFile==legacyFile,"Legacy square source was rewritten");
+            string terrains=Directory.CreateDirectory(Path.Combine(library,"Terrains","Graphics")).FullName;
+            string backgrounds=Directory.CreateDirectory(Path.Combine(library,"Backgrounds")).FullName;
+            var graphic=Terrain(source,"Grafika 0131");
+            var old=new TerrainGraphic { Id="old-terrain",Name="Grafika 0131",Asset=graphic };
+            string oldPath=Path.Combine(terrains,"terrain-old.json");
+            File.WriteAllText(oldPath,json.Serialize(old));
+            var background=new BackgroundEntry { BackgroundFormatVersion=1, Id="legacy-background",Name="Tło 0131",
+                Settings=new MapBackground { Source=source,SourceId=source.Id } };
+            string backgroundPath=Path.Combine(backgrounds,"background-old.json");
+            File.WriteAllText(backgroundPath,json.Serialize(background));
+            var from = TerrainGraphicLibrary.Read(oldPath);
+            var adjusted=from.Asset.Copy(); CropMath.Rotate(adjusted,false,25); adjusted.Seal();
+            var after=TerrainGraphicLibrary.Prepare(terrains,from,from.Name,adjusted,new[]{from});
+            new TerrainGraphicChange { Before=from,After=after }.Write(true);
+            var read=TerrainGraphicLibrary.Read(after.Path);
+            var another=TerrainGraphicLibrary.Prepare(terrains,null,"Drugi kadr",adjusted,new[]{read});
+            new TerrainGraphicChange { After=another }.Write(true);
+            Check(read.Asset.Pointy.Angle==25 && read.Asset.Source.LibraryFile==legacyFile &&
+                BackgroundLibrary.Read(backgroundPath,new Dictionary<string,GraphicSource>()).Settings.Source.LibraryFile==legacyFile &&
+                another.SourceFile=="Drugi kadr-original.jpg" && File.ReadAllBytes(legacyFile).SequenceEqual(original),
+                "Legacy recrop changed original or new entry kept external reference");
+            var older=GraphicSources.Import(Picture(Color.DarkGreen,false));
+            var olderFolder=Directory.CreateDirectory(Path.Combine(terrains,"Sources")).FullName;
+            File.WriteAllText(Path.Combine(olderFolder,older.Id+".json"),json.Serialize(older));
+            File.WriteAllText(Path.Combine(terrains,"terrain-older.json"),
+                json.Serialize(new TerrainGraphic { Id="older-terrain", Name="Starsza",Asset=Terrain(older,"Starsza") }));
+            Check(TerrainGraphicLibrary.Read(Path.Combine(terrains,"terrain-older.json")).Asset.Source.Data==older.Data,"Legacy JSON source unreadable");
         }
         static void Queue()
         {
@@ -153,7 +249,15 @@ namespace HexMapEditor.Tests
             string left=Add(library,ImportCategory.Objects,"again.png",image);
             var restart=new FolderImport(library);
             Check(restart.Scan().All(c=>c.Path!=left),"Committed metadata did not survive a rescan");
-            Check(Directory.GetFiles(Path.Combine(library,"Sources"),GraphicSources.Id(image)+".*").Length==1,"Cross-category source duplicated");
+            foreach (var sample in new[] {
+                new { Category=Path.Combine("Terrains","Graphics"), Name="a-original.png", Data=image },
+                new { Category="Backgrounds", Name="a-original.png", Data=image },
+                new { Category="Icons", Name="b-original.png", Data=newer },
+                new { Category="Objects", Name="Obiekt-original.png", Data=image } })
+                Check(File.ReadAllBytes(Path.Combine(library,sample.Category,sample.Name)).SequenceEqual(sample.Data), "Incorrect queue original: "+sample.Category);
+            Check(!Directory.Exists(Path.Combine(library,"Sources")) && restart.Scan().All(c=>
+                c.Path.StartsWith(Path.Combine(library,"Import")+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)),
+                "Category file entered queue or created a central store");
             string removal=Add(library,ImportCategory.Icons,"Recycled.png",Picture(Color.Blue,false));
             RecycleFile.Send(removal,IntPtr.Zero);
             Check(!File.Exists(removal)&&File.Exists(duplicate),"Recycle touched other queue files");
@@ -171,7 +275,13 @@ namespace HexMapEditor.Tests
         }
         static void Map()
         {
-            var source = GraphicSources.Import(Picture(Color.Brown,true));
+            string separate = Path.Combine(Root,"Separate map sources");
+            string terrains = Directory.CreateDirectory(Path.Combine(separate,"Terrains","Graphics")).FullName;
+            var initial = Terrain(GraphicSources.Import(Picture(Color.Brown,true)),"Dwa kadry");
+            var stored = TerrainGraphicLibrary.Prepare(terrains,null,initial.Name,initial,new TerrainGraphic[0]);
+            new TerrainGraphicChange { After=stored }.Write(true);
+            var source = TerrainGraphicLibrary.Read(stored.Path).Asset.Source;
+            string sourceData = source.Data;
             var one=Terrain(source,"Dwa kadry"); var two=one.Copy();
             CropMath.Zoom(two,true,1.8); CropMath.Rotate(two,true,25); two.Seal();
             var fills=new List<FillVariant> { new FillVariant { Graphic=one, GraphicId=one.Id }, new FillVariant { Graphic=two, GraphicId=two.Id } };
@@ -188,6 +298,7 @@ namespace HexMapEditor.Tests
             string signature=Pixels(map);
             string path=Path.Combine(Root,"portable-fixture.hexmap");
             MainWindow.WriteProjectData(map,path,false);
+            Directory.Move(separate,Path.Combine(Root,"Disconnected map sources"));
             string json=File.ReadAllText(path);
             Check(!json.Contains(squareSource.Id),"Map contains a new square original.");
             var read=MainWindow.ReadProjectData(path);
@@ -200,7 +311,7 @@ namespace HexMapEditor.Tests
             MainWindow.WriteProjectData(read,editedPath,false);
             var reloaded=MainWindow.ReadProjectData(editedPath);
             Check(reloaded.Cells[1].Texture.Flat.Angle==edited.Flat.Angle && Pixels(reloaded)!=signature &&
-                reloaded.Background.Source.Data==source.Data && !Directory.Exists(Path.Combine(Root,"Library")),
+                reloaded.Background.Source.Data==sourceData && !Directory.Exists(Path.Combine(Root,"Library")),
                 "Recrop or save without Library failed");
         }
         [STAThread]

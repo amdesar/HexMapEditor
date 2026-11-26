@@ -26,12 +26,12 @@ namespace HexMapEditor
         internal static GraphicSource SourceFor(IconAsset asset)
         { return asset.LibrarySource ?? GraphicSources.Import(Convert.FromBase64String(asset.Png)); }
 
-        internal static IconAsset Read(string directory, Dictionary<string, object> raw)
+        internal static IconAsset Read(string directory, Dictionary<string, object> raw, string file)
         {
             object id, name, crop;
             if (!raw.TryGetValue("SourceId", out id) || !raw.TryGetValue("AssetName", out name) || !raw.TryGetValue("Crop", out crop))
                 throw new InvalidDataException("Brak metadanych źródła grafiki.");
-            var source = LibraryImageStore.Find(directory, id as string);
+            var source = LibraryImageStore.Find(directory, id as string, file);
             if (source == null) throw new InvalidDataException("Brakuje pliku źródłowego biblioteki.");
             if (crop == null) return IconAssets.FromPng(source, name as string);
             var values = crop as Dictionary<string, object>;

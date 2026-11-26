@@ -2,10 +2,10 @@
 
 HexMapEditor to działający offline edytor map heksagonalnych na Windows, przeznaczony m.in. do prowadzenia kampanii RPG.
 
-**Publiczna wersja testowa 0.13.1.** Paczki wydania `v0.13.1` są pod poniższymi odznakami. [Raport 0.13.1](docs/raport-0.13.1.md).
+**Publiczna wersja testowa 0.13.2.** Odznaki prowadzą do paczek wydania `v0.13.2`. [Raport 0.13.2](docs/raport-0.13.2.md).
 
-[![Instalator Windows EXE](https://img.shields.io/badge/Windows-Setup%20EXE-2864a6)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.1/HexMapEditor-0.13.1-Setup.exe)
-[![Portable ZIP](https://img.shields.io/badge/Portable-ZIP-3b7964)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.1/HexMapEditor-0.13.1-Portable.zip)
+[![Instalator Windows EXE](https://img.shields.io/badge/Windows-Setup%20EXE-2864a6)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.2/HexMapEditor-0.13.2-Setup.exe)
+[![Portable ZIP](https://img.shields.io/badge/Portable-ZIP-3b7964)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.2/HexMapEditor-0.13.2-Portable.zip)
 
 ![Mapa demonstracyjna z teksturami, ikonami i panelem grupy obiektów](docs/screenshots/SS2.png)
 
@@ -14,7 +14,7 @@ HexMapEditor to działający offline edytor map heksagonalnych na Windows, przez
 - Edycja map na siatce heksagonalnej w dwóch orientacjach. Rysowanie terenu, nanoszenie ikon i obiektów oraz obsługa mgły wojny i widoczności.
 - Karty map z niezależnym widokiem i historią edycji, wspólne presety i autozapis zapisanych map.
 - Opisy heksów z formatowaniem, tabelami i osadzonymi obrazami. Indywidualne i grupowe właściwości obiektów.
-- Biblioteka terenów, ikon, obiektów, teł i presetów z kolejką `Library/Import` i zachowywaniem oryginalnych grafik.
+- Biblioteka terenów, ikon, obiektów, teł i presetów z kolejką `Library/Import`. Nowe oryginalne grafiki trafiają pod czytelnymi nazwami do folderów kategorii.
 - Mapy pozostają samodzielnymi plikami JSON `.hexmap` (Map12), z osadzonymi grafikami potrzebnymi do edycji.
 
 ![Import grafiki terenu z podglądem kadru heksagonalnego](docs/screenshots/SS3.png)
@@ -31,7 +31,7 @@ Wymagany jest Windows 10 lub 11 z pełnym .NET Framework 4.8 albo 4.8.1. [Pobier
 
 - [Galeria](docs/galeria.md) i [specyfikacja](docs/specyfikacja.md)
 - [Budowanie i pakowanie](docs/budowanie.md)
-- [Raport bieżącego wydania 0.13.1](docs/raport-0.13.1.md), [plan wydań](docs/plan-wersji.md) i [opisy wcześniejszych wersji](docs/historia-wydan.md)
+- [Raport bieżącego wydania 0.13.2](docs/raport-0.13.2.md), [plan wydań](docs/plan-wersji.md) i [opisy wcześniejszych wersji](docs/historia-wydan.md)
 
 ## Zgłaszanie błędów
 
