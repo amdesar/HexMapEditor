@@ -56,10 +56,11 @@ namespace HexMapEditor
             var sources = new HashSet<string>();
             string catalog = Catalog(category);
             if (!Directory.Exists(catalog)) return sources;
-            foreach (var file in Directory.EnumerateFiles(catalog, EntryPattern(category)))
+            foreach (var file in LibraryMetadata.Files(catalog, EntryPattern(category)))
             {
                 try
                 {
+                    LibraryImageStore.RequireOrdinaryPath(file);
                     if (new FileInfo(file).Length > 3 * 1024 * 1024) continue;
                     var raw = MapLogic.Serializer().DeserializeObject(File.ReadAllText(file)) as Dictionary<string, object>;
                     if (raw == null) continue;

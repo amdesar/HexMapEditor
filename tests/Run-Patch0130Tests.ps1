@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][ValidateSet('library','queue','map')][string]$Case)
+param([Parameter(Mandatory)][ValidateSet('library','queue','map','metadata')][string]$Case)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot
 $run=Join-Path $PSScriptRoot ('_work/patch-0130-'+$Case+'-'+[Guid]::NewGuid().ToString('N'))

@@ -32,18 +32,16 @@ namespace HexMapEditor
             var item=serializer.ConvertToType<BackgroundEntry>(raw);
             if(item==null||item.BackgroundFormatVersion!=1||String.IsNullOrWhiteSpace(item.Id)||item.Id.Length>200||String.IsNullOrWhiteSpace(item.Name)||item.Name.Length>200||item.LibraryOrder<0||item.Settings==null)throw new InvalidDataException("Nieprawidłowy wpis biblioteki teł.");
             item.SourceFile=LibraryImageStore.ReadReference(raw);
-            item.Settings.Source=TerrainGraphicLibrary.ReadSource(System.IO.Path.GetDirectoryName(path),item.Settings.SourceId,item.SourceFile,sources);
+            item.Settings.Source=TerrainGraphicLibrary.ReadSource(LibraryMetadata.Catalog(path),item.Settings.SourceId,item.SourceFile,sources);
             item.Settings.LibraryId=item.Id;BackgroundRenderer.Validate(item.Settings);
             item.Path=System.IO.Path.GetFullPath(path);item.Bytes=bytes;return item;
         }
         internal static List<BackgroundEntry> Load(string directory,out string warning)
         {
-            Directory.CreateDirectory(directory);var items=new List<BackgroundEntry>();var errors=new List<string>();var sources=new Dictionary<string,GraphicSource>();
-            foreach(var path in Directory.GetFiles(directory,"background-*.json").OrderBy(p=>p,StringComparer.OrdinalIgnoreCase))try
-            {
-                var item=Read(path,sources);if(items.Count>=GraphicLimits.LibraryEntries||items.Any(i=>i.Id==item.Id))throw new InvalidDataException("Powtórzone ID lub limit 128 teł.");
-                GraphicSources.Collect(items.Select(i=>i.Settings.Source).Concat(new[]{item.Settings.Source}),true);items.Add(item);
-            }catch(Exception ex){errors.Add(System.IO.Path.GetFileName(path)+": "+ex.Message);}
+            var errors=new List<string>();var sources=new Dictionary<string,GraphicSource>();
+            var items=LibraryMetadata.Read(directory,"background-*.json",path=>Read(path,sources),i=>i.Id,(i,path)=>i.Path=path,
+                GraphicLimits.LibraryEntries,errors,
+                (entries,item)=>GraphicSources.Collect(entries.Select(i=>i.Settings.Source).Concat(new[]{item.Settings.Source}),true));
             warning=String.Join(Environment.NewLine,errors);return LibrarySequence.Sort(items,i=>i.LibraryOrder,i=>i.Id).ToList();
         }
         internal static BackgroundEntry Prepare(string directory,BackgroundEntry before,string name,MapBackground settings,IEnumerable<BackgroundEntry> items)
@@ -53,7 +51,7 @@ namespace HexMapEditor
             BackgroundRenderer.Validate(settings);GraphicSources.Collect(items.Where(i=>before==null||i.Id!=before.Id).Select(i=>i.Settings.Source).Concat(new[]{settings.Source}),true);
             var entry=new BackgroundEntry{BackgroundFormatVersion=1,Id=before==null?Guid.NewGuid().ToString("N"):before.Id,Name=name,Settings=settings.Copy(),LibraryOrder=before==null?LibrarySequence.Next(items.Select(i=>i.LibraryOrder)):before.LibraryOrder};
             entry.Settings.Source=settings.Source.Pin();entry.Settings.LibraryId=entry.Id;
-            entry.Path=PresetFiles.Destination(directory,"background-"+PresetFiles.Stem(name),before==null?null:before.Path);
+            entry.Path=LibraryMetadata.Destination(directory,"background-"+PresetFiles.Stem(name),before==null?null:before.Path);
             if(!System.IO.Path.GetFileName(entry.Path).StartsWith("background-",StringComparison.Ordinal))throw new IOException("Za długa ścieżka biblioteki teł.");
             entry.SourceFile=before!=null && before.Settings.SourceId==settings.SourceId ? before.SourceFile :
                 LibraryImageStore.Store(directory,name,settings.Source);
@@ -70,9 +68,10 @@ namespace HexMapEditor
             var from=forward?Before:After;var to=forward?After:Before;
             if(to!=null)
             {
-                foreach(var path in Directory.GetFiles(System.IO.Path.GetDirectoryName(to.Path),"background-*.json"))
-                    if((from==null||!String.Equals(path,from.Path,StringComparison.OrdinalIgnoreCase))&&PresetCatalog.ReadIdentity(path).Id==to.Id)throw new IOException("Inny plik ma już ID tego tła: "+path);
-                TerrainGraphicLibrary.ReadSource(System.IO.Path.GetDirectoryName(to.Path),to.Settings.SourceId,to.SourceFile);
+                string catalog=LibraryMetadata.Catalog(to.Path);
+                foreach(var path in LibraryMetadata.Files(catalog,"background-*.json"))
+                    if((from==null||!String.Equals(path,from.Path,StringComparison.OrdinalIgnoreCase))&&LibraryMetadata.ReadIdentity(path)==to.Id)throw new IOException("Inny plik ma już ID tego tła: "+path);
+                TerrainGraphicLibrary.ReadSource(catalog,to.Settings.SourceId,to.SourceFile);
             }
             LibraryFiles.Transition(from==null?null:from.Path,from==null?null:from.Bytes,to==null?null:to.Path,to==null?null:to.Bytes);
         }

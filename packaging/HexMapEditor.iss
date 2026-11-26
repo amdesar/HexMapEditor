@@ -464,10 +464,6 @@ var
 begin
   Result := ProgramChoiceError;
   if Result <> '' then exit;
-  if CheckForMutexes('{#InstallGuard}') then begin
-    Result := 'HexMapEditor nadal działa. Zapisz pracę, zamknij edytor i ponów instalację.';
-    exit;
-  end;
   if not ValidPathField(ChosenLibrary) then begin
     Result := 'Podaj pełną ścieżkę katalogu Library.';
     exit;
@@ -476,6 +472,8 @@ begin
   DataDir := AddBackslash(ProgramDir) + 'Data';
   AdjacentDir := AddBackslash(ProgramDir) + 'Library';
   try
+    Result := CheckTargetEditor(ProgramDir);
+    if Result <> '' then exit;
     RequireOrdinaryParents(ProgramDir);
     if IsProtectedScope then Result := CheckMachineProgram(ProgramDir)
     else Result := RunStorage('user-program', Arg(ProgramDir), Info);

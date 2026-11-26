@@ -140,7 +140,7 @@ namespace HexMapEditor.Tests
             Legacy(library, original);
             string moved=Path.Combine(Root,"Relocated Library");
             Directory.Move(library,moved);
-            Check(IconLibrary.Read(Path.Combine(moved,"Icons",Path.GetFileName(entry.FilePath))).Asset.Png==asset.Png &&
+            Check(IconLibrary.Read(Path.Combine(moved,"Icons","Metadata",Path.GetFileName(entry.FilePath))).Asset.Png==asset.Png &&
                 TerrainGraphicLibrary.Load(Path.Combine(moved,"Terrains","Graphics"),out warning).Count==3 && warning=="",
                 "Moving the entire Library broke relative references");
         }
@@ -314,6 +314,96 @@ namespace HexMapEditor.Tests
                 reloaded.Background.Source.Data==sourceData && !Directory.Exists(Path.Combine(Root,"Library")),
                 "Recrop or save without Library failed");
         }
+        static void Metadata()
+        {
+            string library=Path.Combine(Root,"Moved graphics catalog");
+            var import=new FolderImport(library); import.EnsureFolders();
+            var bytes=Picture(Color.IndianRed,false);
+            foreach(var category in FolderImport.Categories) Add(library,category,"Wspólna.png",bytes);
+            var pending=import.Scan();
+            var batch=FolderImportDialog.ImportDefaults(import,pending);
+            Check(batch.Result.Count==4 && batch.Notes.Count==0,"Fresh queue could not save all metadata");
+            var terrain=Path.Combine(library,"Terrains","Graphics");
+            var icons=Path.Combine(library,"Icons");
+            var objects=Path.Combine(library,"Objects");
+            var backgrounds=Path.Combine(library,"Backgrounds");
+            var categories=new[]{terrain,icons,objects,backgrounds};
+            var flat=new Dictionary<string,byte[]>();
+            foreach(var catalog in categories)
+            {
+                string original=Path.Combine(catalog,"Wspólna-original.png");
+                Check(File.ReadAllBytes(original).SequenceEqual(bytes),"Original is not directly in "+catalog);
+                string metadata=Path.Combine(catalog,"Metadata");
+                Check(!Directory.GetFiles(metadata,"*.png").Any()&&!Directory.GetFiles(catalog,"*.json").Any(),"New layout put files in the wrong folder");
+                var path=Directory.GetFiles(metadata,"*Wspólna*.json").Single();
+                var legacy=Path.Combine(catalog,Path.GetFileName(path));
+                File.Move(path,legacy); flat.Add(legacy,File.ReadAllBytes(legacy));
+                File.WriteAllText(Path.Combine(catalog,"nieznany.json"),"{\"Id\":\"not-graphic\",\"Name\":\"Obcy wpis\"}");
+            }
+            // Open the flat layout through a new Library location to simulate a first load.
+            string reopened=Path.Combine(Root,"Restored 0132");
+            Directory.Move(library,reopened);
+            string oldTerrain=Path.Combine(reopened,"Terrains","Graphics");
+            string oldIcons=Path.Combine(reopened,"Icons");
+            string oldObjects=Path.Combine(reopened,"Objects");
+            string oldBackgrounds=Path.Combine(reopened,"Backgrounds");
+            string oldTerrainPath=Directory.GetFiles(oldTerrain,"terrain-*.json").Single();
+            var serde=MapLogic.Serializer();
+            var competing=serde.DeserializeObject(File.ReadAllText(oldTerrainPath)) as Dictionary<string,object>;
+            competing["Id"]="competing-terrain";
+            competing["Name"]="Inny poprawny wpis";
+            string collision=Path.Combine(oldTerrain,"Metadata",Path.GetFileName(oldTerrainPath));
+            File.WriteAllText(collision,serde.Serialize(competing));
+            string warning;
+            var terrains=TerrainGraphicLibrary.Load(oldTerrain,out warning);
+            Check(terrains.Count==2 && warning.Contains("pozostawiono dotychczasowy plik") && File.Exists(oldTerrainPath),
+                "Collision hid an old entry: "+warning);
+            var loadedIcons=IconLibrary.Load(oldIcons,out warning);
+            var loadedObjects=ObjectLibrary.Load(oldObjects,out warning);
+            var loadedBackgrounds=BackgroundLibrary.Load(oldBackgrounds,out warning);
+            foreach(var pair in flat)
+            {
+                string relative=pair.Key.Substring(library.Length+1);
+                string legacy=Path.Combine(reopened,relative);
+                string catalog=Path.GetDirectoryName(legacy);
+                string moved=Path.Combine(catalog,"Metadata",Path.GetFileName(legacy));
+                Check(File.Exists(Path.Combine(catalog,"nieznany.json"))&&!File.Exists(Path.Combine(catalog,"Metadata","nieznany.json")),"Moved unknown JSON");
+                if(legacy==oldTerrainPath)
+                    Check(File.ReadAllBytes(legacy).SequenceEqual(pair.Value) && TerrainGraphicLibrary.Read(moved).Id=="competing-terrain","Collision overwrote data");
+                else
+                    Check(!File.Exists(legacy) && File.ReadAllBytes(moved).SequenceEqual(pair.Value),"Move rewrote "+relative);
+            }
+            Check(loadedBackgrounds.Single().Settings.Source.LibraryFile==Path.Combine(oldBackgrounds,"Wspólna-original.png")&&
+                loadedObjects.Single(o=>o.Name=="Wspólna").Asset.LibrarySource.LibraryFile==Path.Combine(oldObjects,"Wspólna-original.png"),
+                "Relocated references no longer resolve against their category");
+            var first=loadedIcons.Single(i=>i.Name=="Wspólna");
+            var change=new IconLibraryChange { Before=first,BeforeBytes=first.DiskBytes };
+            change.Write(true); Check(!File.Exists(first.FilePath),"Delete missed relocated metadata");
+            change.Write(false); Check(IconLibrary.Read(first.FilePath).Id==first.Id,"Undo did not restore migrated entry");
+            var renamed=first.Copy(); renamed.Name="Po uporządkowaniu"; renamed.FilePath=IconLibrary.Destination(oldIcons,renamed.Name,first.FilePath);
+            renamed.DiskBytes=IconLibrary.Metadata(renamed,first);
+            var edit=new IconLibraryChange { Before=first,BeforeBytes=first.DiskBytes,After=renamed,AfterBytes=renamed.DiskBytes };
+            edit.Write(true); Check(IconLibrary.Read(renamed.FilePath).SourceFile==first.SourceFile,"Edit changed the original");
+            edit.Write(false);
+            string blocked=Directory.CreateDirectory(Path.Combine(Root,"Unwritable layout","Backgrounds")).FullName;
+            var before=loadedBackgrounds[0];
+            File.Copy(before.Settings.Source.LibraryFile,Path.Combine(blocked,before.SourceFile));
+            string flatBackground=Path.Combine(blocked,Path.GetFileName(before.Path));
+            File.Copy(before.Path,flatBackground);
+            File.WriteAllText(Path.Combine(blocked,"Metadata"),"not a directory");
+            Check(BackgroundLibrary.Load(blocked,out warning).Single().Path==flatBackground && warning.Contains("Metadata"),
+                "Failed metadata creation blocked legacy entry");
+            try
+            {
+                BackgroundLibrary.Prepare(blocked,null,"Odmowa zapisu",before.Settings,new BackgroundEntry[0]);
+                throw new InvalidOperationException("Write was allowed in an unavailable metadata folder");
+            }
+            catch(IOException) { Check(File.Exists(flatBackground),"Failed write removed old entry"); }
+            Check(TerrainGraphicLibrary.Load(oldTerrain,out warning).Count==2 && IconLibrary.Load(oldIcons,out warning).Count==loadedIcons.Count,
+                "Second load duplicated metadata");
+            string again=Add(reopened,ImportCategory.Icons,"Ponownie.png",bytes);
+            Check(new FolderImport(reopened).Scan().All(i=>i.Path!=again),"Queue ignored relocated metadata");
+        }
         [STAThread]
         internal static int Main(string[] args)
         {
@@ -325,6 +415,7 @@ namespace HexMapEditor.Tests
                     case "library": Library(); break;
                     case "queue": Queue(); break;
                     case "map": Map(); break;
+                    case "metadata": Metadata(); break;
                     default: throw new ArgumentException("Unknown case.");
                 }
                 Console.WriteLine(args[0]+" PASS"); return 0;

@@ -16,7 +16,7 @@ namespace HexMapEditor
             {
                 directory = Path.GetFullPath(directory);
                 if (before == null && next == null) return true;
-                if (before != null && (!libraryIcons.Any(i => i.Id == before.Id) || !String.Equals(Path.GetDirectoryName(before.FilePath),directory,StringComparison.OrdinalIgnoreCase))) throw new IOException("Pozycja biblioteki zmieniła się. Wybierz ją ponownie.");
+                if (before != null && (!libraryIcons.Any(i => i.Id == before.Id) || !String.Equals(LibraryMetadata.Catalog(before.FilePath),directory,StringComparison.OrdinalIgnoreCase))) throw new IOException("Pozycja biblioteki zmieniła się. Wybierz ją ponownie.");
                 if (before == null && libraryIcons.Count >= IconAssets.MaxAssets) throw new IOException("Limit 128 ikon w bibliotece.");
                 if (next != null)
                 {

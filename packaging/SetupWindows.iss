@@ -15,6 +15,8 @@ function GetFileAttributes(Path: String): LongWord;
 function OpenSetupFile(Path: String; Access, Share: LongWord; Security: LongWord;
   Creation, Flags, Template: LongWord): THandle;
   external 'CreateFileW@kernel32.dll stdcall';
+function GetLastError: LongWord;
+  external 'GetLastError@kernel32.dll stdcall';
 function ConvertSecurity(Text: String; Revision: LongWord; var Descriptor: LongWord; Size: LongWord): Boolean;
   external 'ConvertStringSecurityDescriptorToSecurityDescriptorW@advapi32.dll stdcall';
 function SetFileSecurity(Path: String; Information, Descriptor: LongWord): Boolean;
@@ -34,6 +36,7 @@ begin
   Result := True;
   EditorPid := StrToIntDef(ExpandConstant('{param:WaitForEditorPid|0}'), 0);
   if EditorPid <= 0 then exit;
+  Log('Sprawdzenie zakończenia procesu inicjującego aktualizację. PID ' + IntToStr(EditorPid));
   EditorProcess := OpenProcess($00100000, False, EditorPid);
   if EditorProcess = 0 then exit;
   try
@@ -43,6 +46,37 @@ begin
   finally
     CloseHandle(EditorProcess);
   end;
+end;
+
+procedure RequireOrdinaryParents(Path: String); forward;
+
+function CheckTargetEditor(const ProgramDir: String): String;
+var ExePath: String; FileHandle: THandle; ErrorCode: LongWord;
+begin
+  Result := '';
+  ExePath := AddBackslash(ProgramDir) + 'HexMapEditor.exe';
+  RequireOrdinaryParents(ExePath);
+  repeat
+    // Installed editors hold this particular EXE open with FileShare.Read.
+    // A mutex shared by every installation cannot identify the target file.
+    FileHandle := OpenSetupFile(ExePath, $80000000, 0, 0, 3, $00200000, 0);
+    ErrorCode := GetLastError;
+    if FileHandle <> $FFFFFFFF then begin
+      CloseHandle(FileHandle);
+      exit;
+    end;
+    if (ErrorCode = 2) or (ErrorCode = 3) then exit;
+    Log('Sprawdzenie blokady EXE (Windows ' + IntToStr(ErrorCode) + '): ' + ExePath);
+    if (ErrorCode <> 32) and (ErrorCode <> 33) then begin
+      Result := 'Nie można sprawdzić dostępu do pliku programu: ' + ExePath + #13#10 + SysErrorMessage(ErrorCode);
+      exit;
+    end;
+    Result := 'Plik tej instalacji jest zajęty: ' + ExePath;
+    if SuppressibleMsgBox(Result + #13#10#13#10 +
+      'Jeśli ta kopia HexMapEditora nadal działa, zapisz w niej pracę i zamknij jej okno. Następnie wybierz Ponów. Setup użyje tej samej paczki.',
+      mbError, MB_RETRYCANCEL, IDCANCEL) <> IDRETRY then exit;
+    Result := '';
+  until False;
 end;
 
 function IsReparse(const Path: String): Boolean;

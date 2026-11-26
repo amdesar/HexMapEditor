@@ -37,7 +37,7 @@ namespace HexMapEditor
             if (icon.IconFormatVersion == 3)
             {
                 icon.SourceFile = LibraryImageStore.ReadReference(raw);
-                icon.Asset = SquareLibraryAsset.Read(Path.GetDirectoryName(path), raw, icon.SourceFile);
+                icon.Asset = SquareLibraryAsset.Read(LibraryMetadata.Catalog(path), raw, icon.SourceFile);
             }
             Validate(icon); icon.FilePath = Path.GetFullPath(path); icon.DiskBytes = bytes; return icon;
         }
@@ -48,7 +48,7 @@ namespace HexMapEditor
                 return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(entry));
             var source = SquareLibraryAsset.SourceFor(entry.Asset);
             entry.SourceFile = before != null && before.IconFormatVersion == 3 && before.Asset.LibrarySource.Id == source.Id
-                ? before.SourceFile : LibraryImageStore.Store(Path.GetDirectoryName(entry.FilePath), entry.Name, source);
+                ? before.SourceFile : LibraryImageStore.Store(LibraryMetadata.Catalog(entry.FilePath), entry.Name, source);
             entry.IconFormatVersion = 3;
             return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new {
                 entry.IconFormatVersion, entry.Id, entry.Name, entry.LibraryOrder,
@@ -57,33 +57,37 @@ namespace HexMapEditor
         }
         public static string Destination(string directory, string name, string current)
         {
-            string path = PresetFiles.Destination(directory, "icon-" + PresetFiles.Stem(name), current);
+            string path = LibraryMetadata.Destination(directory, "icon-" + PresetFiles.Stem(name), current);
             if (!Path.GetFileName(path).StartsWith("icon-", StringComparison.Ordinal)) throw new IOException("Ścieżka biblioteki jest zbyt długa, aby zachować prefiks icon- i sufiks kolizji. Nie zmieniono plików.");
             return path;
         }
         public static List<LibraryIcon> Load(string directory, out string warning)
         {
-            Directory.CreateDirectory(directory); string marker = Path.Combine(directory, ".starter-icons-v2");
+            var errors = new List<string>();
+            var result = ReadCatalog(directory, errors);
+            string marker = Path.Combine(directory, ".starter-icons-v2");
             if (!File.Exists(marker))
             {
-                LibraryImageStore.CheckCatalog(directory);
-                var ids = new HashSet<string>(Directory.GetFiles(directory,"*.json").Select(SquareLibraryAsset.ReadStarterIdentity));
-                foreach (var entry in StarterSets.Icons())
+                try
                 {
-                    if (ids.Contains(entry.Id)) continue;
-                    entry.FilePath = Destination(directory, entry.Name, null);
-                    LibraryFiles.Transition(null, null, entry.FilePath, Metadata(entry));
+                    var ids = new HashSet<string>(LibraryMetadata.Files(directory,"*.json").Select(LibraryMetadata.ReadIdentity));
+                    foreach (var entry in StarterSets.Icons())
+                    {
+                        if (ids.Contains(entry.Id)) continue;
+                        entry.FilePath = Destination(directory, entry.Name, null);
+                        LibraryFiles.Transition(null, null, entry.FilePath, Metadata(entry));
+                        if (result.Count < IconAssets.MaxAssets) result.Add(Read(entry.FilePath));
+                    }
+                    MapLogic.AtomicWrite(marker, "1", false);
                 }
-                MapLogic.AtomicWrite(marker, "1", false);
+                catch (IOException error) { errors.Add(error.Message); }
+                catch (UnauthorizedAccessException error) { errors.Add(error.Message); }
             }
-            var result = new List<LibraryIcon>(); var errors = new List<string>();
-            foreach (string path in Directory.GetFiles(directory,"*.json").OrderBy(f=>f,StringComparer.OrdinalIgnoreCase)) try
-            {
-                var entry = Read(path); if (result.Any(i=>i.Id==entry.Id)) throw new InvalidDataException("Powtórzone logiczne ID ikony.");
-                if (result.Count >= IconAssets.MaxAssets) throw new InvalidDataException("Limit biblioteki: 128 ikon."); result.Add(entry);
-            }
-            catch(Exception ex) { errors.Add(Path.GetFileName(path)+": "+ex.Message); }
             warning = String.Join(Environment.NewLine,errors); return LibrarySequence.Sort(result, i => i.LibraryOrder, i => i.Id);
+        }
+        static List<LibraryIcon> ReadCatalog(string directory, List<string> errors)
+        {
+            return LibraryMetadata.Read(directory,"*.json",Read,i=>i.Id,(i,path)=>i.FilePath=path,IconAssets.MaxAssets,errors);
         }
     }
     internal sealed class IconLibraryChange

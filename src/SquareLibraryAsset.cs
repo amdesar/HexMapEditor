@@ -17,12 +17,6 @@ namespace HexMapEditor
                 return GraphicSources.Import(stream.ToArray());
             }
         }
-        internal static string ReadStarterIdentity(string path)
-        {
-            try { return PresetCatalog.ReadIdentity(path).Id; }
-            catch (Exception)
-            { return null; }
-        }
         internal static GraphicSource SourceFor(IconAsset asset)
         { return asset.LibrarySource ?? GraphicSources.Import(Convert.FromBase64String(asset.Png)); }
 

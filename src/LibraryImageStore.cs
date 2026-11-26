@@ -103,7 +103,7 @@ namespace HexMapEditor
 
         internal static void VerifySquare(string entryPath, GraphicSource source, string file)
         {
-            if (Find(Path.GetDirectoryName(entryPath), source.Id, file) == null)
+            if (Find(LibraryMetadata.Catalog(entryPath), source.Id, file) == null)
                 throw new InvalidDataException("Brakuje pliku źródłowego biblioteki.");
         }
 

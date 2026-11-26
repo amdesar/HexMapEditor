@@ -31,11 +31,12 @@ namespace HexMapEditor
             var to = forward ? After : Before;
             if (to != null)
             {
-                TerrainGraphicLibrary.ReadSource(Path.GetDirectoryName(to.Path), to.Asset.SourceId, to.SourceFile);
-                foreach (string path in TerrainGraphicLibrary.Files(Path.GetDirectoryName(to.Path)))
+                string catalog = LibraryMetadata.Catalog(to.Path);
+                TerrainGraphicLibrary.ReadSource(catalog, to.Asset.SourceId, to.SourceFile);
+                foreach (string path in LibraryMetadata.Files(catalog,"terrain-*.json"))
                 {
                     if (from != null && String.Equals(path, from.Path, StringComparison.OrdinalIgnoreCase)) continue;
-                    if (TerrainGraphicLibrary.ReadIdentity(path) == to.Id) throw new IOException("Inny plik ma już to samo ID grafiki: " + path);
+                    if (LibraryMetadata.ReadIdentity(path) == to.Id) throw new IOException("Inny plik ma już to samo ID grafiki: " + path);
                 }
             }
             LibraryFiles.Transition(from == null ? null : from.Path, from == null ? null : from.Bytes,
@@ -45,9 +46,6 @@ namespace HexMapEditor
 
     internal static class TerrainGraphicLibrary
     {
-        internal static string[] Files(string directory) { return Directory.GetFiles(directory, "terrain-*.json"); }
-        internal static string ReadIdentity(string path) { return PresetCatalog.ReadIdentity(path).Id; }
-
         internal static TerrainGraphic Read(string path, Dictionary<string, GraphicSource> sources = null)
         {
             if (new FileInfo(path).Length > 1024 * 1024) throw new InvalidDataException("Za duży plik grafiki terenu.");
@@ -62,7 +60,7 @@ namespace HexMapEditor
                 throw new InvalidDataException("Nieprawidłowe metadane grafiki terenu.");
             if (item.Asset == null) throw new InvalidDataException("Brak definicji kadrów.");
             item.SourceFile = LibraryImageStore.ReadReference(raw);
-            item.Asset.Source = ReadSource(Path.GetDirectoryName(path), item.Asset.SourceId, item.SourceFile, sources);
+            item.Asset.Source = ReadSource(LibraryMetadata.Catalog(path), item.Asset.SourceId, item.SourceFile, sources);
             TerrainTextures.Validate(item.Asset);
             item.Path = Path.GetFullPath(path);
             item.Bytes = bytes;
@@ -98,22 +96,11 @@ namespace HexMapEditor
         }
         internal static List<TerrainGraphic> Load(string directory, out string warning)
         {
-            Directory.CreateDirectory(directory);
             var errors = new List<string>();
-            var items = new List<TerrainGraphic>();
-            var ids = new HashSet<string>();
             var sources = new Dictionary<string, GraphicSource>();
-            foreach (var path in Files(directory).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    var item = Read(path, sources);
-                    if (items.Count >= GraphicLimits.LibraryEntries || !ids.Add(item.Id)) throw new InvalidDataException("Powtórzone ID lub przekroczony limit 128 grafik.");
-                    GraphicSources.Collect(items.Select(e => e.Asset.Source).Concat(new[] { item.Asset.Source }), true);
-                    items.Add(item);
-                }
-                catch (Exception ex) { errors.Add(Path.GetFileName(path) + ": " + ex.Message); }
-            }
+            var items = LibraryMetadata.Read(directory, "terrain-*.json", path=>Read(path,sources), i=>i.Id, (i,path)=>i.Path=path,
+                GraphicLimits.LibraryEntries, errors,
+                (entries,item)=>GraphicSources.Collect(entries.Select(e=>e.Asset.Source).Concat(new[]{item.Asset.Source}),true));
             warning = String.Join(Environment.NewLine, errors);
             return LibrarySequence.Sort(items, i => i.LibraryOrder, i => i.Id).ToList();
         }
@@ -124,7 +111,7 @@ namespace HexMapEditor
             if (before == null && entries.Count() >= GraphicLimits.LibraryEntries) throw new InvalidDataException("Limit 128 aktywnych grafik biblioteki.");
             TerrainTextures.Validate(asset);
             GraphicSources.Collect(entries.Where(e => before == null || e.Id != before.Id).Select(e => e.Asset.Source).Concat(new[] { asset.Source }), true);
-            var path = PresetFiles.Destination(directory, "terrain-" + PresetFiles.Stem(name), before == null ? null : before.Path, allowSuffix);
+            var path = LibraryMetadata.Destination(directory, "terrain-" + PresetFiles.Stem(name), before == null ? null : before.Path, allowSuffix);
             if (!Path.GetFileName(path).StartsWith("terrain-", StringComparison.Ordinal))
                 throw new IOException("Za długa ścieżka biblioteki grafik terenów.");
             var item = new TerrainGraphic
