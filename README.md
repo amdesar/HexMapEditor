@@ -2,10 +2,10 @@
 
 HexMapEditor to działający offline edytor map heksagonalnych na Windows, przeznaczony m.in. do prowadzenia kampanii RPG.
 
-**Publiczna wersja testowa 0.12.4.** Odznaki prowadzą do obu paczek opublikowanych pod tagiem `v0.12.4`. [Raport 0.12.4](docs/raport-0.12.4.md).
+**Publiczna wersja testowa 0.13.0.** Odznaki prowadzą do obu paczek opublikowanych pod tagiem `v0.13.0`. [Raport 0.13.0](docs/raport-0.13.0.md).
 
-[![Instalator Windows EXE](https://img.shields.io/badge/Windows-Setup%20EXE-2864a6)](https://github.com/amdesar/HexMapEditor/releases/download/v0.12.4/HexMapEditor-0.12.4-Setup.exe)
-[![Portable ZIP](https://img.shields.io/badge/Portable-ZIP-3b7964)](https://github.com/amdesar/HexMapEditor/releases/download/v0.12.4/HexMapEditor-0.12.4-Portable.zip)
+[![Instalator Windows EXE](https://img.shields.io/badge/Windows-Setup%20EXE-2864a6)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.0/HexMapEditor-0.13.0-Setup.exe)
+[![Portable ZIP](https://img.shields.io/badge/Portable-ZIP-3b7964)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.0/HexMapEditor-0.13.0-Portable.zip)
 
 ![Mapa demonstracyjna z teksturami, ikonami i panelem grupy obiektów](docs/screenshots/SS2.png)
 
