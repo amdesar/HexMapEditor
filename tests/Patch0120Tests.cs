@@ -168,7 +168,7 @@ namespace HexMapEditor.Tests
             File.WriteAllText(marker,AppStorage.InstalledMode);
             File.WriteAllText(Path.Combine(app,AppStorage.LibraryLocationFile),profile);
             var installed = new AppStorage(app);
-            Check(installed.Installed && installed.CanLaunchInstaller && installed.LibraryRoot==profile &&
+            Check(installed.Installed && installed.MachineInstalled && installed.LibraryRoot==profile &&
                 installed.DataRoot==Path.Combine(app,"Data"), "Split installed paths");
             File.WriteAllText(marker,"invalid");
             Refuses<InvalidDataException>(()=>new AppStorage(app),"Invalid marker silently used wrong root");
@@ -195,27 +195,45 @@ namespace HexMapEditor.Tests
             string library=Directory.CreateDirectory(Path.Combine(Root,"Personal library")).FullName;
             File.WriteAllText(Path.Combine(Root,AppStorage.LibraryLocationFile),library);
             var storage=AppStorage.Current;
-            Check(storage.Installed&&!storage.CanLaunchInstaller&&storage.LibraryRoot==library&&
+            Check(storage.Installed&&!storage.MachineInstalled&&storage.LibraryRoot==library&&
                 storage.MapRoot==Path.Combine(library,"Hexmaps")&&storage.RecentProjectsPath==Path.Combine(Root,"Data","recent-projects.json"),
                 "Wrong routing or data in personal mode");
             var address=new Uri("https://github.com/amdesar/HexMapEditor/releases/download/v0.12.4/HexMapEditor-0.12.4-Setup.exe");
             string sha=new string('a',64);
             var offer=new ReleaseOffer(new Version(0,12,4),null,"HexMapEditor-0.12.4-Setup.exe",address,address,sha,100,true);
-            using(var dialog=new UpdateOfferDialog(offer,storage.CanLaunchInstaller))
+            using(var dialog=new UpdateOfferDialog(offer))
             {
-                Check(dialog.Controls.OfType<Button>().Any(button=>button.Text=="Otwórz link do Setup"),"Missing manual download");
-                Check(dialog.Controls.OfType<TextBox>().Any(box=>box.ReadOnly&&box.Text==sha),"Missing expected checksum");
+                Check(dialog.Controls.OfType<Button>().Any(button=>button.Text=="Zainstaluj aktualizację"),"Missing automatic update action");
             }
-            using(var installer=new VerifiedInstaller(Path.Combine(Root,"must-not-run.exe"),sha,100))
-                Refuses<InvalidOperationException>(()=>installer.Launch(),"Personal mode offered to start installer");
+            using(var zip=new UpdateOfferDialog(new ReleaseOffer(offer.Version,null,"portable.zip",address,address,sha,100,false)))
+                Check(zip.Controls.OfType<Button>().Any(button=>button.Text=="Otwórz link do ZIP"),"Portable lost manual ZIP");
+            string machineRoot=Directory.CreateDirectory(Path.Combine(Root,"machine")).FullName;
+            File.WriteAllText(Path.Combine(machineRoot,AppStorage.ModeFile),AppStorage.InstalledMode);
+            File.WriteAllText(Path.Combine(machineRoot,AppStorage.LibraryLocationFile),library);
+            using(var installer=new VerifiedInstaller(Path.Combine(Root,"must-not-run.exe"),sha,100,offer.Version))
+            {
+                var personal=installer.LaunchArguments(storage,Root.TrimEnd('\\'),123);
+                var machine=installer.LaunchArguments(new AppStorage(machineRoot),machineRoot,456);
+                Check(personal.Contains("/HMEUpdateScope=user") && personal.Contains("/WaitForEditorPid=123") &&
+                    machine.Contains("/HMEUpdateScope=machine") && machine.Contains("/WaitForEditorPid=456") &&
+                    machine.Contains("/HMESetupHash="+sha) && machine.Contains("/HMEExpectedVersion=0.12.4") &&
+                    !machine.Contains("/ALLUSERS") && !personal.Contains("/ALLUSERS"),"Wrong original-token handoff");
+                Refuses<InvalidOperationException>(()=>installer.LaunchArguments(new AppStorage(library),library,1),"Portable can launch Setup");
+            }
         }
         static void Set(MainWindow window,string name,object val)
         {
             typeof(MainWindow).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).SetValue(window,val);
         }
+        static bool HasOpenMaps(MainWindow window)
+        {
+            return (bool)typeof(MainWindow).GetProperty("HasDocuments",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(window,null);
+        }
         static void CloseFlow()
         {
-            var project = MainWindow.CreateProjectData(4,4,"PointyTop","Aktualizacja i anulowanie",PresetCatalog.Default());
+            var preset = PresetCatalog.Default();
+            preset.Id = "update-fixture"; preset.Name = "Paleta próby aktualizacji";
+            var project = MainWindow.CreateProjectData(4,4,"PointyTop","Aktualizacja i anulowanie",preset);
             var path = ProjectCreation.CreateInHexmaps(project).Path;
             var verified = new VerifiedInstaller(Path.Combine(Root,"unused","setup.exe"),"",0);
             Exception failure = null;
@@ -232,7 +250,17 @@ namespace HexMapEditor.Tests
                         typeof(MainWindow).GetMethod("RenameSelectedHex",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(editor,new object[]{"Praca przed aktualizacją"});
                         editor.ConfirmUnsavedForTest=()=>DialogResult.Cancel;
                         Check(!context.FinishForUpdate(editor,verified)&&context.PendingInstaller==null&&!editor.IsDisposed,"Cancel still schedules installer");
+                        editor.ConfirmUnsavedForTest=()=>DialogResult.No;
+                        Check(!context.FinishForUpdate(editor,verified)&&context.PendingInstaller==null&&!editor.IsDisposed,"Discard still schedules installer");
                         editor.ConfirmUnsavedForTest=()=>DialogResult.Yes;
+                        editor.ConfirmPresetForTest=p=>DialogResult.No;
+                        Check(!context.FinishForUpdate(editor,verified)&&context.PendingInstaller==null&&HasOpenMaps(editor),
+                            "Declining preset save lost a draft, a tab, or scheduled installer");
+                        editor.ConfirmPresetForTest=p=>DialogResult.Yes;
+                        editor.SavePresetAllForTest=p=>false;
+                        Check(!context.FinishForUpdate(editor,verified)&&context.PendingInstaller==null&&HasOpenMaps(editor),
+                            "Failed preset save closed editor");
+                        editor.SavePresetAllForTest=p=>{PresetCatalog.PrepareWrite(p,LibraryPaths.Presets,false,null).Write(true); return true;};
                         Check(context.FinishForUpdate(editor,verified)&&editor.IsDisposed,"Successful save did not allow close");
                     }
                     catch(Exception ex) { failure=ex;editor.Dispose();context.ExitThread(); }
@@ -241,6 +269,7 @@ namespace HexMapEditor.Tests
                 if(failure!=null)throw failure;
                 Check(ReferenceEquals(context.PendingInstaller,verified),"Installer lost between close and exit");
                 Check(MainWindow.ReadProjectData(path).Cells[0].Name=="Praca przed aktualizacją","Pre-upgrade save lost");
+                Check(PresetCatalog.ReadFile(PresetCatalog.FindFile(LibraryPaths.Presets,preset.Id)).Name==preset.Name,"Pre-upgrade preset save lost");
             }
         }
         [STAThread] static int Main(string[] args)

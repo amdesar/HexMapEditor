@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
@@ -39,6 +41,8 @@ internal static class SetupStorageTool
                 case "inspect": result = Inspect(args[2], args[3], args[4]); break;
                 case "machine": RequireProtectedProgram(Absolute(args[2])); break;
                 case "user-program": RequireWritableProgram(Absolute(args[2])); break;
+                case "program-scope": result = new[] { "OK", ProgramScope(Absolute(args[2])) }; break;
+                case "machine-stage": result = new[] { "OK", RunMachineStage(args).ToString(CultureInfo.InvariantCulture) }; break;
                 case "probe": Probe(args[2], args[3], args[4]); break;
                 case "copy": Copy(args[2], args[3], args[4]); break;
                 default: throw new InvalidOperationException("Nieznana operacja konfiguracji danych.");
@@ -53,6 +57,41 @@ internal static class SetupStorageTool
             catch (UnauthorizedAccessException) { }
             return 1;
         }
+    }
+
+    static int RunMachineStage(string[] args)
+    {
+        // This helper runs under the original token. Only Inno's loader requests elevation.
+        using (var identity = WindowsIdentity.GetCurrent())
+            if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+                throw new IOException("Etap instalacji musi rozpocząć zwykły użytkownik.");
+        string source = Absolute(args[2]);
+        string directory = Absolute(args[3]);
+        string command = "/ALLUSERS /HMEWorker=1 /SP- /NORESTART /RESTARTEXITCODE=10 " +
+            (args[4] == "1" ? "/SILENT" : "/VERYSILENT") + " /DIR=" + Quote(directory);
+        string mode = args[5];
+        if (mode != "")
+        {
+            if (mode != "adjacent" && mode != "documents" && mode != "custom")
+                throw new IOException("Nieprawidłowy wybór katalogu Library.");
+            if (args[7].Split(',').Any(task => task != "" && task != "hexmap" && task != "desktop"))
+                throw new IOException("Nieprawidłowe zadania instalatora.");
+            command += " /HMELibraryMode=" + mode + " /HMELibrary=" + Quote(Absolute(args[6])) + " /TASKS=" + Quote(args[7]);
+            if (args[8] == "1") command += " /HMECopyLegacy=1";
+        }
+        using (var process = Process.Start(new ProcessStartInfo(source, command) {
+            WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows), UseShellExecute = false
+        }))
+        {
+            if (process == null) throw new IOException("Windows nie uruchomił etapu zapisu Setup.");
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+    }
+
+    static string Quote(string argument)
+    {
+        return "\"" + argument + new string('\\', argument.Length - argument.TrimEnd('\\').Length) + "\"";
     }
 
     static void Respond(string response, string[] lines)
@@ -150,7 +189,7 @@ internal static class SetupStorageTool
             raw.DiscretionaryAcl.Cast<GenericAce>().OfType<QualifiedAce>().Any(rule =>
                 rule.AceQualifier == AceQualifier.AccessAllowed && (rule.AceFlags & AceFlags.InheritOnly) == 0 &&
                 ((FileSystemRights)rule.AccessMask & rights) != 0 && !Trusted(rule.SecurityIdentifier)))
-            throw new IOException("W tej lokalizacji użyj trybu „Tylko dla mnie”. Instalacja dla wszystkich wymaga chronionego katalogu: " + entry.FullName);
+            throw new IOException("Instalacja dla wszystkich wymaga chronionego katalogu: " + entry.FullName);
     }
 
     static DirectoryInfo ExistingDirectory(string program)
@@ -182,6 +221,16 @@ internal static class SetupStorageTool
         {
             CheckOrdinaryEntry(file.FullName);
             CheckMachineAccess(file, file.GetAccessControl(), Redirect | FileSystemRights.Write);
+        }
+    }
+
+    static string ProgramScope(string program)
+    {
+        try { RequireWritableProgram(program); return "user"; }
+        catch (IOException)
+        {
+            RequireProtectedProgram(program);
+            return "machine";
         }
     }
 

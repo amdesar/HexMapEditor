@@ -28,7 +28,7 @@
   #define Classes "Software\Classes"
   #define ProgramGroupPath "{group}\HexMapEditor"
   #define DesktopDirectory "{autodesktop}"
-  #define InstallDirectory "{autopf}\HexMapEditor"
+  #define InstallDirectory "{code:DefaultProgramDirectory}"
   #define FixtureProfile ""
 #endif
 #define ProgId "HexMapEditor.Hexmap"
@@ -46,17 +46,14 @@ DefaultDirName={#InstallDirectory}
 DefaultGroupName=HexMapEditor
 DisableProgramGroupPage=yes
 DisableDirPage=no
+DisableStartupPrompt=yes
 UsePreviousAppDir=yes
 UsePreviousTasks=yes
 AllowUNCPath=no
-#ifdef Fixture
 PrivilegesRequired=lowest
-#else
-PrivilegesRequired=admin
-PrivilegesRequiredOverridesAllowed=dialog
-UsePreviousPrivileges=yes
+PrivilegesRequiredOverridesAllowed=commandline
+UsePreviousPrivileges=no
 ArchitecturesInstallIn64BitMode=x64compatible
-#endif
 MinVersion=10.0
 CloseApplications=no
 RestartApplications=no
@@ -68,6 +65,9 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 OutputBaseFilename=HexMapEditor-{#Version}-Setup
+#ifdef Fixture
+SetupLogging=yes
+#endif
 
 [Languages]
 Name: polish; MessagesFile: "compiler:Languages\Polish.isl"
@@ -99,6 +99,7 @@ Root: {#AssociationRoot}; Subkey: "{#Classes}\{#ProgId}\shell\open\command"; Val
 const
   DesktopTag = 'Skrót utworzony przez HexMapEditor Setup';
   RuntimePageUrl = 'https://dotnet.microsoft.com/download/dotnet-framework/net48';
+  UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1';
 var
   LibraryPage: TWizardPage;
   AdjacentRadio, DocumentsRadio, CustomRadio: TNewRadioButton;
@@ -106,15 +107,22 @@ var
   LibraryBrowse: TNewButton;
   CopyLegacy: TNewCheckBox;
   DocumentsLibrary, CustomLibrary, LegacyProgram, LegacyRoot, OriginalSid, PreviousProgram, OriginalDesktop: String;
-  LegacyData, MigrationOffered, RestartForUser: Boolean;
-  OppositeProgram: String;
+  LegacyData, MigrationOffered, DelegationDone, DelegationBusy: Boolean;
+  OppositeProgram, MachineTarget, UpdateProgram: String;
+  UpdateSourceLock: THandle;
+
+#include "SetupStages.iss"
 
 function InitializeSetup: Boolean;
 var
   ErrorCode: Integer;
 begin
   if not IsAdminInstallMode and IsUserAnAdmin then begin
-    SuppressibleMsgBox('Uruchom instalator dla bieżącego użytkownika bez podniesionych uprawnień.', mbError, MB_OK, IDOK);
+    SuppressibleMsgBox('Uruchom Setup zwykłym dwuklikiem. Jeżeli wybrana lokalizacja wymaga uprawnień administratora, kreator poprosi o zgodę Windows.', mbError, MB_OK, IDOK);
+    Result := False;
+    exit;
+  end;
+  if IsAdminInstallMode and not IsInstallWorker then begin
     Result := False;
     exit;
   end;
@@ -131,32 +139,22 @@ begin
         MsgBox('Otwórz stronę w przeglądarce: ' + RuntimePageUrl, mbInformation, MB_OK);
     exit;
   end;
+  if IsAppUpdate then begin
+    try
+      ValidateAppUpdate;
+    except
+      MsgBox(GetExceptionMessage, mbError, MB_OK);
+      Result := False;
+      exit;
+    end;
+  end;
   Result := WaitForEditor;
 end;
 
-function MachineProgram: String;
+procedure DeinitializeSetup;
 begin
-  Result := '';
-#ifndef Fixture
-  if IsWin64 then RegQueryStringValue(HKLM64, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1',
-    'InstallLocation', Result);
-  if Result = '' then RegQueryStringValue(HKLM32, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1',
-    'InstallLocation', Result);
-  Result := RemoveBackslashUnlessRoot(Result);
-#endif
-end;
-
-function OldProgram: String;
-begin
-  Result := '';
-  RegQueryStringValue(HKA, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1',
-    'InstallLocation', Result);
-  Result := RemoveBackslashUnlessRoot(Result);
-end;
-
-function SetupScope(Param: String): String;
-begin
-  if IsAdminInstallMode then Result := 'machine' else Result := 'user';
+  if (UpdateSourceLock <> 0) and (UpdateSourceLock <> $FFFFFFFF) then CloseHandle(UpdateSourceLock);
+  if IsAppUpdate and not IsMachineUpdate and DelegationDone then FinishAppUpdate(0);
 end;
 
 function HasProgramEntry(const ProgramDir, Name: String): Boolean;
@@ -196,6 +194,7 @@ var
   Info: TArrayOfString;
   Mode, SavedPath, ErrorText: String;
   Width, RadioLeft: Integer;
+  RecordedPath: TArrayOfString;
 begin
   InitializeStorageTool;
   ErrorText := RunStorage('inspect', Arg('{#FixtureProfile}') + ' ' + Arg('{#LegacyProductId}') + ' ' + Arg('{#ProductId}'), Info);
@@ -208,9 +207,16 @@ begin
   OriginalSid := Info[5];
   OriginalDesktop := Info[6];
   if not IsAccountSid(OriginalSid) then RaiseException('Nieprawidłowa tożsamość użytkownika Setup.');
-  PreviousProgram := OldProgram;
-  if IsAdminInstallMode then OppositeProgram := Info[7]
-  else OppositeProgram := MachineProgram;
+  MachineTarget := MachineProgram;
+  if IsAdminInstallMode then begin
+    PreviousProgram := MachineTarget;
+    OppositeProgram := Info[7];
+  end else begin
+    PreviousProgram := Info[7];
+    if (PreviousProgram = '') and not IsInstallWorker then PreviousProgram := MachineTarget
+    else OppositeProgram := MachineTarget;
+  end;
+  if PreviousProgram <> '' then WizardForm.DirEdit.Text := PreviousProgram;
 
   LibraryPage := CreateCustomPage(wpSelectDir, 'Lokalizacja biblioteki',
     'Wybierz katalog terenów, ikon, obiektów i presetów. Położenie biblioteki nie zmienia położenia map.');
@@ -247,6 +253,16 @@ begin
 
   Mode := GetPreviousData('LibraryMode', 'adjacent');
   SavedPath := GetPreviousData('LibraryPath', '');
+  if (PreviousProgram <> '') and (SavedPath = '') then
+    if LoadStringsFromFile(AddBackslash(PreviousProgram) + 'library-location.txt', RecordedPath) and (GetArrayLength(RecordedPath) = 1) then begin
+      SavedPath := RecordedPath[0];
+      if CompareText(SavedPath, AddBackslash(PreviousProgram) + 'Library') <> 0 then Mode := 'custom';
+    end;
+  if IsInstallWorker and (PreviousProgram = '') then begin
+    Mode := ExpandConstant('{param:HMELibraryMode|adjacent}');
+    SavedPath := ExpandConstant('{param:HMELibrary|}');
+    CopyLegacy.Checked := MigrationOffered and (ExpandConstant('{param:HMECopyLegacy|0}') = '1');
+  end;
   if (Mode = 'documents') and (SavedPath <> '') then begin
     DocumentsLibrary := SavedPath;
     DocumentsRadio.Enabled := True;
@@ -283,8 +299,7 @@ begin
       'Zapisz pracę, zamknij edytor i odinstaluj starą wersję w ustawieniach Windows. Następnie uruchom ten Setup ponownie. ' +
       'Starsza deinstalacja pozostawia Library, mapy i dane użytkownika.'
   else if OppositeProgram <> '' then
-    Result := 'HexMapEditor jest już zainstalowany w „' + OppositeProgram +
-      '”. Uruchom Setup ponownie w zakresie użytym przy poprzedniej instalacji.'
+    Result := 'Wykryto kolidującą instalację w „' + OppositeProgram + '”. Zachowano obie lokalizacje.'
   else if not ValidPathField(ProgramDir) then
     Result := 'Podaj pełną ścieżkę katalogu programu na dostępnym dysku.'
   else if (PreviousProgram <> '') and (CompareText(PreviousProgram, ProgramDir) <> 0) then
@@ -300,56 +315,91 @@ begin
   end;
 end;
 
-function SwitchToPersonalInstall: Boolean;
-var Info: TArrayOfString; ErrorCode: Integer; AppDir: String;
+function SelectedLibraryMode: String;
 begin
-  Result := False;
-  if not IsAdminInstallMode or (PreviousProgram <> '') or WizardSilent then exit;
-  AppDir := RemoveBackslashUnlessRoot(WizardDirValue);
-  if RunStorage('user-program', Arg(AppDir), Info) <> '' then exit;
-  if MsgBox('Wybrany katalog jest zapisywalny na Twoim koncie. Kontynuować w trybie „Tylko dla mnie” z tym folderem?',
-    mbConfirmation, MB_YESNO) <> IDYES then begin
-    Result := True;
-    exit;
-  end;
-  Result := True;
-  if ExecAsOriginalUser(ExpandConstant('{srcexe}'), '/CURRENTUSER /SP- /DIR=' + Arg(AppDir),
-    ExpandConstant('{win}'), SW_SHOWNORMAL, ewNoWait, ErrorCode) then begin
-    RestartForUser := True;
-    WizardForm.Close;
-  end else
-    MsgBox('Nie można ponownie uruchomić kreatora. Uruchom Setup i wybierz „Tylko dla mnie”. ' +
-      SysErrorMessage(ErrorCode), mbError, MB_OK);
+  if AdjacentRadio.Checked then Result := 'adjacent'
+  else if DocumentsRadio.Checked then Result := 'documents'
+  else Result := 'custom';
 end;
 
 procedure CancelButtonClick(CurPageID: Integer; var Cancel, Confirm: Boolean);
 begin
-  if RestartForUser then begin
+  if DelegationBusy then Cancel := False
+  else if DelegationDone then begin
     Cancel := True;
     Confirm := False;
   end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
-var ErrorText: String;
+var ErrorText, Scope, ReadyText, Mode, LibraryPath, Tasks: String;
+  Info: TArrayOfString; Code: Integer; CopyData: Boolean;
 begin
   ErrorText := '';
-  if CurPageID = wpSelectDir then begin
-    ErrorText := ProgramChoiceError;
-    if (ErrorText = '') and SwitchToPersonalInstall then begin
-      Result := False;
-      exit;
-    end;
-  end;
+  if CurPageID = wpSelectDir then ErrorText := ProgramChoiceError;
   if CurPageID = LibraryPage.ID then begin
     if not ValidPathField(ChosenLibrary) then ErrorText := 'Podaj pełną, dostępną ścieżkę katalogu Library.';
     if CustomRadio.Checked then CustomLibrary := Trim(LibraryEdit.Text);
+  end;
+  if (CurPageID = wpReady) and not IsInstallWorker and not IsAdminInstallMode then begin
+    ErrorText := ProgramChoiceError;
+    Scope := 'user';
+    if (ErrorText = '') and (MachineTarget <> '') then Scope := 'machine'
+    else if (ErrorText = '') and (PreviousProgram = '') then begin
+      ErrorText := RunStorage('program-scope', Arg(WizardDirValue), Info);
+      if (ErrorText = '') and (GetArrayLength(Info) = 2) then Scope := Info[1]
+      else if ErrorText = '' then ErrorText := 'Nie można rozpoznać uprawnień katalogu.';
+    end;
+    if (ErrorText = '') and (Scope = 'machine') then begin
+      Result := False;
+      Mode := '';
+      LibraryPath := '';
+      Tasks := '';
+      CopyData := False;
+      if MachineTarget = '' then begin
+        Mode := SelectedLibraryMode;
+        LibraryPath := ChosenLibrary;
+        Tasks := WizardSelectedTasks(False);
+        CopyData := CopyLegacy.Visible and CopyLegacy.Checked;
+      end;
+      DelegationBusy := True;
+      ReadyText := WizardForm.ReadyMemo.Text;
+      WizardForm.ReadyMemo.Text := ReadyText + #13#10#13#10 + 'Trwa instalacja. Windows może poprosić o zgodę administratora.';
+      WizardForm.NextButton.Enabled := False;
+      WizardForm.BackButton.Enabled := False;
+      WizardForm.CancelButton.Enabled := False;
+      try
+        Code := RunMachineStage(WizardDirValue, Mode, LibraryPath, Tasks, IsMachineUpdate, CopyData);
+      finally
+        WizardForm.ReadyMemo.Text := ReadyText;
+        DelegationBusy := False;
+        WizardForm.NextButton.Enabled := True;
+        WizardForm.BackButton.Enabled := True;
+        WizardForm.CancelButton.Enabled := True;
+      end;
+      if IsMachineUpdate then begin
+        FinishAppUpdate(Code);
+        DelegationDone := True;
+        WizardForm.Close;
+      end else if StageSucceeded(Code, WizardDirValue) then begin
+        DelegationDone := True;
+        SuppressibleMsgBox('HexMapEditor został zainstalowany. Uruchom go z menu Start.', mbInformation, MB_OK, IDOK);
+        WizardForm.Close;
+      end else if not WizardSilent then MsgBox(StageFailure(Code), mbError, MB_OK);
+      exit;
+    end;
   end;
   Result := ErrorText = '';
   if not Result then begin
     Log(ErrorText);
     SuppressibleMsgBox(ErrorText, mbError, MB_OK, IDOK);
   end;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PreviousProgram <> '') and
+    ((PageID = wpSelectDir) or (PageID = LibraryPage.ID) or (PageID = wpSelectTasks));
 end;
 
 function UpdateReadyMemo(Space, NewLine, MemoUserUserInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
@@ -362,12 +412,8 @@ begin
 end;
 
 procedure RegisterPreviousData(PreviousDataKey: Integer);
-var Mode: String;
 begin
-  if AdjacentRadio.Checked then Mode := 'adjacent'
-  else if DocumentsRadio.Checked then Mode := 'documents'
-  else Mode := 'custom';
-  SetPreviousData(PreviousDataKey, 'LibraryMode', Mode);
+  SetPreviousData(PreviousDataKey, 'LibraryMode', SelectedLibraryMode);
   SetPreviousData(PreviousDataKey, 'LibraryPath', ChosenLibrary);
   if MigrationOffered or (GetPreviousData('LegacyOffered', '0') = '1') then
     SetPreviousData(PreviousDataKey, 'LegacyOffered', '1');
@@ -524,6 +570,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssDone then DelegationDone := IsAppUpdate and not IsMachineUpdate;
   if CurStep <> ssPostInstall then exit;
   if not WizardIsTaskSelected('hexmap') then RemoveOwnAssociation;
   try

@@ -49,7 +49,8 @@ namespace HexMapEditor
         internal bool FinishForUpdate(Form window, VerifiedInstaller installer)
         {
             if(opening||exiting||window!=MainForm)return false;
-            window.Close(); // Includes the existing map and preset decisions.
+            var editor = window as MainWindow;
+            if (editor != null) editor.CloseForUpdate(); else window.Close();
             if(!window.IsDisposed)return false;
             PendingInstaller=installer;
             return true;

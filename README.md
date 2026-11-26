@@ -2,10 +2,10 @@
 
 HexMapEditor to działający offline edytor map heksagonalnych na Windows, przeznaczony m.in. do prowadzenia kampanii RPG.
 
-**Publiczna wersja testowa 0.13.0.** Odznaki prowadzą do obu paczek opublikowanych pod tagiem `v0.13.0`. [Raport 0.13.0](docs/raport-0.13.0.md).
+**Publiczna wersja testowa 0.13.1.** Paczki wydania `v0.13.1` są pod poniższymi odznakami. [Raport 0.13.1](docs/raport-0.13.1.md).
 
-[![Instalator Windows EXE](https://img.shields.io/badge/Windows-Setup%20EXE-2864a6)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.0/HexMapEditor-0.13.0-Setup.exe)
-[![Portable ZIP](https://img.shields.io/badge/Portable-ZIP-3b7964)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.0/HexMapEditor-0.13.0-Portable.zip)
+[![Instalator Windows EXE](https://img.shields.io/badge/Windows-Setup%20EXE-2864a6)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.1/HexMapEditor-0.13.1-Setup.exe)
+[![Portable ZIP](https://img.shields.io/badge/Portable-ZIP-3b7964)](https://github.com/amdesar/HexMapEditor/releases/download/v0.13.1/HexMapEditor-0.13.1-Portable.zip)
 
 ![Mapa demonstracyjna z teksturami, ikonami i panelem grupy obiektów](docs/screenshots/SS2.png)
 
@@ -14,7 +14,7 @@ HexMapEditor to działający offline edytor map heksagonalnych na Windows, przez
 - Edycja map na siatce heksagonalnej w dwóch orientacjach. Rysowanie terenu, nanoszenie ikon i obiektów oraz obsługa mgły wojny i widoczności.
 - Karty map z niezależnym widokiem i historią edycji, wspólne presety i autozapis zapisanych map.
 - Opisy heksów z formatowaniem, tabelami i osadzonymi obrazami. Indywidualne i grupowe właściwości obiektów.
-- Biblioteka terenów, ikon, obiektów, teł i presetów. W przygotowywanej 0.13.0 dodatkowo kolejka z folderów `Library/Import` i zachowywanie źródeł nowych grafik.
+- Biblioteka terenów, ikon, obiektów, teł i presetów z kolejką `Library/Import` i zachowywaniem oryginalnych grafik.
 - Mapy pozostają samodzielnymi plikami JSON `.hexmap` (Map12), z osadzonymi grafikami potrzebnymi do edycji.
 
 ![Import grafiki terenu z podglądem kadru heksagonalnego](docs/screenshots/SS3.png)
@@ -23,7 +23,7 @@ HexMapEditor to działający offline edytor map heksagonalnych na Windows, przez
 
 Wymagany jest Windows 10 lub 11 z pełnym .NET Framework 4.8 albo 4.8.1. [Pobierz .NET Framework Runtime](https://dotnet.microsoft.com/download/dotnet-framework/net48).
 
-1. **Instalator** — uruchom Setup, wybierz folder programu i Library, po czym uruchom edytor z menu Start. Od 0.12.3 własny katalog zapisywalny na Twoim koncie obsługuje tryb „Tylko dla mnie”. Tryb dla wszystkich użytkowników proponuje Program Files i wymaga zgody administratora.
+1. **Instalator** — uruchom Setup i wybierz folder programu oraz Library w jednym kreatorze. Setup proponuje Program Files, gdzie Windows poprosi o zgodę administratora. Własny zapisywalny folder możesz wybrać bez podniesienia uprawnień. Późniejsze aktualizacje instalowanych kopii uruchomisz w edytorze.
 2. **Portable** — rozpakuj całe ZIP do zapisywalnego folderu i uruchom `HexMapEditor.exe`. Biblioteka i dane pozostają obok kopii.
 3. Wybierz **Stwórz nowy projekt**. Nowa mapa trafi do `Hexmaps` w aktywnej Library. **Zapisz jako** pozwala wybrać inny folder.
 
@@ -31,7 +31,7 @@ Wymagany jest Windows 10 lub 11 z pełnym .NET Framework 4.8 albo 4.8.1. [Pobier
 
 - [Galeria](docs/galeria.md) i [specyfikacja](docs/specyfikacja.md)
 - [Budowanie i pakowanie](docs/budowanie.md)
-- [Plan wydań](docs/plan-wersji.md), [opisy wcześniejszych wersji](docs/historia-wydan.md) i [raport 0.12.2](docs/raport-0.12.2.md)
+- [Raport bieżącego wydania 0.13.1](docs/raport-0.13.1.md), [plan wydań](docs/plan-wersji.md) i [opisy wcześniejszych wersji](docs/historia-wydan.md)
 
 ## Zgłaszanie błędów
 

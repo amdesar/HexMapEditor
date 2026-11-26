@@ -13,7 +13,8 @@ namespace HexMapEditor
         readonly FolderImport import;
         readonly HashSet<string> reviewed = new HashSet<string>();
         readonly ListView files = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = false,
-            HideSelection = false, BackColor = Color.FromArgb(29,33,42), ForeColor = Color.WhiteSmoke };
+            HideSelection = false, BackColor = Color.FromArgb(29,33,42), ForeColor = Color.WhiteSmoke,
+            OwnerDraw = true, ShowItemToolTips = true };
         readonly Label status = new Label { Dock = DockStyle.Top, Height = 30, Text = "Sprawdzanie folderów…" };
         readonly Button add = new EditorButton { Text = "Dodaj", AutoSize = true };
         readonly Button skip = new EditorButton { Text = "Pomiń na teraz", AutoSize = true };
@@ -21,7 +22,7 @@ namespace HexMapEditor
         readonly Button addRest = new EditorButton { Text = "Dodaj pozostałe z domyślnym kadrem", AutoSize = true };
         readonly Button skipRest = new EditorButton { Text = "Pomiń pozostałe", AutoSize = true };
         readonly Button close = new EditorButton { Text = "Zamknij", AutoSize = true, DialogResult = DialogResult.Cancel };
-        bool busy;
+        bool busy, sizingColumns;
         internal bool Saved { get; private set; }
 
         internal FolderImportDialog(FolderImport import)
@@ -29,7 +30,13 @@ namespace HexMapEditor
             this.import = import;
             Text = "Kolejka importu grafik"; ClientSize = new Size(748,390); StartPosition = FormStartPosition.CenterParent;
             MinimumSize = new Size(590,300); Padding = new Padding(12);
-            files.Columns.Add("Kategoria",150); files.Columns.Add("Plik",520);
+            files.Columns.Add("Kategoria"); files.Columns.Add("Plik");
+            files.Resize += (s,e) => QueueColumnSize();
+            files.FontChanged += (s,e) => QueueColumnSize();
+            files.DrawItem += (s,e) => { }; // Details view draws each cell in DrawSubItem.
+            files.DrawColumnHeader += (s,e) => PaintCell(e.Graphics,e.Bounds,e.Header.Text,Color.FromArgb(49,54,67));
+            files.DrawSubItem += (s,e) => PaintCell(e.Graphics,e.Bounds,e.SubItem.Text,
+                e.Item.Selected ? Color.FromArgb(63,82,118) : files.BackColor);
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true, Padding = new Padding(0,5,0,0) };
             buttons.Controls.AddRange(new Control[] { add, skip, delete, addRest, skipRest, close });
             Controls.Add(files); Controls.Add(status); Controls.Add(buttons); CancelButton = close;
@@ -46,14 +53,38 @@ namespace HexMapEditor
                 try
                 {
                     foreach (var item in await Task.Run(() => import.Scan()))
-                        files.Items.Add(new ListViewItem(new[] { CategoryName(item.Category), item.Name }) { Tag = item });
+                        files.Items.Add(new ListViewItem(new[] { CategoryName(item.Category), item.Name }) { Tag = item, ToolTipText = item.Name });
                 }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, "Nie można odczytać kolejki", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
                 finally { SetBusy(false); }
                 if (files.Items.Count > 0) files.Items[0].Selected = true;
+                QueueColumnSize();
                 SetCount();
             };
             UpdateActions();
+        }
+        void QueueColumnSize()
+        {
+            if(sizingColumns||!IsHandleCreated||IsDisposed)return;
+            sizingColumns=true;
+            // Let the native list settle its client rectangle and scrollbar before sizing.
+            BeginInvoke((Action)(() => {
+                sizingColumns=false;
+                int available=files.ClientSize.Width-2;
+                if(available<2)return;
+                int natural=FolderImport.Categories.Select(CategoryName).Concat(new[] { files.Columns[0].Text })
+                    .Max(text => TextRenderer.MeasureText(text,files.Font).Width)+16;
+                int category=Math.Min(natural,Math.Max(1,available/3));
+                files.Columns[0].Width=category;
+                files.Columns[1].Width=available-category;
+            }));
+        }
+        void PaintCell(Graphics graphics,Rectangle bounds,string text,Color background)
+        {
+            using (var brush = new SolidBrush(background)) graphics.FillRectangle(brush,bounds);
+            if(bounds.Width <= 12) return;
+            TextRenderer.DrawText(graphics,text,files.Font,Rectangle.Inflate(bounds,-6,0),files.ForeColor,
+                TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
         static string CategoryName(ImportCategory category)
         {

@@ -9,16 +9,20 @@ namespace HexMapEditor
 {
     internal sealed class UpdateController
     {
-        readonly ReleaseUpdates channel = new ReleaseUpdates(UpdateChannelConfiguration.Owner, UpdateChannelConfiguration.Repository,
-            includePrereleases: UpdateChannelConfiguration.IncludePrereleases);
+        readonly ReleaseUpdates channel;
+        readonly string downloadRoot;
         readonly Func<Form, bool> currentWindow;
         readonly Func<Form, VerifiedInstaller, bool> finish;
         bool busy;
 
-        internal UpdateController(Func<Form, bool> currentWindow, Func<Form, VerifiedInstaller, bool> finish)
+        internal UpdateController(Func<Form, bool> currentWindow, Func<Form, VerifiedInstaller, bool> finish,
+            ReleaseUpdates channel = null, string downloadRoot = null)
         {
             this.currentWindow = currentWindow;
             this.finish = finish;
+            this.channel = channel ?? new ReleaseUpdates(UpdateChannelConfiguration.Owner, UpdateChannelConfiguration.Repository,
+                includePrereleases: UpdateChannelConfiguration.IncludePrereleases);
+            this.downloadRoot = downloadRoot ?? Path.GetTempPath();
         }
         internal async void Check(Form owner, bool manual)
         {
@@ -39,7 +43,6 @@ namespace HexMapEditor
             {
                 var storage = AppStorage.Current;
                 bool installed = storage.Installed;
-                bool canLaunch = storage.CanLaunchInstaller;
                 var offer = await Task.Run(() => channel.Check(new Version(ReleaseMetadata.Version), installed));
                 if (!CanPrompt(owner)) return;
                 if (offer == null)
@@ -47,33 +50,43 @@ namespace HexMapEditor
                     if (manual) Tell(owner, "Brak nowszej wersji w tym kanale.");
                     return;
                 }
-                using (var dialog = new UpdateOfferDialog(offer, canLaunch))
+                using (var dialog = new UpdateOfferDialog(offer))
                     if (Prompt(owner, () => dialog.ShowDialog(owner)) != DialogResult.OK) return;
-                if (!canLaunch)
+                if (!installed)
                 {
                     OpenReleaseLink(offer.Download);
+                    return;
+                }
+                if (VerifiedInstaller.HasElevatedToken())
+                {
+                    Tell(owner,"Uruchom edytor ze zwykłymi uprawnieniami i ponów aktualizację.");
                     return;
                 }
 
                 downloading = true;
                 using (var progress = new Form {
-                    Text = "Aktualizacja HexMapEditor", ClientSize = new Size(360, 65),
+                    Text = "Aktualizacja HexMapEditor", ClientSize = new Size(410, 86),
                     FormBorderStyle = FormBorderStyle.FixedToolWindow, StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false,
                     ControlBox = false
                 })
                 {
-                    progress.Controls.Add(new Label { Dock = DockStyle.Fill, Text = "Pobieranie i sprawdzanie instalatora…", TextAlign = ContentAlignment.MiddleCenter });
+                    var message = new Label { Bounds = new Rectangle(14,12,382,24), Text = "Pobieranie instalatora…" };
+                    var bar = new ProgressBar { Bounds = new Rectangle(14,45,382,22) };
+                    progress.Controls.AddRange(new Control[] { message, bar });
+                    IProgress<int> received = new Progress<int>(value => {
+                        if (progress.IsDisposed) return;
+                        bar.Value = value;
+                        if (value == 100) message.Text = "Sprawdzanie pliku instalatora…";
+                    });
                     progress.Show(owner);
                     VerifiedInstaller installer;
-                    try { installer = await Task.Run(() => channel.DownloadSetup(offer, Path.GetTempPath())); }
+                    try { installer = await Task.Run(() => channel.DownloadSetup(offer, downloadRoot, received.Report)); }
                     finally { progress.Close(); }
                     try
                     {
                         if (!CanPrompt(owner)) return;
-                        var decision = Prompt(owner, () => MessageBox.Show(owner,
-                            "Instalator został sprawdzony. Zamknąć edytor i rozpocząć aktualizację?",
-                            "Aktualizacja HexMapEditor", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2));
-                        if (decision == DialogResult.Yes && finish(owner, installer)) installer = null;
+                        installer.LockForLaunch(); // Verify before asking to save or closing anything.
+                        if (finish(owner, installer)) installer = null;
                     }
                     finally { if (installer != null) installer.Dispose(); }
                 }
@@ -108,11 +121,10 @@ namespace HexMapEditor
 
     internal sealed class UpdateOfferDialog : DarkForm
     {
-        internal UpdateOfferDialog(ReleaseOffer offer, bool canLaunchInstaller)
+        internal UpdateOfferDialog(ReleaseOffer offer)
         {
-            bool manualSetup = offer.Setup && !canLaunchInstaller;
             Text = "Dostępna aktualizacja";
-            ClientSize = new Size(525, manualSetup ? 245 : 206);
+            ClientSize = new Size(525, 206);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = MaximizeBox = false;
@@ -121,8 +133,7 @@ namespace HexMapEditor
                 AutoSize = true, Location = new Point(16, 16)
             });
             Controls.Add(new Label {
-                Text = manualSetup ? "Pobierz Setup, porównaj jego SHA-256 i zamknij edytor. Uruchom Setup zwyczajnie, w trybie „Tylko dla mnie”, w bieżącej lokalizacji."
-                    : offer.Setup ? "Po pobraniu i sprawdzeniu instalatora możesz zamknąć edytor i zaktualizować bieżącą instalację."
+                Text = offer.Setup ? "Program pobierze i sprawdzi instalator. Przed zamknięciem edytora zapiszesz niezapisane mapy i presety albo anulujesz aktualizację."
                     : "Zamknij edytor i zastąp pliki programu z ZIP w obecnym folderze. Zachowaj folder Library, ustawienia, recent-projects.json i mapy.",
                 Bounds = new Rectangle(16, 50, 493, 61)
             });
@@ -131,16 +142,9 @@ namespace HexMapEditor
                 try { UpdateController.OpenReleaseLink(offer.Notes); }
                 catch (Exception error) { MessageBox.Show(this, error.Message, "Opis wydania", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             };
-            if (manualSetup)
-            {
-                Controls.Add(new Label { Text = "SHA-256", Bounds = new Rectangle(16, 149, 66, 25) });
-                Controls.Add(new TextBox { Text = offer.Sha256, ReadOnly = true, Font = new Font("Consolas", 8),
-                    AccessibleName = "Oczekiwana suma SHA-256 instalatora", Bounds = new Rectangle(82, 147, 427, 25) });
-            }
-            int y = manualSetup ? 197 : 158;
-            var ok = new EditorButton { Text = manualSetup ? "Otwórz link do Setup" : offer.Setup ? "Pobierz instalator" : "Otwórz link do ZIP",
-                DialogResult = DialogResult.OK, Bounds = new Rectangle(216, y, 160, 32) };
-            var cancel = new EditorButton { Text = "Pomiń", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(390, y, 119, 32) };
+            var ok = new EditorButton { Text = offer.Setup ? "Zainstaluj aktualizację" : "Otwórz link do ZIP",
+                DialogResult = DialogResult.OK, Bounds = new Rectangle(204, 158, 172, 32) };
+            var cancel = new EditorButton { Text = "Pomiń", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(390, 158, 119, 32) };
             Controls.AddRange(new Control[] { notes, ok, cancel });
             AcceptButton = CancelButton = cancel;
         }
@@ -149,6 +153,13 @@ namespace HexMapEditor
     public sealed partial class MainWindow
     {
         internal Action UpdateRequested;
+        bool closingForUpdate;
+        internal void CloseForUpdate()
+        {
+            closingForUpdate = true;
+            try { Close(); }
+            finally { closingForUpdate = false; }
+        }
         internal bool ReadyForUpdate { get { return ReadyForExternalOpen && !autoSaving && Visible; } }
         internal DialogResult ShowUpdateDialog(Func<DialogResult> show) { return RunModal(show); }
     }

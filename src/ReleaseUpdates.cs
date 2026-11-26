@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
@@ -200,7 +201,7 @@ namespace HexMapEditor
                 }
             }
         }
-        static void CopyBounded(Stream source, Stream destination, long limit)
+        static void CopyBounded(Stream source, Stream destination, long limit, Action<long> transferred = null)
         {
             var time = Stopwatch.StartNew();
             byte[] buffer = new byte[64 * 1024];
@@ -212,18 +213,20 @@ namespace HexMapEditor
                 if (time.ElapsedMilliseconds > 90000) throw new IOException("Przekroczono czas transferu aktualizacji.");
                 if (bytes > limit) throw new InvalidDataException("Przekroczono oczekiwany rozmiar aktualizacji.");
                 destination.Write(buffer, 0, count);
+                if (transferred != null) transferred(bytes);
             }
         }
-        internal VerifiedInstaller DownloadSetup(ReleaseOffer offer, string temporaryRoot)
+        internal VerifiedInstaller DownloadSetup(ReleaseOffer offer, string temporaryRoot, Action<int> progress = null)
         {
             if (!offer.Setup) throw new InvalidOperationException("Kopia przenośna aktualizuje się z ZIP.");
             var directory = Path.Combine(temporaryRoot, "HexMapEditor-update-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
-            var result = new VerifiedInstaller(Path.Combine(directory, offer.FileName), offer.Sha256, offer.Bytes);
+            var result = new VerifiedInstaller(Path.Combine(directory, offer.FileName), offer.Sha256, offer.Bytes, offer.Version);
             try
             {
                 using (var file = new FileStream(result.FilePath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    receive(offer.Download, source => CopyBounded(source, file, offer.Bytes));
+                    receive(offer.Download, source => CopyBounded(source, file, offer.Bytes,
+                        progress == null ? (Action<long>)null : bytes => progress((int)(100 * bytes / offer.Bytes))));
                 using (result.OpenVerified()) { }
                 // Preserve Windows' internet-origin checks for an unsigned download.
                 MarkInternetOrigin(result.FilePath);
@@ -256,10 +259,12 @@ namespace HexMapEditor
         internal readonly string FilePath;
         readonly string sha256;
         readonly long bytes;
+        readonly Version version;
+        FileStream launchLock;
         bool launched;
-        internal VerifiedInstaller(string path, string digest, long expectedBytes)
+        internal VerifiedInstaller(string path, string digest, long expectedBytes, Version version = null)
         {
-            FilePath = path; sha256 = digest; bytes = expectedBytes;
+            FilePath = path; sha256 = digest; bytes = expectedBytes; this.version = version;
         }
         internal FileStream OpenVerified()
         {
@@ -289,14 +294,30 @@ namespace HexMapEditor
             }
             catch { file.Dispose(); throw; }
         }
+        internal void LockForLaunch()
+        {
+            if (launchLock == null) launchLock = OpenVerified();
+        }
+        internal static bool HasElevatedToken()
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+                return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+        }
+        internal string LaunchArguments(AppStorage storage, string installDirectory, int editorPid)
+        {
+            if (!storage.Installed || version == null) throw new InvalidOperationException("Setup wymaga zweryfikowanej oferty dla zainstalowanej kopii.");
+            return "/HMEUpdate=1 /HMEUpdateScope=" + (storage.MachineInstalled ? "machine" : "user") +
+                " /HMEExpectedVersion=" + version.ToString(3) + " /HMESetupHash=" + sha256 +
+                " /WaitForEditorPid=" + editorPid + " /DIR=\"" + installDirectory + "\" /SP- /SILENT /NORESTART /RESTARTEXITCODE=10";
+        }
         internal void Launch()
         {
-            if (!AppStorage.Current.CanLaunchInstaller) throw new InvalidOperationException("Ten tryb instalacji wymaga ręcznego uruchomienia Setup.");
-            string installDirectory = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-            using (OpenVerified())
+            if (HasElevatedToken()) throw new InvalidOperationException("Uruchom edytor ze zwykłymi uprawnieniami i ponów aktualizację.");
+            string directory = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+            LockForLaunch();
             using (var editor = Process.GetCurrentProcess())
             using (var installer = Process.Start(new ProcessStartInfo(FilePath) {
-                Arguments = "/WaitForEditorPid=" + editor.Id + " /DIR=\"" + installDirectory + "\" /NORESTART",
+                Arguments = LaunchArguments(AppStorage.Current, directory, editor.Id),
                 WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows),
                 UseShellExecute = true
             }))
@@ -307,6 +328,7 @@ namespace HexMapEditor
         }
         public void Dispose()
         {
+            if (launchLock != null) { launchLock.Dispose(); launchLock = null; }
             if (launched) return;
             try { File.Delete(FilePath); Directory.Delete(Path.GetDirectoryName(FilePath)); }
             catch (IOException) { }

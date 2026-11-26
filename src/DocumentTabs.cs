@@ -298,16 +298,19 @@ namespace HexMapEditor
             }
             finally { reviewingExit=false;if(HasDocuments)HidePresetReview(); }
         }
-        bool ReviewWindowExit()
+        bool ReviewWindowExit(bool mustSave=false)
         {
             foreach(var doc in documents.Where(d=>d.Unsaved).ToArray())
             {
                 if(!ReferenceEquals(doc,activeDocument))SwitchDocument(doc);
-                if(!ConfirmDiscard(doc))return false;
-                retainedPresets.Add(doc.Panel);
-                DetachDocument(doc);
+                if(!ConfirmDiscard(doc,mustSave))return false;
+                if(!mustSave)
+                {
+                    retainedPresets.Add(doc.Panel);
+                    DetachDocument(doc);
+                }
             }
-            return ReviewPresetDrafts(retainedPresets.Concat(documents.Select(d=>d.Panel)));
+            return ReviewPresetDrafts(retainedPresets.Concat(documents.Select(d=>d.Panel)),mustSave:mustSave);
         }
         void DetachDocument(DocumentSession doc)
         {

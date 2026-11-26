@@ -333,12 +333,17 @@ namespace HexMapEditor
         }
 
         internal Func<DialogResult> ConfirmUnsavedForTest;
-        bool ConfirmDiscard(DocumentSession document)
+        bool ConfirmDiscard(DocumentSession document, bool mustSave=false)
         {
             if (!document.Unsaved) return true;
             PaintBeforeClosePrompt();
-            var result=ConfirmUnsavedForTest!=null?ConfirmUnsavedForTest():ShowEditorMessage("Mapa „"+ProjectTitle(document.Path,document.Map.Name)+"” zawiera niezapisane zmiany. Czy chcesz je zapisać przed kontynuowaniem?", "Niezapisana mapa", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
-            return result==DialogResult.No||result==DialogResult.Yes&&SaveDocument(document,false);
+            string name=ProjectTitle(document.Path,document.Map.Name);
+            var result=ConfirmUnsavedForTest!=null?ConfirmUnsavedForTest():ShowEditorMessage(
+                "Mapa „"+name+"” zawiera niezapisane zmiany. Czy chcesz je zapisać przed kontynuowaniem?", "Niezapisana mapa",
+                mustSave?MessageBoxButtons.OKCancel:MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning,
+                mustSave?MessageBoxDefaultButton.Button2:MessageBoxDefaultButton.Button1);
+            if(result==DialogResult.No)return !mustSave;
+            return (result==DialogResult.Yes||(mustSave&&result==DialogResult.OK))&&SaveDocument(document,false);
         }
 
         void NewProject()
@@ -610,7 +615,7 @@ namespace HexMapEditor
             if(autoSaving){CancelAutoSave();e.Cancel=true;return;}
             if(!FinishDocumentInteraction()){e.Cancel=true;return;}
             reviewingExit=true;
-            try { e.Cancel=!ReviewWindowExit(); }
+            try { e.Cancel=!ReviewWindowExit(closingForUpdate); }
             finally { reviewingExit=false;if(e.Cancel)HidePresetReview(); }
         }
         void OnKeyDown(object sender, KeyEventArgs e)

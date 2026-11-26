@@ -58,7 +58,7 @@ namespace HexMapEditor
         }
         internal Func<TerrainPreset,DialogResult> ConfirmPresetForTest;
         internal Func<TerrainPreset,bool> SavePresetAllForTest;
-        bool ReviewPresetDrafts(IEnumerable<PresetWorkspace> workspaces,DocumentSession closingOne=null)
+        bool ReviewPresetDrafts(IEnumerable<PresetWorkspace> workspaces,DocumentSession closingOne=null,bool mustSave=false)
         {
             var reviewed=new HashSet<SharedPreset>();
             foreach(var workspace in workspaces)
@@ -70,8 +70,13 @@ namespace HexMapEditor
                     if(!WorkingPresetDirty(workspace,preset))continue;
                     var candidate=ClosingPresetCandidate(workspace,preset);
                     ShowPresetReview(candidate);
-                    var answer=ConfirmPresetForTest!=null?ConfirmPresetForTest(preset):ShowEditorMessage("Preset „"+preset.Name+"” ma niezapisane zmiany. Zapisać przed zamknięciem?","Niezapisany preset",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Warning);
-                    if(answer!=DialogResult.No&&(answer!=DialogResult.Yes||!(SavePresetAllForTest!=null?SavePresetAllForTest(preset):SaveClosingPreset(workspace,preset,candidate))))return false;
+                    var answer=ConfirmPresetForTest!=null?ConfirmPresetForTest(preset):ShowEditorMessage(
+                        "Preset „"+preset.Name+"” ma niezapisane zmiany. "+(mustSave?"Zapisz przed aktualizacją albo ją anuluj.":"Zapisać przed zamknięciem?"),
+                        "Niezapisany preset",mustSave?MessageBoxButtons.OKCancel:MessageBoxButtons.YesNoCancel,MessageBoxIcon.Warning,
+                        mustSave?MessageBoxDefaultButton.Button2:MessageBoxDefaultButton.Button1);
+                    if(!mustSave&&answer==DialogResult.No)continue;
+                    if(answer!=DialogResult.Yes&&(!mustSave||answer!=DialogResult.OK))return false;
+                    if(!(SavePresetAllForTest!=null?SavePresetAllForTest(preset):SaveClosingPreset(workspace,preset,candidate,mustSave)))return false;
                 }
             }
             return true;
@@ -115,9 +120,9 @@ namespace HexMapEditor
             PositionOverlays();
             if(HasDocuments){RefreshPresetPicker();RefreshIconPreview();RefreshObjectPreview();}
         }
-        bool SaveClosingPreset(PresetWorkspace workspace,TerrainPreset preset,TerrainPreset candidate)
+        bool SaveClosingPreset(PresetWorkspace workspace,TerrainPreset preset,TerrainPreset candidate,bool mustSave)
         {
-            using(var dialog=new SavePresetDialog(preset,preset.Id!=PresetCatalog.DefaultId&&StoredPreset(preset)!=null,true))
+            using(var dialog=new SavePresetDialog(preset,preset.Id!=PresetCatalog.DefaultId&&StoredPreset(preset)!=null,true,mustSave))
             {
                 if(RunModal(()=>dialog.ShowDialog(this))!=DialogResult.OK)return false;
                 try

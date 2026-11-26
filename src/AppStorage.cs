@@ -18,7 +18,7 @@ namespace HexMapEditor
         static readonly Lazy<AppStorage> current = new Lazy<AppStorage>(() => new AppStorage(AppDomain.CurrentDomain.BaseDirectory));
 
         internal static AppStorage Current { get { return current.Value; } }
-        internal readonly bool Installed, CanLaunchInstaller;
+        internal readonly bool Installed, MachineInstalled;
         internal readonly string DataRoot, LibraryRoot;
 
         internal AppStorage(string directory)
@@ -32,8 +32,8 @@ namespace HexMapEditor
                 mode = File.ReadAllText(marker).TrimEnd('\r', '\n');
             }
             catch (FileNotFoundException) { mode = PortableMode; }
-            CanLaunchInstaller = mode == InstalledMode;
-            Installed = CanLaunchInstaller || mode == UserInstalledMode;
+            MachineInstalled = mode == InstalledMode;
+            Installed = MachineInstalled || mode == UserInstalledMode;
             if (!Installed && mode != PortableMode)
                 throw new InvalidDataException("Nieznany tryb uruchomienia. Użyj kompletnej paczki HexMapEditor.");
             DataRoot = Path.GetFullPath(Installed ? Path.Combine(directory, "Data") : directory);

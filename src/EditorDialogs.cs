@@ -34,7 +34,7 @@ namespace HexMapEditor
         readonly SwitchBox terrains=new SwitchBox{Text="Tereny",Checked=true,AutoSize=true},icons=new SwitchBox{Text="Ikony",Checked=true,AutoSize=true},objects=new SwitchBox{Text="Obiekty",Checked=true,AutoSize=true};
         internal PresetSections Sections{get{return (terrains.Checked?PresetSections.Terrains:0)|(icons.Checked?PresetSections.Icons:0)|(objects.Checked?PresetSections.Objects:0);}}
         public bool AsNew { get { return asNew.Checked; } } public string PresetName { get { return name.Text.Trim(); } }
-        public SavePresetDialog(TerrainPreset preset, bool saved,bool all=false) : base("Zapisz preset", 410)
+        public SavePresetDialog(TerrainPreset preset, bool saved,bool all=false,bool mustSave=false) : base("Zapisz preset", 410)
         {
             overwrite.Enabled = saved && preset.Id != PresetCatalog.DefaultId; overwrite.Checked = overwrite.Enabled; asNew.Checked = !overwrite.Enabled;
             name.Text = preset.Name + (preset.Id == PresetCatalog.DefaultId || saved ? " — kopia" : ""); name.Enabled = asNew.Checked;
@@ -46,7 +46,7 @@ namespace HexMapEditor
             var sections=new FlowLayoutPanel{Dock=DockStyle.Fill,WrapContents=false};sections.Controls.AddRange(new Control[]{terrains,icons,objects});Layout.Controls.Add(sections,0,4);Layout.SetColumnSpan(sections,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,34));
             var hint=new Label{Dock=DockStyle.Fill};Layout.Controls.Add(hint,0,5);Layout.SetColumnSpan(hint,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
             Buttons(6, () => { if (Sections!=PresetSections.None&&(!AsNew || PresetName.Length > 0)) DialogResult = DialogResult.OK; }); Ok.Text = "Zapisz";
-            Action state=()=>{Ok.Enabled=Sections!=PresetSections.None;hint.Text=Ok.Enabled?(all?"Niezapisane zmiany pominiętych sekcji zostaną odrzucone dopiero po ostatecznym zamknięciu aplikacji.":""):"Wybierz przynajmniej jedną sekcję lub utwórz nowy pusty preset.";};foreach(var s in new[]{terrains,icons,objects}){s.CheckedChanged+=(sender,e)=>state();}state();
+            Action state=()=>{Ok.Enabled=Sections!=PresetSections.None;hint.Text=Ok.Enabled?(mustSave?"Aktualizacja wymaga zapisania wszystkich sekcji.":all?"Niezapisane zmiany pominiętych sekcji zostaną odrzucone dopiero po ostatecznym zamknięciu aplikacji.":""):"Wybierz przynajmniej jedną sekcję lub utwórz nowy pusty preset.";};foreach(var s in new[]{terrains,icons,objects}){s.Enabled=!mustSave;s.CheckedChanged+=(sender,e)=>state();}state();
         }
     }
     internal sealed class TableSizeDialog : EditorDialog
