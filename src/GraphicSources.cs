@@ -14,14 +14,17 @@ namespace HexMapEditor
         public string Id { get; set; }
         string data;
         internal string LibraryFile;
+        internal bool BinaryLibraryFile;
         internal long LibraryEncodedLength;
         public string Data
         {
-            get { return data ?? (LibraryFile == null ? null : MapLogic.Serializer().Deserialize<GraphicSource>(File.ReadAllText(LibraryFile)).Data); }
+            get { return data ?? (LibraryFile == null ? null : BinaryLibraryFile
+                ? Convert.ToBase64String(GraphicSources.ReadFile(LibraryFile, GraphicSources.MaxFileBytes))
+                : MapLogic.Serializer().Deserialize<GraphicSource>(File.ReadAllText(LibraryFile)).Data); }
             set { data = value; }
         }
         internal long EncodedLength { get { return data == null ? LibraryEncodedLength : data.Length; } }
-        internal GraphicSource SnapshotCopy(){return new GraphicSource{Id=Id,Width=Width,Height=Height,data=data,LibraryFile=LibraryFile,LibraryEncodedLength=LibraryEncodedLength};}
+        internal GraphicSource SnapshotCopy(){return new GraphicSource{Id=Id,Width=Width,Height=Height,data=data,LibraryFile=LibraryFile,BinaryLibraryFile=BinaryLibraryFile,LibraryEncodedLength=LibraryEncodedLength};}
         internal GraphicSource Pin()
         {
             if (data != null) return this;
@@ -29,7 +32,8 @@ namespace HexMapEditor
             using (var image = GraphicSources.Decode(copy)) { }
             return copy;
         }
-        internal void MakeLibraryReference(string path) { LibraryEncodedLength = data.Length; LibraryFile = path; data = null; }
+        internal void MakeLibraryReference(string path, bool binary = false)
+        { LibraryEncodedLength = data.Length; LibraryFile = path; BinaryLibraryFile = binary; data = null; }
         public int Width { get; set; }
         public int Height { get; set; }
     }
@@ -87,15 +91,17 @@ namespace HexMapEditor
             return x.Length == y.Length && x.SequenceEqual(y);
         }
         internal static GraphicSource Import(string path)
+        { return Import(ReadFile(path, MaxFileBytes)); }
+        internal static byte[] ReadFile(string path, int limit)
         {
             using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
-                if (stream.Length < 1 || stream.Length > MaxFileBytes) throw new InvalidDataException("Źródło musi mieć od 1 bajta do 32 MiB.");
+                if (stream.Length < 1 || stream.Length > limit) throw new InvalidDataException("Rozmiar źródła przekracza limit " + (limit / (1024 * 1024)) + " MiB lub plik jest pusty.");
                 var bytes = new byte[(int)stream.Length];
                 int read = 0, count;
                 while (read < bytes.Length && (count = stream.Read(bytes, read, bytes.Length - read)) > 0) read += count;
                 if (read != bytes.Length) throw new IOException("Nie odczytano całego obrazu.");
-                return Import(bytes);
+                return bytes;
             }
         }
         internal static GraphicSource Import(byte[] bytes)

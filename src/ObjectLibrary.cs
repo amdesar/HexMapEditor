@@ -27,20 +27,54 @@ namespace HexMapEditor
         internal QuickLibraryState RemovedLists;
         public ObjectTemplate Before,After;
         public int Index;
-        public void Write(bool after){var a=after?Before:After;var b=after?After:Before;var directory=Path.GetDirectoryName(a==null?b.FilePath:a.FilePath);foreach(var path in Directory.GetFiles(directory,"*.json")){if(a!=null&&String.Equals(path,a.FilePath,StringComparison.OrdinalIgnoreCase))continue;var other=ObjectLibrary.Read(path);if((a!=null&&other.Id==a.Id)||(b!=null&&other.Id==b.Id))throw new IOException("Konflikt ID wzorca obiektu: "+path);}LibraryFiles.Transition(a==null?null:a.FilePath,a==null?null:a.DiskBytes,b==null?null:b.FilePath,b==null?null:b.DiskBytes);}
+        public void Write(bool after)
+        {
+            var from=after?Before:After;
+            var to=after?After:Before;
+            var directory=Path.GetDirectoryName(from==null?to.FilePath:from.FilePath);
+            foreach(var path in Directory.GetFiles(directory,"*.json"))
+            {
+                if(from!=null&&String.Equals(path,from.FilePath,StringComparison.OrdinalIgnoreCase))continue;
+                var id=PresetCatalog.ReadIdentity(path).Id;
+                if((from!=null&&id==from.Id)||(to!=null&&id==to.Id))throw new IOException("Konflikt ID wzorca obiektu: "+path);
+            }
+            if (to != null && to.ObjectFormatVersion == 2)
+                LibraryImageStore.Store(directory, SquareLibraryAsset.SourceFor(to.Asset));
+            LibraryFiles.Transition(from==null?null:from.FilePath,from==null?null:from.DiskBytes,to==null?null:to.FilePath,to==null?null:to.DiskBytes);
+        }
     }
     internal static class ObjectLibrary
     {
-        public static void Validate(ObjectTemplate o){if(o==null||o.ObjectFormatVersion!=1||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200||o.LightRadius<0||o.LightRadius>20)throw new InvalidDataException("Nieprawidłowy wzorzec obiektu.");using(var image=IconAssets.Decode(o.Asset)){} }
-        public static ObjectTemplate Read(string path){if(new FileInfo(path).Length>3*1024*1024)throw new InvalidDataException("Za duży plik obiektu.");var bytes=File.ReadAllBytes(path);var o=MapLogic.Serializer().Deserialize<ObjectTemplate>(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF'));Validate(o);o.FilePath=Path.GetFullPath(path);o.DiskBytes=bytes;return o;}
+        public static void Validate(ObjectTemplate o){if(o==null||(o.ObjectFormatVersion!=1&&o.ObjectFormatVersion!=2)||String.IsNullOrWhiteSpace(o.Id)||o.Id.Length>200||String.IsNullOrWhiteSpace(o.Name)||o.Name.Length>200||o.LightRadius<0||o.LightRadius>20)throw new InvalidDataException("Nieprawidłowy wzorzec obiektu.");using(var image=IconAssets.Decode(o.Asset)){} }
+        public static ObjectTemplate Read(string path)
+        {
+            if(new FileInfo(path).Length>3*1024*1024)throw new InvalidDataException("Za duży plik obiektu.");
+            var bytes=File.ReadAllBytes(path);var serializer=MapLogic.Serializer();
+            var raw=serializer.DeserializeObject(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF')) as Dictionary<string,object>;
+            if(raw==null)throw new InvalidDataException("Nieprawidłowy plik obiektu.");
+            var entry=serializer.ConvertToType<ObjectTemplate>(raw);
+            if(entry.ObjectFormatVersion==2)entry.Asset=SquareLibraryAsset.Read(Path.GetDirectoryName(path),raw);
+            Validate(entry);entry.FilePath=Path.GetFullPath(path);entry.DiskBytes=bytes;return entry;
+        }
+        internal static byte[] Metadata(ObjectTemplate entry)
+        {
+            Validate(entry);entry.ObjectFormatVersion=2;
+            return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new {
+                entry.ObjectFormatVersion, entry.Id, entry.Name, entry.LibraryOrder, entry.LightEnabled, entry.LightRadius,
+                SourceId=SquareLibraryAsset.SourceFor(entry.Asset).Id, AssetName=entry.Asset.Name, Crop=entry.Asset.LibraryCrop
+            }));
+        }
         public static string Destination(string directory,string name,string current){var path=PresetFiles.Destination(directory,"object-"+PresetFiles.Stem(name),current);if(!Path.GetFileName(path).StartsWith("object-",StringComparison.Ordinal))throw new IOException("Za długa ścieżka obiektu.");return path;}
         public static List<ObjectTemplate> Load(string directory,out string warning)
         {
             Directory.CreateDirectory(directory);string marker=Path.Combine(directory,".starter-objects-v2");
             if(!File.Exists(marker)){
-                foreach(var starter in StarterSets.Objects()){
-                    var o=starter;
-                    if(!Directory.GetFiles(directory,"*.json").Any(p=>{try{return Read(p).Id==o.Id;}catch{return false;}}))MapLogic.AtomicWrite(Destination(directory,o.Name,null),MapLogic.Serializer().Serialize(o),false);
+                var ids=new HashSet<string>(Directory.GetFiles(directory,"*.json").Select(SquareLibraryAsset.ReadStarterIdentity));
+                foreach(var entry in StarterSets.Objects()){
+                    if(ids.Contains(entry.Id))continue;
+                    byte[] metadata=Metadata(entry);
+                    LibraryImageStore.Store(directory,SquareLibraryAsset.SourceFor(entry.Asset));
+                    LibraryFiles.Transition(null,null,Destination(directory,entry.Name,null),metadata);
                 }MapLogic.AtomicWrite(marker,"1",false);
             }
             var result=new List<ObjectTemplate>();var errors=new List<string>();
@@ -102,7 +136,9 @@ namespace HexMapEditor
                 directory=Path.GetFullPath(directory);Directory.CreateDirectory(directory);
                 if(before!=null&&(!libraryObjects.Any(o=>o.Id==before.Id)||!String.Equals(Path.GetDirectoryName(before.FilePath),directory,StringComparison.OrdinalIgnoreCase)))throw new IOException("Wzorzec zmienił się. Wybierz ponownie.");
                 if(before==null&&libraryObjects.Count>=128)throw new IOException("Limit 128 wzorców.");
-                if(next!=null){next=next.Copy();next.Name=(next.Name??"").Trim();ObjectLibrary.Validate(next);if(before!=null&&before.Id!=next.Id||before==null&&libraryObjects.Any(o=>o.Id==next.Id))throw new IOException("Konflikt tożsamości wzorca.");next.FilePath=ObjectLibrary.Destination(directory,next.Name,before==null?null:before.FilePath);next.LibraryOrder = before == null ? LibrarySequence.Next(libraryObjects.Select(o => o.LibraryOrder)) : before.LibraryOrder;next.DiskBytes=new UTF8Encoding(false).GetBytes(json.Serialize(next));}
+                if(next!=null){next=next.Copy();next.Name=(next.Name??"").Trim();ObjectLibrary.Validate(next);if(before!=null&&before.Id!=next.Id||before==null&&libraryObjects.Any(o=>o.Id==next.Id))throw new IOException("Konflikt tożsamości wzorca.");next.FilePath=ObjectLibrary.Destination(directory,next.Name,before==null?null:before.FilePath);next.LibraryOrder = before == null ? LibrarySequence.Next(libraryObjects.Select(o => o.LibraryOrder)) : before.LibraryOrder;
+                    next.DiskBytes=before!=null&&next.Name==before.Name&&ReferenceEquals(next.Asset,before.Asset)&&next.LightEnabled==before.LightEnabled&&next.LightRadius==before.LightRadius
+                        ?before.DiskBytes:ObjectLibrary.Metadata(next);}
                 var action=new EditAction{Label=before==null?"Dodanie wzorca":next==null?"Usunięcie wzorca":"Edycja wzorca"};
                 if(update&&before!=null&&next!=null)foreach(var o in map.Objects.Where(o=>o.TemplateId==before.Id)){
                     if(o.AssetId==next.Asset.Id)continue;var after=o.Copy();after.AssetId=next.Asset.Id;action.Objects.Add(new ObjectChange{Before=o.Copy(),After=after,Index=map.Objects.IndexOf(o)});

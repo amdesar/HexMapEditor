@@ -16,6 +16,8 @@ namespace HexMapEditor
         public string Png { get; set; }
         public int Width { get; set; }
         public int Height { get; set; }
+        internal GraphicSource LibrarySource;
+        internal CropTransform LibraryCrop;
     }
     internal static class IconAssets
     {
@@ -24,6 +26,12 @@ namespace HexMapEditor
         public static IconAsset FromBitmap(Bitmap image, string name)
         {
             using (var stream = new MemoryStream()) { image.Save(stream, ImageFormat.Png); byte[] bytes = stream.ToArray(); return new IconAsset { Id = Id(bytes), Name = name, Png = Convert.ToBase64String(bytes), Width = image.Width, Height = image.Height }; }
+        }
+        internal static IconAsset FromPng(GraphicSource source, string name)
+        {
+            string png = source.Data;
+            return new IconAsset { Id = Id(Convert.FromBase64String(png)), Name = name, Png = png,
+                Width = source.Width, Height = source.Height, LibrarySource = source };
         }
         public static Bitmap Decode(IconAsset asset)
         {

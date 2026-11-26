@@ -24,7 +24,7 @@ namespace HexMapEditor
         internal MapBackground Initial {get;private set;}
         internal MapBackground Result { get; private set; }
         static TrackBar Slider(int min, int max, int value) { return new TrackBar { Minimum = min, Maximum = max, Value = value, TickStyle = TickStyle.None, Width = 185, Height = 35 }; }
-        internal BackgroundDialog(MapBackground initial, Size viewport)
+        internal BackgroundDialog(MapBackground initial, Size viewport, bool importQueue = false)
         {
             Initial=initial==null?null:initial.Copy();
             this.viewport = new Size(Math.Max(1,viewport.Width),Math.Max(1,viewport.Height));
@@ -35,6 +35,7 @@ namespace HexMapEditor
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI", 9);
             var import = new Button { Text = "Z pliku…", Bounds = new Rectangle(149, 10, 125, 28) };
             var library = new Button { Text = "Z biblioteki…", Bounds = new Rectangle(12,10,125,28) };
+            if (importQueue) { import.Visible = library.Visible = remove.Visible = false; }
             remove.FlatStyle=FlatStyle.Flat;remove.ForeColor=Color.FromArgb(244,113,113);remove.FlatAppearance.BorderColor=remove.ForeColor;
             remove.EnabledChanged+=(s,e)=>{remove.ForeColor=remove.Enabled?Color.FromArgb(244,113,113):Color.Gray;remove.FlatAppearance.BorderColor=remove.ForeColor;};
             remove.FlatAppearance.MouseOverBackColor=Color.FromArgb(80,42,48);remove.FlatAppearance.MouseDownBackColor=Color.FromArgb(100,44,52);

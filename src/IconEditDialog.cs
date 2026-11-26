@@ -28,10 +28,17 @@ namespace HexMapEditor
             var choices=new EditorButton { Text="Wybierz z biblioteki", AccessibleName="Wybierz grafikę z biblioteki" };Row(2,"Z biblioteki",choices,true);
             int row=3; Button cross=null;
             if(other!=null){cross=new EditorButton{Text=title=="Edytuj ikonę"?"Z biblioteki obiektów":"Z biblioteki ikon"};Row(row++,"Inna biblioteka",cross,true);}
+            var recrop=new EditorButton{Text="Kadruj źródło…"};
+            Row(row++,"Kadr",recrop,true);ClientSize=new Size(ClientSize.Width,ClientSize.Height+36);
             Row(row,"Podgląd",preview,true);Layout.RowStyles[row++].Height=90;
             if(title!="Edytuj ikonę"){Row(row++,"Nowe instancje",light,true);Row(row++,"Promień widzenia",radius,true);light.CheckedChanged+=(s,e)=>radius.Enabled=light.Checked;radius.Enabled=false;}
             Layout.Controls.Add(update,0,row++);Layout.SetColumnSpan(update,3);Layout.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Buttons(row,()=>{if(IconName.Length>0 && (CanAccept == null || CanAccept()))DialogResult=DialogResult.OK;});
-            Action show=()=>{var old=preview.Image;preview.Image=IconAssets.Decode(Asset);if(old!=null)old.Dispose();};show();
+            Action show=()=>{var old=preview.Image;preview.Image=IconAssets.Decode(Asset);if(old!=null)old.Dispose();recrop.Enabled=Asset.LibrarySource!=null;};show();
+            recrop.Click+=(s,e)=>{
+                try{using(var crop=new SquareImportDialog(Asset.LibrarySource, Asset.Name, Asset.LibraryCrop))
+                    if(crop.ShowDialog(this)==DialogResult.OK){Asset=crop.Result;show();}}
+                catch(Exception ex){MessageBox.Show(this,ex.Message,"Nie można zmienić kadru",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            };
             choices.Click+=(s,e)=>{var chosen=pick(this);if(chosen!=null){Asset=chosen.Asset;show();}};
             if(cross!=null)cross.Click+=(s,e)=>{var chosen=other(this);if(chosen!=null){Asset=chosen.Asset;show();}};
             file.Click+=(s,e)=>{using(var d=new OpenFileDialog { Title="Podmień grafikę ikony",Filter="Bitmapy PNG/JPG/BMP/GIF|*.png;*.jpg;*.jpeg;*.bmp;*.gif",RestoreDirectory=true })if(d.ShowDialog(this)==DialogResult.OK)try{using(var crop=new SquareImportDialog(d.FileName))if(crop.ShowDialog(this)==DialogResult.OK){Asset=crop.Result;show();}}catch(Exception ex){MessageBox.Show(this,ex.Message,"Nie można podmienić grafiki",MessageBoxButtons.OK,MessageBoxIcon.Warning);}};

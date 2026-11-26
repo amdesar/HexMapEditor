@@ -39,7 +39,9 @@ namespace HexMapEditor
             var quality=new ToolStripMenuItem("Jakość");view.DropDownItems.Add(quality);qualityHigh=new ToolStripMenuItem("Wysoka",null,(s,e)=>SetLowQuality(false));qualityLow=new ToolStripMenuItem("Niska",null,(s,e)=>SetLowQuality(true));quality.DropDownItems.AddRange(new ToolStripItem[]{qualityHigh,qualityLow});Sep(view);
             var zoomMenu=new ToolStripMenuItem("Powiększenie");view.DropDownItems.Add(zoomMenu);FillZoomMenu(zoomMenu.DropDownItems);
             var fit=new ToolStripMenuItem("Dopasuj widok");view.DropDownItems.Add(fit);AddCommand(fit,"Dopasuj mapę",EditorCommand.FitMap);AddCommand(fit,"Dopasuj wszystko",EditorCommand.FitAll);
-            var library=Category("&Biblioteka");var root=new ToolStripMenuItem("Otwórz główny folder biblioteki",null,(s,e)=>OpenLibraryFolder());library.DropDownItems.Add(root);Sep(library);
+            var library=Category("&Biblioteka");var root=new ToolStripMenuItem("Otwórz główny folder biblioteki",null,(s,e)=>OpenLibraryFolder());library.DropDownItems.Add(root);
+            library.DropDownItems.Add(new ToolStripMenuItem("Otwórz folder importu",null,(s,e)=>OpenImportFolder()));
+            library.DropDownItems.Add(new ToolStripMenuItem("Przejrzyj kolejkę importu…",null,(s,e)=>OpenImportQueue()));Sep(library);
             foreach(var folder in LibraryFolders()){string relative=folder.Value;library.DropDownItems.Add(new ToolStripMenuItem(folder.Key,null,(s,e)=>OpenLibraryFolder(relative)));}
             var help=Category("&Pomoc");help.DropDownItems.Add(new ToolStripMenuItem("Sprawdź aktualizacje",null,(s,e)=>{if(UpdateRequested!=null)UpdateRequested();}));AddCommand(help,"O programie…",EditorCommand.About);
             foreach(ToolStripMenuItem category in mainMenu.Items){category.DropDownOpening+=(s,e)=>UpdateCommandState();StyleMenus(category);}

@@ -133,6 +133,8 @@ namespace HexMapEditor
         int refreshQueued;
         bool choosing,transition;
         internal Action UpdateRequested;
+        readonly Button importPending = new EditorButton { Name = "pendingFolderImport", Visible = false,
+            Bounds = new Rectangle(150,500,278,30), Anchor = AnchorStyles.Bottom };
         internal bool Transition {get{return transition;}set{transition=value;}}
         internal bool ReadyForExternalOpen { get { return !choosing&&!transition&&Visible; } }
         internal StartWindow(Action<MapData,string> open)
@@ -159,7 +161,26 @@ namespace HexMapEditor
                 catch(Exception error){MessageBox.Show(this,error.Message,"Strona projektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
             };
             Controls.Add(github);
+            Controls.Add(importPending);
+            Shown += (s,e) => RefreshFolderImport();
+            importPending.Click += (s,e) => {
+                if (choosing || transition) return;
+                choosing = true;
+                try { using (var dialog = new FolderImportDialog(FolderImport.Current)) dialog.ShowDialog(this); }
+                finally { choosing = false; RefreshFolderImport(); }
+            };
             Load+=(s,e)=>{var area=Screen.FromControl(this).WorkingArea;Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);};Disposed+=(s,e)=>tips.Dispose();
+        }
+        async void RefreshFolderImport()
+        {
+            try
+            {
+                int count = await System.Threading.Tasks.Task.Run(() => FolderImport.Current.Scan().Count);
+                if (IsDisposed) return;
+                importPending.Text = "Znaleziono " + count + " grafik — Przejrzyj";
+                importPending.Visible = count > 0;
+            }
+            catch (Exception) { if (!IsDisposed) importPending.Visible = false; }
         }
         Button ButtonAt(string text,int x,int y){var b=new Button{Text=text,Bounds=new Rectangle(x,y,280,44),FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(38,65,96)};b.FlatAppearance.BorderColor=Color.FromArgb(90,145,205);Controls.Add(b);return b;}
         internal DialogResult ShowUpdateDialog(Func<DialogResult> show)

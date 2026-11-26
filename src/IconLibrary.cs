@@ -22,7 +22,7 @@ namespace HexMapEditor
     {
         public static void Validate(LibraryIcon icon)
         {
-            if (icon == null || icon.IconFormatVersion != 2 || String.IsNullOrWhiteSpace(icon.Id) || icon.Id.Length > 200 || String.IsNullOrWhiteSpace(icon.Name) || icon.Name.Length > 200) throw new InvalidDataException("Nieprawidłowa pozycja biblioteki ikon.");
+            if (icon == null || (icon.IconFormatVersion != 2 && icon.IconFormatVersion != 3) || String.IsNullOrWhiteSpace(icon.Id) || icon.Id.Length > 200 || String.IsNullOrWhiteSpace(icon.Name) || icon.Name.Length > 200) throw new InvalidDataException("Nieprawidłowa pozycja biblioteki ikon.");
             using (var bitmap = IconAssets.Decode(icon.Asset)) { }
         }
         public static LibraryIcon Read(string path)
@@ -34,7 +34,17 @@ namespace HexMapEditor
             LibraryIcon icon;
             if (raw.ContainsKey("IconFormatVersion")) icon = json.ConvertToType<LibraryIcon>(raw);
             else { var asset = json.ConvertToType<IconAsset>(raw); icon = new LibraryIcon { Id = asset.Id, Name = asset.Name, Asset = asset }; }
+            if (icon.IconFormatVersion == 3) icon.Asset = SquareLibraryAsset.Read(Path.GetDirectoryName(path), raw);
             Validate(icon); icon.FilePath = Path.GetFullPath(path); icon.DiskBytes = bytes; return icon;
+        }
+        internal static byte[] Metadata(LibraryIcon entry)
+        {
+            Validate(entry);
+            entry.IconFormatVersion = 3;
+            return Encoding.UTF8.GetBytes(MapLogic.Serializer().Serialize(new {
+                entry.IconFormatVersion, entry.Id, entry.Name, entry.LibraryOrder,
+                SourceId = SquareLibraryAsset.SourceFor(entry.Asset).Id, AssetName = entry.Asset.Name, Crop = entry.Asset.LibraryCrop
+            }));
         }
         public static string Destination(string directory, string name, string current)
         {
@@ -47,11 +57,13 @@ namespace HexMapEditor
             Directory.CreateDirectory(directory); string marker = Path.Combine(directory, ".starter-icons-v2");
             if (!File.Exists(marker))
             {
-                foreach (var starter in StarterSets.Icons())
+                var ids = new HashSet<string>(Directory.GetFiles(directory,"*.json").Select(SquareLibraryAsset.ReadStarterIdentity));
+                foreach (var entry in StarterSets.Icons())
                 {
-                    var entry = starter;
-                    bool present = Directory.GetFiles(directory,"*.json").Any(f => { try { return Read(f).Id == entry.Id; } catch { return false; } });
-                    if (!present) MapLogic.AtomicWrite(Destination(directory, entry.Name, null), MapLogic.Serializer().Serialize(entry), false);
+                    if (ids.Contains(entry.Id)) continue;
+                    byte[] metadata = Metadata(entry);
+                    LibraryImageStore.Store(directory, SquareLibraryAsset.SourceFor(entry.Asset));
+                    LibraryFiles.Transition(null, null, Destination(directory, entry.Name, null), metadata);
                 }
                 MapLogic.AtomicWrite(marker, "1", false);
             }
@@ -75,6 +87,13 @@ namespace HexMapEditor
         public bool BeforeObjectMaterial, BeforeNoMaterial, AfterNoMaterial;
         public int Index;
         public void Write(bool after)
-        { var from = after ? Before : After; var to = after ? After : Before; LibraryFiles.Transition(from == null ? null : from.FilePath, after ? BeforeBytes : AfterBytes, to == null ? null : to.FilePath, after ? AfterBytes : BeforeBytes); }
+        {
+            var from = after ? Before : After;
+            var to = after ? After : Before;
+            if (to != null && to.IconFormatVersion == 3)
+                LibraryImageStore.Store(Path.GetDirectoryName(to.FilePath), SquareLibraryAsset.SourceFor(to.Asset));
+            LibraryFiles.Transition(from == null ? null : from.FilePath, after ? BeforeBytes : AfterBytes,
+                to == null ? null : to.FilePath, after ? AfterBytes : BeforeBytes);
+        }
     }
 }

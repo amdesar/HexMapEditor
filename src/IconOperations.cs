@@ -25,7 +25,8 @@ namespace HexMapEditor
                     if (before == null && libraryIcons.Any(i => i.Id == next.Id)) throw new IOException("Powtórzone ID ikony.");
                     Directory.CreateDirectory(directory); next.FilePath = IconLibrary.Destination(directory,next.Name,before == null ? null : before.FilePath);
                     next.LibraryOrder = before == null ? LibrarySequence.Next(libraryIcons.Select(i => i.LibraryOrder)) : before.LibraryOrder;
-                    next.DiskBytes = new UTF8Encoding(false).GetBytes(json.Serialize(next));
+                    next.DiskBytes = before != null && next.Name == before.Name && ReferenceEquals(next.Asset,before.Asset)
+                        ? before.DiskBytes : IconLibrary.Metadata(next);
                 }
                 var action = new EditAction { Label = before == null ? "Dodanie ikony" : next == null ? "Usunięcie ikony" : "Edycja ikony" };
                 if (updateMap && before != null && next != null)

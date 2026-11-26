@@ -6,11 +6,11 @@ using System.IO;
 using System.Windows.Forms;
 namespace HexMapEditor
 {
-    // Transient import draft. Only its final square PNG is a library asset.
     internal sealed class SquareCropState
     {
-        internal readonly CropTransform Transform=new CropTransform();
-        internal SquareCropState(Size source){Transform.Zoom=(double)Math.Min(source.Width,source.Height)/Math.Max(source.Width,source.Height);}
+        internal readonly CropTransform Transform;
+        internal SquareCropState(Size source,CropTransform initial=null)
+        {Transform=initial==null?new CropTransform{Zoom=(double)Math.Min(source.Width,source.Height)/Math.Max(source.Width,source.Height)}:initial.Copy();}
         internal void Pan(double dx,double dy,Size source,double side)
         {
             double factor=side/Math.Min(source.Width,source.Height)*Transform.Zoom,r=Transform.Angle*Math.PI/180;
@@ -27,16 +27,19 @@ namespace HexMapEditor
         readonly string name;
         internal readonly SquareCropState Draft;
         internal IconAsset Result{get;private set;}
-        internal SquareImportDialog(string path):this(IconAssets.ReadImport(path),Path.GetFileNameWithoutExtension(path)){}
-        internal SquareImportDialog(Bitmap bitmap,string sourceName)
+        internal SquareImportDialog(string path):this(GraphicSources.Import(GraphicSources.ReadFile(path,SquareLibraryAsset.InputBytes)),Path.GetFileNameWithoutExtension(path)){}
+        internal SquareImportDialog(Bitmap bitmap,string sourceName):this(SquareLibraryAsset.TakeBitmap(bitmap),sourceName){}
+        internal SquareImportDialog(GraphicSource original,string sourceName,CropTransform initial=null)
         {
-            source=bitmap;name=sourceName.Substring(0,Math.Min(200,sourceName.Length));Draft=new SquareCropState(source.Size);
+            if(original.Width>2048||original.Height>2048||original.EncodedLength>GraphicLimits.Encoded(SquareLibraryAsset.InputBytes))
+                throw new InvalidDataException("Import: źródło może mieć najwyżej 2048 × 2048 i 8 MiB.");
+            source=GraphicSources.Decode(original);name=sourceName.Substring(0,Math.Min(200,sourceName.Length));Draft=new SquareCropState(source.Size,initial);
             Text="Kadrowanie importowanej grafiki";ClientSize=new Size(640,660);Font=new Font("Segoe UI",9);FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;StartPosition=FormStartPosition.CenterParent;
             var surface=new SquareCropSurface(source,Draft){Bounds=new Rectangle(16,40,608,536)};
-            var hint=new Label{Text="Przeciągaj: przesunięcie • Kółko: skala • Obrót suwakiem. Zapis tylko wnętrza kwadratu512×512.",Bounds=new Rectangle(16,10,608,24)};
-            var rotation=new TrackBar{Minimum=0,Maximum=360,TickFrequency=45,Bounds=new Rectangle(16,582,390,32)};var angle=new Label{Bounds=new Rectangle(417,588,72,24),Text="0°"};rotation.ValueChanged+=(s,e)=>{Draft.Transform.Angle=CropMath.Angle(rotation.Value);angle.Text=rotation.Value+"°";surface.Invalidate();};
+            var hint=new Label{Text="Przeciągaj: przesunięcie • Kółko: skala • Obrót suwakiem. Kadr 512×512.",Bounds=new Rectangle(16,10,608,24)};
+            var rotation=new TrackBar{Minimum=0,Maximum=360,Value=(int)Math.Round(Draft.Transform.Angle),TickFrequency=45,Bounds=new Rectangle(16,582,390,32)};var angle=new Label{Bounds=new Rectangle(417,588,72,24),Text=rotation.Value+"°"};rotation.ValueChanged+=(s,e)=>{Draft.Transform.Angle=CropMath.Angle(rotation.Value);angle.Text=rotation.Value+"°";surface.Invalidate();};
             var accept=new EditorButton{Text="Importuj",Bounds=new Rectangle(400,620,105,28)};var cancel=new EditorButton{Text="Anuluj",DialogResult=DialogResult.Cancel,Bounds=new Rectangle(516,620,108,28)};
-            accept.Click+=(s,e)=>{using(var image=Draft.Render(source)){var asset=IconAssets.FromBitmap(image,name);using(var valid=IconAssets.Decode(asset)){}Result=asset;}DialogResult=DialogResult.OK;};
+            accept.Click+=(s,e)=>{try{using(var image=Draft.Render(source))Result=SquareLibraryAsset.Prepare(image,original,name,Draft.Transform);DialogResult=DialogResult.OK;}catch(Exception ex){MessageBox.Show(this,ex.Message,"Nie można zapisać kadru",MessageBoxButtons.OK,MessageBoxIcon.Warning);}};
             var reset=new EditorButton{Text="Obrót 0°",Bounds=new Rectangle(512,582,110,28)};reset.Click+=(s,e)=>{Draft.Transform.Angle=0;rotation.Value=0;angle.Text="0°";surface.Invalidate();};Controls.AddRange(new Control[]{hint,surface,rotation,angle,reset,accept,cancel});AcceptButton=accept;CancelButton=cancel;Disposed+=(s,e)=>source.Dispose();
         }
     }
@@ -67,7 +70,7 @@ namespace HexMapEditor
         IconAsset CropClipboardIcon(IWin32Window owner,string name)
         {
             var bytes=ReadClipboardGraphic(8*1024*1024,2048);
-            using(var dialog=new SquareImportDialog(IconAssets.ReadImport(bytes),name))
+            using(var dialog=new SquareImportDialog(GraphicSources.Import(bytes),name))
                 return RunModal(()=>dialog.ShowDialog(owner))==DialogResult.OK?dialog.Result:null;
         }
         static byte[] ReadClipboardGraphic(int limit,int side)

@@ -71,12 +71,13 @@ namespace HexMapEditor
         }
         static string SourcePath(string directory, string id)
         {
-            if (id == null || !id.StartsWith("source-", StringComparison.Ordinal) || id.Length != 71 || !id.Substring(7).All(Uri.IsHexDigit))
-                throw new InvalidDataException("Nieprawidłowy identyfikator źródła.");
+            LibraryImageStore.ValidateId(id);
             return Path.Combine(directory, "Sources", id + ".json");
         }
         internal static GraphicSource ReadSource(string directory, string id)
         {
+            var binary = LibraryImageStore.Find(directory, id);
+            if (binary != null) return binary;
             string path = SourcePath(directory, id);
             if (new FileInfo(path).Length > GraphicLimits.SourceJsonBytes) throw new InvalidDataException("Za duży plik źródła.");
             var source = MapLogic.Serializer().Deserialize<GraphicSource>(File.ReadAllText(path));
@@ -86,21 +87,7 @@ namespace HexMapEditor
             return source;
         }
         internal static void StoreSource(string directory, GraphicSource source)
-        {
-            string path = SourcePath(directory, source.Id);
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            if (File.Exists(path))
-            {
-                if (!GraphicSources.Same(ReadSource(directory, source.Id), source)) throw new IOException("Konflikt bajtów źródła.");
-                return;
-            }
-            var stored = new DirectoryInfo(Path.GetDirectoryName(path)).GetFiles("source-*.json");
-            if (stored.Length >= GraphicSources.MaxSources || stored.Sum(f => f.Length) +
-                source.EncodedLength > GraphicLimits.Encoded(GraphicLimits.LibrarySources) + GraphicLimits.SourceCount * 65536L)
-                throw new IOException("Magazyn źródeł biblioteki osiągnął limit 64 obrazów / 192 MiB. Zachowano dotychczasowe wpisy i historię.");
-            // Immutable content store. Undo removes the logical entry, retaining reusable source bytes.
-            MapLogic.AtomicWrite(path, MapLogic.Serializer().Serialize(source), false);
-        }
+        { LibraryImageStore.Store(directory, source); }
 
         internal static List<TerrainGraphic> Load(string directory, out string warning)
         {

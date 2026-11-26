@@ -11,6 +11,23 @@ namespace HexMapEditor
         {return new ProcessStartInfo(LibraryPaths.Root){UseShellExecute=true,Verb="open"};}
         void OpenLibraryFolder()
         {OpenLibraryFolder(null);}
+        void OpenImportFolder()
+        {
+            try { using (Process.Start(new ProcessStartInfo(FolderImport.Current.EnsureFolders()) { UseShellExecute = true, Verb = "open" })) { } }
+            catch (Exception ex) { ShowEditorMessage(ex.Message,"Nie można otworzyć folderu importu",MessageBoxButtons.OK,MessageBoxIcon.Warning); }
+        }
+        void OpenImportQueue()
+        {
+            using (var dialog = new FolderImportDialog(FolderImport.Current))
+            {
+                RunModal(() => dialog.ShowDialog(this));
+                if (!dialog.Saved) return;
+            }
+            terrainGraphics = null;
+            backgroundLibrary = null;
+            LoadIcons();
+            LoadObjects();
+        }
         internal static IEnumerable<KeyValuePair<string,string>> LibraryFolders()
         {
             string[] names={"Tereny","Presety terenów","Grafiki terenów","Ikony","Obiekty","Stany obiektów","Tła","Mapy","Eksport obrazów","Eksport tekstu"};
