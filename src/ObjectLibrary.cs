@@ -20,7 +20,7 @@ namespace HexMapEditor
         internal string FilePath, SourceFile; internal byte[] DiskBytes;
         public ObjectTemplate(){ObjectFormatVersion=1;LightRadius=1;Id=Guid.NewGuid().ToString("N");}
         internal ObjectTemplate Copy(){return (ObjectTemplate)MemberwiseClone();}
-        internal LibraryIcon Graphic(){return new LibraryIcon{Id=Id,Name=Name,Asset=Asset};}
+        internal LibraryIcon Graphic(){return new LibraryIcon{Id=Id,Name=Name,Asset=Asset,LibraryOrder=LibraryOrder};}
     }
     internal sealed class ObjectLibraryChange
     {

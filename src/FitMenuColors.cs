@@ -37,7 +37,11 @@ namespace HexMapEditor
             if (e.Item.Selected || e.Item.Pressed)
                 using (var brush = new SolidBrush(Color.FromArgb(65, 73, 90))) e.Graphics.FillRectangle(brush, bounds);
             using (var pen = new Pen(Color.FromArgb(74, 81, 98)))
+            {
                 e.Graphics.DrawRectangle(pen, 0, 0, bounds.Width - 1, bounds.Height - 1);
+                if(e.Item.Placement==ToolStripItemPlacement.Main&&bounds.Width>bounds.Height)
+                    e.Graphics.DrawLine(pen,bounds.Height,2,bounds.Height,bounds.Bottom-3);
+            }
         }
 
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e) { }

@@ -181,6 +181,7 @@ namespace HexMapEditor
     {
         static readonly TerrainState neutralState = new TerrainState(new CellData());
         internal static bool IsUnpainted(CellData cell) { return neutralState.Matches(cell); }
+        internal static TerrainState UnpaintedState { get { return neutralState; } }
         public static JavaScriptSerializer Serializer() { return new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 128 }; }
         public static string Hash(string value) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? ""))).Replace("-", "").ToLowerInvariant(); }
         public static bool ValidColor(string value)
@@ -366,6 +367,7 @@ namespace HexMapEditor
         }
         public void BreakGroups() { foreach (var history in entries.Values) history.BreakGroup(); }
         public void Clear() { entries.Clear(); }
+        internal void RemoveDescription(string cellId) { entries.Remove(cellId+":description"); }
         public void Trim()
         {
             long total = entries.Values.Sum(h => h.Bytes);

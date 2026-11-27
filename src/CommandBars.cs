@@ -21,6 +21,7 @@ namespace HexMapEditor
         {var item=new ToolStripMenuItem(text){ShortcutKeyDisplayString=shortcut};item.Click+=(s,e)=>ExecuteCommand(command);parent.DropDownItems.Add(item);commandMenus[command]=item;return item;}
         ToolStripMenuItem Category(string text){var item=new ToolStripMenuItem(text);mainMenu.Items.Add(item);return item;}
         static void Sep(ToolStripMenuItem menu){menu.DropDownItems.Add(new ToolStripSeparator());}
+        void QuickSeparator(){quickStrip.Items.Add(new ToolStripSeparator{Margin=new Padding(3,0,3,0)});}
         void MenuFence(ToolStripDropDown menu){menu.Closed+=(s,e)=>{waitingForMouseRelease=Control.MouseButtons!=MouseButtons.None;requireFreshCanvasDown=true;};}
         void BuildCommandBars()
         {
@@ -44,12 +45,12 @@ namespace HexMapEditor
             var help=Category("&Pomoc");help.DropDownItems.Add(new ToolStripMenuItem("Sprawdź aktualizacje",null,(s,e)=>{if(UpdateRequested!=null)UpdateRequested();}));AddCommand(help,"O programie…",EditorCommand.About);
             foreach(ToolStripMenuItem category in mainMenu.Items){category.DropDownOpening+=(s,e)=>UpdateCommandState();StyleMenus(category);}
             quickStrip=new ToolStrip{Dock=DockStyle.None,AutoSize=false,Height=36,GripStyle=ToolStripGripStyle.Hidden,CanOverflow=true,LayoutStyle=ToolStripLayoutStyle.HorizontalStackWithOverflow,BackColor=shellToolbar.BackColor,ForeColor=Color.WhiteSmoke,Renderer=new FitButtonRenderer(),Padding=new Padding(4,1,4,1)};shellToolbar.Controls.Add(quickStrip);
-            Quick(new Button(),EditorCommand.New,"new","Nowa mapa",32);Quick(new Button(),EditorCommand.Open,"open","Otwórz mapę",32);Quick(saveButton,EditorCommand.Save,"save","Zapisz (Ctrl+S)",32);quickStrip.Items.Add(new ToolStripSeparator());
-            Quick(undoButton,EditorCommand.Undo,"undo","Cofnij (Ctrl+Z)",32);Quick(redoButton,EditorCommand.Redo,"redo","Ponów (Ctrl+Y)",32);quickStrip.Items.Add(new ToolStripSeparator());
+            Quick(new Button(),EditorCommand.New,"new","Nowa mapa",32);Quick(new Button(),EditorCommand.Open,"open","Otwórz mapę",32);Quick(saveButton,EditorCommand.Save,"save","Zapisz (Ctrl+S)",32);QuickSeparator();
+            Quick(undoButton,EditorCommand.Undo,"undo","Cofnij (Ctrl+Z)",32);Quick(redoButton,EditorCommand.Redo,"redo","Ponów (Ctrl+Y)",32);QuickSeparator();
             ConfigureButton(zoomButton,"100%","fit","Ustaw powiększenie 100%",SetZoom100,ZoomButtonWidth());zoomButton.Image=null;
             ConfigureButton(zoomArrow,"▾","fit","Powiększenie — presety i wartość niestandardowa",ShowZoomMenu,24);zoomArrow.Image=null;zoomArrow.MouseDown+=(s,e)=>{if(GetMessageTime()!=zoomClosingStamp)suppressZoomOpen=false;};zoomArrow.KeyDown+=(s,e)=>suppressZoomOpen=false;
             var zoomHost=new Panel{Size=new Size(zoomButton.Width+zoomArrow.Width,32),Margin=Padding.Empty};zoomButton.Location=Point.Empty;zoomArrow.Location=new Point(zoomButton.Width,0);zoomHost.Controls.Add(zoomButton);zoomHost.Controls.Add(zoomArrow);quickStrip.Items.Add(new ToolStripControlHost(zoomHost){AutoSize=false,Size=zoomHost.Size,Margin=new Padding(1,0,1,0),Overflow=ToolStripItemOverflow.AsNeeded});
-            Quick(new Button(),EditorCommand.FitMap,"fit","Dopasuj mapę",32);Quick(new Button(),EditorCommand.FitAll,"fitall","Dopasuj wszystko — widoczne warstwy",32);quickStrip.Items.Add(new ToolStripSeparator());
+            Quick(new Button(),EditorCommand.FitMap,"fit","Dopasuj mapę",32);Quick(new Button(),EditorCommand.FitAll,"fitall","Dopasuj wszystko — widoczne warstwy",32);QuickSeparator();
             AddQuickLayers();qualityButton=new Button();Quick(qualityButton,EditorCommand.Quality,null,"Wysoka / Niska jakość — tylko podgląd sesji",60);
             AddDetailsCommands();
             MenuFence(quickStrip.OverflowButton.DropDown);UpdateQualityButton();UpdateCommandState();

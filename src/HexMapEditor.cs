@@ -127,6 +127,7 @@ namespace HexMapEditor
         internal string QuickPresetId;internal QuickSnapshot BeforeQuick,AfterQuick;
         public List<CellChange> Changes = new List<CellChange>();
         public List<LayerChange> Layers = new List<LayerChange>();
+        internal List<ErasedCellText> ErasedText;
         public IconLibraryChange LibraryChange;
         public PresetFileChange PresetChange;
         public ObjectLibraryChange ObjectLibraryChange;
@@ -622,6 +623,7 @@ namespace HexMapEditor
         {
             if(!HasDocuments)return;
             if(InkCommitBusy&&!(e.Alt&&e.KeyCode==Keys.F4)){if(e.KeyCode==Keys.Escape)CancelInkCommit();else BlockInkCommit();e.Handled=true;e.SuppressKeyPress=true;return;}
+            if(e.KeyCode==Keys.Escape&&gestureButton==MouseButtons.Left&&gestureTool==EditorTool.Eraser){EndCanvasGesture(false);e.Handled=true;e.SuppressKeyPress=true;return;}
             if ((e.KeyCode==Keys.Escape || e.KeyCode==Keys.Delete && selectedObjects.Count>0 && !left.ContainsFocus) && !TextInputFocused(this)) { if(e.KeyCode==Keys.Delete)ConfirmDeleteSelectedObjects();else {EndCanvasGesture(true);selectedObjects.Clear();UpdateUI();} e.Handled=true;e.SuppressKeyPress=true;return; }
             if (e.KeyData == (Keys.Control|Keys.Shift|Keys.S)) { ExecuteCommand(EditorCommand.SaveAs); e.Handled = true; e.SuppressKeyPress = true; }
             else if (e.KeyData == (Keys.Control|Keys.S)) { ExecuteCommand(EditorCommand.Save); e.Handled = true; e.SuppressKeyPress = true; }
@@ -637,7 +639,7 @@ namespace HexMapEditor
         {
             if(!HasDocuments)return false;
             var key = keyData & Keys.KeyCode;
-            if ((key != Keys.Z && key != Keys.Y) || (keyData & Keys.Control) == 0) return false;
+            if ((key != Keys.Z && key != Keys.Y) || (keyData & Keys.Control) == 0 || (keyData & Keys.Alt) != 0) return false;
             if ((keyData & Keys.Modifiers) != Keys.Control) return true;
 
             var local=LocalToolNumber(FocusedEditorControl());
@@ -836,7 +838,7 @@ namespace HexMapEditor
             if (requireFreshCanvasDown && e.Clicks != 1) return;
             if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Middle && !(e.Button==MouseButtons.Right&&(currentTool==EditorTool.Stylus||currentTool==EditorTool.Eraser))) return;
             requireFreshCanvasDown = false; EndObjectPropertyEdit();
-            if (e.Button != MouseButtons.Middle && !GuardCanvasLayer()) return;
+            if (e.Button != MouseButtons.Middle && !(currentTool==EditorTool.Eraser?GuardEraserLayers(e.Button):GuardCanvasLayer())) return;
             // Numeric editors can commit on focus loss and end an old gesture. Finish that first.
             canvas.Focus();
             gestureButton = e.Button; gestureTool = currentTool;

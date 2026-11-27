@@ -50,6 +50,7 @@ namespace HexMapEditor
         readonly ImageList images = new ImageList { ImageSize = new Size(88, 72), ColorDepth = ColorDepth.Depth32Bit };
         readonly List<Bitmap> thumbnails = new List<Bitmap>();
         readonly Func<List<TerrainGraphic>> items;
+        readonly LibraryListing listing;
         readonly bool flat;
         [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam);
         internal Func<TerrainGraphic> Import;
@@ -77,7 +78,9 @@ namespace HexMapEditor
             buttons.Controls.AddRange(new Control[] { add, edit, remove, select, cancel });
             foreach(Button b in buttons.Controls){b.FlatStyle=FlatStyle.Flat;b.BackColor=Color.FromArgb(49,54,67);b.ForeColor=ForeColor;}
             select.Visible=!manage; cancel.Text=manage?"Zamknij":"Anuluj";
-            Controls.Add(list);
+            var content=new Panel{Dock=DockStyle.Fill};content.Controls.Add(list);
+            listing=new LibraryListing(GraphicLibraryKind.Terrain,content,()=>RefreshList(Selected==null?null:Selected.Id));
+            Controls.Add(content);Controls.Add(listing);
             Controls.Add(buttons);
             list.LargeImageList = images;
             add.Click += (s, e) => Run(() => { var entry = Import(); if (entry != null) RefreshList(entry.Id); });
@@ -115,7 +118,7 @@ namespace HexMapEditor
                 images.Images.Clear();
                 foreach (var thumbnail in thumbnails) thumbnail.Dispose();
                 thumbnails.Clear();
-                foreach (var entry in items())
+                foreach (var entry in listing.View(items(),item=>item.Name,item=>item.LibraryOrder,item=>item.Id))
                 {
                     var thumbnail = new Bitmap(88, 72);
                     thumbnails.Add(thumbnail);

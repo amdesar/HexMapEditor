@@ -96,10 +96,10 @@ namespace HexMapEditor.Tests
                 Check(!(bool)Call(editor,"get_HasUnsavedChanges")&&ink.Value==dragged,"Global Undo affected the field or did not undo one map edit");
                 Check(((ICollection)Call(editor,"get_undo")).Count==0,"Tool entries leaked into document history");
                 Call(editor,"ShowAbout");
-                var about=Get<AboutDialog>(editor,"aboutDialog");
-                Check(!about.Modal&&about.Controls.OfType<LinkLabel>().Count()==1&&
+                var about=editor.OwnedForms.OfType<AboutDialog>().Single();
+                Check(!about.Modal&&about.Controls.OfType<Button>().Any(b=>b.Text=="Repozytorium projektu")&&
                     about.Controls.OfType<Label>().Any(l=>l.Text.Contains("Licencja MIT")),"About contents or modality");
-                Call(editor,"ShowAbout");Check(ReferenceEquals(about,Get<AboutDialog>(editor,"aboutDialog")),"Duplicate About window");
+                Call(editor,"ShowAbout");Check(ReferenceEquals(about,editor.OwnedForms.OfType<AboutDialog>().Single()),"Duplicate About window");
                 ((Button)about.CancelButton).PerformClick();Check(about.IsDisposed,"About Cancel did not close");
         }
         static void Flow()

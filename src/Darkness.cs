@@ -74,7 +74,7 @@ namespace HexMapEditor
             var action=new EditAction{Label="Wygląd ograniczenia widoczności"};
             if(FillRules.Signature(map.DarkPalette)!=FillRules.Signature(fills)){action.BeforeDarkPalette=FillRules.Copy(map.DarkPalette);action.AfterDarkPalette=FillRules.Copy(fills);}
             if(apply)foreach(var cell in map.Cells.Where(c=>c.Darkness))
-            {var next=preserve?fills.FirstOrDefault(f=>f.Id==cell.DarkFill.Id):NextFill(fills);if(next==null||FillRules.Signature(new[]{next})==FillRules.Signature(new[]{cell.DarkFill}))continue;action.Layers.Add(new LayerChange{CellId=cell.Id,DarkAppearance=true,BeforeDarkFill=cell.DarkFill.Copy(),AfterDarkFill=next.Copy()});}
+            {var next=preserve?fills.FirstOrDefault(f=>f.Id==cell.DarkFill.Id):NextFill(fills);if(next==null||FillRules.SurfaceSignature(new[]{next})==FillRules.SurfaceSignature(new[]{cell.DarkFill}))continue;action.Layers.Add(new LayerChange{CellId=cell.Id,DarkAppearance=true,BeforeDarkFill=cell.DarkFill.Copy(),AfterDarkFill=FillRules.Painted(next)});}
             if(action.BeforeDarkPalette==null&&action.Layers.Count==0)return false;
             ApplyAction(action,true);PushAction(action);MarkDirty();return true;
         }

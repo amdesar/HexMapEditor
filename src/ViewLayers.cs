@@ -105,6 +105,7 @@ namespace HexMapEditor
             quickLayers=new ToolStripDropDownButton("Warstwy widoku",EditorIcons.Small("layers"))
             {
                 DisplayStyle=ToolStripItemDisplayStyle.Image,AccessibleName="Warstwy widoku",
+                AutoSize=false,Size=new Size(44,32),Margin=new Padding(1,0,1,0),
                 ToolTipText="Warstwy widoku — pokaż lub ukryj warstwy (Ctrl+Shift+L)",Overflow=ToolStripItemOverflow.AsNeeded,
                 DropDown=menu
             };

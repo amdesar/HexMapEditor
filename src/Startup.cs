@@ -177,6 +177,8 @@ namespace HexMapEditor
                 catch(Exception error){MessageBox.Show(this,error.Message,"Strona projektu",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
             };
             Controls.Add(github);
+            var about=new EditorButton{Text="O programie",Bounds=new Rectangle(36,461,108,30),Anchor=AnchorStyles.Bottom|AnchorStyles.Left};
+            about.Click+=(s,e)=>AboutDialog.ShowFor(this);Controls.Add(about);
             Controls.Add(importPending);
             Shown += (s,e) => RefreshFolderImport();
             importPending.Click += (s,e) => {

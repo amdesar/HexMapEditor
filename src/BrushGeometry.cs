@@ -8,6 +8,20 @@ namespace HexMapEditor
     internal enum BrushShape { Point, Square, Rectangle, Circle, Hexagon, Pentagon, Horizontal, Vertical, Line, Triangle, Octagon }
     internal static class BrushGeometry
     {
+        internal static bool InsideCircle(double dx,double dy,double radius)
+        {return dx*dx+dy*dy<=radius*radius+.01;}
+
+        internal static IEnumerable<int> CircleCells(MapData map,Point grid,double radius)
+        {
+            int extent=(int)Math.Ceiling(radius/42)+2;
+            var origin=Center(map,grid.X,grid.Y);
+            for(int row=Math.Max(0,grid.Y-extent);row<=Math.Min(map.Rows-1,grid.Y+extent);row++)
+                for(int column=Math.Max(0,grid.X-extent);column<=Math.Min(map.Columns-1,grid.X+extent);column++)
+                {
+                    var center=Center(map,column,row);
+                    if(InsideCircle(center.X-origin.X,center.Y-origin.Y,radius))yield return row*map.Columns+column;
+                }
+        }
         public static PointF Center(MapData map, int c, int r)
         {
             return map.Orientation == "FlatTop" ? new PointF(42 * c, (float)(Math.Sqrt(3) * 28 * (r + ((c + map.ColumnParity) & 1) * .5))) : new PointF((float)(Math.Sqrt(3) * 28 * (c + ((r + map.RowParity) & 1) * .5)), 42 * r);
@@ -51,7 +65,7 @@ namespace HexMapEditor
             {
                 var center = Center(map, p.X, p.Y); double dx = center.X - origin.X, dy = center.Y - origin.Y,x=dx*cos+dy*sin,y=-dx*sin+dy*cos; bool inside;
                 if (shape == BrushShape.Hexagon) { double q,s;if(map.Orientation=="PointyTop"){s=y/42;q=x/48.4974226-s/2;}else{q=x/42;s=y/48.4974226-q/2;}inside=Math.Max(Math.Abs(q),Math.Max(Math.Abs(s),Math.Abs(q+s)))<=size-0.5; }
-                else if (shape == BrushShape.Circle) inside = x * x + y * y <= halfX * halfX + .01;
+                else if (shape == BrushShape.Circle) inside = InsideCircle(x,y,halfX);
                 else if(shape==BrushShape.Triangle)
                 {
                     double a=Math.Max(1,Math.Min(179,apex))*Math.PI/360,L=size*48.4974226,h=L*Math.Cos(a),b=L*Math.Sin(a);

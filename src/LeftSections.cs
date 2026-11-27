@@ -37,7 +37,7 @@ namespace HexMapEditor
             string[] names={"Kursor","Rączka","Rysik","Gumka","Pędzel","Wiadro","Zaznaczenie prostokątne","Lasso","Mgła wojny","Wiadro mgły","Ograniczenie widoczności","Wiadro ograniczenia widoczności"},icons={"select","hand","stylus","eraser","brush","bucket","rectangle","lasso","fog","fogbucket","dark","darkbucket"};
             var tools=new[]{EditorTool.Select,EditorTool.Hand,EditorTool.Stylus,EditorTool.Eraser,EditorTool.Brush,EditorTool.Bucket,EditorTool.RectangleSelect,EditorTool.Lasso,EditorTool.FogBrush,EditorTool.FogBucket,EditorTool.DarkBrush,EditorTool.DarkBucket};
             for(int i=0;i<tools.Length;i++){var tool=tools[i];var b=ShellButton(paletteTools,"",icons[i],names[i],()=>SelectTool(tool),48);b.Height=26;toolButtons.Add(tool,b);}
-            AttachFogAppearanceMenu(); AttachDarkAppearanceMenu();
+            AttachFogAppearanceMenu(); AttachDarkAppearanceMenu(); AttachEraserMenu();
             var shapeLabel = shapeCaption = new Label { Text = "Kształt", Width = 52, Height = 22 }; toolbox.Controls.Add(shapeLabel);
             shapePicker = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Kształt pędzla" }; shapePicker.Items.AddRange(new object[] { "Punkt", "Linia", "Koło", "Trójkąt", "Kwadrat", "Prostokąt", "Pięciokąt", "Heksagon", "Oktagon" }); shapePicker.SelectedIndex = 0; toolbox.Controls.Add(shapePicker);
             var sizeLabel = new Label { Text = "Rozmiar", Width = 52, Height = 22, Visible=false }; toolbox.Controls.Add(sizeLabel);

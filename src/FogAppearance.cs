@@ -55,9 +55,9 @@ namespace HexMapEditor
                 {
                     var next = preserve ? fills.FirstOrDefault(f => f.Id == cell.FogFill.Id) : NextFill(fills);
                     if (next == null) continue;
-                    if (FillRules.Signature(new[] { next }) == FillRules.Signature(new[] { cell.FogFill })) continue;
+                    if (FillRules.SurfaceSignature(new[] { next }) == FillRules.SurfaceSignature(new[] { cell.FogFill })) continue;
                     action.Layers.Add(new LayerChange { CellId = cell.Id, FogAppearance = true,
-                        BeforeFill = cell.FogFill.Copy(), AfterFill = next });
+                        BeforeFill = cell.FogFill.Copy(), AfterFill = FillRules.Painted(next) });
                 }
             }
             if (action.BeforeFogPalette == null && action.Layers.Count == 0) return false;

@@ -62,11 +62,19 @@ namespace HexMapEditor
         void DeleteSelectedObjects()
         {
             EndCanvasGesture(true);var action=new EditAction{Label="Usunięcie instancji"};
-            for(int i=0;i<map.Objects.Count;i++)if(selectedObjects.Contains(map.Objects[i].Id))action.Objects.Add(new ObjectChange{Before=map.Objects[i].Copy(),Index=i});
+            AddObjectDeletions(action,selectedObjects);
             if(action.Objects.Count==0)return;
-            var remaining=map.Groups.Select(g=>g.Copy()).ToList();foreach(var g in remaining){g.Members.RemoveAll(selectedObjects.Contains);foreach(var id in selectedObjects)g.Overrides.Remove(id);}remaining.RemoveAll(g=>g.Members.Count==0);
-            if(json.Serialize(remaining)!=json.Serialize(map.Groups)){action.BeforeGroups=map.Groups.Select(g=>g.Copy()).ToList();action.AfterGroups=remaining;}
             ApplyAction(action,true);selectedObjects.Clear();selectedGroupId=null;PushAction(action);MarkDirty();
+        }
+        void AddObjectDeletions(EditAction action,HashSet<string> ids)
+        {
+            for(int i=0;i<map.Objects.Count;i++)if(ids.Contains(map.Objects[i].Id))action.Objects.Add(new ObjectChange{Before=map.Objects[i].Copy(),Index=i});
+            if(!map.Groups.Any(g=>g.Members.Any(ids.Contains)))return;
+            action.BeforeGroups=map.Groups.Select(g=>g.Copy()).ToList();
+            action.AfterGroups=map.Groups.Select(g=>g.Copy()).ToList();
+            foreach(var group in action.AfterGroups)
+            {group.Members.RemoveAll(ids.Contains);foreach(string id in ids)group.Overrides.Remove(id);}
+            action.AfterGroups.RemoveAll(g=>g.Members.Count==0);
         }
         List<ObjectChange> TransformObjects(MapData geometry,int dc,int dr)
         {

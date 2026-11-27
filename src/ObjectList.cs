@@ -47,7 +47,7 @@ namespace HexMapEditor
         ObjectListRow ObjectListItem(MapObject obj)
         {
             double visible = FogVisibility.VisibleFraction(map, ObjectBounds(obj));
-            bool masked = MaskVisible(ObjectBounds(obj)) <= .5;
+            bool masked = ObjectListMasked(obj);
             double darkVisible=FogVisibility.VisibleFraction(map,ObjectBounds(obj),EffectiveDarkness);
             var effective = GroupRules.Effective(map, obj);
             var state = map.ObjectStates.Single(s => s.Id == effective.Side);
@@ -65,6 +65,7 @@ namespace HexMapEditor
             item.SubItems.Add(darkVisible==1?"Widoczny":darkVisible==0?"Poza polem widzenia":"Częściowo widoczny ("+Math.Round((1-darkVisible)*100,MidpointRounding.AwayFromZero)+"% poza polem widzenia)");
             return item;
         }
+        bool ObjectListMasked(MapObject obj){return MaskVisible(ObjectBounds(obj))<=.5;}
 
         static void DrawQuestionMarker(Graphics graphics, Rectangle bounds)
         {

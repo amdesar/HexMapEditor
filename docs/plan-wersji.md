@@ -27,6 +27,7 @@
 | 0.13.2 | Nazwane oryginały bezpośrednio w folderach kategorii Library, z odczytem dotychczasowych źródeł |
 | 0.13.3 | Metadane grafik w podfolderach kategorii i kontrola blokady konkretnego EXE podczas aktualizacji |
 | 0.13.4 | Szybkie warstwy Widoku, lokalna historia pól narzędzi, panel aktualizacji, kontrast, tło ze schowka, O programie i upuszczanie map |
+| 0.13.5 | AltGr w opisie heksa, wagi wyglądu, wyszukiwanie i sortowanie w bibliotekach grafik, selektywna gumka i poprawki odbiorcze |
 | 0.13.x | Końcowa stabilizacja i uzgodnione testy |
 | 1.0.0 | Wyłącznie oznaczenia wersji, bez nowych zmian funkcjonalnych/stylistycznych |
 

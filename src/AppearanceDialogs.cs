@@ -69,6 +69,7 @@ namespace HexMapEditor
             {
                 foreach (Control child in tiles.Controls.Cast<Control>().ToArray()) child.Dispose();
                 var needed = new HashSet<string>(Fills.Where(f => f.Graphic != null||f.Gradient!=null).Select(f => f.Graphic!=null?f.GraphicId:"gradient:"+MapLogic.Serializer().Serialize(f.Gradient)));
+                int totalWeight=Fills.Sum(f=>f.Weight);
                 foreach (var key in thumbnails.Keys.Where(k => !needed.Contains(k)).ToArray()) { thumbnails[key].Dispose(); thumbnails.Remove(key); }
                 for (int i = 0; i < Fills.Count; i++)
                 {
@@ -77,6 +78,8 @@ namespace HexMapEditor
                     var choose = new TerrainChoiceButton { Dock = DockStyle.Fill, BackColor = ColorTranslator.FromHtml(fill.Color), ForeColor = Color.White,
                         Text = fill.Graphic == null ? fill.Color : "", AccessibleName = "Wariant " + (i + 1), FlatStyle = FlatStyle.Flat };
                     tile.Controls.Add(choose);
+                    var share=new Label{Text=FillRules.Share(fill,totalWeight),Dock=DockStyle.Bottom,Height=19,TextAlign=ContentAlignment.MiddleCenter};
+                    share.Click+=(s,e)=>Edit(index);tile.Controls.Add(share);share.BringToFront();
                     if (fill.Gradient != null)
                     {
                         string key="gradient:"+MapLogic.Serializer().Serialize(fill.Gradient);Bitmap image;if(!thumbnails.TryGetValue(key,out image))thumbnails.Add(key,image=GradientRules.Thumbnail(fill.Gradient,new Size(88,88)));choose.FillImage=image;choose.Text="";
@@ -179,14 +182,16 @@ namespace HexMapEditor
         int Kind{get{return graphic.Checked?2:gradient.Checked?1:0;}}
         internal FillVariantDialog(FillVariant initial,bool flat):base("Wariant wyglądu",300)
         {
-            ClientSize=new Size(460,300);
+            ClientSize=new Size(460,334);
             draft=initial.Copy();var choices=new FlowLayoutPanel{WrapContents=false};choices.Controls.AddRange(new Control[]{solid,gradient,graphic});
             var clipboard=new EditorButton{Text="Schowek",Width=72};
             var library=new EditorButton{Text="Biblioteka",Width=82};var import=new EditorButton{Text="Plik",Width=53};
             crop.Text="Kadruj";graphicButtons.Controls.AddRange(new Control[]{clipboard,import,library,crop});
             Row(0,"Typ",choices,true);var value=new Panel();value.Controls.AddRange(new Control[]{color,graphicButtons});color.Dock=graphicButtons.Dock=DockStyle.Fill;Row(1,"Kolor",value,true);valueLabel=(Label)Layout.GetControlFromPosition(0,1);
-            preview=new TerrainPreview(flat){Dock=DockStyle.Fill};Layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));Layout.Controls.Add(preview,0,2);Layout.SetColumnSpan(preview,3);
-            Buttons(3,()=>{if(Kind==2&&draft.Graphic==null)return;if(Kind!=2){draft.Graphic=null;draft.GraphicId=null;}if(Kind!=1)draft.Gradient=null;Result=draft.Copy();DialogResult=DialogResult.OK;});
+            var weight=new ScrubNumber{Minimum=1,Maximum=200,Value=initial.Weight,Width=80,UseLocalHistory=true,AccessibleName="Waga wariantu"};
+            Row(2,"Waga (1–200)",weight,false);
+            preview=new TerrainPreview(flat){Dock=DockStyle.Fill};Layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));Layout.Controls.Add(preview,0,3);Layout.SetColumnSpan(preview,3);
+            Buttons(4,()=>{if(Kind==2&&draft.Graphic==null)return;weight.CommitText();draft.Weight=(int)weight.Value;if(Kind!=2){draft.Graphic=null;draft.GraphicId=null;}if(Kind!=1)draft.Gradient=null;Result=draft.Copy();DialogResult=DialogResult.OK;});
             color.Click+=(s,e)=>{using(var picker=new PaintPickerDialog(ColorTranslator.FromHtml(draft.Color),draft.Gradient,false,flat,Kind==1))if(picker.ShowDialog(this)==DialogResult.OK){draft.Color=picker.Hex;draft.Gradient=picker.Gradient;if(picker.Gradient==null)solid.Checked=true;else gradient.Checked=true;RefreshPreview();}};
             clipboard.Click+=(s,e)=>Pick(TerrainGraphicInput.Clipboard);
             library.Click+=(s,e)=>Pick(TerrainGraphicInput.Library);import.Click+=(s,e)=>Pick(TerrainGraphicInput.File);crop.Click+=(s,e)=>{if(draft.Graphic==null||EditCrop==null)return;var next=EditCrop(this,draft.Graphic);if(next!=null){draft.Graphic=next;draft.GraphicId=next.Id;RefreshPreview();}};

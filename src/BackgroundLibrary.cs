@@ -141,16 +141,19 @@ namespace HexMapEditor
                 picker.Rename=entry=>{using(var d=new NameDialog("Zmień nazwę tła",entry.Name))if(d.ShowDialog(picker)==DialogResult.OK&&d.Value!=entry.Name)CommitBackground(null,entry,BackgroundLibrary.Prepare(LibraryPaths.Backgrounds,entry,d.Value,entry.Settings,backgroundLibrary),false);};
                 picker.Delete=entry=>{if(MessageBox.Show(picker,"Usunąć tło „"+entry.Name+"” z biblioteki? Mapy zachowają własne dane. Bez Kosza; Undo tylko w zachowanej historii sesji (300 wpisów, do Nowa/Otwórz lub zakończenia programu).","Usuń tło z biblioteki",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)CommitBackground(null,entry,null,false);};
                 picker.Edit=entry=>{using(var d=new BackgroundDialog(entry.Settings,canvas.ClientSize)){d.LibraryOnly=true;d.ChooseLibrary=()=>ChooseBackground(d);d.SaveAndApply=(settings,id)=>AcceptBackground(d,settings,id,false);d.ShowDialog(picker);}};
-                picker.ImportClipboard=()=>{
-                    using(var dialog=new BackgroundDialog(null,canvas.ClientSize){LibraryOnly=true})
-                    {
-                        if(!dialog.ImportClipboard(picker))return;
-                        dialog.ChooseLibrary=()=>ChooseBackground(dialog);
-                        dialog.SaveAndApply=(settings,id)=>AcceptBackground(dialog,settings,id,false);
-                        dialog.ShowDialog(picker);
-                    }
-                };
+                picker.ImportClipboard=()=>ImportBackgroundFromPicker(picker,true);
+                picker.ImportFile=()=>ImportBackgroundFromPicker(picker,false);
                 return picker.ShowDialog(owner)==DialogResult.OK?picker.Selected:null;
+            }
+        }
+        void ImportBackgroundFromPicker(BackgroundPicker picker,bool fromClipboard)
+        {
+            using(var dialog=new BackgroundDialog(null,canvas.ClientSize){LibraryOnly=true})
+            {
+                if(!(fromClipboard?dialog.ImportClipboard(picker):dialog.ImportFile(picker)))return;
+                dialog.ChooseLibrary=()=>ChooseBackground(dialog);
+                dialog.SaveAndApply=(settings,id)=>AcceptBackground(dialog,settings,id,false);
+                dialog.ShowDialog(picker);
             }
         }
     }

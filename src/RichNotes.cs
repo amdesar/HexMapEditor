@@ -292,10 +292,11 @@ namespace HexMapEditor
             dock.PreviewKeyDown += (s, e) =>
             {
                 if (new[] { Key.Left, Key.Right, Key.Up, Key.Down, Key.Home, Key.End, Key.PageUp, Key.PageDown }.Contains(e.Key) && BreakHistoryGroup != null) BreakHistoryGroup();
-                if ((Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == 0) return;
-                if (HandlePlainPasteKey(e.Key, Keyboard.Modifiers)) { e.Handled = true; return; }
-                if (e.Key == Key.S) { e.Handled = true; if (SaveRequested != null) SaveRequested((Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0); return; }
-                if (HandleHistoryKey(e.Key, Keyboard.Modifiers)) { e.Handled = true; return; }
+                var modifiers=Keyboard.Modifiers;
+                if (!AllowsControlShortcut(modifiers)) return;
+                if (HandlePlainPasteKey(e.Key, modifiers)) { e.Handled = true; return; }
+                if (e.Key == Key.S) { e.Handled = true; if (SaveRequested != null) SaveRequested((modifiers & System.Windows.Input.ModifierKeys.Shift) != 0); return; }
+                if (HandleHistoryKey(e.Key, modifiers)) { e.Handled = true; return; }
                 RoutedUICommand command = e.Key == Key.B ? EditingCommands.ToggleBold : e.Key == Key.I ? EditingCommands.ToggleItalic : e.Key == Key.U ? EditingCommands.ToggleUnderline : e.Key == Key.E ? EditingCommands.AlignCenter : e.Key == Key.L ? EditingCommands.AlignLeft : e.Key == Key.R ? EditingCommands.AlignRight : e.Key == Key.J ? EditingCommands.AlignJustify : null;
                 if (command != null) { e.Handled = true; Execute(command); }
             };
@@ -311,6 +312,11 @@ namespace HexMapEditor
             menu.Items.Add(new Separator()); menu.Items.Add(PlainPasteItem); PlainPasteItem.Click += (s, e) => Paste(true);
             menu.Opened += (s, e) => { try { PlainPasteItem.IsEnabled = HasPlainClipboardText(); } catch { PlainPasteItem.IsEnabled = false; } }; Box.ContextMenu = menu;
             UpdateTools();
+        }
+        internal static bool AllowsControlShortcut(System.Windows.Input.ModifierKeys modifiers)
+        {
+            const System.Windows.Input.ModifierKeys control=System.Windows.Input.ModifierKeys.Control;
+            return modifiers==control||modifiers==(control|System.Windows.Input.ModifierKeys.Shift);
         }
         void Track(Button button,DependencyProperty property,object value)
         {toolStates.Add(button,()=>Equals(Box.Selection.GetPropertyValue(property),value));}

@@ -14,6 +14,7 @@ namespace HexMapEditor
             internal MapData Document;internal List<InkStroke> Expected,Before;
             internal long Revision;
             internal InkEraseGesture Preview;
+            internal EditAction Selective;
             internal CancellationTokenSource Cancellation=new CancellationTokenSource();
             internal Stopwatch Clock=Stopwatch.StartNew();
         }
@@ -40,11 +41,11 @@ namespace HexMapEditor
             if(inkProcessingLabel!=null)inkProcessingLabel.Text="Anulowanie… Wynik nie zostanie zastosowany.";
             statusLabel.Text="Anulowanie wymazywania…";
         }
-        void StartInkCommit(List<InkStroke> before,InkEraseGesture gesture)
+        void StartInkCommit(List<InkStroke> before,InkEraseGesture gesture,EditAction selective)
         {
             if(pendingInk!=null)throw new InvalidOperationException("Poprzednia operacja gumki nie została zakończona.");
             ReleaseInkHandoff();LastInkCommitTiming=null;var watch=Stopwatch.StartNew();
-            var job=new PendingInkCommit{Document=map,Expected=map.Ink,Before=before,Revision=documentRevision,Preview=gesture};pendingInk=job;inkJobCount++;
+            var job=new PendingInkCommit{Document=map,Expected=map.Ink,Before=before,Revision=documentRevision,Preview=gesture,Selective=selective};pendingInk=job;inkJobCount++;
             var work=gesture.Capture(before);
             var retained=new HashSet<InkStroke>(before);
             foreach(var a in undo){if(a.BeforeInk!=null)retained.UnionWith(a.BeforeInk);if(a.AfterInk!=null)retained.UnionWith(a.AfterInk);}
@@ -93,16 +94,31 @@ namespace HexMapEditor
                     else if(s.Gradient!=null){s.Points=original.Points;s.Gradient=original.Gradient;s.ColorTrace=original.ColorTrace;}
                     after.Add(s);
                 }
-                map.Ink=after;
-                var history=Stopwatch.StartNew();PushAction(new EditAction{Label="Gumka",BeforeInk=job.Before,AfterInk=after});
-                dirty=savedState.CheckInkSerialized(result.Serialized);UpdateCaption();result.Timing.History=history.Elapsed.TotalMilliseconds;
-                InkLayerRenderer.Clear();inkHandoff=job.Preview;inkHandoffResult=after;
+                var history=Stopwatch.StartNew();
+                if(job.Selective==null)
+                {
+                    map.Ink=after;PushAction(new EditAction{Label="Gumka",BeforeInk=job.Before,AfterInk=after});
+                    dirty=savedState.CheckInkSerialized(result.Serialized);UpdateCaption();
+                }
+                else
+                {
+                    job.Selective.BeforeInk=job.Before;job.Selective.AfterInk=after;
+                    CommitSelectiveErase(job.Selective);
+                }
+                result.Timing.History=history.Elapsed.TotalMilliseconds;
+                InkLayerRenderer.Clear();inkHandoff=job.Preview;inkHandoffResult=map.Ink;
             }
-            else {if(current)map.Ink=job.Before;job.Preview.Dispose();}
+            else
+            {
+                if(current)map.Ink=job.Before;
+                job.Preview.Dispose();
+                if(current&&!cancelled&&error==null)CommitSelectiveErase(job.Selective);
+            }
             if(ObserveInkHandoff!=null)ObserveInkHandoff();
             pendingInk=null;job.Cancellation.Dispose();if(inkProcessing!=null&&inkProcessing.Visible)inkProcessing.Hide();
+            UpdateCommandState();
             if(result!=null){result.Timing.ApplyUI=watch.Elapsed.TotalMilliseconds;LastInkCommitTiming=result.Timing;}
-            statusLabel.Text=cancelled?"Wymazywanie anulowane — rysunki bez zmian.":!current?"Stan dokumentu zmienił się — spóźniony wynik gumki odrzucono.":error!=null?"Nie można wymazać: "+error.Message:"Wymazywanie zakończone.";
+            statusLabel.Text=cancelled?"Wymazywanie anulowane — mapa bez zmian.":!current?"Stan dokumentu zmienił się — spóźniony wynik gumki odrzucono.":error!=null?"Nie można wymazać: "+error.Message:"Wymazywanie zakończone.";
             canvas.Invalidate();
         }
     }

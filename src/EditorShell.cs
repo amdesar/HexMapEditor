@@ -109,6 +109,7 @@ namespace HexMapEditor
         {
             EndCanvasGesture(true);if(currentTool!=tool)ClearPointerContext(); currentTool = tool;
             foreach (var pair in toolButtons) { ChoiceStyle.Apply(pair.Value,pair.Key==tool); pair.Value.FlatAppearance.BorderSize = pair.Key == tool ? 3 : 1; pair.Value.AccessibleDescription = pair.Key == tool ? "Aktywne" : "Nieaktywne"; }
+            UpdateEraserHint();
             UpdateBrushAvailability();
         }
         void BuildDetailsPanel()

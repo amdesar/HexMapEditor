@@ -42,19 +42,29 @@ namespace HexMapEditor
             if(gestureTool!=EditorTool.Stylus&&gestureTool!=EditorTool.Eraser)return false;
             if(e.Button==MouseButtons.Right){if(gestureTool==EditorTool.Stylus){using(var g=canvas.CreateGraphics()){pointerDpiFactor=g.DpiX/96f;pointerDiameter=18*pointerDpiFactor+2;}AgePointer();pointerActive=true;((InkCanvas)canvas).PointerHidden=true;PointerAt(e.Location);}else ClearInk();return true;}
             if(e.Button!=MouseButtons.Left)return true;
+            inkGestureSize=InkWorldSize();inkError=null;inkPrevious=null;
+            if(gestureTool==EditorTool.Eraser&&(eraserTargets&~EraserTargets.Ink)!=0)
+            {
+                eraserSelection=new EraserSelection(map,eraserTargets,inkGestureSize/2);
+                if(!eraserTargets.HasFlag(EraserTargets.Ink)){MoveInk(e.Location);return true;}
+            }
             InkGeometry.Validate(map.Ink);inkBasePointCost=map.Ink.Sum(s=>InkGeometry.PointCost(s));
-            inkGestureSize=InkWorldSize();inkCycleWorld=300.0*inkGestureSize/inkToolSize;inkBefore=new List<InkStroke>(map.Ink);map.Ink=new List<InkStroke>(map.Ink);inkError=null;inkPrevious=null;if(gestureTool==EditorTool.Eraser)eraseGesture=new InkEraseGesture(inkGestureSize,inkBefore);MoveInk(e.Location);return true;
+            inkCycleWorld=300.0*inkGestureSize/inkToolSize;inkBefore=new List<InkStroke>(map.Ink);map.Ink=new List<InkStroke>(map.Ink);if(gestureTool==EditorTool.Eraser)eraseGesture=new InkEraseGesture(inkGestureSize,inkBefore);MoveInk(e.Location);return true;
         }
         void MoveInk(Point point)
         {
             inkCursor=point;
             if(gestureTool==EditorTool.Stylus&&gestureButton==MouseButtons.Right){PointerAt(point);return;}
-            if(inkBefore==null||inkError!=null)return;
-            if(!canvas.ClientRectangle.Contains(point)){inkPrevious=null;if(activeStroke!=null)inkBasePointCost+=activeStroke.Points.Count;activeStroke=null;return;}
+            if((inkBefore==null&&eraserSelection==null)||inkError!=null)return;
+            if(!canvas.ClientRectangle.Contains(point)){inkPrevious=null;if(eraserSelection!=null)eraserSelection.BreakPath();if(activeStroke!=null)inkBasePointCost+=activeStroke.Points.Count;activeStroke=null;return;}
             var p=World(point);
             try
             {
-                if(gestureTool==EditorTool.Eraser)eraseGesture.Add(inkPrevious??p,p);
+                if(gestureTool==EditorTool.Eraser)
+                {
+                    if(eraserSelection!=null)eraserSelection.Add(p);
+                    if(eraseGesture!=null)eraseGesture.Add(inkPrevious??p,p);
+                }
                 else
                 {
                     if(activeStroke==null){activeStroke=new InkStroke{Color=inkColor,Width=inkGestureSize,Gradient=inkGradient==null?null:inkGradient.Copy(),CycleWorld=inkGradient==null?0:inkCycleWorld};map.Ink.Add(activeStroke);}
@@ -64,17 +74,29 @@ namespace HexMapEditor
                 }
                 inkPrevious=p;canvas.Invalidate();
             }
-            catch(Exception ex){inkError=ex.Message;map.Ink=new List<InkStroke>(inkBefore);canvas.Invalidate();}
+            catch(Exception ex){inkError=ex.Message;if(inkBefore!=null)map.Ink=new List<InkStroke>(inkBefore);canvas.Invalidate();}
         }
         void FinishInk(bool commit)
         {
             pointerActive=false;((InkCanvas)canvas).PointerHidden=false;AgePointer();
-            if(inkBefore==null)return;
+            var selection=eraserSelection;eraserSelection=null;
+            EditAction selective=null;
+            if(commit&&inkError==null&&selection!=null)
+            {
+                try{selective=PrepareSelectiveErase(selection);}
+                catch(Exception ex){inkError=ex.Message;}
+            }
+            if(inkBefore==null)
+            {
+                if(selection!=null&&inkError!=null)statusLabel.Text="Nie można wymazać: "+inkError;
+                else CommitSelectiveErase(selective);
+                return;
+            }
             if(eraseGesture!=null)
             {
                 var source=inkBefore;var gesture=eraseGesture;inkBefore=null;eraseGesture=null;activeStroke=null;inkPrevious=null;
-                if(!commit||inkError!=null){gesture.Dispose();map.Ink=new List<InkStroke>(source);canvas.Invalidate();return;}
-                try{if(!gesture.MayAffect(source)){inkNoopCount++;gesture.Dispose();map.Ink=source;return;}StartInkCommit(source,gesture);}
+                if(!commit||inkError!=null){gesture.Dispose();map.Ink=new List<InkStroke>(source);if(inkError!=null)statusLabel.Text="Nie można wymazać: "+inkError;canvas.Invalidate();return;}
+                try{if(!gesture.MayAffect(source)){inkNoopCount++;gesture.Dispose();map.Ink=source;CommitSelectiveErase(selective);return;}StartInkCommit(source,gesture,selective);}
                 catch(Exception ex){if(pendingInk!=null)CompleteInkCommit(pendingInk,null,ex);else gesture.Dispose();map.Ink=new List<InkStroke>(source);statusLabel.Text="Nie można przygotować gumki: "+ex.Message;canvas.Invalidate();}
                 return;
             }

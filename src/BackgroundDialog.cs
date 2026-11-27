@@ -8,11 +8,11 @@ namespace HexMapEditor
     internal sealed class BackgroundDialog : DarkForm
     {
         MapBackground draft;
-        readonly BackgroundCropSurface crop = new BackgroundCropSurface { Bounds = new Rectangle(12, 58, 365, 310) };
+        readonly BackgroundCropSurface crop = new BackgroundCropSurface { Bounds = new Rectangle(12, 70, 365, 298) };
         readonly CanvasAspectPreview preview = new CanvasAspectPreview { Bounds = new Rectangle(403, 58, 365, 310) };
         readonly TrackBar opacity = Slider(0, 100, 100), saturation = Slider(0, 200, 100), blur = Slider(0, 24, 0);
         readonly Label values = new Label { Bounds = new Rectangle(15, 453, 620, 25) };
-        readonly Button remove = new EditorButton { Text = "Usuń tło", Destructive=true, Bounds = new Rectangle(286, 10, 110, 28) };
+        readonly Button remove = new EditorButton { Text = "Usuń tło", Destructive=true, Bounds = new Rectangle(455, 10, 110, 28) };
         bool updating;
         readonly Size viewport;
         Bitmap previewSource, filtered, covered;
@@ -35,16 +35,17 @@ namespace HexMapEditor
             Text = "Tło mapy"; ClientSize = new Size(780, 526); FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent; MaximizeBox = MinimizeBox = false;
             BackColor = Color.FromArgb(34, 38, 48); ForeColor = Color.WhiteSmoke; Font = new Font("Segoe UI", 9);
-            var import = new EditorButton { Text = "Z pliku…", Bounds = new Rectangle(149, 10, 125, 28) };
-            var library = new EditorButton { Text = "Z biblioteki…", Bounds = new Rectangle(12,10,125,28) };
-            var clipboard = new EditorButton { Text="Importuj ze schowka", Bounds=new Rectangle(407,10,163,28) };
+            var clipboard = new EditorButton { Text="Importuj ze schowka", Bounds=new Rectangle(12,10,163,28) };
+            var import = new EditorButton { Text = "Importuj z pliku", Bounds = new Rectangle(185,10,137,28) };
+            var library = new EditorButton { Text = "Biblioteka", Bounds = new Rectangle(332,10,113,28) };
             if (importQueue) { import.Visible = library.Visible = clipboard.Visible = remove.Visible = false; }
             library.Click+=(s,e)=>{if(ChooseLibrary==null)return;var chosen=ChooseLibrary();if(chosen==null)return;draft=chosen.Settings.Copy();draft.Source=draft.Source.Pin();draft.LibraryId=chosen.Id;ImportName=null;UpdateSettings();};
-            var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(12,39,365,19) };
+            var hint = new Label { Text = "LPM: kadr/uchwyty. MMB: przesuń cały kadr.", Bounds = new Rectangle(12,49,365,19) };
+            preview.Top=crop.Top;preview.Height=crop.Height;
             opacity.Location = new Point(12, 403); saturation.Location = new Point(272, 403); blur.Location = new Point(532, 403);
             var accept = new EditorButton { Text = "Zatwierdź", Bounds = new Rectangle(546, 484, 106, 29) };
             var cancel = new EditorButton { Text = "Anuluj", DialogResult = DialogResult.Cancel, Bounds = new Rectangle(660, 484, 106, 29) };
-            import.Click += (s, e) => Import();
+            import.Click += (s, e) => ImportFile();
             clipboard.Click+=(s,e)=>ImportClipboard();
             remove.Click += (s, e) => { draft = null; ImportName=null; UpdateSettings(); };
             crop.Changed = QueuePreview;
@@ -65,25 +66,26 @@ namespace HexMapEditor
             accept.Click += (s, e) => { if (CanAccept != null && !CanAccept())return;var result=draft==null?null:draft.Copy();if(SaveAndApply!=null&&!SaveAndApply(result,draft==null?null:draft.LibraryId))return;Result=result;DialogResult=DialogResult.OK; };
             var reset = new EditorButton { Text = "100%", Bounds = new Rectangle(462,403,58,26), AccessibleName = "Przywróć nasycenie 100%" };
             reset.Click += (s,e) => saturation.Value = 100;
-            Controls.AddRange(new Control[] { crop, preview, import, clipboard, remove, library, hint, opacity, saturation, blur, accept, cancel, values, reset,
-                new Label { Text = "Podgląd na płótnie", Bounds = new Rectangle(403,35,365,22) },
+            Controls.AddRange(new Control[] { clipboard, import, library, remove, crop, preview, hint, opacity, saturation, blur, accept, cancel, values, reset,
+                new Label { Text = "Podgląd na płótnie", Bounds = new Rectangle(403,49,365,20) },
                 new Label { Text = "Krycie", Location = new Point(12, 381), AutoSize = true },
                 new Label { Text = "Nasycenie", Location = new Point(272, 381), AutoSize = true },
                 new Label { Text = "Rozmycie", Location = new Point(532, 381), AutoSize = true } });
             AcceptButton = accept; CancelButton = cancel; UpdateSettings();
             Disposed += (s, e) => { if (preview.Image != null) preview.Image.Dispose(); if (previewSource != null) previewSource.Dispose(); if (filtered != null) filtered.Dispose(); if (covered != null) covered.Dispose(); };
         }
-        void Import()
+        internal bool ImportFile(IWin32Window owner=null)
         {
             using (var file = new OpenFileDialog { Filter = "Grafiki|*.png;*.jpg;*.jpeg;*.bmp;*.gif", RestoreDirectory = true })
             {
-                if (file.ShowDialog(this) != DialogResult.OK) return;
+                if (file.ShowDialog(owner??this) != DialogResult.OK) return false;
                 try
                 {
                     string name=Path.GetFileNameWithoutExtension(file.FileName).Trim();
                     SetImportedSource(GraphicSources.Import(file.FileName),name.Length==0?"Tło":PresetFiles.Shorten(name,200));
+                    return true;
                 }
-                catch (Exception ex) { MessageBox.Show(this, ex.Message, "Import tła", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                catch (Exception ex) { MessageBox.Show(owner??this, ex.Message, "Import tła", MessageBoxButtons.OK, MessageBoxIcon.Warning);return false; }
             }
         }
         internal bool ImportClipboard(IWin32Window owner=null)

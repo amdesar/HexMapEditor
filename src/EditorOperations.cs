@@ -108,6 +108,17 @@ namespace HexMapEditor
                 var named=map.Cells.FirstOrDefault(c=>c.Id==action.NamedCellId);
                 if(named!=null)named.Name=after?action.AfterCellName:action.BeforeCellName;
             }
+            if(action.ErasedText!=null)
+            {
+                var cells=map.Cells.ToDictionary(c=>c.Id);
+                foreach(var change in action.ErasedText)
+                {
+                    CellData cell;
+                    if(!cells.TryGetValue(change.Id,out cell))continue;
+                    change.Apply(cell,after);
+                    if(change.RemoveDescription)textHistory.RemoveDescription(cell.Id);
+                }
+            }
             InvalidateLight();
             selected = selectedId == null ? -1 : map.Cells.FindIndex(c => c.Id == selectedId); editorCellId = null;
             if (action.BeforePalette != null || action.PresetChange != null) RefreshPresetPicker();
